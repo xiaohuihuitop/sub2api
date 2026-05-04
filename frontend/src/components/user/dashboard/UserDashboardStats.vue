@@ -1,7 +1,5 @@
 <template>
-  <!-- Row 1: Core Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <!-- Balance -->
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <div v-if="!isSimple" class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
@@ -17,35 +15,33 @@
       </div>
     </div>
 
-    <!-- API Keys -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-          <Icon name="key" size="md" class="text-blue-600 dark:text-blue-400" :stroke-width="2" />
+    <div
+      v-for="subscription in displayedSubscriptions"
+      :key="subscription.id"
+      class="card p-4"
+    >
+      <div class="flex items-start gap-3">
+        <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
+          <Icon name="creditCard" size="md" class="text-primary-600 dark:text-primary-400" :stroke-width="2" />
         </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.apiKeys') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ stats?.total_api_keys || 0 }}</p>
-          <p class="text-xs text-green-600 dark:text-green-400">{{ stats?.active_api_keys || 0 }} {{ t('common.active') }}</p>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('nav.mySubscriptions') }}</p>
+          <p class="truncate text-base font-bold text-gray-900 dark:text-white">
+            {{ subscription.group?.name || `Group #${subscription.group_id}` }}
+          </p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ subscriptionSummary(subscription) }}
+          </p>
+          <p v-if="subscription.expires_at" :class="['mt-1 text-xs', expirationClass(subscription.expires_at)]">
+            {{ formatExpiration(subscription.expires_at) }}
+          </p>
+          <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('userSubscriptions.noExpiration') }}
+          </p>
         </div>
       </div>
     </div>
 
-    <!-- Today Requests -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-          <Icon name="chart" size="md" class="text-green-600 dark:text-green-400" :stroke-width="2" />
-        </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.todayRequests') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ stats?.today_requests || 0 }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.total') }}: {{ formatNumber(stats?.total_requests || 0) }}</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Today Cost -->
     <div class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
@@ -65,11 +61,7 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Row 2: Token Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <!-- Today Tokens -->
     <div class="card p-4">
       <div class="flex items-center gap-3">
         <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
@@ -82,68 +74,25 @@
         </div>
       </div>
     </div>
-
-    <!-- Total Tokens -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-          <Icon name="database" size="md" class="text-indigo-600 dark:text-indigo-400" :stroke-width="2" />
-        </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.totalTokens') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.total_tokens || 0) }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.input') }}: {{ formatTokens(stats?.total_input_tokens || 0) }} / {{ t('dashboard.output') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Performance (RPM/TPM) -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
-          <Icon name="bolt" size="md" class="text-violet-600 dark:text-violet-400" :stroke-width="2" />
-        </div>
-        <div class="flex-1">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.performance') }}</p>
-          <div class="flex items-baseline gap-2">
-            <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.rpm || 0) }}</p>
-            <span class="text-xs text-gray-500 dark:text-gray-400">RPM</span>
-          </div>
-          <div class="flex items-baseline gap-2">
-            <p class="text-sm font-semibold text-violet-600 dark:text-violet-400">{{ formatTokens(stats?.tpm || 0) }}</p>
-            <span class="text-xs text-gray-500 dark:text-gray-400">TPM</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Avg Response Time -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-rose-100 p-2 dark:bg-rose-900/30">
-          <Icon name="clock" size="md" class="text-rose-600 dark:text-rose-400" :stroke-width="2" />
-        </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.avgResponse') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.averageTime') }}</p>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { UserDashboardStats as UserStatsType } from '@/api/usage'
+import type { UserSubscription } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   stats: UserStatsType
   balance: number
   isSimple: boolean
+  subscriptions: UserSubscription[]
 }>()
+
 const { t } = useI18n()
+const displayedSubscriptions = computed(() => props.subscriptions.slice(0, 4))
 
 const formatBalance = (b: number) =>
   new Intl.NumberFormat('en-US', {
@@ -151,12 +100,56 @@ const formatBalance = (b: number) =>
     maximumFractionDigits: 2
   }).format(b)
 
-const formatNumber = (n: number) => n.toLocaleString()
 const formatCost = (c: number) => c.toFixed(4)
-const formatTokens = (t: number) => {
-  if (t >= 1_000_000) return `${(t / 1_000_000).toFixed(1)}M`
-  if (t >= 1000) return `${(t / 1000).toFixed(1)}K`
-  return t.toString()
+const formatTokens = (value: number) => {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+  return value.toString()
 }
-const formatDuration = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms.toFixed(0)}ms`
+
+function subscriptionSummary(subscription: UserSubscription): string {
+  const group = subscription.group
+
+  if (!group?.daily_limit_usd && !group?.weekly_limit_usd && !group?.monthly_limit_usd) {
+    return t('userSubscriptions.unlimited')
+  }
+
+  if (group?.monthly_limit_usd) {
+    return `$${(subscription.monthly_usage_usd || 0).toFixed(2)} / $${group.monthly_limit_usd.toFixed(2)} · ${t('userSubscriptions.monthly')}`
+  }
+
+  if (group?.weekly_limit_usd) {
+    return `$${(subscription.weekly_usage_usd || 0).toFixed(2)} / $${group.weekly_limit_usd.toFixed(2)} · ${t('userSubscriptions.weekly')}`
+  }
+
+  if (group?.daily_limit_usd) {
+    return `$${(subscription.daily_usage_usd || 0).toFixed(2)} / $${group.daily_limit_usd.toFixed(2)} · ${t('userSubscriptions.daily')}`
+  }
+
+  return t('common.active')
+}
+
+function formatExpiration(expiresAt: string): string {
+  const now = new Date()
+  const expires = new Date(expiresAt)
+  const diff = expires.getTime() - now.getTime()
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+
+  if (days < 0) return t('userSubscriptions.status.expired')
+  if (days === 0) return t('common.today')
+  if (days === 1) return t('common.tomorrow')
+  return t('userSubscriptions.daysRemaining', { days })
+}
+
+function expirationClass(expiresAt: string): string {
+  const now = new Date()
+  const expires = new Date(expiresAt)
+  const diff = expires.getTime() - now.getTime()
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+
+  if (days <= 0) return 'text-red-600 dark:text-red-400 font-medium'
+  if (days <= 3) return 'text-red-600 dark:text-red-400'
+  if (days <= 7) return 'text-orange-600 dark:text-orange-400'
+  return 'text-gray-500 dark:text-gray-400'
+}
 </script>
