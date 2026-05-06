@@ -204,6 +204,7 @@ func TestAPIContracts(t *testing.T) {
 					"key": "sk_custom_1234567890",
 					"name": "Key One",
 					"group_id": null,
+					"group_ids": null,
 					"status": "active",
 					"ip_whitelist": null,
 					"ip_blacklist": null,
@@ -253,6 +254,7 @@ func TestAPIContracts(t *testing.T) {
 							"key": "sk_custom_1234567890",
 							"name": "Key One",
 							"group_id": null,
+							"group_ids": null,
 							"status": "active",
 							"ip_whitelist": null,
 							"ip_blacklist": null,
@@ -2051,6 +2053,72 @@ func (r *stubApiKeyRepo) ListKeysByUserID(ctx context.Context, userID int64) ([]
 
 func (r *stubApiKeyRepo) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (r *stubApiKeyRepo) ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error {
+	key, ok := r.byID[keyID]
+	if !ok {
+		return service.ErrAPIKeyNotFound
+	}
+	key.AllowedGroupIDs = append([]int64(nil), groupIDs...)
+	if len(groupIDs) == 0 {
+		key.AllowedGroups = nil
+		key.Group = nil
+		key.GroupID = nil
+	} else {
+		groupByID := make(map[int64]service.Group, len(key.AllowedGroups)+1)
+		for _, group := range key.AllowedGroups {
+			groupByID[group.ID] = group
+		}
+		if key.Group != nil {
+			groupByID[key.Group.ID] = *key.Group
+		}
+		orderedGroups := make([]service.Group, 0, len(groupIDs))
+		for _, groupID := range groupIDs {
+			if group, exists := groupByID[groupID]; exists {
+				orderedGroups = append(orderedGroups, group)
+			}
+		}
+		key.AllowedGroups = orderedGroups
+		primaryGroupID := groupIDs[0]
+		key.GroupID = &primaryGroupID
+		key.Group = nil
+		for i := range key.AllowedGroups {
+			if key.AllowedGroups[i].ID == primaryGroupID {
+				group := key.AllowedGroups[i]
+				key.Group = &group
+				break
+			}
+		}
+	}
+	clone := *key
+	r.byID[keyID] = &clone
+	r.byKey[clone.Key] = &clone
+	return nil
+}
+
+func (r *stubApiKeyRepo) ListAllowedGroups(ctx context.Context, keyID int64) ([]service.Group, error) {
+	key, ok := r.byID[keyID]
+	if !ok {
+		return nil, service.ErrAPIKeyNotFound
+	}
+	if len(key.AllowedGroupIDs) == 0 {
+		return append([]service.Group(nil), key.AllowedGroups...), nil
+	}
+	groupByID := make(map[int64]service.Group, len(key.AllowedGroups)+1)
+	for _, group := range key.AllowedGroups {
+		groupByID[group.ID] = group
+	}
+	if key.Group != nil {
+		groupByID[key.Group.ID] = *key.Group
+	}
+	orderedGroups := make([]service.Group, 0, len(key.AllowedGroupIDs))
+	for _, groupID := range key.AllowedGroupIDs {
+		if group, exists := groupByID[groupID]; exists {
+			orderedGroups = append(orderedGroups, group)
+		}
+	}
+	return orderedGroups, nil
 }
 
 func (r *stubApiKeyRepo) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {

@@ -166,6 +166,12 @@ func (s *apiKeyRepoStubForGroupUpdate) ListKeysByUserID(context.Context, int64) 
 func (s *apiKeyRepoStubForGroupUpdate) ListKeysByGroupID(context.Context, int64) ([]string, error) {
 	panic("unexpected")
 }
+func (s *apiKeyRepoStubForGroupUpdate) ReplaceAllowedGroups(context.Context, int64, []int64) error {
+	panic("unexpected")
+}
+func (s *apiKeyRepoStubForGroupUpdate) ListAllowedGroups(context.Context, int64) ([]Group, error) {
+	panic("unexpected")
+}
 func (s *apiKeyRepoStubForGroupUpdate) IncrementQuotaUsed(context.Context, int64, float64) (float64, error) {
 	panic("unexpected")
 }

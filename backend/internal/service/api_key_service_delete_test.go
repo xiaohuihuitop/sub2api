@@ -124,6 +124,14 @@ func (s *apiKeyRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) (
 	panic("unexpected ListKeysByGroupID call")
 }
 
+func (s *apiKeyRepoStub) ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error {
+	panic("unexpected ReplaceAllowedGroups call")
+}
+
+func (s *apiKeyRepoStub) ListAllowedGroups(ctx context.Context, keyID int64) ([]Group, error) {
+	panic("unexpected ListAllowedGroups call")
+}
+
 func (s *apiKeyRepoStub) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {
 	panic("unexpected IncrementQuotaUsed call")
 }

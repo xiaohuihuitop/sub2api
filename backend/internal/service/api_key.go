@@ -44,6 +44,8 @@ type APIKey struct {
 	UpdatedAt           time.Time
 	User                *User
 	Group               *Group
+	AllowedGroupIDs     []int64
+	AllowedGroups       []Group
 
 	// Quota fields
 	Quota     float64    // Quota limit in USD (0 = unlimited)

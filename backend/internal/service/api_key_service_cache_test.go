@@ -102,6 +102,14 @@ func (s *authRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) ([]
 	return s.listKeysByGroupID(ctx, groupID)
 }
 
+func (s *authRepoStub) ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error {
+	panic("unexpected ReplaceAllowedGroups call")
+}
+
+func (s *authRepoStub) ListAllowedGroups(ctx context.Context, keyID int64) ([]Group, error) {
+	panic("unexpected ListAllowedGroups call")
+}
+
 func (s *authRepoStub) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {
 	panic("unexpected IncrementQuotaUsed call")
 }
@@ -269,6 +277,67 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesMessagesDispatchModelConfig(t 
 	require.NotNil(t, roundTrip)
 	require.NotNil(t, roundTrip.Group)
 	require.Equal(t, apiKey.Group.MessagesDispatchModelConfig, roundTrip.Group.MessagesDispatchModelConfig)
+}
+
+func TestAPIKeyService_SnapshotRoundTrip_PreservesAllowedGroups(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{})
+	primaryID := int64(9)
+	apiKey := &APIKey{
+		ID:              1,
+		UserID:          2,
+		GroupID:         &primaryID,
+		Key:             "k-roundtrip-groups",
+		Status:          StatusActive,
+		AllowedGroupIDs: []int64{9, 11},
+		AllowedGroups: []Group{
+			{
+				ID:               9,
+				Name:             "subscription",
+				Platform:         PlatformAnthropic,
+				Status:           StatusActive,
+				Hydrated:         true,
+				SubscriptionType: SubscriptionTypeSubscription,
+				RateMultiplier:   1,
+				DailyLimitUSD:    testPtrFloat64(5),
+			},
+			{
+				ID:               11,
+				Name:             "balance",
+				Platform:         PlatformAnthropic,
+				Status:           StatusActive,
+				Hydrated:         true,
+				SubscriptionType: SubscriptionTypeStandard,
+				RateMultiplier:   1,
+			},
+		},
+		User: &User{
+			ID:          2,
+			Status:      StatusActive,
+			Role:        RoleUser,
+			Balance:     10,
+			Concurrency: 3,
+		},
+		Group: &Group{
+			ID:               9,
+			Name:             "subscription",
+			Platform:         PlatformAnthropic,
+			Status:           StatusActive,
+			Hydrated:         true,
+			SubscriptionType: SubscriptionTypeSubscription,
+			RateMultiplier:   1,
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	roundTrip := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+
+	require.NotNil(t, roundTrip)
+	require.Equal(t, []int64{9, 11}, roundTrip.AllowedGroupIDs)
+	require.Len(t, roundTrip.AllowedGroups, 2)
+	require.Equal(t, int64(9), roundTrip.AllowedGroups[0].ID)
+	require.Equal(t, SubscriptionTypeSubscription, roundTrip.AllowedGroups[0].SubscriptionType)
+	require.Equal(t, int64(11), roundTrip.AllowedGroups[1].ID)
+	require.Equal(t, SubscriptionTypeStandard, roundTrip.AllowedGroups[1].SubscriptionType)
 }
 
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {

@@ -60,6 +60,7 @@ export async function getById(id: number): Promise<ApiKey> {
 export async function create(
   name: string,
   groupId?: number | null,
+  groupIds?: number[],
   customKey?: string,
   ipWhitelist?: string[],
   ipBlacklist?: string[],
@@ -68,6 +69,9 @@ export async function create(
   rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number }
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
+  if (groupIds && groupIds.length > 0) {
+    payload.group_ids = groupIds
+  }
   if (groupId !== undefined) {
     payload.group_id = groupId
   }

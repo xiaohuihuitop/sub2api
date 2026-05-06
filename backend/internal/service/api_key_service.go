@@ -68,6 +68,8 @@ type APIKeyRepository interface {
 	CountByGroupID(ctx context.Context, groupID int64) (int64, error)
 	ListKeysByUserID(ctx context.Context, userID int64) ([]string, error)
 	ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error)
+	ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error
+	ListAllowedGroups(ctx context.Context, keyID int64) ([]Group, error)
 
 	// Quota methods
 	IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error)
@@ -151,6 +153,7 @@ type APIKeyAuthCacheInvalidator interface {
 type CreateAPIKeyRequest struct {
 	Name        string   `json:"name"`
 	GroupID     *int64   `json:"group_id"`
+	GroupIDs    []int64  `json:"group_ids"`
 	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
 	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
 	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
@@ -169,6 +172,7 @@ type CreateAPIKeyRequest struct {
 type UpdateAPIKeyRequest struct {
 	Name        *string  `json:"name"`
 	GroupID     *int64   `json:"group_id"`
+	GroupIDs    []int64  `json:"group_ids"`
 	Status      *string  `json:"status"`
 	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单（空数组清空）
 	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单（空数组清空）
@@ -347,17 +351,15 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 验证分组权限（如果指定了分组）
-	if req.GroupID != nil {
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-
-		// 检查用户是否可以绑定该分组
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
+	groupIDs := normalizeAPIKeyGroupIDs(req.GroupIDs, req.GroupID)
+	allowedGroups, err := s.validateAPIKeyAllowedGroups(ctx, user, groupIDs)
+	if err != nil {
+		return nil, err
+	}
+	var primaryGroupID *int64
+	if len(groupIDs) > 0 {
+		id := groupIDs[0]
+		primaryGroupID = &id
 	}
 
 	var key string
@@ -400,7 +402,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		UserID:      userID,
 		Key:         key,
 		Name:        req.Name,
-		GroupID:     req.GroupID,
+		GroupID:     primaryGroupID,
 		Status:      StatusActive,
 		IPWhitelist: req.IPWhitelist,
 		IPBlacklist: req.IPBlacklist,
@@ -419,6 +421,14 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	if err := s.apiKeyRepo.Create(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
+	}
+	if err := s.apiKeyRepo.ReplaceAllowedGroups(ctx, apiKey.ID, groupIDs); err != nil {
+		return nil, fmt.Errorf("replace api key allowed groups: %w", err)
+	}
+	apiKey.AllowedGroupIDs = groupIDs
+	apiKey.AllowedGroups = allowedGroups
+	if len(allowedGroups) > 0 {
+		apiKey.Group = &allowedGroups[0]
 	}
 
 	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
@@ -541,23 +551,26 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.Name = *req.Name
 	}
 
-	if req.GroupID != nil {
-		// 验证分组权限
+	if req.GroupID != nil || len(req.GroupIDs) > 0 {
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
-
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
+		groupIDs := normalizeAPIKeyGroupIDs(req.GroupIDs, req.GroupID)
+		allowedGroups, err := s.validateAPIKeyAllowedGroups(ctx, user, groupIDs)
 		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
+			return nil, err
 		}
-
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
+		apiKey.AllowedGroupIDs = groupIDs
+		apiKey.AllowedGroups = allowedGroups
+		if len(groupIDs) > 0 {
+			id := groupIDs[0]
+			apiKey.GroupID = &id
+			apiKey.Group = &allowedGroups[0]
+		} else {
+			apiKey.GroupID = nil
+			apiKey.Group = nil
 		}
-
-		apiKey.GroupID = req.GroupID
 	}
 
 	if req.Status != nil {
@@ -623,6 +636,11 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 	if err := s.apiKeyRepo.Update(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("update api key: %w", err)
+	}
+	if req.GroupID != nil || len(req.GroupIDs) > 0 {
+		if err := s.apiKeyRepo.ReplaceAllowedGroups(ctx, apiKey.ID, apiKey.AllowedGroupIDs); err != nil {
+			return nil, fmt.Errorf("replace api key allowed groups: %w", err)
+		}
 	}
 
 	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
