@@ -1,5 +1,15 @@
 <template>
-  <main class="page">
+  <div v-if="homeContent" class="custom-home-content">
+    <iframe
+      v-if="isHomeContentUrl"
+      :src="homeContentTrimmed"
+      class="custom-home-iframe"
+      allowfullscreen
+    ></iframe>
+    <div v-else v-html="homeContent"></div>
+  </div>
+
+  <main v-else class="page">
     <section class="hero">
       <div class="badge">Code Token</div>
       <h1>Code Token</h1>
@@ -31,7 +41,7 @@
             若你已经登录，点击下方按钮会自动跳转到控制台页面。
           </p>
           <div class="card-links console-links">
-            <a class="btn btn-primary" href="/login">进入控制台</a>
+            <a class="btn btn-primary" :href="dashboardEntryPath">进入控制台</a>
           </div>
         </article>
       </div>
@@ -114,7 +124,85 @@ base_url = "https://api.xhhtop.top/v1"</code></pre>
   </main>
 </template>
 
+<script setup lang="ts">
+import { computed, onMounted } from 'vue'
+import { useAuthStore, useAppStore } from '@/stores'
+
+const authStore = useAuthStore()
+const appStore = useAppStore()
+
+const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
+const homeContentTrimmed = computed(() => homeContent.value.trim())
+const isHomeContentUrl = computed(() => {
+  return (
+    homeContentTrimmed.value.startsWith('http://') ||
+    homeContentTrimmed.value.startsWith('https://')
+  )
+})
+
+const dashboardEntryPath = computed(() => {
+  if (!authStore.isAuthenticated) return '/login'
+  return authStore.isAdmin ? '/admin/dashboard' : '/dashboard'
+})
+
+onMounted(() => {
+  authStore.checkAuth()
+
+  if (!appStore.publicSettingsLoaded) {
+    appStore.fetchPublicSettings()
+  }
+})
+</script>
+
 <style scoped>
+:global(:root) {
+  color-scheme: light dark;
+  --bg: #f5f7fb;
+  --bg-soft: #edf2f8;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-strong: rgba(255, 255, 255, 0.96);
+  --text: #0f172a;
+  --muted: #526076;
+  --line: rgba(15, 23, 42, 0.1);
+  --accent: #0f766e;
+  --accent-2: #2563eb;
+  --accent-soft: rgba(15, 118, 110, 0.1);
+  --shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.06);
+  --code-bg: #ebf1f8;
+  --code-text: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(:root) {
+    --bg: #09111f;
+    --bg-soft: #0d1729;
+    --panel: rgba(15, 23, 42, 0.8);
+    --panel-strong: rgba(15, 23, 42, 0.94);
+    --text: #e8eef8;
+    --muted: #9aa8bc;
+    --line: rgba(148, 163, 184, 0.16);
+    --accent: #34d399;
+    --accent-2: #60a5fa;
+    --accent-soft: rgba(52, 211, 153, 0.12);
+    --shadow: 0 30px 80px rgba(0, 0, 0, 0.32);
+    --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.24);
+    --code-bg: #0f172a;
+    --code-text: #dbe7f5;
+  }
+}
+
+.custom-home-content {
+  min-height: 100vh;
+}
+
+.custom-home-iframe {
+  width: 100%;
+  height: 100vh;
+  border: 0;
+  display: block;
+}
+
 :global(html) {
   scroll-behavior: smooth;
 }

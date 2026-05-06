@@ -108,7 +108,7 @@ describe('HomeView', () => {
     })
   })
 
-  it('未登录时展示站点名、简介、套餐和登录控制台入口', async () => {
+  it('未登录时展示固定首页、套餐和登录控制台入口', async () => {
     const router = createTestRouter()
     await router.push('/')
     await router.isReady()
@@ -117,13 +117,13 @@ describe('HomeView', () => {
       global: { plugins: [router] }
     })
 
-    expect(wrapper.text()).toContain('Sub2API')
-    expect(wrapper.text()).toContain('简单、直接、可用')
+    expect(wrapper.text()).toContain('Code Token')
+    expect(wrapper.text()).toContain('稳定&流畅的AI编程体验。。。')
     expect(wrapper.text()).toContain('套餐')
     expect(wrapper.text()).toContain('控制台')
     expect(wrapper.text()).toContain('购买套餐')
-    expect(wrapper.text()).toContain('兑换套餐')
-    expect(wrapper.text()).toContain('登录控制台')
+    expect(wrapper.text()).toContain('兑换入口')
+    expect(wrapper.text()).toContain('进入控制台')
   })
 
   it('未登录时控制台入口指向 /login，兑换入口指向 /redeem', async () => {
@@ -188,6 +188,23 @@ describe('HomeView', () => {
     })
 
     expect(wrapper.find('.custom-home').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('购买套餐')
+  })
+
+  it('home_content 是链接时使用 iframe 模式', async () => {
+    appState.cachedPublicSettings.home_content = 'https://example.com/home'
+
+    const router = createTestRouter()
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(HomeView, {
+      global: { plugins: [router] }
+    })
+
+    const iframe = wrapper.find('iframe')
+    expect(iframe.exists()).toBe(true)
+    expect(iframe.attributes('src')).toBe('https://example.com/home')
     expect(wrapper.text()).not.toContain('购买套餐')
   })
 })
