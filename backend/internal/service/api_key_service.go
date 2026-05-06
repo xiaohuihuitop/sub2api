@@ -172,7 +172,7 @@ type CreateAPIKeyRequest struct {
 type UpdateAPIKeyRequest struct {
 	Name        *string  `json:"name"`
 	GroupID     *int64   `json:"group_id"`
-	GroupIDs    []int64  `json:"group_ids"`
+	GroupIDs    *[]int64 `json:"group_ids"`
 	Status      *string  `json:"status"`
 	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单（空数组清空）
 	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单（空数组清空）
@@ -551,12 +551,15 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.Name = *req.Name
 	}
 
-	if req.GroupID != nil || len(req.GroupIDs) > 0 {
+	if req.GroupID != nil || req.GroupIDs != nil {
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
-		groupIDs := normalizeAPIKeyGroupIDs(req.GroupIDs, req.GroupID)
+		groupIDs := normalizeAPIKeyGroupIDs(nil, req.GroupID)
+		if req.GroupIDs != nil {
+			groupIDs = normalizeAPIKeyGroupIDs(*req.GroupIDs, req.GroupID)
+		}
 		allowedGroups, err := s.validateAPIKeyAllowedGroups(ctx, user, groupIDs)
 		if err != nil {
 			return nil, err
@@ -637,7 +640,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	if err := s.apiKeyRepo.Update(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("update api key: %w", err)
 	}
-	if req.GroupID != nil || len(req.GroupIDs) > 0 {
+	if req.GroupID != nil || req.GroupIDs != nil {
 		if err := s.apiKeyRepo.ReplaceAllowedGroups(ctx, apiKey.ID, apiKey.AllowedGroupIDs); err != nil {
 			return nil, fmt.Errorf("replace api key allowed groups: %w", err)
 		}

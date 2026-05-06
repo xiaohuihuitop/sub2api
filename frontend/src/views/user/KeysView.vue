@@ -1211,9 +1211,6 @@ const loadApiKeys = async () => {
 const loadGroups = async () => {
   try {
     groups.value = await userGroupsAPI.getAvailable()
-    if (!showEditModal.value && !showCreateModal.value && formData.value.group_ids.length === 0) {
-      formData.value.group_ids = groups.value.map(group => group.id)
-    }
   } catch (error) {
     console.error('Failed to load groups:', error)
   }
@@ -1308,11 +1305,6 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
-  if (formData.value.group_ids.length === 0) {
-    appStore.showError(t('keys.groupRequired'))
-    return
-  }
-
   // Validate custom key if enabled
   if (!showEditModal.value && formData.value.use_custom_key) {
     if (!formData.value.custom_key) {
@@ -1359,15 +1351,17 @@ const handleSubmit = async () => {
     rate_limit_1d: formData.value.rate_limit_1d && formData.value.rate_limit_1d > 0 ? formData.value.rate_limit_1d : 0,
     rate_limit_7d: formData.value.rate_limit_7d && formData.value.rate_limit_7d > 0 ? formData.value.rate_limit_7d : 0,
   } : { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }
+  const availableGroupIds = new Set(groups.value.map(group => group.id))
+  const selectedGroupIds = formData.value.group_ids.filter(groupId => availableGroupIds.has(groupId))
 
   submitting.value = true
   try {
-    const primaryGroupId = formData.value.group_ids[0] ?? null
+    const primaryGroupId = selectedGroupIds[0] ?? null
     if (showEditModal.value && selectedKey.value) {
       await keysAPI.update(selectedKey.value.id, {
         name: formData.value.name,
         group_id: primaryGroupId,
-        group_ids: formData.value.group_ids,
+        group_ids: selectedGroupIds,
         status: formData.value.status,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
@@ -1383,7 +1377,7 @@ const handleSubmit = async () => {
       await keysAPI.create(
         formData.value.name,
         primaryGroupId,
-        formData.value.group_ids,
+        selectedGroupIds,
         customKey,
         ipWhitelist,
         ipBlacklist,
@@ -1434,7 +1428,7 @@ const closeModals = () => {
   selectedKey.value = null
   formData.value = {
     name: '',
-    group_ids: groups.value.map(group => group.id),
+    group_ids: [],
     status: 'active',
     use_custom_key: false,
     custom_key: '',
