@@ -116,9 +116,17 @@
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('nav.mySubscriptions') }}
             </p>
-            <p class="truncate text-base font-bold text-gray-900 dark:text-white">
-              {{ subscription.group?.name || `Group #${subscription.group_id}` }}
-            </p>
+            <div class="mt-0.5 flex items-start justify-between gap-3">
+              <p class="min-w-0 truncate text-base font-bold text-gray-900 dark:text-white">
+                {{ subscription.group?.name || `Group #${subscription.group_id}` }}
+              </p>
+              <span
+                v-if="primaryUsageMetric(subscription)"
+                class="shrink-0 text-right text-[11px] text-gray-500 dark:text-gray-400"
+              >
+                {{ t('userSubscriptions.resetIn', { time: formatResetTime(subscription) }) }}
+              </span>
+            </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ subscriptionSummary(subscription) }}
             </p>
@@ -254,6 +262,55 @@ function getUsedProgressWidth(subscription: UserSubscription): string {
   const metric = primaryUsageMetric(subscription)
   if (!metric || metric.limit <= 0) return '0%'
   return `${Math.min((metric.used / metric.limit) * 100, 100)}%`
+}
+
+function getWindowStart(subscription: UserSubscription): string | null {
+  const group = subscription.group
+  if (group?.daily_limit_usd) return subscription.daily_window_start || null
+  if (group?.weekly_limit_usd) return subscription.weekly_window_start || null
+  if (group?.monthly_limit_usd) return subscription.monthly_window_start || null
+  return null
+}
+
+function getWindowHours(subscription: UserSubscription): number {
+  const group = subscription.group
+  if (group?.daily_limit_usd) return 24
+  if (group?.weekly_limit_usd) return 168
+  if (group?.monthly_limit_usd) return 720
+  return 0
+}
+
+function formatResetTime(subscription: UserSubscription): string {
+  const windowStart = getWindowStart(subscription)
+  const windowHours = getWindowHours(subscription)
+
+  if (!windowStart || windowHours <= 0) {
+    return t('userSubscriptions.windowNotActive')
+  }
+
+  const start = new Date(windowStart)
+  const end = new Date(start.getTime() + windowHours * 60 * 60 * 1000)
+  const now = new Date()
+  const diff = end.getTime() - now.getTime()
+
+  if (diff <= 0) {
+    return t('userSubscriptions.windowNotActive')
+  }
+
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+  if (hours > 24) {
+    const days = Math.floor(hours / 24)
+    const remainingHours = hours % 24
+    return `${days}d ${remainingHours}h`
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+
+  return `${minutes}m`
 }
 
 function formatExpiration(expiresAt: string): string {
