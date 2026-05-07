@@ -98,7 +98,7 @@
             <div v-if="subscription.group?.daily_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('userSubscriptions.daily') }}
+                  {{ t('admin.groups.form.usage') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
                   ${{ (subscription.daily_usage_usd || 0).toFixed(2) }} / ${{
@@ -106,15 +106,11 @@
                   }}
                 </span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div
+                class="relative h-2 overflow-hidden rounded-full bg-emerald-500/25 dark:bg-emerald-400/25"
+              >
                 <div
-                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-                  :class="
-                    getProgressBarClass(
-                      subscription.daily_usage_usd,
-                      subscription.group.daily_limit_usd
-                    )
-                  "
+                  class="absolute inset-y-0 left-0 rounded-full bg-red-200 transition-all duration-300 dark:bg-red-400/35"
                   :style="{
                     width: getProgressWidth(
                       subscription.daily_usage_usd,
@@ -123,10 +119,7 @@
                   }"
                 ></div>
               </div>
-              <p
-                v-if="subscription.daily_window_start"
-                class="text-xs text-gray-500 dark:text-dark-400"
-              >
+              <p class="text-xs text-gray-500 dark:text-dark-400">
                 {{
                   t('userSubscriptions.resetIn', {
                     time: formatResetTime(subscription.daily_window_start, 24)
@@ -139,7 +132,7 @@
             <div v-if="subscription.group?.weekly_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('userSubscriptions.weekly') }}
+                  {{ t('admin.groups.form.usage') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
                   ${{ (subscription.weekly_usage_usd || 0).toFixed(2) }} / ${{
@@ -147,15 +140,11 @@
                   }}
                 </span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div
+                class="relative h-2 overflow-hidden rounded-full bg-emerald-500/25 dark:bg-emerald-400/25"
+              >
                 <div
-                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-                  :class="
-                    getProgressBarClass(
-                      subscription.weekly_usage_usd,
-                      subscription.group.weekly_limit_usd
-                    )
-                  "
+                  class="absolute inset-y-0 left-0 rounded-full bg-red-200 transition-all duration-300 dark:bg-red-400/35"
                   :style="{
                     width: getProgressWidth(
                       subscription.weekly_usage_usd,
@@ -164,10 +153,7 @@
                   }"
                 ></div>
               </div>
-              <p
-                v-if="subscription.weekly_window_start"
-                class="text-xs text-gray-500 dark:text-dark-400"
-              >
+              <p class="text-xs text-gray-500 dark:text-dark-400">
                 {{
                   t('userSubscriptions.resetIn', {
                     time: formatResetTime(subscription.weekly_window_start, 168)
@@ -180,7 +166,7 @@
             <div v-if="subscription.group?.monthly_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('userSubscriptions.monthly') }}
+                  {{ t('admin.groups.form.usage') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
                   ${{ (subscription.monthly_usage_usd || 0).toFixed(2) }} / ${{
@@ -188,15 +174,11 @@
                   }}
                 </span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div
+                class="relative h-2 overflow-hidden rounded-full bg-emerald-500/25 dark:bg-emerald-400/25"
+              >
                 <div
-                  class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-                  :class="
-                    getProgressBarClass(
-                      subscription.monthly_usage_usd,
-                      subscription.group.monthly_limit_usd
-                    )
-                  "
+                  class="absolute inset-y-0 left-0 rounded-full bg-red-200 transition-all duration-300 dark:bg-red-400/35"
                   :style="{
                     width: getProgressWidth(
                       subscription.monthly_usage_usd,
@@ -205,10 +187,7 @@
                   }"
                 ></div>
               </div>
-              <p
-                v-if="subscription.monthly_window_start"
-                class="text-xs text-gray-500 dark:text-dark-400"
-              >
+              <p class="text-xs text-gray-500 dark:text-dark-400">
                 {{
                   t('userSubscriptions.resetIn', {
                     time: formatResetTime(subscription.monthly_window_start, 720)
@@ -290,14 +269,6 @@ function getProgressWidth(used: number | undefined, limit: number | null | undef
   if (!limit || limit === 0) return '0%'
   const percentage = Math.min(((used || 0) / limit) * 100, 100)
   return `${percentage}%`
-}
-
-function getProgressBarClass(used: number | undefined, limit: number | null | undefined): string {
-  if (!limit || limit === 0) return 'bg-gray-400'
-  const percentage = ((used || 0) / limit) * 100
-  if (percentage >= 90) return 'bg-red-500'
-  if (percentage >= 70) return 'bg-orange-500'
-  return 'bg-green-500'
 }
 
 function formatExpirationDate(expiresAt: string): string {
