@@ -127,9 +127,6 @@
                 {{ t('userSubscriptions.resetIn', { time: formatResetTime(subscription) }) }}
               </span>
             </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ subscriptionSummary(subscription) }}
-            </p>
             <p
               v-if="subscription.expires_at"
               :class="['mt-1 text-xs', expirationClass(subscription.expires_at)]"
@@ -201,28 +198,6 @@ const formatTokens = (value: number) => {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
   return value.toString()
-}
-
-function subscriptionSummary(subscription: UserSubscription): string {
-  const group = subscription.group
-
-  if (!group?.daily_limit_usd && !group?.weekly_limit_usd && !group?.monthly_limit_usd) {
-    return t('userSubscriptions.unlimited')
-  }
-
-  if (group?.daily_limit_usd) {
-    return t('userSubscriptions.daily')
-  }
-
-  if (group?.weekly_limit_usd) {
-    return t('userSubscriptions.weekly')
-  }
-
-  if (group?.monthly_limit_usd) {
-    return t('userSubscriptions.monthly')
-  }
-
-  return t('common.active')
 }
 
 function primaryUsageMetric(subscription: UserSubscription): UsageMetric | null {

@@ -98,7 +98,7 @@
             <div v-if="subscription.group?.daily_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.groups.form.usage') }}
+                  {{ t('userSubscriptions.daily') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
                   ${{ (subscription.daily_usage_usd || 0).toFixed(2) }} / ${{
@@ -132,7 +132,7 @@
             <div v-if="subscription.group?.weekly_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.groups.form.usage') }}
+                  {{ t('userSubscriptions.weekly') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
                   ${{ (subscription.weekly_usage_usd || 0).toFixed(2) }} / ${{
@@ -166,7 +166,7 @@
             <div v-if="subscription.group?.monthly_limit_usd" class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.groups.form.usage') }}
+                  {{ t('userSubscriptions.monthly') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
                   ${{ (subscription.monthly_usage_usd || 0).toFixed(2) }} / ${{
