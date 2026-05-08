@@ -32,12 +32,6 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run build
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Debug frontend build inputs
         shell: bash
         run: |
@@ -53,16 +47,19 @@ jobs:
           echo "=== frontend/dist ==="
           ls -la frontend/dist | sed -n '1,20p'
 
-      - name: Build Docker image tar
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.ci
-          platforms: linux/amd64
-          tags: sub2api:latest
-          outputs: type=docker,dest=/tmp/sub2api_latest.tar
-          no-cache: true
-          provenance: false
+      - name: Build Docker image
+        shell: bash
+        run: |
+          docker build \
+            --no-cache \
+            -f Dockerfile.ci \
+            -t sub2api:latest \
+            .
+
+      - name: Export Docker image tar
+        shell: bash
+        run: |
+          docker save -o /tmp/sub2api_latest.tar sub2api:latest
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
