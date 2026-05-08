@@ -174,6 +174,7 @@ interface UsageMetric {
   usageText: string
   used: number
   limit: number
+  remaining: number
 }
 
 const props = defineProps<{
@@ -204,29 +205,41 @@ function primaryUsageMetric(subscription: UserSubscription): UsageMetric | null 
   const group = subscription.group
 
   if (group?.daily_limit_usd) {
+    const limit = group.daily_limit_usd
+    const used = subscription.daily_usage_usd || 0
+    const remaining = Math.max(limit - used, 0)
     return {
       label: t('userSubscriptions.daily'),
-      usageText: `$${(subscription.daily_usage_usd || 0).toFixed(2)} / $${group.daily_limit_usd.toFixed(2)}`,
-      used: subscription.daily_usage_usd || 0,
-      limit: group.daily_limit_usd
+      usageText: `$${limit.toFixed(2)} / $${remaining.toFixed(2)}`,
+      used,
+      limit,
+      remaining
     }
   }
 
   if (group?.weekly_limit_usd) {
+    const limit = group.weekly_limit_usd
+    const used = subscription.weekly_usage_usd || 0
+    const remaining = Math.max(limit - used, 0)
     return {
       label: t('userSubscriptions.weekly'),
-      usageText: `$${(subscription.weekly_usage_usd || 0).toFixed(2)} / $${group.weekly_limit_usd.toFixed(2)}`,
-      used: subscription.weekly_usage_usd || 0,
-      limit: group.weekly_limit_usd
+      usageText: `$${limit.toFixed(2)} / $${remaining.toFixed(2)}`,
+      used,
+      limit,
+      remaining
     }
   }
 
   if (group?.monthly_limit_usd) {
+    const limit = group.monthly_limit_usd
+    const used = subscription.monthly_usage_usd || 0
+    const remaining = Math.max(limit - used, 0)
     return {
       label: t('userSubscriptions.monthly'),
-      usageText: `$${(subscription.monthly_usage_usd || 0).toFixed(2)} / $${group.monthly_limit_usd.toFixed(2)}`,
-      used: subscription.monthly_usage_usd || 0,
-      limit: group.monthly_limit_usd
+      usageText: `$${limit.toFixed(2)} / $${remaining.toFixed(2)}`,
+      used,
+      limit,
+      remaining
     }
   }
 
