@@ -4134,6 +4134,17 @@ export default {
       errorTrend: 'Error Trend',
       errorDistribution: 'Error Distribution',
       switchRate: 'Avg switches',
+      accountSwitch: {
+        title: 'Account Switches',
+        currentAccount: 'Last Selected Account',
+        lastSelectedAt: 'Last Selected At',
+        recentSwitches: 'Recent 30 Real Switches',
+        noCurrentAccount: 'No selection record',
+        noSwitchHistory: 'No switch history for the current filters',
+        totalRows: '{count} records',
+        allGroups: 'All groups',
+        loadFailed: 'Failed to load account switch data'
+      },
       // Health Score & Diagnosis
       health: 'Health',
       healthCondition: 'Health Condition',

@@ -174,6 +174,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		if !acquired {
 			return
 		}
+		recordOpsSelectedAccount(c, account.ID, account.Name, account.Platform)
 
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()

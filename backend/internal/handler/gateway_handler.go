@@ -418,6 +418,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
 			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+			recordOpsSelectedAccount(c, account.ID, account.Name, account.Platform)
 
 			// 转发请求 - 根据账号平台分流
 			var result *service.ForwardResult
@@ -674,6 +675,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
 			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+			recordOpsSelectedAccount(c, account.ID, account.Name, account.Platform)
 
 			// ===== 用户消息串行队列 START =====
 			var queueRelease func()

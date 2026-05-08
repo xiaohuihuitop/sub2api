@@ -17,6 +17,25 @@ type OpsSystemLog struct {
 	Extra           map[string]any `json:"extra,omitempty"`
 }
 
+type OpsAccountSwitchRecord struct {
+	SwitchedAt       time.Time `json:"switched_at"`
+	RequestID        string    `json:"request_id"`
+	ClientRequestID  string    `json:"client_request_id"`
+	Platform         string    `json:"platform"`
+	GroupID          *int64    `json:"group_id"`
+	GroupName        string    `json:"group_name"`
+	FromAccountID    *int64    `json:"from_account_id"`
+	FromAccountName  string    `json:"from_account_name"`
+	ToAccountID      int64     `json:"to_account_id"`
+	ToAccountName    string    `json:"to_account_name"`
+	UserID           *int64    `json:"user_id"`
+}
+
+type OpsAccountSwitchSummary struct {
+	Current        *OpsAccountSwitchRecord   `json:"current"`
+	RecentSwitches []*OpsAccountSwitchRecord `json:"recent_switches"`
+}
+
 type OpsErrorLog struct {
 	ID        int64     `json:"id"`
 	CreatedAt time.Time `json:"created_at"`

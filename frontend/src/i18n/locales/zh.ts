@@ -4291,6 +4291,17 @@ export default {
       errorTrend: '错误趋势',
       errorDistribution: '错误分布',
       switchRate: '平均账号切换',
+      accountSwitch: {
+        title: '账号切换',
+        currentAccount: '最近选中账号',
+        lastSelectedAt: '最近选中时间',
+        recentSwitches: '最近30次真实切换',
+        noCurrentAccount: '暂无选中记录',
+        noSwitchHistory: '当前筛选条件下暂无切换记录',
+        totalRows: '共 {count} 条',
+        allGroups: '全部分组',
+        loadFailed: '加载账号切换数据失败'
+      },
       // Health Score & Diagnosis
       health: '健康',
       healthCondition: '健康状况',

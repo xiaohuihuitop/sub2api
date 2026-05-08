@@ -1222,6 +1222,184 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 	}, nil
 }
 
+func (r *opsRepository) GetAccountSwitchSummary(
+	ctx context.Context,
+	filter *service.OpsDashboardFilter,
+	limit int,
+) (*service.OpsAccountSwitchSummary, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("nil ops repository")
+	}
+	if filter == nil {
+		return nil, fmt.Errorf("nil ops filter")
+	}
+	if limit <= 0 {
+		limit = 30
+	}
+	const batchSize = 200
+
+	args := make([]any, 0, 6)
+	clauses := []string{
+		"l.component = 'ops.account_switch'",
+		"l.level = 'warn'",
+		"(l.message = 'account_selected' OR l.message = 'account_switch')",
+	}
+
+	if !filter.StartTime.IsZero() {
+		args = append(args, filter.StartTime.UTC())
+		clauses = append(clauses, "l.created_at >= $"+itoa(len(args)))
+	}
+	if !filter.EndTime.IsZero() {
+		args = append(args, filter.EndTime.UTC())
+		clauses = append(clauses, "l.created_at < $"+itoa(len(args)))
+	}
+	if p := strings.TrimSpace(filter.Platform); p != "" {
+		args = append(args, p)
+		clauses = append(clauses, "COALESCE(l.platform,'') = $"+itoa(len(args)))
+	}
+	if filter.GroupID != nil && *filter.GroupID > 0 {
+		args = append(args, *filter.GroupID)
+		clauses = append(clauses, "COALESCE((l.extra->>'group_id')::bigint, 0) = $"+itoa(len(args)))
+	}
+
+query := `
+SELECT
+  l.created_at,
+  COALESCE(l.request_id, ''),
+  COALESCE(l.client_request_id, ''),
+  COALESCE(l.platform, ''),
+  l.user_id,
+  COALESCE((l.extra->>'group_id')::bigint, 0),
+  COALESCE(l.extra->>'group_name', ''),
+  COALESCE((l.extra->>'account_id')::bigint, 0),
+  COALESCE(l.extra->>'account_name', ''),
+  COALESCE(l.message, '')
+FROM ops_system_logs l
+WHERE ` + strings.Join(clauses, " AND ") + `
+ORDER BY l.created_at DESC, l.id DESC`
+
+	selected := make([]*service.OpsAccountSwitchRecord, 0, limit*4)
+	offset := 0
+	for {
+		pageArgs := append(append([]any{}, args...), batchSize, offset)
+		rows, err := r.db.QueryContext(
+			ctx,
+			query+" LIMIT $"+itoa(len(args)+1)+" OFFSET $"+itoa(len(args)+2),
+			pageArgs...,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		fetched := 0
+		for rows.Next() {
+			fetched++
+			var (
+				createdAt       time.Time
+				requestID       string
+				clientRequestID string
+				platform        string
+				userID          sql.NullInt64
+				groupIDRaw      int64
+				groupName       string
+				accountIDRaw    int64
+				accountName     string
+				message         string
+			)
+			if err := rows.Scan(
+				&createdAt,
+				&requestID,
+				&clientRequestID,
+				&platform,
+				&userID,
+				&groupIDRaw,
+				&groupName,
+				&accountIDRaw,
+				&accountName,
+				&message,
+			); err != nil {
+				_ = rows.Close()
+				return nil, err
+			}
+			if accountIDRaw <= 0 {
+				continue
+			}
+
+			rec := &service.OpsAccountSwitchRecord{
+				SwitchedAt:      createdAt,
+				RequestID:       requestID,
+				ClientRequestID: clientRequestID,
+				Platform:        platform,
+				GroupName:       groupName,
+				ToAccountID:     accountIDRaw,
+				ToAccountName:   accountName,
+			}
+			if userID.Valid && userID.Int64 > 0 {
+				v := userID.Int64
+				rec.UserID = &v
+			}
+			if groupIDRaw > 0 {
+				v := groupIDRaw
+				rec.GroupID = &v
+			}
+			trimmedMessage := strings.TrimSpace(message)
+			if trimmedMessage != "account_selected" && trimmedMessage != "account_switch" {
+				continue
+			}
+			selected = append(selected, rec)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		_ = rows.Close()
+
+		if fetched < batchSize {
+			break
+		}
+		if len(selected) >= limit+1 {
+			switches := 0
+			for i := 0; i < len(selected)-1; i++ {
+				if selected[i].ToAccountID != selected[i+1].ToAccountID {
+					switches++
+					if switches >= limit {
+						break
+					}
+				}
+			}
+			if switches >= limit {
+				break
+			}
+		}
+		offset += batchSize
+	}
+
+	summary := &service.OpsAccountSwitchSummary{
+		RecentSwitches: make([]*service.OpsAccountSwitchRecord, 0, limit),
+	}
+	if len(selected) == 0 {
+		return summary, nil
+	}
+
+	summary.Current = selected[0]
+
+	for i := 0; i < len(selected)-1 && len(summary.RecentSwitches) < limit; i++ {
+		curr := selected[i]
+		prev := selected[i+1]
+		if curr.ToAccountID == prev.ToAccountID {
+			continue
+		}
+
+		item := *curr
+		fromID := prev.ToAccountID
+		item.FromAccountID = &fromID
+		item.FromAccountName = prev.ToAccountName
+		summary.RecentSwitches = append(summary.RecentSwitches, &item)
+	}
+
+	return summary, nil
+}
+
 func (r *opsRepository) DeleteSystemLogs(ctx context.Context, filter *service.OpsSystemLogCleanupFilter) (int64, error) {
 	if r == nil || r.db == nil {
 		return 0, fmt.Errorf("nil ops repository")

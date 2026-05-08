@@ -259,6 +259,54 @@ export interface OpsErrorDistributionResponse {
   items: OpsErrorDistributionItem[]
 }
 
+export interface OpsAccountSwitchRecord {
+  switched_at: string
+  request_id: string
+  client_request_id: string
+  platform: string
+  group_id?: number | null
+  group_name: string
+  from_account_id?: number | null
+  from_account_name: string
+  to_account_id: number
+  to_account_name: string
+  user_id?: number | null
+}
+
+export interface OpsAccountSwitchSummary {
+  current?: OpsAccountSwitchRecord | null
+  recent_switches: OpsAccountSwitchRecord[]
+}
+
+export async function getAccountSwitchSummary(
+  platform?: string,
+  groupId?: number | null,
+  timeRange?: string,
+  startTime?: string | null,
+  endTime?: string | null
+): Promise<OpsAccountSwitchSummary> {
+  const params: Record<string, any> = {}
+  if (platform) {
+    params.platform = platform
+  }
+  if (typeof groupId === 'number' && groupId > 0) {
+    params.group_id = groupId
+  }
+  if (startTime || endTime) {
+    if (startTime) {
+      params.start_time = startTime
+    }
+    if (endTime) {
+      params.end_time = endTime
+    }
+  } else if (timeRange) {
+    params.time_range = timeRange
+  }
+
+  const { data } = await apiClient.get<OpsAccountSwitchSummary>('/admin/ops/dashboard/account-switch-summary', { params })
+  return data
+}
+
 export interface OpsDashboardSnapshotV2Response {
   generated_at: string
   overview: OpsDashboardOverview
@@ -1370,6 +1418,7 @@ export const opsAPI = {
   getLatencyHistogram,
   getErrorTrend,
   getErrorDistribution,
+  getAccountSwitchSummary,
   getOpenAITokenStats,
   getConcurrencyStats,
   getUserConcurrencyStats,

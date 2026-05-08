@@ -40,9 +40,19 @@
       />
 
       <!-- Row: Concurrency + Throughput -->
-      <div v-if="opsEnabled && !(loading && !hasLoadedOnce)" class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <div v-if="opsEnabled && !(loading && !hasLoadedOnce)" class="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div class="lg:col-span-1 min-h-[360px]">
           <OpsConcurrencyCard :platform-filter="platform" :group-id-filter="groupId" :refresh-token="dashboardRefreshToken" />
+        </div>
+        <div class="lg:col-span-1 min-h-[360px]">
+          <OpsAccountSwitchCard
+            :platform-filter="platform"
+            :group-id-filter="groupId"
+            :time-range="timeRange"
+            :custom-start-time="customStartTime"
+            :custom-end-time="customEndTime"
+            :refresh-token="dashboardRefreshToken"
+          />
         </div>
         <div class="lg:col-span-1 min-h-[360px]">
           <OpsSwitchRateTrendChart
@@ -155,6 +165,7 @@ import {
 import { useAdminSettingsStore, useAppStore } from '@/stores'
 import OpsDashboardHeader from './components/OpsDashboardHeader.vue'
 import OpsDashboardSkeleton from './components/OpsDashboardSkeleton.vue'
+import OpsAccountSwitchCard from './components/OpsAccountSwitchCard.vue'
 import OpsConcurrencyCard from './components/OpsConcurrencyCard.vue'
 import OpsErrorDetailModal from './components/OpsErrorDetailModal.vue'
 import OpsErrorDistributionChart from './components/OpsErrorDistributionChart.vue'

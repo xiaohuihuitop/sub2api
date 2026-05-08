@@ -207,6 +207,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		recordOpsSelectedAccount(c, account.ID, account.Name, account.Platform)
 
 		// 5. Forward request
 		writerSizeBeforeForward := c.Writer.Size()

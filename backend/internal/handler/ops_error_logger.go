@@ -393,6 +393,56 @@ func setOpsSelectedAccount(c *gin.Context, accountID int64, platform ...string) 
 	}
 }
 
+func recordOpsSelectedAccount(c *gin.Context, accountID int64, accountName string, platform ...string) {
+	if c == nil || c.Request == nil || accountID <= 0 {
+		return
+	}
+	opsSvc, ok := c.Get("ops_service")
+	if !ok {
+		return
+	}
+	svc, ok := opsSvc.(*service.OpsService)
+	if !ok || svc == nil {
+		return
+	}
+
+	var userID *int64
+	if subject, ok := middleware2.GetAuthSubjectFromContext(c); ok && subject.UserID > 0 {
+		v := subject.UserID
+		userID = &v
+	}
+
+	var group *service.Group
+	if g, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group); ok && service.IsGroupContextValid(g) {
+		group = g
+	}
+
+	requestID := ""
+	if v, ok := c.Request.Context().Value(ctxkey.RequestID).(string); ok {
+		requestID = strings.TrimSpace(v)
+	}
+	clientRequestID := ""
+	if v, ok := c.Request.Context().Value(ctxkey.ClientRequestID).(string); ok {
+		clientRequestID = strings.TrimSpace(v)
+	}
+
+	selectedPlatform := ""
+	if len(platform) > 0 {
+		selectedPlatform = strings.TrimSpace(platform[0])
+	}
+
+	svc.RecordAccountSelection(
+		c.Request.Context(),
+		requestID,
+		clientRequestID,
+		userID,
+		group,
+		accountID,
+		strings.TrimSpace(accountName),
+		selectedPlatform,
+	)
+}
+
 type opsCaptureWriter struct {
 	gin.ResponseWriter
 	limit int
@@ -459,6 +509,9 @@ func (w *opsCaptureWriter) WriteString(s string) (int, error) {
 // - Streaming errors after the response has started (SSE) may still need explicit logging.
 func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if ops != nil {
+			c.Set("ops_service", ops)
+		}
 		originalWriter := c.Writer
 		w := acquireOpsCaptureWriter(originalWriter)
 		defer func() {

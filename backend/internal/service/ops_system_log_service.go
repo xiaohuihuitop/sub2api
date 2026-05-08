@@ -10,6 +10,14 @@ import (
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+)
+
+const (
+	opsAccountSwitchComponent = "ops.account_switch"
+	opsAccountSwitchMessage   = "account_switch"
+	opsAccountSelectedMessage = "account_selected"
+	opsAccountSwitchMaxLimit  = 30
 )
 
 func (s *OpsService) ListSystemLogs(ctx context.Context, filter *OpsSystemLogFilter) (*OpsSystemLogList, error) {
@@ -121,4 +129,74 @@ func (s *OpsService) GetSystemLogSinkHealth() OpsSystemLogSinkHealth {
 		return OpsSystemLogSinkHealth{}
 	}
 	return s.systemLogSink.Health()
+}
+
+func (s *OpsService) RecordAccountSelection(
+	ctx context.Context,
+	requestID string,
+	clientRequestID string,
+	userID *int64,
+	group *Group,
+	accountID int64,
+	accountName string,
+	platform string,
+) {
+	if s == nil || s.systemLogSink == nil || accountID <= 0 || !s.IsMonitoringEnabled(ctx) {
+		return
+	}
+
+	platform = strings.TrimSpace(platform)
+	if platform == "" && group != nil {
+		platform = strings.TrimSpace(group.Platform)
+	}
+
+	fields := map[string]any{
+		"request_id":       strings.TrimSpace(requestID),
+		"client_request_id": strings.TrimSpace(clientRequestID),
+		"platform":         platform,
+		"account_id":       accountID,
+		"account_name":     strings.TrimSpace(accountName),
+		"event_type":       "account_selected",
+	}
+	if userID != nil && *userID > 0 {
+		fields["user_id"] = *userID
+	}
+	if group != nil && group.ID > 0 {
+		fields["group_id"] = group.ID
+		fields["group_name"] = strings.TrimSpace(group.Name)
+	}
+
+	logger.WriteSinkEvent("warn", opsAccountSwitchComponent, opsAccountSelectedMessage, fields)
+}
+
+func (s *OpsService) GetAccountSwitchSummary(
+	ctx context.Context,
+	filter *OpsDashboardFilter,
+	limit int,
+) (*OpsAccountSwitchSummary, error) {
+	if err := s.RequireMonitoringEnabled(ctx); err != nil {
+		return nil, err
+	}
+	if s.opsRepo == nil {
+		return &OpsAccountSwitchSummary{RecentSwitches: []*OpsAccountSwitchRecord{}}, nil
+	}
+	if filter == nil {
+		return nil, infraerrors.BadRequest("OPS_FILTER_REQUIRED", "filter is required")
+	}
+
+	if limit <= 0 || limit > opsAccountSwitchMaxLimit {
+		limit = opsAccountSwitchMaxLimit
+	}
+
+	result, err := s.opsRepo.GetAccountSwitchSummary(ctx, filter, limit)
+	if err != nil {
+		return nil, infraerrors.InternalServer("OPS_ACCOUNT_SWITCH_SUMMARY_FAILED", "Failed to load account switch summary").WithCause(err)
+	}
+	if result == nil {
+		return &OpsAccountSwitchSummary{RecentSwitches: []*OpsAccountSwitchRecord{}}, nil
+	}
+	if result.RecentSwitches == nil {
+		result.RecentSwitches = []*OpsAccountSwitchRecord{}
+	}
+	return result, nil
 }

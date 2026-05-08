@@ -461,6 +461,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		}
 		// 账号槽位/等待计数需要在超时或断开时安全回收
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		recordOpsSelectedAccount(c, account.ID, account.Name, account.Platform)
 
 		// 5) forward (根据平台分流)
 		var result *service.ForwardResult
