@@ -23,6 +23,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Debug frontend build inputs
+        shell: bash
+        run: |
+          echo "=== Dockerfile (head) ==="
+          sed -n '1,40p' Dockerfile
+          echo
+          echo "=== frontend/package.json (head) ==="
+          sed -n '1,20p' frontend/package.json
+          echo
+          echo "=== frontend/.npmrc ==="
+          cat frontend/.npmrc
+
       - name: Build Docker image tar
         uses: docker/build-push-action@v6
         with:
@@ -31,6 +43,7 @@ jobs:
           platforms: linux/amd64
           tags: sub2api:latest
           outputs: type=docker,dest=/tmp/sub2api_latest.tar
+          no-cache: true
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
