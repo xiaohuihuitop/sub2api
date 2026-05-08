@@ -17,6 +17,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Preflight frontend install
+        shell: bash
+        run: |
+          cd frontend
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          pnpm --version
+          pnpm install --frozen-lockfile
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -44,6 +58,7 @@ jobs:
           tags: sub2api:latest
           outputs: type=docker,dest=/tmp/sub2api_latest.tar
           no-cache: true
+          provenance: false
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
