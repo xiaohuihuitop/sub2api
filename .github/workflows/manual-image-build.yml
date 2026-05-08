@@ -30,6 +30,7 @@ jobs:
           corepack prepare pnpm@9.15.9 --activate
           pnpm --version
           pnpm install --frozen-lockfile
+          pnpm run build
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -40,20 +41,23 @@ jobs:
       - name: Debug frontend build inputs
         shell: bash
         run: |
-          echo "=== Dockerfile (head) ==="
-          sed -n '1,40p' Dockerfile
+          echo "=== Dockerfile.ci (head) ==="
+          sed -n '1,40p' Dockerfile.ci
           echo
           echo "=== frontend/package.json (head) ==="
           sed -n '1,20p' frontend/package.json
           echo
           echo "=== frontend/.npmrc ==="
           cat frontend/.npmrc
+          echo
+          echo "=== frontend/dist ==="
+          ls -la frontend/dist | sed -n '1,20p'
 
       - name: Build Docker image tar
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.ci
           platforms: linux/amd64
           tags: sub2api:latest
           outputs: type=docker,dest=/tmp/sub2api_latest.tar
