@@ -33,7 +33,7 @@ COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 COPY backend/ ./
-COPY frontend/dist ./internal/web/dist
+COPY backend/internal/web/dist ./internal/web/dist
 
 RUN VERSION_VALUE="${VERSION}" && \
     if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(tr -d '\r\n' < ./cmd/server/VERSION)"; fi && \

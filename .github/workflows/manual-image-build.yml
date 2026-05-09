@@ -44,8 +44,8 @@ jobs:
           echo "=== frontend/.npmrc ==="
           cat frontend/.npmrc
           echo
-          echo "=== frontend/dist ==="
-          ls -la frontend/dist | sed -n '1,20p'
+          echo "=== backend/internal/web/dist ==="
+          ls -la backend/internal/web/dist | sed -n '1,20p'
 
       - name: Build Docker image
         shell: bash
