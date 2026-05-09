@@ -110,19 +110,16 @@ watch(
       <div class="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
         {{ t('admin.ops.accountSwitch.currentAccount') }}
       </div>
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="truncate text-base font-bold text-gray-900 dark:text-white">
-            {{ currentRecord ? formatToLabel(currentRecord) : t('admin.ops.accountSwitch.noCurrentAccount') }}
-          </div>
-          <div v-if="currentRecord" class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-            <span>{{ currentRecord.platform || '--' }}</span>
-            <span>{{ currentRecord.group_name || t('admin.ops.accountSwitch.allGroups') }}</span>
-          </div>
+      <div class="min-w-0">
+        <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+          {{ currentRecord ? formatToLabel(currentRecord) : t('admin.ops.accountSwitch.noCurrentAccount') }}
         </div>
-        <div class="shrink-0 text-right text-[11px] text-gray-500 dark:text-gray-400">
+        <div v-if="currentRecord" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <span>{{ currentRecord.platform || '--' }}</span>
+        </div>
+        <div class="mt-3 text-[11px] text-gray-500 dark:text-gray-400">
           <div>{{ t('admin.ops.accountSwitch.lastSelectedAt') }}</div>
-          <div class="mt-1 font-medium text-gray-700 dark:text-gray-200">
+          <div class="mt-1 text-sm font-medium text-gray-700 dark:text-gray-200">
             {{ currentRecord ? formatWhen(currentRecord.switched_at) : '--' }}
           </div>
         </div>
@@ -148,22 +145,22 @@ watch(
         :key="`${item.switched_at}-${item.to_account_id}-${item.from_account_id ?? 0}-${index}`"
         class="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900"
       >
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-              <span class="truncate">{{ formatFromLabel(item) }}</span>
-              <svg class="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-              <span class="truncate">{{ formatToLabel(item) }}</span>
-            </div>
-            <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
-              <span>{{ item.platform || '--' }}</span>
-              <span>{{ item.group_name || t('admin.ops.accountSwitch.allGroups') }}</span>
-            </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+            <span class="truncate">{{ formatFromLabel(item) }}</span>
+            <svg class="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+            <span class="truncate">{{ formatToLabel(item) }}</span>
           </div>
-          <div class="shrink-0 text-right text-[11px] text-gray-500 dark:text-gray-400">
-            {{ formatWhen(item.switched_at) }}
+          <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+            {{ item.platform || '--' }}
+          </div>
+          <div class="mt-3 text-[11px] text-gray-500 dark:text-gray-400">
+            <div>{{ t('admin.ops.accountSwitch.lastSelectedAt') }}</div>
+            <div class="mt-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ formatWhen(item.switched_at) }}
+            </div>
           </div>
         </div>
       </div>
