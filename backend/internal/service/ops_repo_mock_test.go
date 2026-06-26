@@ -55,6 +55,10 @@ func (m *opsRepoMock) ListSystemLogs(ctx context.Context, filter *OpsSystemLogFi
 	return &OpsSystemLogList{Logs: []*OpsSystemLog{}, Total: 0, Page: 1, PageSize: 50}, nil
 }
 
+func (m *opsRepoMock) GetAccountSwitchSummary(ctx context.Context, filter *OpsDashboardFilter, limit int) (*OpsAccountSwitchSummary, error) {
+	return &OpsAccountSwitchSummary{RecentSwitches: []*OpsAccountSwitchRecord{}}, nil
+}
+
 func (m *opsRepoMock) DeleteSystemLogs(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error) {
 	if m.DeleteSystemLogsFn != nil {
 		return m.DeleteSystemLogsFn(ctx, filter)
