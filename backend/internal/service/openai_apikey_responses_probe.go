@@ -19,7 +19,7 @@ import (
 
 const (
 	openaiResponsesProbeTimeout = 15 * time.Second
-	responsesProbeMaxBodyBytes = 256 * 1024
+	responsesProbeMaxBodyBytes  = 256 * 1024
 )
 
 func openaiResponsesProbePayload(modelID string) []byte {
@@ -118,7 +118,6 @@ func (s *AccountTestService) ProbeOpenAIAPIKeyResponsesSupport(ctx context.Conte
 		logger.LegacyPrintf("service.openai_probe", "probe_build_request_failed: account_id=%d err=%v", accountID, err)
 		return
 	}
-	req = req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Accept", "application/json")
