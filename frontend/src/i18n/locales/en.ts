@@ -2942,6 +2942,22 @@ export default {
         compactModelMapping: 'Compact-only model mapping',
         compactModelMappingDesc:
           'Only applies to /responses/compact. Use this when the upstream compact endpoint requires a special compact model.',
+        responsesMode: 'Responses API support',
+        responsesModeDesc:
+          'Only applies to OpenAI API Key accounts. Auto follows probe results; force modes override probing.',
+        responsesModeAuto: 'Auto',
+        responsesModeForceResponses: 'Force Responses',
+        responsesModeForceChatCompletions: 'Force Chat Completions',
+        responsesStatusAutoSupported: 'Auto probe: Responses',
+        responsesStatusAutoUnsupported: 'Auto probe: Chat Completions',
+        responsesStatusAutoUnknown: 'Auto probe: unknown',
+        responsesStatusForcedResponses: 'Forced Responses',
+        responsesStatusForcedChatCompletions: 'Forced Chat Completions',
+        endpointCapabilities: 'Endpoint capabilities',
+        endpointCapabilitiesDesc:
+          'Uncheck endpoints this API key upstream does not support. Empty custom config keeps legacy all-endpoint behavior.',
+        endpointCapabilityChatCompletions: 'Chat Completions',
+        endpointCapabilityEmbeddings: 'Embeddings',
         compactSupported: 'Compact supported',
         compactUnsupported: 'Compact unsupported',
         compactUnknown: 'Compact unknown',
