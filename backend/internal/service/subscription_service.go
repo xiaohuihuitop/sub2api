@@ -142,6 +142,17 @@ func (s *SubscriptionService) InvalidateSubCache(userID, groupID int64) {
 	s.subCacheL1.Del(subCacheKey(userID, groupID))
 }
 
+// InvalidateSubCacheSync invalidates the L1 subscription cache and waits until
+// Ristretto has processed the delete. Use this after billing writes so the next
+// auth/usage request cannot read a stale subscription snapshot.
+func (s *SubscriptionService) InvalidateSubCacheSync(userID, groupID int64) {
+	if s.subCacheL1 == nil {
+		return
+	}
+	s.subCacheL1.Del(subCacheKey(userID, groupID))
+	s.subCacheL1.Wait()
+}
+
 // AssignSubscriptionInput 分配订阅输入
 type AssignSubscriptionInput struct {
 	UserID       int64

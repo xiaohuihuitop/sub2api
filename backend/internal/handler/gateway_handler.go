@@ -1191,25 +1191,28 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, modelStats any) {
 	// 订阅模式
 	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+		subscriptionGroup := apiKey.Group
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
-			"planName": apiKey.Group.Name,
+			"planName": subscriptionGroup.Name,
 			"unit":     "USD",
 		}
 
 		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
 		subscription, ok := middleware2.GetSubscriptionFromContext(c)
 		if ok {
-			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
+			subscriptionGroup = resolvedSubscriptionGroup(apiKey, subscription)
+			resp["planName"] = subscriptionGroup.Name
+			remaining := h.calculateSubscriptionRemaining(subscriptionGroup, subscription)
 			resp["remaining"] = remaining
 			resp["subscription"] = gin.H{
 				"daily_usage_usd":   subscription.DailyUsageUSD,
 				"weekly_usage_usd":  subscription.WeeklyUsageUSD,
 				"monthly_usage_usd": subscription.MonthlyUsageUSD,
-				"daily_limit_usd":   apiKey.Group.DailyLimitUSD,
-				"weekly_limit_usd":  apiKey.Group.WeeklyLimitUSD,
-				"monthly_limit_usd": apiKey.Group.MonthlyLimitUSD,
+				"daily_limit_usd":   subscriptionGroup.DailyLimitUSD,
+				"weekly_limit_usd":  subscriptionGroup.WeeklyLimitUSD,
+				"monthly_limit_usd": subscriptionGroup.MonthlyLimitUSD,
 				"expires_at":        subscription.ExpiresAt,
 			}
 		}
@@ -1248,11 +1251,33 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 	c.JSON(http.StatusOK, resp)
 }
 
+func resolvedSubscriptionGroup(apiKey *service.APIKey, sub *service.UserSubscription) *service.Group {
+	if apiKey == nil || sub == nil {
+		if apiKey != nil {
+			return apiKey.Group
+		}
+		return nil
+	}
+	for i := range apiKey.AllowedGroups {
+		group := &apiKey.AllowedGroups[i]
+		if group.ID == sub.GroupID {
+			return group
+		}
+	}
+	if apiKey.Group != nil && apiKey.Group.ID == sub.GroupID {
+		return apiKey.Group
+	}
+	return apiKey.Group
+}
+
 // calculateSubscriptionRemaining 计算订阅剩余可用额度
 // 逻辑：
 // 1. 如果日/周/月任一限额达到100%，返回0
 // 2. 否则返回所有已配置周期中剩余额度的最小值
 func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, sub *service.UserSubscription) float64 {
+	if group == nil || sub == nil {
+		return -1
+	}
 	var remainingValues []float64
 
 	// 检查日限额

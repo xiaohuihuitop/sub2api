@@ -549,6 +549,10 @@ type GatewayService struct {
 	billingService        *BillingService
 	rateLimitService      *RateLimitService
 	billingCacheService   *BillingCacheService
+	subscriptionCache     interface {
+		InvalidateSubCache(userID, groupID int64)
+		InvalidateSubCacheSync(userID, groupID int64)
+	}
 	identityService       *IdentityService
 	httpUpstream          HTTPUpstream
 	deferredService       *DeferredService
@@ -588,6 +592,10 @@ func NewGatewayService(
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
 	billingCacheService *BillingCacheService,
+	subscriptionCache interface {
+		InvalidateSubCache(userID, groupID int64)
+		InvalidateSubCacheSync(userID, groupID int64)
+	},
 	identityService *IdentityService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
@@ -620,6 +628,7 @@ func NewGatewayService(
 		billingService:       billingService,
 		rateLimitService:     rateLimitService,
 		billingCacheService:  billingCacheService,
+		subscriptionCache:    subscriptionCache,
 		identityService:      identityService,
 		httpUpstream:         httpUpstream,
 		deferredService:      deferredService,
@@ -7905,6 +7914,7 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 	defer cancel()
 
 	cost := p.Cost
+	applied := false
 
 	if p.IsSubscriptionBill {
 		// Subscription usage tracked by ActualCost so group rate multiplier
@@ -7912,12 +7922,16 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 		if cost.ActualCost > 0 {
 			if err := deps.userSubRepo.IncrementUsage(billingCtx, p.Subscription.ID, cost.ActualCost); err != nil {
 				slog.Error("increment subscription usage failed", "subscription_id", p.Subscription.ID, "error", err)
+			} else {
+				applied = true
 			}
 		}
 	} else {
 		if cost.ActualCost > 0 {
 			if err := deps.userRepo.DeductBalance(billingCtx, p.User.ID, cost.ActualCost); err != nil {
 				slog.Error("deduct balance failed", "user_id", p.User.ID, "error", err)
+			} else {
+				applied = true
 			}
 		}
 	}
@@ -7941,10 +7955,7 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 		}
 	}
 
-	// NOTE: finalizePostUsageBilling is NOT called here to avoid double-queuing
-	// cache updates. The legacy path does DB writes directly; the finalize path
-	// does cache queue + notifications. Notifications are dispatched separately
-	// by the caller after recording the usage log.
+	finalizePostUsageBilling(p, deps, &UsageBillingApplyResult{Applied: applied})
 }
 
 func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string) string {
@@ -8054,7 +8065,9 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	}
 
 	if result == nil || !result.Applied {
-		deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
+		if p.Account != nil && deps.deferredService != nil {
+			deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
+		}
 		return false, nil
 	}
 
@@ -8072,20 +8085,28 @@ func finalizePostUsageBilling(p *postUsageBillingParams, deps *billingDeps, resu
 	if p == nil || p.Cost == nil || deps == nil {
 		return
 	}
+	if result == nil || !result.Applied {
+		return
+	}
 
 	if p.IsSubscriptionBill {
-		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
+		if p.User != nil && p.Subscription != nil && deps.subscriptionCache != nil {
+			deps.subscriptionCache.InvalidateSubCacheSync(p.User.ID, p.Subscription.GroupID)
 		}
-	} else if p.Cost.ActualCost > 0 && p.User != nil {
+		if p.Cost.ActualCost > 0 && p.User != nil && p.Subscription != nil && deps.billingCacheService != nil {
+			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, p.Subscription.GroupID, p.Cost.ActualCost)
+		}
+	} else if p.Cost.ActualCost > 0 && p.User != nil && deps.billingCacheService != nil {
 		deps.billingCacheService.QueueDeductBalance(p.User.ID, p.Cost.ActualCost)
 	}
 
-	if p.Cost.ActualCost > 0 && p.APIKey != nil && p.APIKey.HasRateLimits() {
+	if p.Cost.ActualCost > 0 && p.APIKey != nil && p.APIKey.HasRateLimits() && deps.billingCacheService != nil {
 		deps.billingCacheService.QueueUpdateAPIKeyRateLimitUsage(p.APIKey.ID, p.Cost.ActualCost)
 	}
 
-	deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
+	if p.Account != nil && deps.deferredService != nil {
+		deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
+	}
 
 	// Notification checks run async — all parameters are already captured,
 	// no dependency on the request context or upstream connection.
@@ -8196,6 +8217,10 @@ type billingDeps struct {
 	userRepo             UserRepository
 	userSubRepo          UserSubscriptionRepository
 	billingCacheService  *BillingCacheService
+	subscriptionCache    interface {
+		InvalidateSubCache(userID, groupID int64)
+		InvalidateSubCacheSync(userID, groupID int64)
+	}
 	deferredService      *DeferredService
 	balanceNotifyService *BalanceNotifyService
 }
@@ -8206,6 +8231,7 @@ func (s *GatewayService) billingDeps() *billingDeps {
 		userRepo:             s.userRepo,
 		userSubRepo:          s.userSubRepo,
 		billingCacheService:  s.billingCacheService,
+		subscriptionCache:    s.subscriptionCache,
 		deferredService:      s.deferredService,
 		balanceNotifyService: s.balanceNotifyService,
 	}

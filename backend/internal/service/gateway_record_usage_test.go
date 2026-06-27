@@ -34,6 +34,7 @@ func newGatewayRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo 
 		&BillingCacheService{},
 		nil,
 		nil,
+		nil,
 		&DeferredService{},
 		nil,
 		nil,

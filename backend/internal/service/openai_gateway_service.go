@@ -325,6 +325,10 @@ type OpenAIGatewayService struct {
 	billingService        *BillingService
 	rateLimitService      *RateLimitService
 	billingCacheService   *BillingCacheService
+	subscriptionCache     interface {
+		InvalidateSubCache(userID, groupID int64)
+		InvalidateSubCacheSync(userID, groupID int64)
+	}
 	userGroupRateResolver *userGroupRateResolver
 	httpUpstream          HTTPUpstream
 	deferredService       *DeferredService
@@ -367,6 +371,10 @@ func NewOpenAIGatewayService(
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
 	billingCacheService *BillingCacheService,
+	subscriptionCache interface {
+		InvalidateSubCache(userID, groupID int64)
+		InvalidateSubCacheSync(userID, groupID int64)
+	},
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
 	openAITokenProvider *OpenAITokenProvider,
@@ -389,6 +397,7 @@ func NewOpenAIGatewayService(
 		billingService:      billingService,
 		rateLimitService:    rateLimitService,
 		billingCacheService: billingCacheService,
+		subscriptionCache:   subscriptionCache,
 		userGroupRateResolver: newUserGroupRateResolver(
 			userGroupRateRepo,
 			nil,
@@ -493,6 +502,7 @@ func (s *OpenAIGatewayService) billingDeps() *billingDeps {
 		userRepo:             s.userRepo,
 		userSubRepo:          s.userSubRepo,
 		billingCacheService:  s.billingCacheService,
+		subscriptionCache:    s.subscriptionCache,
 		deferredService:      s.deferredService,
 		balanceNotifyService: s.balanceNotifyService,
 	}

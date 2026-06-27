@@ -12,8 +12,9 @@ import (
 )
 
 type billingCacheWorkerStub struct {
-	balanceUpdates      int64
-	subscriptionUpdates int64
+	balanceUpdates                int64
+	subscriptionUpdates           int64
+	subscriptionUpdateGroupID     int64
 }
 
 func (b *billingCacheWorkerStub) GetUserBalance(ctx context.Context, userID int64) (float64, error) {
@@ -45,7 +46,12 @@ func (b *billingCacheWorkerStub) SetSubscriptionCache(ctx context.Context, userI
 
 func (b *billingCacheWorkerStub) UpdateSubscriptionUsage(ctx context.Context, userID, groupID int64, cost float64) error {
 	atomic.AddInt64(&b.subscriptionUpdates, 1)
+	atomic.StoreInt64(&b.subscriptionUpdateGroupID, groupID)
 	return nil
+}
+
+func (b *billingCacheWorkerStub) lastSubscriptionUpdateGroupID() int64 {
+	return atomic.LoadInt64(&b.subscriptionUpdateGroupID)
 }
 
 func (b *billingCacheWorkerStub) InvalidateSubscriptionCache(ctx context.Context, userID, groupID int64) error {
