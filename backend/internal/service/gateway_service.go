@@ -7960,6 +7960,10 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 }
 
 func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string) string {
+	// Upstream IDs identify the billable response/turn; context IDs can span a whole WS session.
+	if requestID := strings.TrimSpace(upstreamRequestID); requestID != "" {
+		return requestID
+	}
 	if ctx != nil {
 		if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
 			return "client:" + strings.TrimSpace(clientRequestID)
@@ -7967,9 +7971,6 @@ func resolveUsageBillingRequestID(ctx context.Context, upstreamRequestID string)
 		if requestID, _ := ctx.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
 			return "local:" + strings.TrimSpace(requestID)
 		}
-	}
-	if requestID := strings.TrimSpace(upstreamRequestID); requestID != "" {
-		return requestID
 	}
 	return "generated:" + generateRequestID()
 }
