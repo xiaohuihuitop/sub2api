@@ -22,6 +22,12 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 			want:       true,
 		},
 		{
+			name:       "openai account without explicit capabilities supports responses",
+			account:    &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+			capability: OpenAIEndpointCapabilityResponses,
+			want:       true,
+		},
+		{
 			name: "array capability allows chat completions",
 			account: &Account{
 				Platform: PlatformOpenAI,
@@ -32,6 +38,18 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 			},
 			capability: OpenAIEndpointCapabilityChatCompletions,
 			want:       true,
+		},
+		{
+			name: "chat completions only blocks responses",
+			account: &Account{
+				Platform: PlatformOpenAI,
+				Type:     AccountTypeAPIKey,
+				Credentials: map[string]any{
+					"openai_capabilities": []any{"chat_completions"},
+				},
+			},
+			capability: OpenAIEndpointCapabilityResponses,
+			want:       false,
 		},
 		{
 			name: "map capability blocks chat completions when disabled",

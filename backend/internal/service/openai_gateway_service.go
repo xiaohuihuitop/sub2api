@@ -5053,6 +5053,10 @@ type OpenAIRecordUsageInput struct {
 
 // RecordUsage records usage and deducts balance
 func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRecordUsageInput) error {
+	if input == nil || input.Result == nil || input.APIKey == nil || input.User == nil || input.Account == nil {
+		return fmt.Errorf("invalid openai usage input")
+	}
+
 	result := input.Result
 	if s.rateLimitService != nil && input != nil && input.Account != nil && input.Account.Platform == PlatformOpenAI {
 		s.rateLimitService.ResetOpenAI403Counter(ctx, input.Account.ID)
@@ -5110,7 +5114,34 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	cost, err = s.calculateOpenAIRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, tokens, serviceTier)
 	if err != nil {
+		logger.L().With(
+			zap.String("component", "service.openai_gateway"),
+			zap.String("model", result.Model),
+			zap.String("billing_model", billingModel),
+			zap.Int64("api_key_id", apiKey.ID),
+			zap.Any("group_id", apiKey.GroupID),
+			zap.Int64("account_id", account.ID),
+			zap.Int("input_tokens", tokens.InputTokens),
+			zap.Int("output_tokens", tokens.OutputTokens),
+			zap.Int("cache_read_tokens", tokens.CacheReadTokens),
+			zap.String("service_tier", serviceTier),
+		).Error("openai.usage_cost_calculation_failed", zap.Error(err))
 		cost = &CostBreakdown{ActualCost: 0}
+	}
+	if cost == nil {
+		logger.L().With(
+			zap.String("component", "service.openai_gateway"),
+			zap.String("model", result.Model),
+			zap.String("billing_model", billingModel),
+			zap.Int64("api_key_id", apiKey.ID),
+			zap.Any("group_id", apiKey.GroupID),
+			zap.Int64("account_id", account.ID),
+			zap.Int("input_tokens", tokens.InputTokens),
+			zap.Int("output_tokens", tokens.OutputTokens),
+			zap.Int("cache_read_tokens", tokens.CacheReadTokens),
+			zap.String("service_tier", serviceTier),
+		).Warn("openai.usage_cost_missing_zero_fallback")
+		cost = &CostBreakdown{}
 	}
 
 	// Determine billing type
@@ -5203,14 +5234,16 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if apiKey.GroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
-			tokens, cost.TotalCost,
+			tokens, usageLog.TotalCost,
 		)
 	}
 
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
 		logger.LegacyPrintf("service.openai_gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
-		s.deferredService.ScheduleLastUsedUpdate(account.ID)
+		if s.deferredService != nil {
+			s.deferredService.ScheduleLastUsedUpdate(account.ID)
+		}
 		return nil
 	}
 
@@ -5230,6 +5263,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}()
 
 	if billingErr != nil {
+		logUsageBillingFailure("service.openai_gateway", usageLog, billingErr)
+		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")

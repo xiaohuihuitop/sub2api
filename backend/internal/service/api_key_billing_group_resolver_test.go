@@ -165,6 +165,153 @@ func TestAPIKeyService_ResolveBillingGroupForRequest_FiltersByTargetPlatform(t *
 	require.Equal(t, []int64{gemini.ID}, resolver.checkedGroups)
 }
 
+func TestAPIKeyService_ResolveBillingGroupForRequest_ChatCompletionsPrefersChatCapableGroup(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, nil)
+	responsesGroup := testSubscriptionGroup(10, "gpt-responses", PlatformOpenAI, 5, 1)
+	chatGroup := testSubscriptionGroup(20, "glm-chat", PlatformOpenAI, 5, 2)
+	responsesGroup.AccountGroups = []AccountGroup{{
+		GroupID: responsesGroup.ID,
+		Account: &Account{
+			ID:       101,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeOAuth,
+			Status:   StatusActive,
+		},
+	}}
+	chatGroup.AccountGroups = []AccountGroup{{
+		GroupID: chatGroup.ID,
+		Account: &Account{
+			ID:       202,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Status:   StatusActive,
+			Credentials: map[string]any{
+				"openai_capabilities": []any{"chat_completions"},
+			},
+		},
+	}}
+	apiKey := testAPIKeyWithAllowedGroups(7, responsesGroup, []Group{*responsesGroup, *chatGroup}, 0)
+	resolver := &fakeAPIKeySubscriptionResolver{
+		subs: map[int64]*UserSubscription{
+			responsesGroup.ID: testActiveSubscription(7, responsesGroup.ID),
+			chatGroup.ID:      testActiveSubscription(7, chatGroup.ID),
+		},
+	}
+
+	subscription, err := svc.ResolveBillingGroupForRequest(
+		context.Background(),
+		apiKey,
+		resolver,
+		false,
+		PlatformOpenAI,
+		"/v1/chat/completions",
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, subscription)
+	require.Equal(t, chatGroup.ID, subscription.GroupID)
+	require.Equal(t, chatGroup.ID, apiKey.Group.ID)
+	require.Equal(t, []int64{chatGroup.ID}, resolver.checkedGroups)
+}
+
+func TestAPIKeyService_ResolveBillingGroupForRequest_DefaultOpenAIGroupDoesNotStealChatEndpoint(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, nil)
+	defaultOpenAIGroup := testSubscriptionGroup(10, "default-openai", PlatformOpenAI, 5, 1)
+	chatGroup := testSubscriptionGroup(20, "glm-chat", PlatformOpenAI, 5, 2)
+	defaultOpenAIGroup.AccountGroups = []AccountGroup{{
+		GroupID: defaultOpenAIGroup.ID,
+		Account: &Account{
+			ID:       101,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Status:   StatusActive,
+		},
+	}}
+	chatGroup.AccountGroups = []AccountGroup{{
+		GroupID: chatGroup.ID,
+		Account: &Account{
+			ID:       202,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Status:   StatusActive,
+			Credentials: map[string]any{
+				"openai_capabilities": []any{"chat_completions"},
+			},
+		},
+	}}
+	apiKey := testAPIKeyWithAllowedGroups(7, defaultOpenAIGroup, []Group{*defaultOpenAIGroup, *chatGroup}, 0)
+	resolver := &fakeAPIKeySubscriptionResolver{
+		subs: map[int64]*UserSubscription{
+			defaultOpenAIGroup.ID: testActiveSubscription(7, defaultOpenAIGroup.ID),
+			chatGroup.ID:         testActiveSubscription(7, chatGroup.ID),
+		},
+	}
+
+	subscription, err := svc.ResolveBillingGroupForRequest(
+		context.Background(),
+		apiKey,
+		resolver,
+		false,
+		PlatformOpenAI,
+		"/v1/chat/completions",
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, subscription)
+	require.Equal(t, chatGroup.ID, subscription.GroupID)
+	require.Equal(t, chatGroup.ID, apiKey.Group.ID)
+	require.Equal(t, []int64{chatGroup.ID}, resolver.checkedGroups)
+}
+
+func TestAPIKeyService_ResolveBillingGroupForRequest_ResponsesAvoidsChatOnlyGroup(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, nil)
+	chatGroup := testSubscriptionGroup(10, "glm-chat", PlatformOpenAI, 5, 1)
+	responsesGroup := testSubscriptionGroup(20, "gpt-responses", PlatformOpenAI, 5, 2)
+	chatGroup.AccountGroups = []AccountGroup{{
+		GroupID: chatGroup.ID,
+		Account: &Account{
+			ID:       101,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Status:   StatusActive,
+			Credentials: map[string]any{
+				"openai_capabilities": []any{"chat_completions"},
+			},
+		},
+	}}
+	responsesGroup.AccountGroups = []AccountGroup{{
+		GroupID: responsesGroup.ID,
+		Account: &Account{
+			ID:       202,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeOAuth,
+			Status:   StatusActive,
+		},
+	}}
+	apiKey := testAPIKeyWithAllowedGroups(7, chatGroup, []Group{*chatGroup, *responsesGroup}, 0)
+	resolver := &fakeAPIKeySubscriptionResolver{
+		subs: map[int64]*UserSubscription{
+			chatGroup.ID:      testActiveSubscription(7, chatGroup.ID),
+			responsesGroup.ID: testActiveSubscription(7, responsesGroup.ID),
+		},
+	}
+
+	subscription, err := svc.ResolveBillingGroupForRequest(
+		context.Background(),
+		apiKey,
+		resolver,
+		false,
+		PlatformOpenAI,
+		"/v1/responses",
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, subscription)
+	require.Equal(t, responsesGroup.ID, subscription.GroupID)
+	require.Equal(t, responsesGroup.ID, apiKey.Group.ID)
+	require.Equal(t, []int64{responsesGroup.ID}, resolver.checkedGroups)
+}
+
 func TestAPIKeyService_ResolveBillingGroupForRequest_ReturnsLastSubscriptionLimitErrorWhenNoFallback(t *testing.T) {
 	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, nil)
 	subGroup := testSubscriptionGroup(10, "sub", PlatformAnthropic, 5, 1)

@@ -67,6 +67,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			subscriptionService,
 			false,
 			targetPlatform,
+			apiKeyBillingRequestEndpoint(c),
 		)
 		if err != nil {
 			handleGoogleBillingResolutionError(c, err)

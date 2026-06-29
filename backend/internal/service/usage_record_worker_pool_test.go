@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,6 +37,44 @@ func TestUsageRecordWorkerPool_SubmitEnqueued(t *testing.T) {
 		stats := pool.Stats()
 		return stats.SubmittedTasks == 1 && stats.SuccessfulTasks == 1
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestUsageRecordWorkerPool_SubmitWithContextPreservesRequestMetadata(t *testing.T) {
+	pool := NewUsageRecordWorkerPoolWithOptions(UsageRecordWorkerPoolOptions{
+		WorkerCount:           1,
+		QueueSize:             8,
+		TaskTimeout:           time.Second,
+		OverflowPolicy:        config.UsageRecordOverflowPolicyDrop,
+		OverflowSamplePercent: 0,
+		AutoScaleEnabled:      false,
+	})
+	t.Cleanup(pool.Stop)
+
+	parent := context.WithValue(context.Background(), ctxkey.ClientRequestID, "client-worker-1")
+	parent = context.WithValue(parent, ctxkey.RequestID, "request-worker-1")
+	cancelledParent, cancel := context.WithCancel(parent)
+	cancel()
+
+	done := make(chan struct{})
+	gotClientRequestID := make(chan any, 1)
+	gotRequestID := make(chan any, 1)
+	gotErr := make(chan error, 1)
+	mode := pool.SubmitWithContext(cancelledParent, func(ctx context.Context) {
+		gotErr <- ctx.Err()
+		gotClientRequestID <- ctx.Value(ctxkey.ClientRequestID)
+		gotRequestID <- ctx.Value(ctxkey.RequestID)
+		close(done)
+	})
+	require.Equal(t, UsageRecordSubmitModeEnqueued, mode)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("task not executed")
+	}
+	require.NoError(t, <-gotErr)
+	require.Equal(t, "client-worker-1", <-gotClientRequestID)
+	require.Equal(t, "request-worker-1", <-gotRequestID)
 }
 
 func TestUsageRecordWorkerPool_OverflowDrop(t *testing.T) {
@@ -449,13 +488,13 @@ func TestUsageRecordWorkerPool_Execute_PanicAndTimeout(t *testing.T) {
 	pool := &UsageRecordWorkerPool{taskTimeout: 30 * time.Millisecond}
 
 	require.NotPanics(t, func() {
-		pool.execute(func(ctx context.Context) {
+		pool.execute(context.Background(), func(ctx context.Context) {
 			panic("boom")
 		})
 	})
 
 	done := make(chan struct{})
-	pool.execute(func(ctx context.Context) {
+	pool.execute(context.Background(), func(ctx context.Context) {
 		<-ctx.Done()
 		close(done)
 	})

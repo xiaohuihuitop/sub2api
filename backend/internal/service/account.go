@@ -70,6 +70,7 @@ type OpenAIEndpointCapability string
 
 const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
+	OpenAIEndpointCapabilityResponses       OpenAIEndpointCapability = "responses"
 	OpenAIEndpointCapabilityEmbeddings      OpenAIEndpointCapability = "embeddings"
 )
 
@@ -1067,6 +1068,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	}
 	switch capability {
 	case OpenAIEndpointCapabilityChatCompletions:
+	case OpenAIEndpointCapabilityResponses:
 	case OpenAIEndpointCapabilityEmbeddings:
 		if a.Type != AccountTypeAPIKey {
 			return false
@@ -1121,6 +1123,15 @@ func (a *Account) openAIEndpointCapabilitySet() (map[string]bool, bool) {
 			if enabled {
 				add(key)
 			}
+		}
+	case string:
+		var decoded []string
+		if err := json.Unmarshal([]byte(capabilities), &decoded); err == nil {
+			for _, value := range decoded {
+				add(value)
+			}
+		} else {
+			add(capabilities)
 		}
 	}
 

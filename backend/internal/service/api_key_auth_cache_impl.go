@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 8 // v8: added allowed groups on auth snapshot
+const apiKeyAuthSnapshotVersion = 9 // v9: added OpenAI endpoint capabilities on group snapshots
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -269,6 +269,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			AllowMessagesDispatch:           apiKey.Group.AllowMessagesDispatch,
 			DefaultMappedModel:              apiKey.Group.DefaultMappedModel,
 			MessagesDispatchModelConfig:     apiKey.Group.MessagesDispatchModelConfig,
+			OpenAIEndpointCapabilities:      copyBoolMap(apiKey.Group.OpenAIEndpointCapabilities),
 			RPMLimit:                        apiKey.Group.RPMLimit,
 		}
 	}
@@ -363,6 +364,7 @@ func apiKeyAuthGroupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		AllowMessagesDispatch:           group.AllowMessagesDispatch,
 		DefaultMappedModel:              group.DefaultMappedModel,
 		MessagesDispatchModelConfig:     group.MessagesDispatchModelConfig,
+		OpenAIEndpointCapabilities:      copyBoolMap(group.OpenAIEndpointCapabilities),
 		RPMLimit:                        group.RPMLimit,
 	}
 }
@@ -395,6 +397,18 @@ func apiKeyAuthSnapshotToGroup(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		AllowMessagesDispatch:           snapshot.AllowMessagesDispatch,
 		DefaultMappedModel:              snapshot.DefaultMappedModel,
 		MessagesDispatchModelConfig:     snapshot.MessagesDispatchModelConfig,
+		OpenAIEndpointCapabilities:      copyBoolMap(snapshot.OpenAIEndpointCapabilities),
 		RPMLimit:                        snapshot.RPMLimit,
 	}
+}
+
+func copyBoolMap(in map[string]bool) map[string]bool {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }

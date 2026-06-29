@@ -3,12 +3,15 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
+	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -616,6 +619,21 @@ func (r *apiKeyRepository) loadAllowedGroups(ctx context.Context, keys []*servic
 		for _, group := range groups {
 			key.AllowedGroupIDs = append(key.AllowedGroupIDs, group.ID)
 		}
+		if key.Group != nil {
+			if group, ok := groupByID(groups, key.Group.ID); ok {
+				groupCopy := group
+				key.Group = &groupCopy
+				key.GroupID = &groupCopy.ID
+			} else {
+				primaryGroups := []service.Group{*key.Group}
+				if err := r.hydrateOpenAIGroupEndpointCapabilities(ctx, primaryGroups); err != nil {
+					return err
+				}
+				groupCopy := primaryGroups[0]
+				key.Group = &groupCopy
+				key.GroupID = &groupCopy.ID
+			}
+		}
 		if key.Group == nil && len(groups) > 0 {
 			groupCopy := groups[0]
 			key.Group = &groupCopy
@@ -623,6 +641,15 @@ func (r *apiKeyRepository) loadAllowedGroups(ctx context.Context, keys []*servic
 		}
 	}
 	return nil
+}
+
+func groupByID(groups []service.Group, id int64) (service.Group, bool) {
+	for _, group := range groups {
+		if group.ID == id {
+			return group, true
+		}
+	}
+	return service.Group{}, false
 }
 
 func (r *apiKeyRepository) listAPIKeyIDsByAllowedGroup(ctx context.Context, groupID int64) ([]int64, error) {
@@ -736,7 +763,136 @@ func (r *apiKeyRepository) ListAllowedGroups(ctx context.Context, keyID int64) (
 			groups = append(groups, mapped)
 		}
 	}
+	if err := r.hydrateOpenAIGroupEndpointCapabilities(ctx, groups); err != nil {
+		return nil, err
+	}
 	return groups, nil
+}
+
+func (r *apiKeyRepository) hydrateOpenAIGroupEndpointCapabilities(ctx context.Context, groups []service.Group) error {
+	openAIGroupIDs := make([]int64, 0, len(groups))
+	groupIndex := make(map[int64]int, len(groups))
+	for i := range groups {
+		if groups[i].Platform != service.PlatformOpenAI {
+			continue
+		}
+		openAIGroupIDs = append(openAIGroupIDs, groups[i].ID)
+		groupIndex[groups[i].ID] = i
+	}
+	if len(openAIGroupIDs) == 0 {
+		return nil
+	}
+
+	accountGroups, err := r.client.AccountGroup.Query().
+		Where(accountgroup.GroupIDIn(openAIGroupIDs...)).
+		WithAccount(func(q *dbent.AccountQuery) {
+			q.Select(
+				dbaccount.FieldID,
+				dbaccount.FieldPlatform,
+				dbaccount.FieldType,
+				dbaccount.FieldCredentials,
+			)
+		}).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range accountGroups {
+		idx, ok := groupIndex[entry.GroupID]
+		if !ok || entry.Edges.Account == nil {
+			continue
+		}
+		account := accountEntityToService(entry.Edges.Account)
+		if account == nil || !account.IsOpenAI() {
+			continue
+		}
+		capabilities := groups[idx].OpenAIEndpointCapabilities
+		if capabilities == nil {
+			capabilities = map[string]bool{
+				string(service.OpenAIEndpointCapabilityChatCompletions): false,
+				string(service.OpenAIEndpointCapabilityResponses):       false,
+			}
+			groups[idx].OpenAIEndpointCapabilities = capabilities
+		}
+		for _, capability := range openAIAccountEndpointCapabilities(account) {
+			capabilities[string(capability)] = true
+		}
+	}
+	return nil
+}
+
+func openAIAccountEndpointCapabilities(account *service.Account) []service.OpenAIEndpointCapability {
+	if account == nil || !account.IsOpenAI() {
+		return nil
+	}
+	if _, configured := openAIEndpointCapabilitySetFromCredentials(account.Credentials); !configured {
+		return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
+	}
+	out := make([]service.OpenAIEndpointCapability, 0, 2)
+	for _, capability := range []service.OpenAIEndpointCapability{
+		service.OpenAIEndpointCapabilityChatCompletions,
+		service.OpenAIEndpointCapabilityResponses,
+	} {
+		if account.SupportsOpenAIEndpointCapability(capability) {
+			out = append(out, capability)
+		}
+	}
+	return out
+}
+
+func openAIEndpointCapabilitySetFromCredentials(credentials map[string]any) (map[string]bool, bool) {
+	if credentials == nil {
+		return nil, false
+	}
+	raw, found := credentials["openai_capabilities"]
+	if !found || raw == nil {
+		return nil, false
+	}
+
+	result := make(map[string]bool)
+	add := func(value string) {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value != "" {
+			result[value] = true
+		}
+	}
+
+	switch capabilities := raw.(type) {
+	case []any:
+		for _, item := range capabilities {
+			if value, ok := item.(string); ok {
+				add(value)
+			}
+		}
+	case []string:
+		for _, value := range capabilities {
+			add(value)
+		}
+	case map[string]any:
+		for key, value := range capabilities {
+			if enabled, ok := value.(bool); ok && enabled {
+				add(key)
+			}
+		}
+	case map[string]bool:
+		for key, enabled := range capabilities {
+			if enabled {
+				add(key)
+			}
+		}
+	case string:
+		var decoded []string
+		if err := json.Unmarshal([]byte(capabilities), &decoded); err == nil {
+			for _, value := range decoded {
+				add(value)
+			}
+		} else {
+			add(capabilities)
+		}
+	}
+
+	return result, true
 }
 
 // IncrementQuotaUsed 使用 Ent 原子递增 quota_used 字段并返回新值

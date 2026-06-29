@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
@@ -22,6 +23,7 @@ func (s *APIKeyService) ResolveBillingGroupForRequest(
 	subscriptionResolver apiKeySubscriptionResolver,
 	skipBilling bool,
 	targetPlatform string,
+	requestEndpoint ...string,
 ) (*UserSubscription, error) {
 	if apiKey == nil {
 		return nil, ErrNoUsableBillingGroup
@@ -37,6 +39,7 @@ func (s *APIKeyService) ResolveBillingGroupForRequest(
 		}
 		candidates = filtered
 	}
+	candidates = filterBillingGroupsForEndpoint(candidates, firstRequestEndpoint(requestEndpoint))
 	if len(candidates) == 0 {
 		return nil, ErrNoUsableBillingGroup
 	}
@@ -84,6 +87,75 @@ func (s *APIKeyService) ResolveBillingGroupForRequest(
 		return nil, lastSubscriptionErr
 	}
 	return nil, ErrNoUsableBillingGroup
+}
+
+func firstRequestEndpoint(endpoints []string) string {
+	if len(endpoints) == 0 {
+		return ""
+	}
+	return endpoints[0]
+}
+
+func filterBillingGroupsForEndpoint(groups []Group, requestEndpoint string) []Group {
+	capability := openAIEndpointCapabilityForBillingEndpoint(requestEndpoint)
+	if capability == "" || len(groups) == 0 {
+		return groups
+	}
+	matched := make([]Group, 0, len(groups))
+	for _, group := range groups {
+		if group.Platform != PlatformOpenAI {
+			matched = append(matched, group)
+			continue
+		}
+		if groupSupportsOpenAIEndpointCapability(group, capability) {
+			matched = append(matched, group)
+		}
+	}
+	if len(matched) == 0 {
+		return groups
+	}
+	return matched
+}
+
+func openAIEndpointCapabilityForBillingEndpoint(endpoint string) OpenAIEndpointCapability {
+	endpoint = strings.ToLower(strings.TrimSpace(endpoint))
+	switch {
+	case strings.Contains(endpoint, "/chat/completions"):
+		return OpenAIEndpointCapabilityChatCompletions
+	case strings.Contains(endpoint, "/responses"):
+		return OpenAIEndpointCapabilityResponses
+	default:
+		return ""
+	}
+}
+
+func groupSupportsOpenAIEndpointCapability(group Group, capability OpenAIEndpointCapability) bool {
+	if capability == "" {
+		return true
+	}
+	if len(group.OpenAIEndpointCapabilities) == 0 {
+		for _, accountGroup := range group.AccountGroups {
+			if openAIAccountSupportsBillingEndpointCapability(accountGroup.Account, capability) {
+				return true
+			}
+		}
+		return len(group.AccountGroups) == 0
+	}
+	return group.OpenAIEndpointCapabilities[string(capability)]
+}
+
+func openAIAccountSupportsBillingEndpointCapability(account *Account, capability OpenAIEndpointCapability) bool {
+	if account == nil || !account.IsOpenAI() {
+		return false
+	}
+	if capability == "" {
+		return true
+	}
+	configured, found := account.openAIEndpointCapabilitySet()
+	if !found {
+		return capability == OpenAIEndpointCapabilityResponses
+	}
+	return configured[string(capability)] && account.SupportsOpenAIEndpointCapability(capability)
 }
 
 func (k *APIKey) allowedBillingGroups() []Group {

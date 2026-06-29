@@ -293,12 +293,15 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesAllowedGroups(t *testing.T) {
 			{
 				ID:               9,
 				Name:             "subscription",
-				Platform:         PlatformAnthropic,
+				Platform:         PlatformOpenAI,
 				Status:           StatusActive,
 				Hydrated:         true,
 				SubscriptionType: SubscriptionTypeSubscription,
 				RateMultiplier:   1,
 				DailyLimitUSD:    testPtrFloat64(5),
+				OpenAIEndpointCapabilities: map[string]bool{
+					string(OpenAIEndpointCapabilityResponses): true,
+				},
 			},
 			{
 				ID:               11,
@@ -336,6 +339,7 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesAllowedGroups(t *testing.T) {
 	require.Len(t, roundTrip.AllowedGroups, 2)
 	require.Equal(t, int64(9), roundTrip.AllowedGroups[0].ID)
 	require.Equal(t, SubscriptionTypeSubscription, roundTrip.AllowedGroups[0].SubscriptionType)
+	require.Equal(t, map[string]bool{string(OpenAIEndpointCapabilityResponses): true}, roundTrip.AllowedGroups[0].OpenAIEndpointCapabilities)
 	require.Equal(t, int64(11), roundTrip.AllowedGroups[1].ID)
 	require.Equal(t, SubscriptionTypeStandard, roundTrip.AllowedGroups[1].SubscriptionType)
 }

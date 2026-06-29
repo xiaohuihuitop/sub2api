@@ -36,6 +36,7 @@ import (
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/gin-gonic/gin"
@@ -8247,9 +8248,6 @@ func writeUsageLogBestEffort(ctx context.Context, repo UsageLogRepository, usage
 	if writer, ok := repo.(usageLogBestEffortWriter); ok {
 		if err := writer.CreateBestEffort(usageCtx, usageLog); err != nil {
 			logger.LegacyPrintf(logKey, "Create usage log failed: %v", err)
-			if IsUsageLogCreateDropped(err) {
-				return
-			}
 			if _, syncErr := repo.Create(usageCtx, usageLog); syncErr != nil {
 				logger.LegacyPrintf(logKey, "Create usage log sync fallback failed: %v", syncErr)
 			}
@@ -8260,6 +8258,37 @@ func writeUsageLogBestEffort(ctx context.Context, repo UsageLogRepository, usage
 	if _, err := repo.Create(usageCtx, usageLog); err != nil {
 		logger.LegacyPrintf(logKey, "Create usage log failed: %v", err)
 	}
+}
+
+func logUsageBillingFailure(logKey string, usageLog *UsageLog, err error) {
+	if err == nil || usageLog == nil {
+		return
+	}
+	fields := []zap.Field{
+		zap.String("component", logKey),
+		zap.String("request_id", usageLog.RequestID),
+		zap.Int64("user_id", usageLog.UserID),
+		zap.Int64("api_key_id", usageLog.APIKeyID),
+		zap.Int64("account_id", usageLog.AccountID),
+		zap.String("model", usageLog.Model),
+		zap.Int("input_tokens", usageLog.InputTokens),
+		zap.Int("output_tokens", usageLog.OutputTokens),
+		zap.Float64("actual_cost", usageLog.ActualCost),
+		zap.Float64("total_cost", usageLog.TotalCost),
+	}
+	if usageLog.GroupID != nil {
+		fields = append(fields, zap.Int64("group_id", *usageLog.GroupID))
+	}
+	if usageLog.SubscriptionID != nil {
+		fields = append(fields, zap.Int64("subscription_id", *usageLog.SubscriptionID))
+	}
+	if usageLog.InboundEndpoint != nil {
+		fields = append(fields, zap.String("inbound_endpoint", *usageLog.InboundEndpoint))
+	}
+	if usageLog.UpstreamEndpoint != nil {
+		fields = append(fields, zap.String("upstream_endpoint", *usageLog.UpstreamEndpoint))
+	}
+	logger.L().With(fields...).Error("usage.billing_failed", zap.Error(err))
 }
 
 // recordUsageOpts 内部选项，参数化 RecordUsage 与 RecordUsageWithLongContext 的差异点。
@@ -8462,6 +8491,8 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	}, s.billingDeps(), s.usageBillingRepo)
 
 	if billingErr != nil {
+		logUsageBillingFailure("service.gateway", usageLog, billingErr)
+		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")

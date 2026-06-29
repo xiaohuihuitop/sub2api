@@ -80,6 +80,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			subscriptionService,
 			skipBilling,
 			targetPlatform,
+			apiKeyBillingRequestEndpoint(c),
 		)
 		if err != nil {
 			if skipBilling && allowUsageWithoutBillingResolution(err, apiKey) {
@@ -140,6 +141,21 @@ func extractAPIKeyFromHeaders(c *gin.Context) string {
 		return key
 	}
 	return strings.TrimSpace(c.GetHeader("x-goog-api-key"))
+}
+
+func apiKeyBillingRequestEndpoint(c *gin.Context) string {
+	if c == nil || c.Request == nil || c.Request.URL == nil {
+		return ""
+	}
+	path := strings.TrimSpace(c.Request.URL.Path)
+	switch {
+	case strings.Contains(path, "/chat/completions"):
+		return "/v1/chat/completions"
+	case strings.Contains(path, "/responses"):
+		return "/v1/responses"
+	default:
+		return path
+	}
 }
 
 func handleAPIKeyBillingResolutionError(c *gin.Context, err error) {

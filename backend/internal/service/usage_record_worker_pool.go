@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/alitto/pond/v2"
 	"go.uber.org/zap"
@@ -143,9 +144,16 @@ func NewUsageRecordWorkerPoolWithOptions(opts UsageRecordWorkerPoolOptions) *Usa
 // Submit 提交一个使用量记录任务。
 // 提交失败（队列满）时按 overflowPolicy 执行降级策略：drop/sample/sync。
 func (p *UsageRecordWorkerPool) Submit(task UsageRecordTask) UsageRecordSubmitMode {
+	return p.SubmitWithContext(context.Background(), task)
+}
+
+// SubmitWithContext submits a usage record task and preserves request metadata
+// needed by billing/logging while detaching from request cancellation.
+func (p *UsageRecordWorkerPool) SubmitWithContext(parent context.Context, task UsageRecordTask) UsageRecordSubmitMode {
 	if p == nil || task == nil {
 		return UsageRecordSubmitModeDropped
 	}
+	parent = detachedUsageRecordContext(parent)
 	if p.pool == nil || p.pool.Stopped() {
 		p.droppedPoolStopped.Add(1)
 		p.logDrop("stopped")
@@ -153,7 +161,7 @@ func (p *UsageRecordWorkerPool) Submit(task UsageRecordTask) UsageRecordSubmitMo
 	}
 
 	_, ok := p.pool.TrySubmit(func() {
-		p.execute(task)
+		p.execute(parent, task)
 	})
 	if ok {
 		return UsageRecordSubmitModeEnqueued
@@ -168,12 +176,12 @@ func (p *UsageRecordWorkerPool) Submit(task UsageRecordTask) UsageRecordSubmitMo
 	switch p.overflowPolicy {
 	case config.UsageRecordOverflowPolicySync:
 		p.syncFallback.Add(1)
-		p.execute(task)
+		p.execute(parent, task)
 		return UsageRecordSubmitModeSync
 	case config.UsageRecordOverflowPolicySample:
 		if p.shouldSyncFallback() {
 			p.syncFallback.Add(1)
-			p.execute(task)
+			p.execute(parent, task)
 			return UsageRecordSubmitModeSync
 		}
 	}
@@ -314,8 +322,8 @@ func (p *UsageRecordWorkerPool) shouldSyncFallback() bool {
 	return int((n-1)%100) < p.overflowSamplePercent
 }
 
-func (p *UsageRecordWorkerPool) execute(task UsageRecordTask) {
-	ctx, cancel := context.WithTimeout(context.Background(), p.taskTimeout)
+func (p *UsageRecordWorkerPool) execute(parent context.Context, task UsageRecordTask) {
+	ctx, cancel := context.WithTimeout(detachedUsageRecordContext(parent), p.taskTimeout)
 	defer cancel()
 
 	defer func() {
@@ -328,6 +336,21 @@ func (p *UsageRecordWorkerPool) execute(task UsageRecordTask) {
 	}()
 
 	task(ctx)
+}
+
+func detachedUsageRecordContext(parent context.Context) context.Context {
+	if parent == nil {
+		return context.Background()
+	}
+	base := context.WithoutCancel(parent)
+	out := context.Background()
+	if clientRequestID, _ := base.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
+		out = context.WithValue(out, ctxkey.ClientRequestID, strings.TrimSpace(clientRequestID))
+	}
+	if requestID, _ := base.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
+		out = context.WithValue(out, ctxkey.RequestID, strings.TrimSpace(requestID))
+	}
+	return out
 }
 
 func (p *UsageRecordWorkerPool) logDrop(reason string) {
