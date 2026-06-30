@@ -153,7 +153,8 @@ func openAIAccountSupportsBillingEndpointCapability(account *Account, capability
 	}
 	configured, found := account.openAIEndpointCapabilitySet()
 	if !found {
-		return capability == OpenAIEndpointCapabilityResponses
+		return capability == OpenAIEndpointCapabilityResponses &&
+			account.SupportsOpenAIEndpointCapability(capability)
 	}
 	return configured[string(capability)] && account.SupportsOpenAIEndpointCapability(capability)
 }

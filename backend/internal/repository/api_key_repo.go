@@ -791,6 +791,7 @@ func (r *apiKeyRepository) hydrateOpenAIGroupEndpointCapabilities(ctx context.Co
 				dbaccount.FieldPlatform,
 				dbaccount.FieldType,
 				dbaccount.FieldCredentials,
+				dbaccount.FieldExtra,
 			)
 		}).
 		All(ctx)
@@ -827,7 +828,10 @@ func openAIAccountEndpointCapabilities(account *service.Account) []service.OpenA
 		return nil
 	}
 	if _, configured := openAIEndpointCapabilitySetFromCredentials(account.Credentials); !configured {
-		return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
+		if account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityResponses) {
+			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
+		}
+		return nil
 	}
 	out := make([]service.OpenAIEndpointCapability, 0, 2)
 	for _, capability := range []service.OpenAIEndpointCapability{

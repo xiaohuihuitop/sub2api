@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 9 // v9: added OpenAI endpoint capabilities on group snapshots
+const apiKeyAuthSnapshotVersion = 10 // v10: refreshed OpenAI endpoint capability semantics
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/stretchr/testify/require"
 )
 
@@ -276,6 +277,55 @@ func TestAPIKeyService_ResolveBillingGroupForRequest_ResponsesAvoidsChatOnlyGrou
 			Status:   StatusActive,
 			Credentials: map[string]any{
 				"openai_capabilities": []any{"chat_completions"},
+			},
+		},
+	}}
+	responsesGroup.AccountGroups = []AccountGroup{{
+		GroupID: responsesGroup.ID,
+		Account: &Account{
+			ID:       202,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeOAuth,
+			Status:   StatusActive,
+		},
+	}}
+	apiKey := testAPIKeyWithAllowedGroups(7, chatGroup, []Group{*chatGroup, *responsesGroup}, 0)
+	resolver := &fakeAPIKeySubscriptionResolver{
+		subs: map[int64]*UserSubscription{
+			chatGroup.ID:      testActiveSubscription(7, chatGroup.ID),
+			responsesGroup.ID: testActiveSubscription(7, responsesGroup.ID),
+		},
+	}
+
+	subscription, err := svc.ResolveBillingGroupForRequest(
+		context.Background(),
+		apiKey,
+		resolver,
+		false,
+		PlatformOpenAI,
+		"/v1/responses",
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, subscription)
+	require.Equal(t, responsesGroup.ID, subscription.GroupID)
+	require.Equal(t, responsesGroup.ID, apiKey.Group.ID)
+	require.Equal(t, []int64{responsesGroup.ID}, resolver.checkedGroups)
+}
+
+func TestAPIKeyService_ResolveBillingGroupForRequest_ResponsesAvoidsProbeRejectedChatGroup(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, nil)
+	chatGroup := testSubscriptionGroup(10, "glm-chat", PlatformOpenAI, 5, 1)
+	responsesGroup := testSubscriptionGroup(20, "gpt-responses", PlatformOpenAI, 5, 2)
+	chatGroup.AccountGroups = []AccountGroup{{
+		GroupID: chatGroup.ID,
+		Account: &Account{
+			ID:       101,
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Status:   StatusActive,
+			Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesSupported: false,
 			},
 		},
 	}}

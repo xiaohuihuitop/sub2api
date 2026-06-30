@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
+)
 
 func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 	tests := []struct {
@@ -46,6 +50,30 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 				Type:     AccountTypeAPIKey,
 				Credentials: map[string]any{
 					"openai_capabilities": []any{"chat_completions"},
+				},
+			},
+			capability: OpenAIEndpointCapabilityResponses,
+			want:       false,
+		},
+		{
+			name: "responses probe failure blocks responses capability",
+			account: &Account{
+				Platform: PlatformOpenAI,
+				Type:     AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesSupported: false,
+				},
+			},
+			capability: OpenAIEndpointCapabilityResponses,
+			want:       false,
+		},
+		{
+			name: "force chat completions blocks responses capability",
+			account: &Account{
+				Platform: PlatformOpenAI,
+				Type:     AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
 				},
 			},
 			capability: OpenAIEndpointCapabilityResponses,

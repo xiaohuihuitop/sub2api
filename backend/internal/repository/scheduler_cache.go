@@ -543,6 +543,8 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		"openai_oauth_responses_websockets_v2_mode",
 		"openai_apikey_responses_websockets_v2_enabled",
 		"openai_apikey_responses_websockets_v2_mode",
+		"openai_responses_supported",
+		"openai_responses_mode",
 		"responses_websockets_v2_enabled",
 		"openai_ws_enabled",
 		"openai_ws_force_http",

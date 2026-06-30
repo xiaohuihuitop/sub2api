@@ -556,6 +556,102 @@ func TestAPIKeyAuthUsageAllowsExpiredSubscriptionLookup(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
+func TestAPIKeyAuthResolvesOpenAIBillingGroupPerEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	limit := 30.0
+	chatGroup := &service.Group{
+		ID:               10,
+		Name:             "glm-chat",
+		Status:           service.StatusActive,
+		Platform:         service.PlatformOpenAI,
+		Hydrated:         true,
+		SubscriptionType: service.SubscriptionTypeSubscription,
+		DailyLimitUSD:    &limit,
+		OpenAIEndpointCapabilities: map[string]bool{
+			string(service.OpenAIEndpointCapabilityChatCompletions): true,
+		},
+	}
+	responsesGroup := &service.Group{
+		ID:               20,
+		Name:             "gpt-responses",
+		Status:           service.StatusActive,
+		Platform:         service.PlatformOpenAI,
+		Hydrated:         true,
+		SubscriptionType: service.SubscriptionTypeSubscription,
+		DailyLimitUSD:    &limit,
+		OpenAIEndpointCapabilities: map[string]bool{
+			string(service.OpenAIEndpointCapabilityResponses): true,
+		},
+	}
+	user := &service.User{
+		ID:          7,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	apiKey := &service.APIKey{
+		ID:              100,
+		UserID:          user.ID,
+		Key:             "mixed-openai-key",
+		Status:          service.StatusActive,
+		User:            user,
+		Group:           chatGroup,
+		GroupID:         &chatGroup.ID,
+		AllowedGroupIDs: []int64{chatGroup.ID, responsesGroup.ID},
+		AllowedGroups:   []service.Group{*chatGroup, *responsesGroup},
+	}
+
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			clone.AllowedGroups = append([]service.Group(nil), apiKey.AllowedGroups...)
+			return &clone, nil
+		},
+	}
+	subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{
+		getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+			return &service.UserSubscription{
+				ID:        groupID + 1000,
+				UserID:    userID,
+				GroupID:   groupID,
+				Status:    service.SubscriptionStatusActive,
+				ExpiresAt: time.Now().Add(24 * time.Hour),
+			}, nil
+		},
+	}, nil, nil, &config.Config{})
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, &config.Config{RunMode: config.RunModeStandard})))
+	router.POST("/v1/chat/completions", func(c *gin.Context) {
+		group, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+		c.JSON(http.StatusOK, gin.H{"group_id": group.ID})
+	})
+	router.POST("/v1/responses", func(c *gin.Context) {
+		group, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+		c.JSON(http.StatusOK, gin.H{"group_id": group.ID})
+	})
+
+	chatResp := httptest.NewRecorder()
+	chatReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	chatReq.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(chatResp, chatReq)
+	require.Equal(t, http.StatusOK, chatResp.Code)
+	require.Contains(t, chatResp.Body.String(), `"group_id":10`)
+
+	responsesResp := httptest.NewRecorder()
+	responsesReq := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	responsesReq.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(responsesResp, responsesReq)
+	require.Equal(t, http.StatusOK, responsesResp.Code)
+	require.Contains(t, responsesResp.Body.String(), `"group_id":20`)
+}
+
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
