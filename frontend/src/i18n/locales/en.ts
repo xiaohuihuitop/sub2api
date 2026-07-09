@@ -842,6 +842,7 @@ export default {
     cost: 'Cost',
     firstToken: 'First Token',
     duration: 'Duration',
+    speed: 'Speed',
     time: 'Time',
     ws: 'WS',
     stream: 'Stream',

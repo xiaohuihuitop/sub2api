@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import UsageView from '../UsageView.vue'
 
-const { list, getStats, getSnapshotV2, getById } = vi.hoisted(() => {
+const { list, getStats, getSnapshotV2, getModelStats, getById } = vi.hoisted(() => {
   vi.stubGlobal('localStorage', {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
@@ -14,6 +14,7 @@ const { list, getStats, getSnapshotV2, getById } = vi.hoisted(() => {
     list: vi.fn(),
     getStats: vi.fn(),
     getSnapshotV2: vi.fn(),
+    getModelStats: vi.fn(),
     getById: vi.fn(),
   }
 })
@@ -40,6 +41,7 @@ vi.mock('@/api/admin', () => ({
     },
     dashboard: {
       getSnapshotV2,
+      getModelStats,
     },
     users: {
       getById,
@@ -83,7 +85,11 @@ vi.mock('vue-router', () => ({
 }))
 
 const AppLayoutStub = { template: '<div><slot /></div>' }
-const UsageFiltersStub = { template: '<div><slot name="after-reset" /></div>' }
+const UsageFiltersStub = { template: '<div data-test="usage-filters"><slot name="after-reset" /></div>' }
+const UsageTableStub = {
+  props: ['columns'],
+  template: '<div data-test="usage-table-columns">{{ columns.map((col) => col.key).join(",") }}</div>',
+}
 const ModelDistributionChartStub = {
   props: ['metric'],
   emits: ['update:metric'],
@@ -111,6 +117,7 @@ describe('admin UsageView distribution metric toggles', () => {
     list.mockReset()
     getStats.mockReset()
     getSnapshotV2.mockReset()
+    getModelStats.mockReset()
     getById.mockReset()
 
     list.mockResolvedValue({
@@ -133,6 +140,9 @@ describe('admin UsageView distribution metric toggles', () => {
       models: [],
       groups: [],
     })
+    getModelStats.mockResolvedValue({
+      models: [],
+    })
   })
 
   afterEach(() => {
@@ -146,7 +156,7 @@ describe('admin UsageView distribution metric toggles', () => {
           AppLayout: AppLayoutStub,
           UsageStatsCards: true,
           UsageFilters: UsageFiltersStub,
-          UsageTable: true,
+          UsageTable: UsageTableStub,
           UsageExportProgress: true,
           UsageCleanupDialog: true,
           UserBalanceHistoryModal: true,
@@ -192,5 +202,52 @@ describe('admin UsageView distribution metric toggles', () => {
     expect(modelChart.find('.metric').text()).toBe('actual_cost')
     expect(groupChart.find('.metric').text()).toBe('actual_cost')
     expect(getSnapshotV2).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows filters before charts and uses the requested default columns', async () => {
+    const wrapper = mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          UsageStatsCards: true,
+          UsageFilters: UsageFiltersStub,
+          UsageTable: UsageTableStub,
+          UsageExportProgress: true,
+          UsageCleanupDialog: true,
+          UserBalanceHistoryModal: true,
+          Pagination: true,
+          Select: true,
+          DateRangePicker: true,
+          Icon: true,
+          TokenUsageTrend: true,
+          ModelDistributionChart: ModelDistributionChartStub,
+          GroupDistributionChart: GroupDistributionChartStub,
+        },
+      },
+    })
+
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+
+    const html = wrapper.html()
+    expect(html.indexOf('data-test="usage-filters"')).toBeGreaterThanOrEqual(0)
+    expect(html.indexOf('data-test="usage-filters"')).toBeLessThan(html.indexOf('data-test="model-chart"'))
+
+    const columnKeys = wrapper.find('[data-test="usage-table-columns"]').text().split(',')
+    expect(columnKeys).toEqual([
+      'user',
+      'api_key',
+      'model',
+      'reasoning_effort',
+      'endpoint',
+      'group',
+      'stream',
+      'tokens',
+      'cost',
+      'first_token',
+      'duration',
+      'speed',
+      'created_at',
+    ])
   })
 })

@@ -169,6 +169,10 @@
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatDuration(row.duration_ms) }}</span>
         </template>
 
+        <template #cell-speed="{ row }">
+          <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400">{{ formatOutputSpeed(row.output_tokens, row.duration_ms) }}</span>
+        </template>
+
         <template #cell-created_at="{ value }">
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatDateTime(value) }}</span>
         </template>
@@ -423,6 +427,11 @@ const formatDuration = (ms: number | null | undefined): string => {
   if (ms == null) return '-'
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(2)}s`
+}
+
+const formatOutputSpeed = (outputTokens: number | null | undefined, durationMs: number | null | undefined): string => {
+  if (outputTokens == null || durationMs == null || durationMs <= 0) return '-'
+  return `${(outputTokens / (durationMs / 1000)).toFixed(2)} t/s`
 }
 
 // Cost tooltip functions

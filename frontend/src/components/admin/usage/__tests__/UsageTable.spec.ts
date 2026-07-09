@@ -22,6 +22,7 @@ const messages: Record<string, string> = {
   'usage.original': 'Original',
   'usage.userBilled': 'User billed',
   'usage.accountBilled': 'Account billed',
+  'usage.speed': 'Speed',
 }
 
 vi.mock('vue-i18n', async () => {
@@ -41,6 +42,7 @@ const DataTableStub = {
       <div v-for="row in data" :key="row.request_id">
         <slot name="cell-model" :row="row" :value="row.model" />
         <slot name="cell-cost" :row="row" />
+        <slot name="cell-speed" :row="row" />
       </div>
     </div>
   `,
@@ -146,5 +148,41 @@ describe('admin UsageTable tooltip', () => {
     const text = wrapper.text()
     expect(text).toContain('claude-sonnet-4')
     expect(text).toContain('claude-sonnet-4-20250514')
+  })
+
+  it('shows output token speed as tokens per second', () => {
+    const row = {
+      request_id: 'req-admin-speed-1',
+      model: 'gpt-5.5',
+      actual_cost: 0,
+      total_cost: 0,
+      account_rate_multiplier: 1,
+      rate_multiplier: 1,
+      input_cost: 0,
+      output_cost: 0,
+      cache_creation_cost: 0,
+      cache_read_cost: 0,
+      input_tokens: 2051,
+      output_tokens: 2030,
+      duration_ms: 78690,
+    }
+
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [row],
+        loading: false,
+        columns: [],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('25.80 t/s')
   })
 })
