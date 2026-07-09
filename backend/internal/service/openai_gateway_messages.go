@@ -643,7 +643,6 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 			Stream:        true,
 			Duration:      time.Since(startTime),
 			FirstTokenMs:  firstTokenMs,
-			ClientDisconnect: clientDisconnected,
 		}
 	}
 
