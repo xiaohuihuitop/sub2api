@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand/v2"
@@ -293,6 +294,147 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 	}
 
 	return sub, false, nil // false 表示是新建
+}
+
+// StartNewSubscriptionCycle starts a fresh paid subscription cycle.
+// Existing usage is intentionally not carried into the new purchase period.
+func (s *SubscriptionService) StartNewSubscriptionCycle(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error) {
+	if input == nil {
+		return nil, false, ErrSubscriptionNilInput
+	}
+	group, err := s.groupRepo.GetByID(ctx, input.GroupID)
+	if err != nil {
+		return nil, false, fmt.Errorf("group not found: %w", err)
+	}
+	if !group.IsSubscriptionType() {
+		return nil, false, ErrGroupNotSubscriptionType
+	}
+
+	existingSub, err := s.userSubRepo.GetByUserIDAndGroupID(ctx, input.UserID, input.GroupID)
+	if errors.Is(err, ErrSubscriptionNotFound) {
+		existingSub = nil
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	now := time.Now()
+	if existingSub == nil {
+		sub := s.newSubscriptionCycle(input, now)
+		if err := s.userSubRepo.Create(ctx, sub); err != nil {
+			return nil, false, err
+		}
+		s.invalidateSubscriptionCachesSync(ctx, input.UserID, input.GroupID)
+		created, err := s.userSubRepo.GetByID(ctx, sub.ID)
+		return created, false, err
+	}
+
+	if subscriptionNotesContain(existingSub.Notes, input.Notes) {
+		return existingSub, true, nil
+	}
+
+	renewed := s.renewSubscriptionCycle(existingSub, input, now)
+	if err := s.updateSubscriptionCycle(ctx, renewed); err != nil {
+		return nil, false, err
+	}
+	s.invalidateSubscriptionCachesSync(ctx, input.UserID, input.GroupID)
+	sub, err := s.userSubRepo.GetByID(ctx, existingSub.ID)
+	return sub, true, err
+}
+
+func (s *SubscriptionService) newSubscriptionCycle(input *AssignSubscriptionInput, now time.Time) *UserSubscription {
+	windowStart := startOfDay(now)
+	expiresAt := now.AddDate(0, 0, normalizeAssignValidityDays(input.ValidityDays))
+	if expiresAt.After(MaxExpiresAt) {
+		expiresAt = MaxExpiresAt
+	}
+	sub := &UserSubscription{
+		UserID:             input.UserID,
+		GroupID:            input.GroupID,
+		StartsAt:           now,
+		ExpiresAt:          expiresAt,
+		Status:             SubscriptionStatusActive,
+		DailyWindowStart:   &windowStart,
+		WeeklyWindowStart:  &windowStart,
+		MonthlyWindowStart: &windowStart,
+		AssignedAt:         now,
+		Notes:              input.Notes,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+	if input.AssignedBy > 0 {
+		sub.AssignedBy = &input.AssignedBy
+	}
+	return sub
+}
+
+func (s *SubscriptionService) renewSubscriptionCycle(existing *UserSubscription, input *AssignSubscriptionInput, now time.Time) *UserSubscription {
+	renewed := *existing
+	fresh := s.newSubscriptionCycle(input, now)
+	renewed.StartsAt = fresh.StartsAt
+	renewed.ExpiresAt = fresh.ExpiresAt
+	renewed.Status = fresh.Status
+	renewed.DailyWindowStart = fresh.DailyWindowStart
+	renewed.WeeklyWindowStart = fresh.WeeklyWindowStart
+	renewed.MonthlyWindowStart = fresh.MonthlyWindowStart
+	renewed.DailyUsageUSD = 0
+	renewed.WeeklyUsageUSD = 0
+	renewed.MonthlyUsageUSD = 0
+	renewed.AssignedAt = fresh.AssignedAt
+	renewed.UpdatedAt = fresh.UpdatedAt
+	renewed.Notes = appendSubscriptionNotes(existing.Notes, input.Notes)
+	if input.AssignedBy > 0 {
+		renewed.AssignedBy = &input.AssignedBy
+	}
+	return &renewed
+}
+
+func (s *SubscriptionService) updateSubscriptionCycle(ctx context.Context, sub *UserSubscription) error {
+	if s.entClient == nil {
+		return s.userSubRepo.Update(ctx, sub)
+	}
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	txCtx := dbent.NewTxContext(ctx, tx)
+	if err := s.userSubRepo.Update(txCtx, sub); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("restart subscription cycle: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (s *SubscriptionService) invalidateSubscriptionCachesSync(ctx context.Context, userID, groupID int64) {
+	s.InvalidateSubCacheSync(userID, groupID)
+	if s.billingCacheService != nil {
+		_ = s.billingCacheService.InvalidateSubscription(ctx, userID, groupID)
+	}
+}
+
+func appendSubscriptionNotes(existingNotes, newNotes string) string {
+	if newNotes == "" {
+		return existingNotes
+	}
+	if existingNotes == "" {
+		return newNotes
+	}
+	return existingNotes + "\n" + newNotes
+}
+
+func subscriptionNotesContain(existingNotes, note string) bool {
+	target := strings.TrimSpace(note)
+	if target == "" {
+		return false
+	}
+	for _, line := range strings.Split(existingNotes, "\n") {
+		if strings.TrimSpace(line) == target {
+			return true
+		}
+	}
+	return false
 }
 
 // createSubscription 创建新订阅（内部方法）

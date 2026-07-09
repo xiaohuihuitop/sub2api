@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -133,6 +134,7 @@ type subscriptionUserSubRepoStub struct {
 	byID        map[int64]*UserSubscription
 	byUserGroup map[string]*UserSubscription
 	createCalls int
+	getErr      error
 }
 
 func newSubscriptionUserSubRepoStub() *subscriptionUserSubRepoStub {
@@ -166,6 +168,9 @@ func (s *subscriptionUserSubRepoStub) ExistsByUserIDAndGroupID(_ context.Context
 }
 
 func (s *subscriptionUserSubRepoStub) GetByUserIDAndGroupID(_ context.Context, userID, groupID int64) (*UserSubscription, error) {
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
 	sub := s.byUserGroup[s.key(userID, groupID)]
 	if sub == nil {
 		return nil, ErrSubscriptionNotFound
@@ -185,6 +190,19 @@ func (s *subscriptionUserSubRepoStub) Create(_ context.Context, sub *UserSubscri
 		s.nextID++
 	}
 	sub.ID = cp.ID
+	s.byID[cp.ID] = &cp
+	s.byUserGroup[s.key(cp.UserID, cp.GroupID)] = &cp
+	return nil
+}
+
+func (s *subscriptionUserSubRepoStub) Update(_ context.Context, sub *UserSubscription) error {
+	if sub == nil {
+		return ErrSubscriptionNilInput
+	}
+	if _, ok := s.byID[sub.ID]; !ok {
+		return ErrSubscriptionNotFound
+	}
+	cp := *sub
 	s.byID[cp.ID] = &cp
 	s.byUserGroup[s.key(cp.UserID, cp.GroupID)] = &cp
 	return nil
@@ -224,6 +242,119 @@ func TestAssignSubscriptionReuseWhenSemanticsMatch(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(10), sub.ID)
 	require.Equal(t, 0, subRepo.createCalls, "reuse should not create new subscription")
+}
+
+func TestStartNewSubscriptionCycleResetsExistingUsage(t *testing.T) {
+	oldWindow := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	oldStart := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeSubscription},
+	}
+	subRepo := newSubscriptionUserSubRepoStub()
+	subRepo.seed(&UserSubscription{
+		ID:                 10,
+		UserID:             1001,
+		GroupID:            1,
+		StartsAt:           oldStart,
+		ExpiresAt:          oldStart.AddDate(0, 0, 30),
+		Status:             SubscriptionStatusActive,
+		DailyWindowStart:   &oldWindow,
+		WeeklyWindowStart:  &oldWindow,
+		MonthlyWindowStart: &oldWindow,
+		DailyUsageUSD:      3.21,
+		WeeklyUsageUSD:     8.76,
+		MonthlyUsageUSD:    12.34,
+		Notes:              "previous purchase",
+	})
+
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	before := time.Now()
+	sub, reused, err := svc.StartNewSubscriptionCycle(context.Background(), &AssignSubscriptionInput{
+		UserID:       1001,
+		GroupID:      1,
+		ValidityDays: 30,
+		Notes:        "payment order 99",
+	})
+	after := time.Now()
+
+	require.NoError(t, err)
+	require.True(t, reused)
+	require.Equal(t, int64(10), sub.ID)
+	require.Equal(t, 0, subRepo.createCalls, "new purchase cycle should update existing subscription, not create a duplicate")
+	require.Equal(t, SubscriptionStatusActive, sub.Status)
+	require.Zero(t, sub.DailyUsageUSD)
+	require.Zero(t, sub.WeeklyUsageUSD)
+	require.Zero(t, sub.MonthlyUsageUSD)
+	require.NotNil(t, sub.DailyWindowStart)
+	require.NotNil(t, sub.WeeklyWindowStart)
+	require.NotNil(t, sub.MonthlyWindowStart)
+	require.False(t, sub.DailyWindowStart.Equal(oldWindow), "purchase should start a fresh daily window")
+	require.False(t, sub.MonthlyWindowStart.Equal(oldWindow), "purchase should start a fresh monthly window")
+	require.True(t, !sub.StartsAt.Before(before) && !sub.StartsAt.After(after))
+	require.True(t, sub.ExpiresAt.After(before.AddDate(0, 0, 29)))
+	require.Contains(t, sub.Notes, "previous purchase")
+	require.Contains(t, sub.Notes, "payment order 99")
+}
+
+func TestStartNewSubscriptionCycleReturnsQueryErrorWithoutCreate(t *testing.T) {
+	errQuery := errors.New("query failed")
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeSubscription},
+	}
+	subRepo := newSubscriptionUserSubRepoStub()
+	subRepo.getErr = errQuery
+
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	sub, reused, err := svc.StartNewSubscriptionCycle(context.Background(), &AssignSubscriptionInput{
+		UserID:       1001,
+		GroupID:      1,
+		ValidityDays: 30,
+		Notes:        "payment order 100",
+	})
+
+	require.Nil(t, sub)
+	require.False(t, reused)
+	require.ErrorIs(t, err, errQuery)
+	require.Equal(t, 0, subRepo.createCalls, "query errors must not be treated as a missing subscription")
+}
+
+func TestStartNewSubscriptionCycleReusesExistingCycleForSameOrderNote(t *testing.T) {
+	oldWindow := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	oldStart := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeSubscription},
+	}
+	subRepo := newSubscriptionUserSubRepoStub()
+	subRepo.seed(&UserSubscription{
+		ID:                 10,
+		UserID:             1001,
+		GroupID:            1,
+		StartsAt:           oldStart,
+		ExpiresAt:          oldStart.AddDate(0, 0, 30),
+		Status:             SubscriptionStatusActive,
+		DailyWindowStart:   &oldWindow,
+		WeeklyWindowStart:  &oldWindow,
+		MonthlyWindowStart: &oldWindow,
+		DailyUsageUSD:      3.21,
+		WeeklyUsageUSD:     8.76,
+		MonthlyUsageUSD:    12.34,
+		Notes:              "previous purchase\npayment order 99",
+	})
+
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	sub, reused, err := svc.StartNewSubscriptionCycle(context.Background(), &AssignSubscriptionInput{
+		UserID:       1001,
+		GroupID:      1,
+		ValidityDays: 30,
+		Notes:        "payment order 99",
+	})
+
+	require.NoError(t, err)
+	require.True(t, reused)
+	require.Equal(t, int64(10), sub.ID)
+	require.Equal(t, oldStart, sub.StartsAt)
+	require.Equal(t, 12.34, sub.MonthlyUsageUSD)
+	require.Equal(t, 0, subRepo.createCalls, "retrying the same order note must not create another purchase cycle")
 }
 
 func TestAssignSubscriptionConflictWhenSemanticsMismatch(t *testing.T) {

@@ -337,7 +337,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			clientIP := ip.GetClientIP(c)
 			requestPayloadHash := service.HashUsageRequestPayload(body)
 			inboundEndpoint := GetInboundEndpoint(c)
-			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
+			upstreamEndpoint := resolveOpenAIUpstreamEndpoint(c, account)
 			channelUsageFields := channelMapping.ToUsageFields(reqModel, result.UpstreamModel)
 
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
@@ -661,7 +661,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			currentRoutingModel,
 			failedAccountIDs,
 			service.OpenAIUpstreamTransportAny,
-			service.OpenAIEndpointCapabilityResponses,
+			service.OpenAIEndpointCapabilityChatCompletions,
 			false,
 		)
 		if err != nil {
@@ -731,7 +731,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			clientIP := ip.GetClientIP(c)
 			requestPayloadHash := service.HashUsageRequestPayload(body)
 			inboundEndpoint := GetInboundEndpoint(c)
-			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
+			upstreamEndpoint := resolveOpenAIUpstreamEndpoint(c, account)
 			channelUsageFields := channelMappingMsg.ToUsageFields(reqModel, result.UpstreamModel)
 
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
@@ -1299,7 +1299,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			}
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, result.FirstTokenMs)
 			inboundEndpoint := GetInboundEndpoint(c)
-			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
+			upstreamEndpoint := resolveOpenAIUpstreamEndpoint(c, account)
 			requestPayloadHash := service.HashUsageRequestPayload(firstMessage)
 			channelUsageFields := channelMappingWS.ToUsageFields(reqModel, result.UpstreamModel)
 			h.submitUsageRecordTask(c.Request.Context(), func(taskCtx context.Context) {
