@@ -20,6 +20,12 @@ describe('AppSidebar custom SVG styles', () => {
 })
 
 describe('AppSidebar header styles', () => {
+  it('links the logo and site name to the home page', () => {
+    expect(componentSource).toContain('class="sidebar-home-link"')
+    expect(componentSource).toContain('to="/home"')
+    expect(componentSource).toContain('aria-label="返回主页"')
+  })
+
   it('does not clip the version badge dropdown', () => {
     const sidebarHeaderBlockMatch = styleSource.match(/\.sidebar-header\s*\{[\s\S]*?\n {2}\}/)
     const sidebarBrandBlockMatch = componentSource.match(/\.sidebar-brand\s*\{[\s\S]*?\n\}/)

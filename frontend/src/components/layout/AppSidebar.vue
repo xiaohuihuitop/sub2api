@@ -8,17 +8,25 @@
   >
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
-      <!-- Custom Logo or Default Logo -->
-      <div class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow">
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
-      </div>
-      <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-        <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
-          {{ siteName }}
-        </span>
-        <!-- Version Badge -->
-        <VersionBadge v-if="isAdmin" :version="siteVersion" />
-      </div>
+      <router-link
+        to="/home"
+        class="sidebar-home-link"
+        title="返回主页"
+        aria-label="返回主页"
+        @click="handleMenuItemClick('/home')"
+      >
+        <!-- Custom Logo or Default Logo -->
+        <div class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow">
+          <img v-if="settingsLoaded" :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+        </div>
+        <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+          <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
+            {{ siteName }}
+          </span>
+        </div>
+      </router-link>
+      <!-- Version Badge -->
+      <VersionBadge v-if="isAdmin && !sidebarCollapsed" :version="siteVersion" />
     </div>
 
     <!-- Navigation -->
@@ -829,6 +837,20 @@ onUnmounted(() => {
 .sidebar-logo {
   flex: 0 0 2.25rem;
   min-width: 2.25rem;
+}
+
+.sidebar-home-link {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+}
+
+.sidebar-home-link:focus-visible {
+  outline: 2px solid rgb(59 130 246);
+  outline-offset: 3px;
 }
 
 .sidebar-header-collapsed {
