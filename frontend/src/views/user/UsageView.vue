@@ -119,6 +119,41 @@
               <button @click="resetFilters" class="btn btn-secondary">
                 {{ t('common.reset') }}
               </button>
+              <div class="relative" ref="columnDropdownRef">
+                <button
+                  type="button"
+                  @click="showColumnDropdown = !showColumnDropdown"
+                  class="btn btn-secondary px-2 md:px-3"
+                  :title="t('admin.users.columnSettings')"
+                  data-test="usage-column-settings"
+                >
+                  <svg class="h-4 w-4 md:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
+                  </svg>
+                  <span class="hidden md:inline">{{ t('admin.users.columnSettings') }}</span>
+                </button>
+                <div
+                  v-if="showColumnDropdown"
+                  class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                >
+                  <button
+                    v-for="col in toggleableColumns"
+                    :key="col.key"
+                    type="button"
+                    @click="toggleColumn(col.key)"
+                    class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
+                  >
+                    <span>{{ col.label }}</span>
+                    <Icon
+                      v-if="isColumnVisible(col.key)"
+                      name="check"
+                      size="sm"
+                      class="text-primary-500"
+                      :stroke-width="2"
+                    />
+                  </button>
+                </div>
+              </div>
               <button @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
                 <svg
                   v-if="exporting"
@@ -150,7 +185,7 @@
 
       <template #table>
         <DataTable
-          :columns="columns"
+          :columns="visibleColumns"
           :data="usageLogs"
           :loading="loading"
           :server-side-sort="true"
@@ -314,6 +349,12 @@
           <template #cell-duration="{ row }">
             <span class="text-sm text-gray-600 dark:text-gray-400">{{
               formatDuration(row.duration_ms)
+            }}</span>
+          </template>
+
+          <template #cell-speed="{ row }">
+            <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400">{{
+              formatOutputSpeed(row.output_tokens, row.duration_ms)
             }}</span>
           </template>
 
@@ -504,7 +545,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { usageAPI, keysAPI } from '@/api'
@@ -544,7 +585,11 @@ const tokenTooltipData = ref<UsageLog | null>(null)
 // Usage stats from API
 const usageStats = ref<UsageStatsResponse | null>(null)
 
-const columns = computed<Column[]>(() => [
+const ALWAYS_VISIBLE = ['api_key', 'created_at']
+const DEFAULT_HIDDEN_COLUMNS = ['billing_mode', 'user_agent']
+const HIDDEN_COLUMNS_KEY = 'user-usage-hidden-columns'
+
+const allColumns = computed<Column[]>(() => [
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
   { key: 'model', label: t('usage.model'), sortable: true },
   { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
@@ -555,9 +600,56 @@ const columns = computed<Column[]>(() => [
   { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'first_token', label: t('usage.firstToken'), sortable: false },
   { key: 'duration', label: t('usage.duration'), sortable: false },
+  { key: 'speed', label: t('usage.speed'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false }
 ])
+
+const hiddenColumns = reactive<Set<string>>(new Set())
+
+const toggleableColumns = computed(() =>
+  allColumns.value.filter(col => !ALWAYS_VISIBLE.includes(col.key))
+)
+
+const visibleColumns = computed(() =>
+  allColumns.value.filter(col =>
+    ALWAYS_VISIBLE.includes(col.key) || !hiddenColumns.has(col.key)
+  )
+)
+
+const isColumnVisible = (key: string) => !hiddenColumns.has(key)
+
+const toggleColumn = (key: string) => {
+  if (hiddenColumns.has(key)) {
+    hiddenColumns.delete(key)
+  } else {
+    hiddenColumns.add(key)
+  }
+  try {
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
+  } catch (e) {
+    console.error('Failed to save usage columns:', e)
+  }
+}
+
+const loadSavedColumns = () => {
+  try {
+    const saved = localStorage.getItem(HIDDEN_COLUMNS_KEY)
+    const keys = saved ? (JSON.parse(saved) as string[]) : DEFAULT_HIDDEN_COLUMNS
+    keys.forEach((key) => hiddenColumns.add(key))
+  } catch {
+    DEFAULT_HIDDEN_COLUMNS.forEach((key) => hiddenColumns.add(key))
+  }
+}
+
+const showColumnDropdown = ref(false)
+const columnDropdownRef = ref<HTMLElement | null>(null)
+
+const handleColumnClickOutside = (event: MouseEvent) => {
+  if (columnDropdownRef.value && !columnDropdownRef.value.contains(event.target as HTMLElement)) {
+    showColumnDropdown.value = false
+  }
+}
 
 const usageLogs = ref<UsageLog[]>([])
 const apiKeys = ref<ApiKey[]>([])
@@ -623,6 +715,11 @@ const sortState = reactive({
 const formatDuration = (ms: number): string => {
   if (ms < 1000) return `${ms.toFixed(0)}ms`
   return `${(ms / 1000).toFixed(2)}s`
+}
+
+const formatOutputSpeed = (outputTokens: number | null | undefined, durationMs: number | null | undefined): string => {
+  if (outputTokens == null || durationMs == null || durationMs <= 0) return '-'
+  return `${(outputTokens / (durationMs / 1000)).toFixed(2)} t/s`
 }
 
 const formatUserAgent = (ua: string): string => {
@@ -846,7 +943,8 @@ const exportToCSV = async () => {
       'Billed Cost',
       'Original Cost',
       'First Token (ms)',
-      'Duration (ms)'
+      'Duration (ms)',
+      'Speed'
     ]
     const rows = allLogs.map((log) =>
       [
@@ -865,7 +963,8 @@ const exportToCSV = async () => {
         log.actual_cost.toFixed(8),
         log.total_cost.toFixed(8),
         log.first_token_ms ?? '',
-        log.duration_ms
+        log.duration_ms,
+        formatOutputSpeed(log.output_tokens, log.duration_ms)
       ].map(escapeCSVValue)
     )
 
@@ -925,8 +1024,15 @@ const hideTokenTooltip = () => {
 }
 
 onMounted(() => {
+  loadSavedColumns()
+  document.addEventListener('click', handleColumnClickOutside)
   loadApiKeys()
   loadUsageLogs()
   loadUsageStats()
+})
+
+onUnmounted(() => {
+  abortController?.abort()
+  document.removeEventListener('click', handleColumnClickOutside)
 })
 </script>

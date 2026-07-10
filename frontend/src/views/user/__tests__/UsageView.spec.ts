@@ -39,8 +39,12 @@ const messages: Record<string, string> = {
   'usage.cost': 'Cost',
   'usage.firstToken': 'First Token',
   'usage.duration': 'Duration',
+  'usage.speed': 'Speed',
   'usage.time': 'Time',
   'usage.userAgent': 'User Agent',
+  'usage.endpoint': 'Endpoint',
+  'admin.usage.billingMode': 'Billing Mode',
+  'admin.users.columnSettings': 'Column Settings',
 }
 
 vi.mock('@/api', () => ({
@@ -69,8 +73,27 @@ vi.mock('vue-i18n', async () => {
 
 const AppLayoutStub = { template: '<div><slot /></div>' }
 const TablePageLayoutStub = {
-  template: '<div><slot name="actions" /><slot name="filters" /><slot /></div>',
+  template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>',
 }
+const DataTableStub = {
+  props: ['columns', 'data'],
+  template: `
+    <div>
+      <div data-test="usage-table-columns">{{ columns.map((col) => col.key).join(",") }}</div>
+      <div v-for="row in data" :key="row.request_id">
+        <slot name="cell-speed" :row="row" />
+      </div>
+    </div>
+  `,
+}
+
+const readBlobAsText = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(blob)
+  })
 
 describe('user UsageView tooltip', () => {
   beforeEach(() => {
@@ -81,6 +104,7 @@ describe('user UsageView tooltip', () => {
     showWarning.mockReset()
     showSuccess.mockReset()
     showInfo.mockReset()
+    localStorage.clear()
 
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 0,
@@ -143,6 +167,7 @@ describe('user UsageView tooltip', () => {
           AppLayout: AppLayoutStub,
           TablePageLayout: TablePageLayoutStub,
           Pagination: true,
+          DataTable: DataTableStub,
           EmptyState: true,
           Select: true,
           DateRangePicker: true,
@@ -241,6 +266,7 @@ describe('user UsageView tooltip', () => {
           AppLayout: AppLayoutStub,
           TablePageLayout: TablePageLayoutStub,
           Pagination: true,
+          DataTable: DataTableStub,
           EmptyState: true,
           Select: true,
           DateRangePicker: true,
@@ -269,9 +295,92 @@ describe('user UsageView tooltip', () => {
     expect(hasSortedExportQuery).toBe(true)
     expect(clickSpy).toHaveBeenCalled()
     expect(showSuccess).toHaveBeenCalled()
+    const csvText = await readBlobAsText(exportedBlob!)
+    expect(csvText).toContain('Speed')
+    expect(csvText).toContain('292.75 t/s')
 
     window.URL.createObjectURL = originalCreateObjectURL
     window.URL.revokeObjectURL = originalRevokeObjectURL
     clickSpy.mockRestore()
+  })
+
+  it('shows column selector and output speed in the default user columns', async () => {
+    query.mockResolvedValue({
+      items: [
+        {
+          request_id: 'req-user-speed-1',
+          actual_cost: 0.1,
+          total_cost: 0.1,
+          rate_multiplier: 1,
+          service_tier: 'priority',
+          input_cost: 0.01,
+          output_cost: 0.02,
+          cache_creation_cost: 0,
+          cache_read_cost: 0,
+          input_tokens: 2051,
+          output_tokens: 2030,
+          cache_creation_tokens: 0,
+          cache_read_tokens: 0,
+          cache_creation_5m_tokens: 0,
+          cache_creation_1h_tokens: 0,
+          image_count: 0,
+          image_size: null,
+          first_token_ms: 5080,
+          duration_ms: 78690,
+          created_at: '2026-07-06T02:18:04Z',
+          model: 'gpt-5.5',
+          reasoning_effort: 'xhigh',
+          api_key: { name: 'my' },
+        },
+      ],
+      total: 1,
+      pages: 1,
+    })
+    getStatsByDateRange.mockResolvedValue({
+      total_requests: 1,
+      total_tokens: 4081,
+      total_cost: 0.1,
+      total_actual_cost: 0.1,
+      total_input_tokens: 2051,
+      total_output_tokens: 2030,
+      average_duration_ms: 78690,
+    })
+    list.mockResolvedValue({ items: [] })
+
+    const wrapper = mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          TablePageLayout: TablePageLayoutStub,
+          Pagination: true,
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Select: true,
+          DateRangePicker: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="usage-column-settings"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('25.80 t/s')
+
+    const columnKeys = wrapper.find('[data-test="usage-table-columns"]').text().split(',')
+    expect(columnKeys).toEqual([
+      'api_key',
+      'model',
+      'reasoning_effort',
+      'endpoint',
+      'stream',
+      'tokens',
+      'cost',
+      'first_token',
+      'duration',
+      'speed',
+      'created_at',
+    ])
   })
 })
