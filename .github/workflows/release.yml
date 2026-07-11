@@ -272,6 +272,68 @@ jobs:
                 disable_web_page_preview: true
               }')"
 
+  offline-docker:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release metadata
+        id: release-meta
+        shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${INPUT_TAG}"
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG_NAME#v}"
+          OWNER_LOWER="${GITHUB_REPOSITORY_OWNER,,}"
+          ARCHIVE_NAME="sub2api_${VERSION}_linux_amd64.tar"
+
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "owner_lower=${OWNER_LOWER}" >> "$GITHUB_OUTPUT"
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export linux/amd64 Docker image
+        shell: bash
+        env:
+          IMAGE: ghcr.io/${{ steps.release-meta.outputs.owner_lower }}/sub2api:${{ steps.release-meta.outputs.version }}
+          VERSION: ${{ steps.release-meta.outputs.version }}
+          ARCHIVE_NAME: ${{ steps.release-meta.outputs.archive_name }}
+        run: |
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker tag "$IMAGE" "sub2api:${VERSION}"
+          docker save --output "$ARCHIVE_NAME" "sub2api:${VERSION}"
+          sha256sum "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
+
+      - name: Upload offline Docker artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sub2api_${{ steps.release-meta.outputs.version }}_linux_amd64
+          path: |
+            ${{ steps.release-meta.outputs.archive_name }}
+            ${{ steps.release-meta.outputs.archive_name }}.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach offline Docker image to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release-meta.outputs.tag_name }}
+          files: |
+            ${{ steps.release-meta.outputs.archive_name }}
+            ${{ steps.release-meta.outputs.archive_name }}.sha256
+          fail_on_unmatched_files: true
+
   sync-version-file:
     needs: [release]
     if: ${{ needs.release.result == 'success' }}
