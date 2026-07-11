@@ -310,10 +310,11 @@ jobs:
           VERSION: ${{ steps.release-meta.outputs.version }}
           ARCHIVE_NAME: ${{ steps.release-meta.outputs.archive_name }}
         run: |
+          set -o pipefail
           docker pull --platform linux/amd64 "$IMAGE"
           docker tag "$IMAGE" "sub2api:latest"
           docker tag "$IMAGE" "sub2api:${VERSION}"
-          docker save --output "$ARCHIVE_NAME" "sub2api:latest" "sub2api:${VERSION}"
+          docker save "sub2api:latest" "sub2api:${VERSION}" | gzip -9 > "$ARCHIVE_NAME"
           sha256sum "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
 
       - name: Upload offline Docker artifact
