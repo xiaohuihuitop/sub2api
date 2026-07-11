@@ -17,7 +17,7 @@
             <div class="ml-auto flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
               <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
+                <Select v-model="granularity" :options="granularityOptions" @change="onGranularityChange" />
               </div>
             </div>
           </div>
@@ -230,6 +230,7 @@ import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import Icon from '@/components/icons/Icon.vue'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { isValidDateRange, readPersistedViewState, writePersistedViewState } from '@/composables/usePersistedViewState'
 import { formatReasoningEffort } from '@/utils/format'
 import { BILLING_MODE_IMAGE, getBillingModeLabel } from '@/utils/billingMode'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
@@ -339,10 +340,61 @@ const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
   return Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24)) <= 1 ? 'hour' : 'day'
 }
 
+type UserUsageViewState = {
+  startDate: string
+  endDate: string
+  granularity: 'day' | 'hour'
+  filters: Partial<UsageQueryParams>
+}
+
+const USAGE_VIEW_STORAGE_KEY = 'sub2api:user-usage:view-state:v1'
+const persistedUserFilterKeys = new Set([
+  'model',
+  'api_key_id',
+  'group_id',
+  'request_type',
+  'billing_type',
+  'billing_mode',
+])
+const isOptionalNumber = (value: unknown) =>
+  value === undefined || (typeof value === 'number' && Number.isFinite(value))
+const isOptionalString = (value: unknown) => value === undefined || typeof value === 'string'
+const isOptionalNullableNumber = (value: unknown) => value == null || isOptionalNumber(value)
+const isOptionalNullableString = (value: unknown) => value == null || isOptionalString(value)
+const isPersistedUserFilters = (value: unknown): value is Partial<UsageQueryParams> => {
+  if (!value || typeof value !== 'object') return false
+  const filters = value as Partial<UsageQueryParams>
+  return Object.keys(filters).every((key) => persistedUserFilterKeys.has(key))
+    && isOptionalString(filters.model)
+    && isOptionalNumber(filters.api_key_id)
+    && isOptionalNumber(filters.group_id)
+    && isOptionalString(filters.request_type)
+    && isOptionalNullableNumber(filters.billing_type)
+    && isOptionalNullableString(filters.billing_mode)
+}
+const isUserUsageViewState = (value: unknown): value is UserUsageViewState => {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Partial<UserUsageViewState>
+  return isValidDateRange(state.startDate, state.endDate)
+    && (state.granularity === 'day' || state.granularity === 'hour')
+    && isPersistedUserFilters(state.filters)
+}
+
 const defaultRange = getLast24HoursRangeDates()
-const startDate = ref(defaultRange.start)
-const endDate = ref(defaultRange.end)
-const granularity = ref<'day' | 'hour'>(getGranularityForRange(startDate.value, endDate.value))
+const defaultViewState: UserUsageViewState = {
+  startDate: defaultRange.start,
+  endDate: defaultRange.end,
+  granularity: getGranularityForRange(defaultRange.start, defaultRange.end),
+  filters: {},
+}
+const initialViewState = readPersistedViewState(
+  USAGE_VIEW_STORAGE_KEY,
+  defaultViewState,
+  isUserUsageViewState,
+)
+const startDate = ref(initialViewState.startDate)
+const endDate = ref(initialViewState.endDate)
+const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
 
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
 const groupDistributionMetric = ref<DistributionMetric>('tokens')
@@ -352,12 +404,20 @@ const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
 
 const filters = ref<UsageQueryParams>({
+  ...initialViewState.filters,
   start_date: startDate.value,
   end_date: endDate.value,
-  request_type: undefined,
-  billing_type: null,
-  billing_mode: null,
 })
+
+const persistUsageViewState = () => {
+  const { model, api_key_id, group_id, request_type, billing_type, billing_mode } = filters.value
+  writePersistedViewState(USAGE_VIEW_STORAGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+    filters: { model, api_key_id, group_id, request_type, billing_type, billing_mode },
+  })
+}
 
 const pagination = reactive({
   page: 1,
@@ -526,6 +586,7 @@ const refreshModelOptions = (models: ModelStat[]) => {
 }
 
 const applyFilters = () => {
+  persistUsageViewState()
   pagination.page = 1
   void loadLogs()
   void loadStats()
@@ -568,6 +629,11 @@ const onDateRangeChange = (range: { startDate: string; endDate: string; preset: 
   filters.value.end_date = range.endDate
   granularity.value = getGranularityForRange(range.startDate, range.endDate)
   applyFilters()
+}
+
+const onGranularityChange = () => {
+  persistUsageViewState()
+  void loadChartData()
 }
 
 const handlePageChange = (page: number) => {
@@ -710,6 +776,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'latency', label: t('usage.latency'), sortable: false },
+  { key: 'output_speed', label: t('usage.outputSpeed'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
 ])

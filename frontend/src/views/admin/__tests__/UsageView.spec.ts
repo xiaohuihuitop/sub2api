@@ -123,6 +123,8 @@ const GroupDistributionChartStub = {
 describe('admin UsageView distribution metric toggles', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
+    vi.mocked(localStorage.setItem).mockClear()
     list.mockReset()
     getStats.mockReset()
     getSnapshotV2.mockReset()
@@ -241,6 +243,69 @@ describe('admin UsageView distribution metric toggles', () => {
     expect(modelChart.find('.metric').text()).toBe('actual_cost')
     expect(groupChart.find('.metric').text()).toBe('actual_cost')
     expect(getSnapshotV2).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores the saved date range, granularity, and filters', async () => {
+    vi.mocked(localStorage.getItem).mockImplementation((key) => key === 'sub2api:admin-usage:view-state:v1'
+      ? JSON.stringify({
+          startDate: '2026-07-01',
+          endDate: '2026-07-08',
+          granularity: 'day',
+          filters: { model: 'gpt-5.6-luna', group_id: 9 },
+        })
+      : null)
+
+    mount(UsageView, {
+      global: { stubs: {
+        AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
+        UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
+        UserBalanceHistoryModal: true, Pagination: true, Select: true,
+        DateRangePicker: true, Icon: true, TokenUsageTrend: true,
+        ModelDistributionChart: true, GroupDistributionChart: true,
+        EndpointDistributionChart: true, UserTokenRanking: true,
+      } },
+    })
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({
+      start_date: '2026-07-01',
+      end_date: '2026-07-08',
+      model: 'gpt-5.6-luna',
+      group_id: 9,
+    }), expect.anything())
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
+      granularity: 'day',
+    }))
+  })
+
+  it('ignores persisted state with impossible dates or unknown filter fields', async () => {
+    vi.mocked(localStorage.getItem).mockImplementation((key) => key === 'sub2api:admin-usage:view-state:v1'
+      ? JSON.stringify({
+          startDate: '2026-99-01',
+          endDate: '2026-07-08',
+          granularity: 'day',
+          filters: { model: 'injected-model', unknown: true },
+        })
+      : null)
+
+    mount(UsageView, {
+      global: { stubs: {
+        AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
+        UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
+        UserBalanceHistoryModal: true, Pagination: true, Select: true,
+        DateRangePicker: true, Icon: true, TokenUsageTrend: true,
+        ModelDistributionChart: true, GroupDistributionChart: true,
+        EndpointDistributionChart: true, UserTokenRanking: true,
+      } },
+    })
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+
+    expect(list).not.toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'injected-model' }),
+      expect.anything(),
+    )
   })
 })
 

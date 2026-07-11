@@ -72,6 +72,7 @@ const DataTableStub = {
         <slot name="cell-billing_mode" :row="row" />
         <slot name="cell-tokens" :row="row" />
         <slot name="cell-cost" :row="row" />
+        <slot name="cell-output_speed" :row="row" />
       </div>
     </div>
   `,
@@ -118,6 +119,38 @@ describe('admin UsageTable tooltip', () => {
       height: 20,
       toJSON: () => ({}),
     } as DOMRect)
+  })
+
+  it('shows output speed using output tokens and total duration', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{
+          request_id: 'req-speed',
+          model: 'gpt-5.5',
+          output_tokens: 120,
+          input_tokens: 10,
+          duration_ms: 2000,
+          actual_cost: 0,
+          total_cost: 0,
+          input_cost: 0,
+          output_cost: 0,
+          rate_multiplier: 1,
+        }],
+        loading: false,
+        columns: [{ key: 'output_speed', label: 'Speed' }],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('60.0 t/s')
+    expect(wrapper.get('[data-testid="usage-table-shell"]').classes()).toContain('min-h-[28rem]')
   })
 
   it('shows service tier and billing breakdown in cost tooltip', async () => {

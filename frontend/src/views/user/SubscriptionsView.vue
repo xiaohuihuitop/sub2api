@@ -28,12 +28,12 @@
         <div
           v-for="subscription in subscriptions"
           :key="subscription.id"
-          class="overflow-hidden rounded-2xl border bg-white dark:bg-dark-800"
+          class="overflow-hidden rounded-lg border bg-white/95 shadow-card dark:bg-dark-900/80"
           :class="platformBorderClass(subscription.group?.platform || '')"
         >
           <!-- Header -->
           <div
-            class="flex items-center justify-between border-b border-gray-100 p-4 dark:border-dark-700"
+            class="flex items-center justify-between border-b border-stone-200/80 bg-stone-50/60 p-4 dark:border-dark-700 dark:bg-dark-900/60"
           >
             <div class="flex items-center gap-3">
               <div :class="['h-1.5 w-1.5 shrink-0 rounded-full', platformAccentDotClass(subscription.group?.platform || '')]" />
@@ -112,7 +112,7 @@
                   }}
                 </span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div class="relative h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-dark-700">
                 <div
                   class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
                   :class="
@@ -149,7 +149,7 @@
                   }}
                 </span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div class="relative h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-dark-700">
                 <div
                   class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
                   :class="
@@ -190,7 +190,7 @@
                   }}
                 </span>
               </div>
-              <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+              <div class="relative h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-dark-700">
                 <div
                   class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
                   :class="
@@ -226,7 +226,7 @@
                 !subscription.group?.weekly_limit_usd &&
                 !subscription.group?.monthly_limit_usd
               "
-              class="flex items-center justify-center rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 py-6 dark:from-emerald-900/20 dark:to-teal-900/20"
+              class="flex items-center justify-center rounded-lg border border-primary-100 bg-primary-50/70 py-6 dark:border-primary-900/40 dark:bg-primary-950/20"
             >
               <div class="flex items-center gap-3">
                 <span class="text-4xl text-emerald-600 dark:text-emerald-400">∞</span>

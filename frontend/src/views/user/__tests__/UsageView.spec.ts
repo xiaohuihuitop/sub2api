@@ -149,6 +149,7 @@ function mountUsageView() {
 
 describe('user UsageView', () => {
   beforeEach(() => {
+    localStorage.clear()
     query.mockReset()
     getStats.mockReset()
     getDashboardModels.mockReset()
@@ -205,6 +206,48 @@ describe('user UsageView', () => {
     }))
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).toHaveBeenCalled()
+  })
+
+  it('restores the saved date range, granularity, and filters', async () => {
+    localStorage.setItem('sub2api:user-usage:view-state:v1', JSON.stringify({
+      startDate: '2026-07-03',
+      endDate: '2026-07-10',
+      granularity: 'day',
+      filters: { model: 'glm-4.7', group_id: 6 },
+    }))
+
+    mountUsageView()
+    await flushPromises()
+
+    expect(query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        start_date: '2026-07-03',
+        end_date: '2026-07-10',
+        model: 'glm-4.7',
+        group_id: 6,
+      }),
+      expect.anything(),
+    )
+    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
+      granularity: 'day',
+    }))
+  })
+
+  it('ignores persisted state with a reversed range or unknown filters', async () => {
+    localStorage.setItem('sub2api:user-usage:view-state:v1', JSON.stringify({
+      startDate: '2026-07-10',
+      endDate: '2026-07-03',
+      granularity: 'day',
+      filters: { model: 'injected-model', page_size: 9999 },
+    }))
+
+    mountUsageView()
+    await flushPromises()
+
+    expect(query).not.toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'injected-model' }),
+      expect.anything(),
+    )
   })
 
   it('exports csv with current filters and without admin-only fields', async () => {

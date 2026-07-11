@@ -1,5 +1,8 @@
 <template>
-  <div :class="flat ? '' : 'card overflow-hidden'">
+  <div
+    data-testid="usage-table-shell"
+    :class="[flat ? '' : 'card', 'flex min-h-[28rem] flex-col overflow-hidden md:min-h-[34rem]']"
+  >
     <div
       v-if="showIpGeoToolbar"
       class="flex items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
@@ -16,7 +19,7 @@
         {{ ipGeoBatchLoading ? t('usage.ipGeo.batchFetching') : t('usage.ipGeo.batchFetch') }}
       </button>
     </div>
-    <div class="overflow-auto">
+    <div class="flex min-h-0 flex-1 overflow-auto">
       <DataTable
         :columns="columns"
         :data="data"
@@ -203,6 +206,12 @@
               <span class="font-medium tabular-nums" :class="LATENCY_TEXT_CLASSES[durationSeverity(row.duration_ms ?? 0)]">{{ formatDuration(row.duration_ms) }}</span>
             </div>
           </div>
+        </template>
+
+        <template #cell-output_speed="{ row }">
+          <span class="whitespace-nowrap font-mono text-sm font-medium text-primary-700 dark:text-primary-300">
+            {{ formatOutputSpeed(row.output_tokens, row.duration_ms) }}
+          </span>
         </template>
 
         <template #cell-created_at="{ value }">
@@ -481,6 +490,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import IpGeoCell from '@/components/common/IpGeoCell.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { fetchBatch, getEntry } from '@/utils/ipGeoLookup'
+import { formatOutputSpeed } from '@/utils/usageSpeed'
 import type { AdminUsageLog } from '@/types'
 import type { Column } from '@/components/common/types'
 

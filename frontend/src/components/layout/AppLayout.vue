@@ -1,7 +1,10 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-950">
+  <div class="min-h-screen bg-stone-100 dark:bg-dark-950">
     <!-- Background Decoration -->
-    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
+    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient opacity-90 dark:opacity-70"></div>
+    <div
+      class="pointer-events-none fixed inset-x-0 top-0 h-72 bg-gradient-to-b from-primary-100/60 via-primary-50/25 to-transparent dark:from-primary-950/20 dark:via-transparent dark:to-transparent"
+    ></div>
 
     <!-- Sidebar -->
     <AppSidebar />

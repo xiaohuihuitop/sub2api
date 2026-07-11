@@ -17,7 +17,7 @@
             <div class="ml-auto flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
               <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
+                <Select v-model="granularity" :options="granularityOptions" @change="onGranularityChange" />
               </div>
             </div>
           </div>
@@ -188,6 +188,7 @@ import { saveAs } from 'file-saver'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admin'; import { adminUsageAPI } from '@/api/admin/usage'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { isValidDateRange, readPersistedViewState, writePersistedViewState } from '@/composables/usePersistedViewState'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
@@ -212,7 +213,7 @@ type EndpointSource = 'inbound' | 'upstream' | 'path'
 type ModelDistributionSource = 'requested' | 'upstream' | 'mapping'
 const route = useRoute()
 const usageStats = ref<AdminUsageStatsResponse | null>(null); const usageLogs = ref<AdminUsageLog[]>([]); const loading = ref(false); const exporting = ref(false)
-const trendData = ref<TrendDataPoint[]>([]); const requestedModelStats = ref<ModelStat[]>([]); const upstreamModelStats = ref<ModelStat[]>([]); const mappingModelStats = ref<ModelStat[]>([]); const groupStats = ref<GroupStat[]>([]); const chartsLoading = ref(false); const modelStatsLoading = ref(false); const granularity = ref<'day' | 'hour'>('hour')
+const trendData = ref<TrendDataPoint[]>([]); const requestedModelStats = ref<ModelStat[]>([]); const upstreamModelStats = ref<ModelStat[]>([]); const mappingModelStats = ref<ModelStat[]>([]); const groupStats = ref<GroupStat[]>([]); const chartsLoading = ref(false); const modelStatsLoading = ref(false)
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
 const modelDistributionSource = ref<ModelDistributionSource>('requested')
 const loadedModelSources = reactive<Record<ModelDistributionSource, boolean>>({
@@ -293,9 +294,81 @@ const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
   const daysDiff = Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24))
   return daysDiff <= 1 ? 'hour' : 'day'
 }
+
+type AdminUsageViewState = {
+  startDate: string
+  endDate: string
+  granularity: 'day' | 'hour'
+  filters: Partial<AdminUsageQueryParams>
+}
+
+const USAGE_VIEW_STORAGE_KEY = 'sub2api:admin-usage:view-state:v1'
+const persistedAdminFilterKeys = new Set([
+  'user_id',
+  'model',
+  'api_key_id',
+  'account_id',
+  'group_id',
+  'request_type',
+  'billing_type',
+  'billing_mode',
+])
+const isOptionalNumber = (value: unknown) =>
+  value === undefined || (typeof value === 'number' && Number.isFinite(value))
+const isOptionalString = (value: unknown) => value === undefined || typeof value === 'string'
+const isOptionalNullableNumber = (value: unknown) => value == null || isOptionalNumber(value)
+const isOptionalNullableString = (value: unknown) => value == null || isOptionalString(value)
+const isPersistedAdminFilters = (value: unknown): value is Partial<AdminUsageQueryParams> => {
+  if (!value || typeof value !== 'object') return false
+  const filters = value as Partial<AdminUsageQueryParams>
+  return Object.keys(filters).every((key) => persistedAdminFilterKeys.has(key))
+    && isOptionalNumber(filters.user_id)
+    && isOptionalString(filters.model)
+    && isOptionalNumber(filters.api_key_id)
+    && isOptionalNumber(filters.account_id)
+    && isOptionalNumber(filters.group_id)
+    && isOptionalString(filters.request_type)
+    && isOptionalNullableNumber(filters.billing_type)
+    && isOptionalNullableString(filters.billing_mode)
+}
+const isAdminUsageViewState = (value: unknown): value is AdminUsageViewState => {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Partial<AdminUsageViewState>
+  return isValidDateRange(state.startDate, state.endDate)
+    && (state.granularity === 'day' || state.granularity === 'hour')
+    && isPersistedAdminFilters(state.filters)
+}
+
 const defaultRange = getLast24HoursRangeDates()
-const startDate = ref(defaultRange.start); const endDate = ref(defaultRange.end)
-const filters = ref<AdminUsageQueryParams>({ user_id: undefined, model: undefined, group_id: undefined, request_type: undefined, billing_type: null, start_date: startDate.value, end_date: endDate.value })
+const defaultViewState: AdminUsageViewState = {
+  startDate: defaultRange.start,
+  endDate: defaultRange.end,
+  granularity: 'hour',
+  filters: {},
+}
+const initialViewState = readPersistedViewState(
+  USAGE_VIEW_STORAGE_KEY,
+  defaultViewState,
+  isAdminUsageViewState,
+)
+const startDate = ref(initialViewState.startDate)
+const endDate = ref(initialViewState.endDate)
+const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
+const filters = ref<AdminUsageQueryParams>({
+  ...initialViewState.filters,
+  start_date: startDate.value,
+  end_date: endDate.value,
+})
+
+const persistUsageViewState = () => {
+  const { user_id, model, api_key_id, account_id, group_id, request_type, billing_type, billing_mode } = filters.value
+  writePersistedViewState(USAGE_VIEW_STORAGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+    filters: { user_id, model, api_key_id, account_id, group_id, request_type, billing_type, billing_mode },
+  })
+}
 const pagination = reactive({ page: 1, page_size: getPersistedPageSize(), total: 0 })
 const sortState = reactive({
   sort_by: 'created_at',
@@ -328,11 +401,13 @@ const applyRouteQueryFilters = () => {
 
   filters.value = {
     ...filters.value,
-    user_id: queryUserId,
+    ...(queryUserId !== undefined ? { user_id: queryUserId } : {}),
     start_date: startDate.value,
     end_date: endDate.value
   }
-  granularity.value = getGranularityForRange(startDate.value, endDate.value)
+  if (queryStartDate || queryEndDate) {
+    granularity.value = getGranularityForRange(startDate.value, endDate.value)
+  }
 }
 
 const onDateRangeChange = (range: { startDate: string; endDate: string; preset: string | null }) => {
@@ -491,6 +566,7 @@ const loadChartData = async () => {
   } catch (error) { console.error('Failed to load chart data:', error) } finally { if (seq === chartReqSeq) chartsLoading.value = false }
 }
 const applyFilters = () => {
+  persistUsageViewState()
   pagination.page = 1
   invalidateModelStatsCache()
   loadLogs()
@@ -520,6 +596,10 @@ const resetFilters = () => {
   filters.value = { start_date: startDate.value, end_date: endDate.value, request_type: undefined, billing_type: null, billing_mode: undefined }
   granularity.value = getGranularityForRange(startDate.value, endDate.value)
   applyFilters()
+}
+const onGranularityChange = () => {
+  persistUsageViewState()
+  loadChartData()
 }
 const handlePageChange = (p: number) => { pagination.page = p; loadLogs() }
 const handlePageSizeChange = (s: number) => { pagination.page_size = s; pagination.page = 1; loadLogs() }
@@ -618,6 +698,7 @@ const allColumns = computed(() => [
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'latency', label: t('usage.latency'), sortable: false },
+  { key: 'output_speed', label: t('usage.outputSpeed'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
   { key: 'ip_address', label: t('admin.usage.ipAddress'), sortable: false }

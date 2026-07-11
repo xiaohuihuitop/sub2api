@@ -3,8 +3,8 @@
     <div class="space-y-6">
       <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
       <template v-else-if="stats">
-        <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" :platform-quotas="platformQuotas" />
-        <UserDashboardCharts v-model:startDate="startDate" v-model:endDate="endDate" v-model:granularity="granularity" :loading="loadingCharts" :trend="trendData" :models="modelStats" @dateRangeChange="loadCharts" @granularityChange="loadCharts" @refresh="refreshAll" />
+        <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" :platform-quotas="platformQuotas" :subscriptions="subscriptions" />
+        <UserDashboardCharts v-model:startDate="startDate" v-model:endDate="endDate" v-model:granularity="granularity" :loading="loadingCharts" :trend="trendData" :models="modelStats" @dateRangeChange="onDateRangeChange" @granularityChange="onGranularityChange" @refresh="refreshAll" />
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div class="lg:col-span-2"><UserDashboardRecentUsage :data="recentUsage" :loading="loadingUsage" /></div>
           <div class="lg:col-span-1"><UserDashboardQuickActions /></div>
@@ -15,26 +15,77 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'; import { useAuthStore } from '@/stores/auth'; import { usageAPI, type UserDashboardStats as UserStatsType } from '@/api/usage'
-import AppLayout from '@/components/layout/AppLayout.vue'; import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'; import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
-import UserDashboardRecentUsage from '@/components/user/dashboard/UserDashboardRecentUsage.vue'; import UserDashboardQuickActions from '@/components/user/dashboard/UserDashboardQuickActions.vue'
-import type { UsageLog, TrendDataPoint, ModelStat, PlatformQuotaItem } from '@/types'
+import { computed, onMounted, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { usageAPI, type UserDashboardStats as UserStatsType } from '@/api/usage'
 import { getMyPlatformQuotas } from '@/api/user'
+import { getActiveSubscriptions } from '@/api/subscriptions'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'
+import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
+import UserDashboardRecentUsage from '@/components/user/dashboard/UserDashboardRecentUsage.vue'
+import UserDashboardQuickActions from '@/components/user/dashboard/UserDashboardQuickActions.vue'
+import { isValidDateRange, readPersistedViewState, writePersistedViewState } from '@/composables/usePersistedViewState'
+import type { ModelStat, PlatformQuotaItem, TrendDataPoint, UsageLog, UserSubscription } from '@/types'
 
-const authStore = useAuthStore(); const user = computed(() => authStore.user)
-const stats = ref<UserStatsType | null>(null); const loading = ref(false); const loadingUsage = ref(false); const loadingCharts = ref(false)
-const trendData = ref<TrendDataPoint[]>([]); const modelStats = ref<ModelStat[]>([]); const recentUsage = ref<UsageLog[]>([])
+type DashboardViewState = {
+  startDate: string
+  endDate: string
+  granularity: 'day' | 'hour'
+}
+
+const DASHBOARD_VIEW_STORAGE_KEY = 'sub2api:user-dashboard:view-state:v1'
+const isDashboardViewState = (value: unknown): value is DashboardViewState => {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Partial<DashboardViewState>
+  return isValidDateRange(state.startDate, state.endDate)
+    && (state.granularity === 'day' || state.granularity === 'hour')
+}
+
+const authStore = useAuthStore()
+const user = computed(() => authStore.user)
+const stats = ref<UserStatsType | null>(null)
+const loading = ref(false)
+const loadingUsage = ref(false)
+const loadingCharts = ref(false)
+const trendData = ref<TrendDataPoint[]>([])
+const modelStats = ref<ModelStat[]>([])
+const recentUsage = ref<UsageLog[]>([])
 const platformQuotas = ref<PlatformQuotaItem[] | null>(null)
+const subscriptions = ref<UserSubscription[]>([])
 
-const formatLD = (d: Date) => d.toISOString().split('T')[0]
-const startDate = ref(formatLD(new Date(Date.now() - 6 * 86400000))); const endDate = ref(formatLD(new Date())); const granularity = ref('day')
+const formatLD = (date: Date) => date.toISOString().split('T')[0]
+const defaultViewState: DashboardViewState = {
+  startDate: formatLD(new Date(Date.now() - 6 * 86400000)),
+  endDate: formatLD(new Date()),
+  granularity: 'day',
+}
+const initialViewState = readPersistedViewState(
+  DASHBOARD_VIEW_STORAGE_KEY,
+  defaultViewState,
+  isDashboardViewState,
+)
+const startDate = ref(initialViewState.startDate)
+const endDate = ref(initialViewState.endDate)
+const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
+
+const persistDashboardViewState = () => {
+  writePersistedViewState(DASHBOARD_VIEW_STORAGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+  })
+}
 
 const loadStats = async () => { loading.value = true; try { await authStore.refreshUser(); stats.value = await usageAPI.getDashboardStats() } catch (error) { console.error('Failed to load dashboard stats:', error) } finally { loading.value = false } }
-const loadCharts = async () => { loadingCharts.value = true; try { const res = await Promise.all([usageAPI.getDashboardTrend({ start_date: startDate.value, end_date: endDate.value, granularity: granularity.value as any }), usageAPI.getDashboardModels({ start_date: startDate.value, end_date: endDate.value })]); trendData.value = res[0].trend || []; modelStats.value = res[1].models || [] } catch (error) { console.error('Failed to load charts:', error) } finally { loadingCharts.value = false } }
+const loadCharts = async () => { loadingCharts.value = true; try { const res = await Promise.all([usageAPI.getDashboardTrend({ start_date: startDate.value, end_date: endDate.value, granularity: granularity.value }), usageAPI.getDashboardModels({ start_date: startDate.value, end_date: endDate.value })]); trendData.value = res[0].trend || []; modelStats.value = res[1].models || [] } catch (error) { console.error('Failed to load charts:', error) } finally { loadingCharts.value = false } }
 const loadRecent = async () => { loadingUsage.value = true; try { const res = await usageAPI.getByDateRange(startDate.value, endDate.value); recentUsage.value = res.items.slice(0, 5) } catch (error) { console.error('Failed to load recent usage:', error) } finally { loadingUsage.value = false } }
 const loadPlatformQuotas = async () => { try { const data = await getMyPlatformQuotas(); platformQuotas.value = data.platform_quotas ?? [] } catch (error) { console.warn('Failed to load platform quotas:', error); platformQuotas.value = [] } }
-const refreshAll = () => { loadStats(); loadCharts(); loadRecent(); loadPlatformQuotas() }
+const loadSubscriptions = async () => { try { subscriptions.value = await getActiveSubscriptions() } catch (error) { console.warn('Failed to load subscriptions:', error); subscriptions.value = [] } }
+const refreshAll = () => { void loadStats(); void loadCharts(); void loadRecent(); void loadPlatformQuotas(); void loadSubscriptions() }
+const onDateRangeChange = () => { persistDashboardViewState(); void loadCharts(); void loadRecent() }
+const onGranularityChange = () => { persistDashboardViewState(); void loadCharts() }
 
-onMounted(() => { refreshAll() })
+onMounted(refreshAll)
 </script>

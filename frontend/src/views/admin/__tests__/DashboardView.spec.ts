@@ -89,6 +89,7 @@ const createDashboardStats = (): DashboardStats => ({
 describe('admin DashboardView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    localStorage.clear()
 
     getSnapshotV2.mockReset()
     getUserUsageTrend.mockReset()
@@ -141,6 +142,37 @@ describe('admin DashboardView', () => {
       start_date: formatLocalDate(yesterday),
       end_date: formatLocalDate(now),
       granularity: 'hour'
+    }))
+  })
+
+  it('restores the saved dashboard range and granularity', async () => {
+    localStorage.setItem('sub2api:admin-dashboard:view-state:v1', JSON.stringify({
+      startDate: '2026-07-01',
+      endDate: '2026-07-10',
+      granularity: 'day',
+    }))
+
+    mount(DashboardView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          LoadingSpinner: true,
+          Icon: true,
+          DateRangePicker: true,
+          Select: true,
+          ModelDistributionChart: true,
+          TokenUsageTrend: true,
+          Line: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
+      start_date: '2026-07-01',
+      end_date: '2026-07-10',
+      granularity: 'day',
     }))
   })
 })

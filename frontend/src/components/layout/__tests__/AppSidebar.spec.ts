@@ -53,3 +53,12 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar custom navigation', () => {
+  it('keeps the official home route while hiding custom-disabled entries', () => {
+    expect(componentSource).toContain(':to="homePath"')
+    expect(componentSource).not.toContain('<VersionBadge')
+    expect(componentSource).not.toContain('function toggleTheme')
+    expect(componentSource).not.toContain("path: '/subscriptions'")
+  })
+})
