@@ -242,7 +242,7 @@
                   <Select
                     v-model="granularity"
                     :options="granularityOptions"
-                    @change="loadChartData"
+                    @change="onGranularityChange"
                   />
                 </div>
               </div>
@@ -312,6 +312,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
+import { getPersistedDateRange, setPersistedDateRange } from '@/composables/usePersistedDateRange'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 
@@ -375,10 +376,16 @@ const getLast24HoursRangeDates = (): { start: string; end: string } => {
 }
 
 // Date range
-const granularity = ref<'day' | 'hour'>('hour')
+const ADMIN_DASHBOARD_DATE_RANGE_KEY = 'admin-dashboard-date-range'
 const defaultRange = getLast24HoursRangeDates()
-const startDate = ref(defaultRange.start)
-const endDate = ref(defaultRange.end)
+const persistedDateRange = getPersistedDateRange(ADMIN_DASHBOARD_DATE_RANGE_KEY, {
+  startDate: defaultRange.start,
+  endDate: defaultRange.end,
+  granularity: 'hour',
+})
+const granularity = ref<'day' | 'hour'>(persistedDateRange.granularity ?? 'hour')
+const startDate = ref(persistedDateRange.startDate)
+const endDate = ref(persistedDateRange.endDate)
 
 // Granularity options for Select component
 const granularityOptions = computed(() => [
@@ -572,6 +579,8 @@ const onDateRangeChange = (range: {
   endDate: string
   preset: string | null
 }) => {
+  startDate.value = range.startDate
+  endDate.value = range.endDate
   // Auto-select granularity based on date range
   const start = new Date(range.startDate)
   const end = new Date(range.endDate)
@@ -584,6 +593,20 @@ const onDateRangeChange = (range: {
     granularity.value = 'day'
   }
 
+  setPersistedDateRange(ADMIN_DASHBOARD_DATE_RANGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+  })
+  loadChartData()
+}
+
+const onGranularityChange = () => {
+  setPersistedDateRange(ADMIN_DASHBOARD_DATE_RANGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+  })
   loadChartData()
 }
 

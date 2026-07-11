@@ -53,7 +53,7 @@
             <div class="ml-auto flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
               <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
+              <Select v-model="granularity" :options="granularityOptions" @change="onGranularityChange" />
               </div>
             </div>
           </div>
@@ -137,6 +137,7 @@ import { saveAs } from 'file-saver'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admin'; import { adminUsageAPI } from '@/api/admin/usage'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { getPersistedDateRange, setPersistedDateRange } from '@/composables/usePersistedDateRange'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
@@ -224,8 +225,15 @@ const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
   const daysDiff = Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24))
   return daysDiff <= 1 ? 'hour' : 'day'
 }
+const ADMIN_USAGE_DATE_RANGE_KEY = 'admin-usage-date-range'
 const defaultRange = getLast24HoursRangeDates()
-const startDate = ref(defaultRange.start); const endDate = ref(defaultRange.end)
+const persistedDateRange = getPersistedDateRange(ADMIN_USAGE_DATE_RANGE_KEY, {
+  startDate: defaultRange.start,
+  endDate: defaultRange.end,
+  granularity: 'hour',
+})
+const startDate = ref(persistedDateRange.startDate); const endDate = ref(persistedDateRange.endDate)
+granularity.value = persistedDateRange.granularity ?? 'hour'
 const filters = ref<AdminUsageQueryParams>({ user_id: undefined, model: undefined, group_id: undefined, request_type: undefined, billing_type: null, start_date: startDate.value, end_date: endDate.value })
 const pagination = reactive({ page: 1, page_size: getPersistedPageSize(), total: 0 })
 const sortState = reactive({
@@ -263,7 +271,9 @@ const applyRouteQueryFilters = () => {
     start_date: startDate.value,
     end_date: endDate.value
   }
-  granularity.value = getGranularityForRange(startDate.value, endDate.value)
+  if (queryStartDate || queryEndDate) {
+    granularity.value = getGranularityForRange(startDate.value, endDate.value)
+  }
 }
 
 const onDateRangeChange = (range: { startDate: string; endDate: string; preset: string | null }) => {
@@ -275,7 +285,21 @@ const onDateRangeChange = (range: { startDate: string; endDate: string; preset: 
     end_date: range.endDate
   }
   granularity.value = getGranularityForRange(range.startDate, range.endDate)
+  setPersistedDateRange(ADMIN_USAGE_DATE_RANGE_KEY, {
+    startDate: range.startDate,
+    endDate: range.endDate,
+    granularity: granularity.value,
+  })
   applyFilters()
+}
+
+const onGranularityChange = () => {
+  setPersistedDateRange(ADMIN_USAGE_DATE_RANGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+  })
+  loadChartData()
 }
 
 const buildUsageListParams = (
@@ -440,6 +464,11 @@ const resetFilters = () => {
   endDate.value = range.end
   filters.value = { start_date: startDate.value, end_date: endDate.value, request_type: undefined, billing_type: null, billing_mode: undefined }
   granularity.value = getGranularityForRange(startDate.value, endDate.value)
+  setPersistedDateRange(ADMIN_USAGE_DATE_RANGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+  })
   applyFilters()
 }
 const handlePageChange = (p: number) => { pagination.page = p; loadLogs() }

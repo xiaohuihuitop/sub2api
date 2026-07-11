@@ -114,6 +114,8 @@ const GroupDistributionChartStub = {
 describe('admin UsageView distribution metric toggles', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.mocked(localStorage.getItem).mockReset()
+    vi.mocked(localStorage.getItem).mockReturnValue(null)
     list.mockReset()
     getStats.mockReset()
     getSnapshotV2.mockReset()
@@ -249,5 +251,48 @@ describe('admin UsageView distribution metric toggles', () => {
       'speed',
       'created_at',
     ])
+  })
+
+  it('keeps a restored granularity when the route has no date range', async () => {
+    vi.mocked(localStorage.getItem).mockImplementation((key) => {
+      if (key === 'admin-usage-date-range') {
+        return JSON.stringify({
+          startDate: '2026-07-03',
+          endDate: '2026-07-09',
+          granularity: 'hour',
+        })
+      }
+      return null
+    })
+
+    mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          UsageStatsCards: true,
+          UsageFilters: UsageFiltersStub,
+          UsageTable: UsageTableStub,
+          UsageExportProgress: true,
+          UsageCleanupDialog: true,
+          UserBalanceHistoryModal: true,
+          Pagination: true,
+          Select: true,
+          DateRangePicker: true,
+          Icon: true,
+          TokenUsageTrend: true,
+          ModelDistributionChart: ModelDistributionChartStub,
+          GroupDistributionChart: GroupDistributionChartStub,
+        },
+      },
+    })
+
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
+      start_date: '2026-07-03',
+      end_date: '2026-07-09',
+      granularity: 'hour',
+    }))
   })
 })

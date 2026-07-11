@@ -1,7 +1,6 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
-      <template #actions>
+    <div class="space-y-6">
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <!-- Total Requests -->
           <div class="card p-4">
@@ -84,9 +83,6 @@
           </div>
         </div>
         </div>
-      </template>
-
-      <template #filters>
         <div class="card">
           <div class="px-6 py-4">
           <div class="flex flex-wrap items-end gap-4">
@@ -181,9 +177,7 @@
           </div>
         </div>
         </div>
-      </template>
-
-      <template #table>
+      <div class="card overflow-hidden">
         <DataTable
           :columns="visibleColumns"
           :data="usageLogs"
@@ -373,19 +367,17 @@
             <EmptyState :message="t('usage.noRecords')" />
           </template>
         </DataTable>
-      </template>
+      </div>
 
-      <template #pagination>
-        <Pagination
-          v-if="pagination.total > 0"
-          :page="pagination.page"
-          :total="pagination.total"
-          :page-size="pagination.page_size"
-          @update:page="handlePageChange"
-          @update:pageSize="handlePageSizeChange"
-        />
-      </template>
-    </TablePageLayout>
+      <Pagination
+        v-if="pagination.total > 0"
+        :page="pagination.page"
+        :total="pagination.total"
+        :page-size="pagination.page_size"
+        @update:page="handlePageChange"
+        @update:pageSize="handlePageSizeChange"
+      />
+    </div>
   </AppLayout>
 
   <!-- Token Tooltip Portal -->
@@ -550,7 +542,6 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { usageAPI, keysAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -561,6 +552,7 @@ import type { UsageLog, ApiKey, UsageQueryParams, UsageStatsResponse } from '@/t
 import type { Column } from '@/components/common/types'
 import { formatDateTime, formatReasoningEffort } from '@/utils/format'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { getPersistedDateRange, setPersistedDateRange } from '@/composables/usePersistedDateRange'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
@@ -671,14 +663,21 @@ const formatLocalDate = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+const USER_USAGE_DATE_RANGE_KEY = 'user-usage-date-range'
+
 // Initialize date range immediately
 const now = new Date()
 const weekAgo = new Date(now)
 weekAgo.setDate(weekAgo.getDate() - 6)
 
 // Date range state
-const startDate = ref(formatLocalDate(weekAgo))
-const endDate = ref(formatLocalDate(now))
+const defaultDateRange = {
+  startDate: formatLocalDate(weekAgo),
+  endDate: formatLocalDate(now),
+}
+const persistedDateRange = getPersistedDateRange(USER_USAGE_DATE_RANGE_KEY, defaultDateRange)
+const startDate = ref(persistedDateRange.startDate)
+const endDate = ref(persistedDateRange.endDate)
 
 const filters = ref<UsageQueryParams>({
   api_key_id: undefined,
@@ -696,8 +695,14 @@ const onDateRangeChange = (range: {
   endDate: string
   preset: string | null
 }) => {
+  startDate.value = range.startDate
+  endDate.value = range.endDate
   filters.value.start_date = range.startDate
   filters.value.end_date = range.endDate
+  setPersistedDateRange(USER_USAGE_DATE_RANGE_KEY, {
+    startDate: range.startDate,
+    endDate: range.endDate,
+  })
   applyFilters()
 }
 
@@ -858,6 +863,10 @@ const resetFilters = () => {
   endDate.value = formatLocalDate(now)
   filters.value.start_date = startDate.value
   filters.value.end_date = endDate.value
+  setPersistedDateRange(USER_USAGE_DATE_RANGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+  })
   pagination.page = 1
   loadUsageLogs()
   loadUsageStats()

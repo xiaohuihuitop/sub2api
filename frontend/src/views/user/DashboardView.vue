@@ -20,6 +20,7 @@ import { ref, computed, onMounted } from 'vue'; import { useAuthStore } from '@/
 import AppLayout from '@/components/layout/AppLayout.vue'; import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'; import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
 import type { TrendDataPoint, ModelStat } from '@/types'
+import { getPersistedDateRange, setPersistedDateRange } from '@/composables/usePersistedDateRange'
 
 const authStore = useAuthStore(); const user = computed(() => authStore.user)
 const subscriptionStore = useSubscriptionStore()
@@ -27,11 +28,18 @@ const stats = ref<UserStatsType | null>(null); const loading = ref(false); const
 const trendData = ref<TrendDataPoint[]>([]); const modelStats = ref<ModelStat[]>([])
 const subscriptionCards = computed(() => subscriptionStore.activeSubscriptions.slice(0, 4))
 
+const USER_DASHBOARD_DATE_RANGE_KEY = 'user-dashboard-date-range'
 const formatLD = (d: Date) => d.toISOString().split('T')[0]
-const startDate = ref(formatLD(new Date(Date.now() - 6 * 86400000))); const endDate = ref(formatLD(new Date())); const granularity = ref('day')
+const defaultDateRange = {
+  startDate: formatLD(new Date(Date.now() - 6 * 86400000)),
+  endDate: formatLD(new Date()),
+  granularity: 'day' as const,
+}
+const persistedDateRange = getPersistedDateRange(USER_DASHBOARD_DATE_RANGE_KEY, defaultDateRange)
+const startDate = ref(persistedDateRange.startDate); const endDate = ref(persistedDateRange.endDate); const granularity = ref(persistedDateRange.granularity ?? 'day')
 
 const loadStats = async () => { loading.value = true; try { await authStore.refreshUser(); stats.value = await usageAPI.getDashboardStats() } catch (error) { console.error('Failed to load dashboard stats:', error) } finally { loading.value = false } }
-const loadCharts = async () => { loadingCharts.value = true; try { const res = await Promise.all([usageAPI.getDashboardTrend({ start_date: startDate.value, end_date: endDate.value, granularity: granularity.value as any }), usageAPI.getDashboardModels({ start_date: startDate.value, end_date: endDate.value })]); trendData.value = res[0].trend || []; modelStats.value = res[1].models || [] } catch (error) { console.error('Failed to load charts:', error) } finally { loadingCharts.value = false } }
+const loadCharts = async () => { setPersistedDateRange(USER_DASHBOARD_DATE_RANGE_KEY, { startDate: startDate.value, endDate: endDate.value, granularity: granularity.value }); loadingCharts.value = true; try { const res = await Promise.all([usageAPI.getDashboardTrend({ start_date: startDate.value, end_date: endDate.value, granularity: granularity.value as any }), usageAPI.getDashboardModels({ start_date: startDate.value, end_date: endDate.value })]); trendData.value = res[0].trend || []; modelStats.value = res[1].models || [] } catch (error) { console.error('Failed to load charts:', error) } finally { loadingCharts.value = false } }
 const loadSubscriptions = async () => { try { await subscriptionStore.fetchActiveSubscriptions() } catch (error) { console.error('Failed to load subscriptions:', error) } }
 const refreshAll = () => { loadStats(); loadCharts(); loadSubscriptions() }
 

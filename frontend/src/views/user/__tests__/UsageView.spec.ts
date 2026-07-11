@@ -73,7 +73,7 @@ vi.mock('vue-i18n', async () => {
 
 const AppLayoutStub = { template: '<div><slot /></div>' }
 const TablePageLayoutStub = {
-  template: '<div><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>',
+  template: '<div data-test="legacy-table-layout"><slot name="actions" /><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>',
 }
 const DataTableStub = {
   props: ['columns', 'data'],
@@ -304,7 +304,7 @@ describe('user UsageView tooltip', () => {
     clickSpy.mockRestore()
   })
 
-  it('shows column selector and output speed in the default user columns', async () => {
+  it('uses a full-height page layout while retaining the output speed column', async () => {
     query.mockResolvedValue({
       items: [
         {
@@ -365,6 +365,7 @@ describe('user UsageView tooltip', () => {
 
     await flushPromises()
 
+    expect(wrapper.find('[data-test="legacy-table-layout"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="usage-column-settings"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('25.80 t/s')
 
@@ -382,5 +383,38 @@ describe('user UsageView tooltip', () => {
       'speed',
       'created_at',
     ])
+  })
+
+  it('restores the saved date range before loading usage records', async () => {
+    localStorage.setItem('user-usage-date-range', JSON.stringify({
+      startDate: '2026-07-03',
+      endDate: '2026-07-09',
+    }))
+    query.mockResolvedValue({ items: [], total: 0, pages: 0 })
+    getStatsByDateRange.mockResolvedValue({ total_requests: 0 })
+    list.mockResolvedValue({ items: [] })
+
+    mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          TablePageLayout: TablePageLayoutStub,
+          Pagination: true,
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Select: true,
+          DateRangePicker: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(query).toHaveBeenCalledWith(expect.objectContaining({
+      start_date: '2026-07-03',
+      end_date: '2026-07-09',
+    }), expect.any(Object))
   })
 })
