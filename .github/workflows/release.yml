@@ -289,7 +289,7 @@ jobs:
           fi
           VERSION="${TAG_NAME#v}"
           OWNER_LOWER="${GITHUB_REPOSITORY_OWNER,,}"
-          ARCHIVE_NAME="sub2api_${VERSION}_linux_amd64.tar"
+          ARCHIVE_NAME="sub2api_latest.tar"
 
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -311,14 +311,15 @@ jobs:
           ARCHIVE_NAME: ${{ steps.release-meta.outputs.archive_name }}
         run: |
           docker pull --platform linux/amd64 "$IMAGE"
+          docker tag "$IMAGE" "sub2api:latest"
           docker tag "$IMAGE" "sub2api:${VERSION}"
-          docker save --output "$ARCHIVE_NAME" "sub2api:${VERSION}"
+          docker save --output "$ARCHIVE_NAME" "sub2api:latest" "sub2api:${VERSION}"
           sha256sum "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
 
       - name: Upload offline Docker artifact
         uses: actions/upload-artifact@v7
         with:
-          name: sub2api_${{ steps.release-meta.outputs.version }}_linux_amd64
+          name: sub2api_latest
           path: |
             ${{ steps.release-meta.outputs.archive_name }}
             ${{ steps.release-meta.outputs.archive_name }}.sha256
