@@ -3,14 +3,18 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
+	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -38,6 +42,36 @@ func newAPIKeyRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *apiKeyR
 func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 	// 默认过滤已软删除记录，避免删除后仍被查询到。
 	return r.client.APIKey.Query().Where(apikey.DeletedAtIsNil())
+}
+
+func (r *apiKeyRepository) rawExecutor(ctx context.Context) sqlExecutor {
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		return tx.Client()
+	}
+	return r.sql
+}
+
+func apiKeyBelongsToGroup(groupID int64) predicate.APIKey {
+	return func(selector *entsql.Selector) {
+		selector.Where(entsql.Or(
+			entsql.EQ(selector.C(apikey.FieldGroupID), groupID),
+			entsql.ExprP(
+				"EXISTS (SELECT 1 FROM api_key_allowed_groups AS akag WHERE akag.api_key_id = "+selector.C(apikey.FieldID)+" AND akag.group_id = ?)",
+				groupID,
+			),
+		))
+	}
+}
+
+func apiKeyHasNoGroups() predicate.APIKey {
+	return func(selector *entsql.Selector) {
+		selector.Where(entsql.And(
+			entsql.IsNull(selector.C(apikey.FieldGroupID)),
+			entsql.ExprP(
+				"NOT EXISTS (SELECT 1 FROM api_key_allowed_groups AS akag WHERE akag.api_key_id = "+selector.C(apikey.FieldID)+")",
+			),
+		))
+	}
 }
 
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
@@ -84,7 +118,11 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.loadAllowedGroups(ctx, []*service.APIKey{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
@@ -122,7 +160,11 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.loadAllowedGroups(ctx, []*service.APIKey{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
@@ -216,7 +258,11 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.loadAllowedGroups(ctx, []*service.APIKey{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) error {
@@ -398,9 +444,9 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 	}
 	if filters.GroupID != nil {
 		if *filters.GroupID == 0 {
-			q = q.Where(apikey.GroupIDIsNil())
+			q = q.Where(apiKeyHasNoGroups())
 		} else {
-			q = q.Where(apikey.GroupIDEQ(*filters.GroupID))
+			q = q.Where(apiKeyBelongsToGroup(*filters.GroupID))
 		}
 	}
 
@@ -432,6 +478,9 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
 	}
+	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+		return nil, nil, err
+	}
 	if err := r.attachLastUsedIPs(ctx, outKeys); err != nil {
 		return nil, nil, err
 	}
@@ -451,6 +500,9 @@ func (r *apiKeyRepository) ListAllByUserID(ctx context.Context, userID int64, fi
 	outKeys := make([]service.APIKey, 0, len(keys))
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
+	}
+	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+		return nil, err
 	}
 	if err := r.attachLastUsedIPs(ctx, outKeys); err != nil {
 		return nil, err
@@ -572,7 +624,7 @@ func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, e
 }
 
 func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]service.APIKey, *pagination.PaginationResult, error) {
-	q := r.activeQuery().Where(apikey.GroupIDEQ(groupID))
+	q := r.activeQuery().Where(apiKeyBelongsToGroup(groupID))
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -595,6 +647,9 @@ func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, par
 	outKeys := make([]service.APIKey, 0, len(keys))
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
+	}
+	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+		return nil, nil, err
 	}
 
 	return outKeys, paginationResultFromTotal(int64(total), params), nil
@@ -656,31 +711,292 @@ func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyw
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
 	}
+	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+		return nil, err
+	}
 	return outKeys, nil
+}
+
+func (r *apiKeyRepository) loadAllowedGroupValues(ctx context.Context, keys []service.APIKey) error {
+	pointers := make([]*service.APIKey, 0, len(keys))
+	for i := range keys {
+		pointers = append(pointers, &keys[i])
+	}
+	return r.loadAllowedGroups(ctx, pointers)
+}
+
+func (r *apiKeyRepository) loadAllowedGroups(ctx context.Context, keys []*service.APIKey) error {
+	for _, key := range keys {
+		if key == nil || key.ID <= 0 {
+			continue
+		}
+		groups, err := r.ListAllowedGroups(ctx, key.ID)
+		if err != nil {
+			return err
+		}
+		if len(groups) == 0 && key.Group != nil {
+			groups = []service.Group{*key.Group}
+		}
+		key.AllowedGroups = groups
+		key.AllowedGroupIDs = make([]int64, 0, len(groups))
+		for i := range groups {
+			key.AllowedGroupIDs = append(key.AllowedGroupIDs, groups[i].ID)
+		}
+		if len(groups) > 0 {
+			key.Group = &key.AllowedGroups[0]
+			key.GroupID = &key.AllowedGroups[0].ID
+		}
+	}
+	return nil
+}
+
+func (r *apiKeyRepository) ListAllowedGroups(ctx context.Context, keyID int64) ([]service.Group, error) {
+	rows, err := r.rawExecutor(ctx).QueryContext(ctx, `
+		SELECT links.group_id
+		FROM api_key_allowed_groups AS links
+		JOIN groups AS g ON g.id = links.group_id
+		WHERE links.api_key_id = $1 AND g.deleted_at IS NULL
+		ORDER BY g.sort_order ASC, g.id ASC
+	`, keyID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	groupIDs := make([]int64, 0)
+	for rows.Next() {
+		var groupID int64
+		if err := rows.Scan(&groupID); err != nil {
+			return nil, err
+		}
+		groupIDs = append(groupIDs, groupID)
+	}
+	if err := rows.Err(); err != nil || len(groupIDs) == 0 {
+		return []service.Group{}, err
+	}
+
+	entities, err := clientFromContext(ctx, r.client).Group.Query().
+		Where(group.IDIn(groupIDs...), group.DeletedAtIsNil()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[int64]service.Group, len(entities))
+	for _, entity := range entities {
+		mapped := groupEntityToService(entity)
+		if mapped != nil {
+			byID[mapped.ID] = *mapped
+		}
+	}
+	groups := make([]service.Group, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		if mapped, ok := byID[groupID]; ok {
+			groups = append(groups, mapped)
+		}
+	}
+	if err := r.hydrateOpenAIBillingEndpointCapabilities(ctx, groups); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
+func (r *apiKeyRepository) hydrateOpenAIBillingEndpointCapabilities(ctx context.Context, groups []service.Group) error {
+	groupIndexes := make(map[int64]int)
+	groupIDs := make([]int64, 0, len(groups))
+	for i := range groups {
+		if groups[i].Platform != service.PlatformOpenAI {
+			continue
+		}
+		groups[i].OpenAIEndpointCapabilities = map[string]bool{}
+		groupIndexes[groups[i].ID] = i
+		groupIDs = append(groupIDs, groups[i].ID)
+	}
+	if len(groupIDs) == 0 {
+		return nil
+	}
+
+	links, err := clientFromContext(ctx, r.client).AccountGroup.Query().
+		Where(accountgroup.GroupIDIn(groupIDs...)).
+		WithAccount(func(q *dbent.AccountQuery) {
+			q.Select(dbaccount.FieldID, dbaccount.FieldPlatform, dbaccount.FieldType, dbaccount.FieldCredentials, dbaccount.FieldExtra)
+		}).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, link := range links {
+		index, ok := groupIndexes[link.GroupID]
+		if !ok || link.Edges.Account == nil {
+			continue
+		}
+		account := accountEntityToService(link.Edges.Account)
+		for _, capability := range openAIAccountBillingEndpointCapabilities(account) {
+			groups[index].OpenAIEndpointCapabilities[string(capability)] = true
+		}
+	}
+	return nil
+}
+
+func openAIAccountBillingEndpointCapabilities(account *service.Account) []service.OpenAIEndpointCapability {
+	if account == nil || !account.IsOpenAICompatible() {
+		return nil
+	}
+	configured, found := configuredOpenAIEndpointCapabilities(account.Credentials)
+	if !found {
+		if account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityResponses) {
+			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
+		}
+		return nil
+	}
+	result := make([]service.OpenAIEndpointCapability, 0, 2)
+	for _, capability := range []service.OpenAIEndpointCapability{
+		service.OpenAIEndpointCapabilityChatCompletions,
+		service.OpenAIEndpointCapabilityResponses,
+	} {
+		if configured[string(capability)] && account.SupportsOpenAIEndpointCapability(capability) {
+			result = append(result, capability)
+		}
+	}
+	return result
+}
+
+func configuredOpenAIEndpointCapabilities(credentials map[string]any) (map[string]bool, bool) {
+	if credentials == nil {
+		return nil, false
+	}
+	raw, found := credentials["openai_capabilities"]
+	if !found || raw == nil {
+		return nil, false
+	}
+	result := make(map[string]bool)
+	add := func(value string) {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value != "" {
+			result[value] = true
+		}
+	}
+	switch values := raw.(type) {
+	case []any:
+		for _, value := range values {
+			if text, ok := value.(string); ok {
+				add(text)
+			}
+		}
+	case []string:
+		for _, value := range values {
+			add(value)
+		}
+	case map[string]any:
+		for key, value := range values {
+			if enabled, ok := value.(bool); ok && enabled {
+				add(key)
+			}
+		}
+	case string:
+		var decoded []string
+		if json.Unmarshal([]byte(values), &decoded) == nil {
+			for _, value := range decoded {
+				add(value)
+			}
+		} else {
+			add(values)
+		}
+	}
+	return result, true
 }
 
 // ClearGroupIDByGroupID 将指定分组的所有 API Key 的 group_id 设为 nil
 func (r *apiKeyRepository) ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	n, err := r.client.APIKey.Update().
-		Where(apikey.GroupIDEQ(groupID), apikey.DeletedAtIsNil()).
-		ClearGroupID().
-		Save(ctx)
-	return int64(n), err
+	result, err := r.rawExecutor(ctx).ExecContext(ctx, `
+		WITH affected AS (
+			SELECT DISTINCT keys.id
+			FROM api_keys AS keys
+			LEFT JOIN api_key_allowed_groups AS links ON links.api_key_id = keys.id
+			WHERE keys.deleted_at IS NULL
+			  AND (keys.group_id = $1 OR links.group_id = $1)
+		), deleted AS (
+			DELETE FROM api_key_allowed_groups
+			WHERE group_id = $1
+			RETURNING api_key_id
+		), next_groups AS (
+			SELECT affected.id AS api_key_id, (
+				SELECT links.group_id
+				FROM api_key_allowed_groups AS links
+				JOIN groups ON groups.id = links.group_id
+				WHERE links.api_key_id = affected.id
+				  AND links.group_id <> $1
+				  AND groups.deleted_at IS NULL
+				ORDER BY groups.sort_order ASC, groups.id ASC
+				LIMIT 1
+			) AS group_id
+			FROM affected
+		)
+		UPDATE api_keys AS keys
+		SET group_id = next_groups.group_id, updated_at = NOW()
+		FROM next_groups
+		WHERE keys.id = next_groups.api_key_id
+	`, groupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
 func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
-	client := clientFromContext(ctx, r.client)
-	n, err := client.APIKey.Update().
-		Where(apikey.UserIDEQ(userID), apikey.GroupIDEQ(oldGroupID), apikey.DeletedAtIsNil()).
-		SetGroupID(newGroupID).
-		Save(ctx)
-	return int64(n), err
+	result, err := r.rawExecutor(ctx).ExecContext(ctx, `
+		WITH affected AS (
+			SELECT DISTINCT keys.id
+			FROM api_keys AS keys
+			LEFT JOIN api_key_allowed_groups AS links ON links.api_key_id = keys.id
+			WHERE keys.user_id = $1
+			  AND keys.deleted_at IS NULL
+			  AND (keys.group_id = $2 OR links.group_id = $2)
+		), inserted AS (
+			INSERT INTO api_key_allowed_groups (api_key_id, group_id)
+			SELECT affected.id, $3
+			FROM affected
+			ON CONFLICT (api_key_id, group_id) DO NOTHING
+			RETURNING api_key_id
+		), deleted AS (
+			DELETE FROM api_key_allowed_groups AS links
+			USING affected
+			WHERE links.api_key_id = affected.id
+			  AND links.group_id = $2
+			  AND $2 <> $3
+			RETURNING links.api_key_id
+		), next_groups AS (
+			SELECT affected.id AS api_key_id, (
+				SELECT candidates.group_id
+				FROM (
+					SELECT links.group_id
+					FROM api_key_allowed_groups AS links
+					WHERE links.api_key_id = affected.id
+					  AND (links.group_id <> $2 OR $2 = $3)
+					UNION
+					SELECT $3
+				) AS candidates
+				JOIN groups ON groups.id = candidates.group_id
+				WHERE groups.deleted_at IS NULL
+				ORDER BY groups.sort_order ASC, groups.id ASC
+				LIMIT 1
+			) AS group_id
+			FROM affected
+		)
+		UPDATE api_keys AS keys
+		SET group_id = next_groups.group_id, updated_at = NOW()
+		FROM next_groups
+		WHERE keys.id = next_groups.api_key_id
+	`, userID, oldGroupID, newGroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // CountByGroupID 获取分组的 API Key 数量
 func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	count, err := r.activeQuery().Where(apikey.GroupIDEQ(groupID)).Count(ctx)
+	count, err := r.activeQuery().Where(apiKeyBelongsToGroup(groupID)).Count(ctx)
 	return int64(count), err
 }
 
@@ -697,7 +1013,7 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 
 func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	keys, err := r.activeQuery().
-		Where(apikey.GroupIDEQ(groupID)).
+		Where(apiKeyBelongsToGroup(groupID)).
 		Select(apikey.FieldKey).
 		Strings(ctx)
 	if err != nil {
@@ -765,7 +1081,7 @@ func (r *apiKeyRepository) UpdateLastUsed(ctx context.Context, id int64, usedAt 
 // IncrementRateLimitUsage atomically increments all rate limit usage counters and initializes
 // window start times via COALESCE if not already set.
 func (r *apiKeyRepository) IncrementRateLimitUsage(ctx context.Context, id int64, cost float64) error {
-	_, err := r.sql.ExecContext(ctx, `
+	_, err := r.rawExecutor(ctx).ExecContext(ctx, `
 		UPDATE api_keys SET
 			usage_5h = CASE WHEN window_5h_start IS NOT NULL AND window_5h_start + INTERVAL '5 hours' <= NOW() THEN $1 ELSE usage_5h + $1 END,
 			usage_1d = CASE WHEN window_1d_start IS NOT NULL AND window_1d_start + INTERVAL '24 hours' <= NOW() THEN $1 ELSE usage_1d + $1 END,
@@ -776,6 +1092,24 @@ func (r *apiKeyRepository) IncrementRateLimitUsage(ctx context.Context, id int64
 			updated_at = NOW()
 		WHERE id = $2 AND deleted_at IS NULL`,
 		cost, id)
+	return err
+}
+
+func (r *apiKeyRepository) ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error {
+	_, err := r.sql.ExecContext(ctx, `
+		WITH deleted AS (
+			DELETE FROM api_key_allowed_groups
+			WHERE api_key_id = $1
+		), normalized AS (
+			SELECT DISTINCT group_id
+			FROM unnest($2::bigint[]) AS group_id
+			WHERE group_id > 0
+		)
+		INSERT INTO api_key_allowed_groups (api_key_id, group_id)
+		SELECT $1, group_id
+		FROM normalized
+		ON CONFLICT (api_key_id, group_id) DO NOTHING
+	`, keyID, pq.Array(groupIDs))
 	return err
 }
 

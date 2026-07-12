@@ -87,6 +87,7 @@ const openAILongContextBillingEnabledKey = "openai_long_context_billing_enabled"
 
 const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
+	OpenAIEndpointCapabilityResponses       OpenAIEndpointCapability = "responses"
 	OpenAIEndpointCapabilityEmbeddings      OpenAIEndpointCapability = "embeddings"
 	OpenAIEndpointCapabilityAlphaSearch     OpenAIEndpointCapability = "alpha_search"
 	// OpenAIEndpointCapabilityGrokMediaGeneration keeps image/video generation
@@ -99,7 +100,8 @@ const (
 	// （openai_responses_supported / openai_responses_mode），而非
 	// credentials["openai_capabilities"] 配置集。仅用于生图意图的 /v1/responses
 	// 调度，避免把请求调度到会在 forward 阶段被降级为 Chat Completions 的账号（#4417）。
-	OpenAIEndpointCapabilityResponses OpenAIEndpointCapability = "responses"
+)
+
 )
 
 const openAIEndpointCapabilitiesCredentialKey = "openai_capabilities"

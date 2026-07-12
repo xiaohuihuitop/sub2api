@@ -113,6 +113,28 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		if len(apiKey.AllowedGroups) <= 1 {
+			if code, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
+				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
+				if code == "GROUP_DELETED" {
+					MarkIngressRejected(c, IngressRejectGroupDeleted)
+				} else {
+					MarkIngressRejected(c, IngressRejectGroupDisabled)
+				}
+				abortWithGoogleError(c, 403, message)
+				return
+			}
+		}
+		resolvedSubscription, err := apiKeyService.ResolveBillingGroupForRequest(
+			c.Request.Context(), apiKey, subscriptionService,
+			cfg.RunMode == config.RunModeSimple,
+			service.PlatformGemini,
+			apiKeyBillingRequestEndpoint(c),
+		)
+		if err != nil {
+			handleGoogleBillingResolutionError(c, err)
+			return
+		}
 		if code, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			if code == "GROUP_DELETED" {
@@ -133,6 +155,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {
+			if resolvedSubscription != nil {
+				c.Set(string(ContextKeySubscription), resolvedSubscription)
+			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,
@@ -255,6 +280,23 @@ func extractAPIKeyForGoogle(c *gin.Context) string {
 
 func allowGoogleQueryKey(path string) bool {
 	return strings.HasPrefix(path, "/v1beta") || strings.HasPrefix(path, "/antigravity/v1beta")
+}
+
+func handleGoogleBillingResolutionError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, service.ErrInsufficientBalance):
+		abortWithGoogleError(c, 403, "Insufficient account balance")
+	case errors.Is(err, service.ErrDailyLimitExceeded),
+		errors.Is(err, service.ErrWeeklyLimitExceeded),
+		errors.Is(err, service.ErrMonthlyLimitExceeded):
+		abortWithGoogleError(c, 429, err.Error())
+	case errors.Is(err, service.ErrSubscriptionNotFound):
+		abortWithGoogleError(c, 403, "No active subscription found for this group")
+	case errors.Is(err, service.ErrNoUsableBillingGroup):
+		abortWithGoogleError(c, 403, "No usable billing group is available")
+	default:
+		abortWithGoogleError(c, 500, "Failed to resolve billing group")
+	}
 }
 
 func abortWithGoogleError(c *gin.Context, status int, message string) {

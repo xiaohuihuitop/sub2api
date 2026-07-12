@@ -7,6 +7,8 @@ import KeysView from '../KeysView.vue'
 
 const {
   listKeys,
+  createKey,
+  updateKey,
   getPublicSettings,
   getDashboardApiKeysUsage,
   getAvailableGroups,
@@ -18,6 +20,8 @@ const {
   nextStep,
 } = vi.hoisted(() => ({
   listKeys: vi.fn(),
+  createKey: vi.fn(),
+  updateKey: vi.fn(),
   getPublicSettings: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
@@ -58,8 +62,8 @@ const messages: Record<string, string> = {
 vi.mock('@/api', () => ({
   keysAPI: {
     list: listKeys,
-    create: vi.fn(),
-    update: vi.fn(),
+    create: createKey,
+    update: updateKey,
     delete: vi.fn(),
     toggleStatus: vi.fn(),
   },
@@ -215,6 +219,12 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
+const BaseDialogStub = {
+  name: 'BaseDialog',
+  props: ['show'],
+  template: '<div v-if="show" data-test="dialog"><slot /><slot name="footer" /></div>',
+}
+
 const mountView = async () => {
   const wrapper = mount(KeysView, {
     global: {
@@ -223,7 +233,7 @@ const mountView = async () => {
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,
         Pagination: PaginationStub,
-        BaseDialog: true,
+        BaseDialog: BaseDialogStub,
         ConfirmDialog: true,
         EmptyState: true,
         Select: SelectStub,
@@ -261,6 +271,8 @@ describe('user KeysView column settings', () => {
     localStorage.clear()
 
     listKeys.mockReset()
+    createKey.mockReset()
+    updateKey.mockReset()
     getPublicSettings.mockReset()
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
@@ -283,6 +295,8 @@ describe('user KeysView column settings', () => {
     getAvailableGroups.mockResolvedValue([])
     getUserGroupRates.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
+    createKey.mockResolvedValue(createApiKey())
+    updateKey.mockResolvedValue(createApiKey())
   })
 
   it('uses the default API key columns with low-frequency columns hidden', async () => {
@@ -437,5 +451,86 @@ describe('user KeysView column settings', () => {
       },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
+  })
+
+  it('creates a key with balance and multiple plan groups', async () => {
+    getAvailableGroups.mockResolvedValue([
+		{ id: 30, name: 'Balance', sort_order: 3, subscription_type: 'standard', platform: 'openai' },
+		{ id: 10, name: 'Plan A', sort_order: 1, subscription_type: 'subscription', platform: 'openai' },
+		{ id: 20, name: 'Plan B', sort_order: 2, subscription_type: 'subscription', platform: 'openai' },
+	])
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await nextTick()
+    const dialog = wrapper.get('[data-test="dialog"]')
+    await dialog.get('input[type="text"]').setValue('multi-key')
+    const groupCheckboxes = dialog.findAll('[data-test="key-group-option"] input[type="checkbox"]')
+    expect(groupCheckboxes).toHaveLength(3)
+    await groupCheckboxes[0].setValue(true)
+    await groupCheckboxes[1].setValue(true)
+    await groupCheckboxes[2].setValue(true)
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(createKey).toHaveBeenCalledWith(
+      'multi-key',
+      10,
+      [10, 20, 30],
+      undefined,
+      [],
+      [],
+      0,
+      undefined,
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 },
+    )
+  })
+
+  it('allows creating an unbound key', async () => {
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await nextTick()
+    const dialog = wrapper.get('[data-test="dialog"]')
+    await dialog.get('input[type="text"]').setValue('unbound-key')
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(showError).not.toHaveBeenCalled()
+    expect(createKey).toHaveBeenCalledWith(
+      'unbound-key', null, [], undefined, [], [], 0, undefined,
+      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 },
+    )
+  })
+
+  it('shows an existing unavailable plan and allows clearing it', async () => {
+    const key = {
+      ...createApiKey(),
+      group_id: 99,
+      group_ids: [99],
+      groups: [{
+        id: 99,
+        name: 'Expired Plan',
+        sort_order: 1,
+        subscription_type: 'subscription',
+        platform: 'openai',
+      }],
+    } as ApiKey
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = await mountView()
+
+    ;(wrapper.vm as unknown as { editKey: (key: ApiKey) => void }).editKey(key)
+    await nextTick()
+    const dialog = wrapper.get('[data-test="dialog"]')
+    const checkbox = dialog.get('[data-test="key-group-option"] input[type="checkbox"]')
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+    await checkbox.setValue(false)
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
+      group_id: null,
+      group_ids: [],
+    }))
   })
 })

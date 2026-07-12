@@ -95,6 +95,11 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
+const usageTableStub = {
+  name: 'UsageTable',
+  props: ['columns'],
+  template: '<div />',
+}
 
 const usageLog = {
   id: 1,
@@ -137,7 +142,7 @@ function mountUsageView() {
         DateRangePicker: true,
         Icon: true,
         UsageStatsCards: chartStub,
-        UsageTable: chartStub,
+        UsageTable: usageTableStub,
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
@@ -205,6 +210,91 @@ describe('user UsageView', () => {
     }))
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).toHaveBeenCalled()
+  })
+
+  it('shows only the requested default usage columns on first visit', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const columns = wrapper.findComponent({ name: 'UsageTable' }).props('columns') as Array<{ key: string }>
+    expect(columns.map((column) => column.key)).toEqual([
+      'api_key',
+      'model',
+      'reasoning_effort',
+      'endpoint',
+      'group',
+      'stream',
+      'tokens',
+      'cost',
+      'latency',
+      'output_speed',
+      'created_at',
+    ])
+  })
+
+  it('preserves the user saved usage column preferences', async () => {
+    localStorage.setItem('user-usage-hidden-columns', JSON.stringify(['model', 'group']))
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const columns = wrapper.findComponent({ name: 'UsageTable' }).props('columns') as Array<{ key: string }>
+    expect(columns.map((column) => column.key)).toEqual([
+      'api_key',
+      'reasoning_effort',
+      'endpoint',
+      'ip_address',
+      'stream',
+      'billing_mode',
+      'tokens',
+      'cost',
+      'latency',
+      'output_speed',
+      'created_at',
+      'user_agent',
+    ])
+  })
+
+  it('restores the saved date range, granularity, and filters', async () => {
+    localStorage.setItem('sub2api:user-usage:view-state:v1', JSON.stringify({
+      startDate: '2026-07-03',
+      endDate: '2026-07-10',
+      granularity: 'day',
+      filters: { model: 'glm-4.7', group_id: 6 },
+    }))
+
+    mountUsageView()
+    await flushPromises()
+
+    expect(query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        start_date: '2026-07-03',
+        end_date: '2026-07-10',
+        model: 'glm-4.7',
+        group_id: 6,
+      }),
+      expect.anything(),
+    )
+    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
+      granularity: 'day',
+    }))
+  })
+
+  it('ignores persisted state with a reversed range or unknown filters', async () => {
+    localStorage.setItem('sub2api:user-usage:view-state:v1', JSON.stringify({
+      startDate: '2026-07-10',
+      endDate: '2026-07-03',
+      granularity: 'day',
+      filters: { model: 'injected-model', page_size: 9999 },
+    }))
+
+    mountUsageView()
+    await flushPromises()
+
+    expect(query).not.toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'injected-model' }),
+      expect.anything(),
+    )
   })
 
   it('exports csv with current filters and without admin-only fields', async () => {

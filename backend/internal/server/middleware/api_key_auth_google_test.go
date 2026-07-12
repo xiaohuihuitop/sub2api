@@ -281,6 +281,37 @@ func newTestAPIKeyService(repo service.APIKeyRepository) *service.APIKeyService 
 	)
 }
 
+func TestGoogleAPIKeyAuthSimpleModeSelectsGeminiAllowedGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	openAI := service.Group{ID: 10, Platform: service.PlatformOpenAI, Status: service.StatusActive, SortOrder: 1}
+	gemini := service.Group{ID: 20, Platform: service.PlatformGemini, Status: service.StatusActive, SortOrder: 2}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 5}
+	apiKey := &service.APIKey{
+		ID: 1, UserID: 7, Key: "gemini-multi", Status: service.StatusActive, User: user,
+		GroupID: &openAI.ID, Group: &openAI,
+		AllowedGroupIDs: []int64{10, 20}, AllowedGroups: []service.Group{openAI, gemini},
+	}
+	svc := newTestAPIKeyService(fakeAPIKeyRepo{getByKey: func(_ context.Context, _ string) (*service.APIKey, error) {
+		copy := *apiKey
+		return &copy, nil
+	}})
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	router := gin.New()
+	router.Use(APIKeyAuthWithSubscriptionGoogle(svc, nil, cfg))
+	router.GET("/v1beta/models", func(c *gin.Context) {
+		selected, _ := GetAPIKeyFromContext(c)
+		c.JSON(http.StatusOK, gin.H{"group_id": selected.GroupID})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
+	req.Header.Set("x-goog-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.JSONEq(t, `{"group_id":20}`, w.Body.String())
+}
+
 func TestApiKeyAuthWithSubscriptionGoogle_MissingKey(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

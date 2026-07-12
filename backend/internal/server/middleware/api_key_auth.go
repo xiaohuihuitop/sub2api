@@ -157,6 +157,28 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
+		if len(apiKey.AllowedGroups) <= 1 {
+			if abortIfAPIKeyGroupUnavailable(c, apiKey) || abortIfAPIKeyGroupNotAllowed(c, apiKey) {
+				return
+			}
+		}
+		resolveSkipBilling := c.Request.URL.Path == "/v1/usage" || cfg.RunMode == config.RunModeSimple
+		targetPlatform, _ := c.Request.Context().Value(ctxkey.ForcePlatform).(string)
+		if targetPlatform == "" && apiKey.Group != nil {
+			targetPlatform = apiKey.Group.Platform
+		}
+		resolvedSubscription, err := apiKeyService.ResolveBillingGroupForRequest(
+			c.Request.Context(),
+			apiKey,
+			subscriptionService,
+			resolveSkipBilling,
+			targetPlatform,
+			apiKeyBillingRequestEndpoint(c),
+		)
+		if err != nil {
+			handleAPIKeyBillingResolutionError(c, err)
+			return
+		}
 		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
 			return
 		}
@@ -174,6 +196,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
 		if cfg.RunMode == config.RunModeSimple {
+			if resolvedSubscription != nil {
+				c.Set(string(ContextKeySubscription), resolvedSubscription)
+			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,
@@ -310,6 +335,38 @@ func isAsyncImageTaskRead(method, path string) bool {
 		return false
 	}
 	return strings.HasPrefix(path, "/v1/images/tasks/") || strings.HasPrefix(path, "/images/tasks/")
+}
+
+func apiKeyBillingRequestEndpoint(c *gin.Context) string {
+	if c == nil || c.Request == nil || c.Request.URL == nil {
+		return ""
+	}
+	path := strings.ToLower(strings.TrimSpace(c.Request.URL.Path))
+	switch {
+	case strings.Contains(path, "/chat/completions"):
+		return "/v1/chat/completions"
+	case strings.Contains(path, "/responses"):
+		return "/v1/responses"
+	default:
+		return path
+	}
+}
+
+func handleAPIKeyBillingResolutionError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, service.ErrInsufficientBalance):
+		AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
+	case errors.Is(err, service.ErrDailyLimitExceeded),
+		errors.Is(err, service.ErrWeeklyLimitExceeded),
+		errors.Is(err, service.ErrMonthlyLimitExceeded):
+		AbortWithError(c, 429, "USAGE_LIMIT_EXCEEDED", err.Error())
+	case errors.Is(err, service.ErrSubscriptionNotFound):
+		AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+	case errors.Is(err, service.ErrNoUsableBillingGroup):
+		AbortWithError(c, 403, "NO_USABLE_BILLING_GROUP", "No usable billing group is available")
+	default:
+		AbortWithError(c, 500, "SUBSCRIPTION_RESOLUTION_FAILED", "Failed to resolve billing group")
+	}
 }
 
 // GetAPIKeyFromContext 从上下文中获取API key

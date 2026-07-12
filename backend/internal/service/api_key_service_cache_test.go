@@ -278,6 +278,33 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesMessagesDispatchModelConfig(t 
 	require.Equal(t, apiKey.Group.MessagesDispatchModelConfig, roundTrip.Group.MessagesDispatchModelConfig)
 }
 
+func TestAPIKeyServiceSnapshotRoundTripPreservesAllowedGroups(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{})
+	groupID := int64(10)
+	apiKey := &APIKey{
+		ID: 1, UserID: 2, GroupID: &groupID, Key: "k-groups", Status: StatusActive,
+		User:            &User{ID: 2, Status: StatusActive},
+		Group:           &Group{ID: 10, Status: StatusActive, SortOrder: 1},
+		AllowedGroupIDs: []int64{10, 20},
+		AllowedGroups: []Group{
+			{ID: 10, Status: StatusActive, SortOrder: 1},
+			{
+				ID: 20, Status: StatusActive, SortOrder: 2,
+				OpenAIEndpointCapabilities: map[string]bool{string(OpenAIEndpointCapabilityResponses): true},
+			},
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	roundTrip := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+
+	require.Equal(t, []int64{10, 20}, roundTrip.AllowedGroupIDs)
+	require.Len(t, roundTrip.AllowedGroups, 2)
+	require.Equal(t, int64(20), roundTrip.AllowedGroups[1].ID)
+	require.Equal(t, 2, roundTrip.AllowedGroups[1].SortOrder)
+	require.True(t, roundTrip.AllowedGroups[1].OpenAIEndpointCapabilities[string(OpenAIEndpointCapabilityResponses)])
+}
+
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
 	cache := &authCacheStub{}
 	var repoCalls int32

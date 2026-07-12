@@ -270,6 +270,54 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	})
 }
 
+func TestAPIKeyAuthSimpleModeSelectsAllowedGroupByAdminOrder(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	primary := service.Group{ID: 20, Platform: service.PlatformOpenAI, Status: service.StatusActive, SortOrder: 2}
+	preferred := service.Group{
+		ID: 10, Platform: service.PlatformOpenAI, Status: service.StatusActive, SortOrder: 1,
+		OpenAIEndpointCapabilities: map[string]bool{string(service.OpenAIEndpointCapabilityChatCompletions): true},
+	}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
+	apiKey := &service.APIKey{
+		ID: 1, UserID: user.ID, Key: "multi-key", Status: service.StatusActive, User: user,
+		GroupID: &primary.ID, Group: &primary,
+		AllowedGroupIDs: []int64{20, 10}, AllowedGroups: []service.Group{primary, preferred},
+	}
+	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, _ string) (*service.APIKey, error) {
+		copy := *apiKey
+		return &copy, nil
+	}}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+	router.GET("/v1/chat/completions", func(c *gin.Context) {
+		selected, _ := GetAPIKeyFromContext(c)
+		c.JSON(http.StatusOK, gin.H{"group_id": selected.GroupID})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil)
+	req.Header.Set("Authorization", "Bearer multi-key")
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.JSONEq(t, `{"group_id":10}`, w.Body.String())
+}
+
+func TestAPIKeyBillingRequestEndpointNormalizesOpenAIPaths(t *testing.T) {
+	for path, expected := range map[string]string{
+		"/v1/chat/completions":        "/v1/chat/completions",
+		"/openai/v1/chat/completions": "/v1/chat/completions",
+		"/openai/v1/responses":        "/v1/responses",
+	} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = req
+		require.Equal(t, expected, apiKeyBillingRequestEndpoint(ctx))
+	}
+}
+
 func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

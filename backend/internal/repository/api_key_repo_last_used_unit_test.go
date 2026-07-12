@@ -31,6 +31,15 @@ func newAPIKeyRepoSQLite(t *testing.T) (*apiKeyRepository, *dbent.Client) {
 	drv := entsql.OpenDB(dialect.SQLite, db)
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
 	t.Cleanup(func() { _ = client.Close() })
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS api_key_allowed_groups (
+			api_key_id INTEGER NOT NULL,
+			group_id INTEGER NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (api_key_id, group_id)
+		)
+	`)
+	require.NoError(t, err)
 
 	return &apiKeyRepository{client: client, sql: db}, client
 }
@@ -58,6 +67,17 @@ func mustCreateAPIKeyRepoAccount(t *testing.T, ctx context.Context, client *dben
 		Save(ctx)
 	require.NoError(t, err)
 	return a.ID
+}
+
+func mustCreateAPIKeyRepoGroup(t *testing.T, ctx context.Context, client *dbent.Client, name string, sortOrder int) int64 {
+	t.Helper()
+	group, err := client.Group.Create().
+		SetName(name).
+		SetStatus(service.StatusActive).
+		SetSortOrder(sortOrder).
+		Save(ctx)
+	require.NoError(t, err)
+	return group.ID
 }
 
 func mustCreateAPIKeyRepoUsageLog(t *testing.T, ctx context.Context, client *dbent.Client, userID, apiKeyID, accountID int64, requestID string, createdAt time.Time, ipAddress *string) {
@@ -248,4 +268,48 @@ func TestAPIKeyRepository_CreateDuplicateKey(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, first))
 	err := repo.Create(ctx, second)
 	require.ErrorIs(t, err, service.ErrAPIKeyExists)
+}
+
+func TestAPIKeyRepositoryGroupQueriesIncludeSecondaryAllowedGroup(t *testing.T) {
+	repo, client := newAPIKeyRepoSQLite(t)
+	ctx := context.Background()
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "secondary-group@test.com")
+	primaryGroupID := mustCreateAPIKeyRepoGroup(t, ctx, client, "primary", 10)
+	secondaryGroupID := mustCreateAPIKeyRepoGroup(t, ctx, client, "secondary", 20)
+	key := &service.APIKey{
+		UserID:  user.ID,
+		Key:     "sk-secondary-group",
+		Name:    "Secondary Group",
+		GroupID: &primaryGroupID,
+		Status:  service.StatusActive,
+	}
+	require.NoError(t, repo.Create(ctx, key))
+	_, err := repo.sql.ExecContext(ctx, `
+		INSERT INTO api_key_allowed_groups (api_key_id, group_id)
+		VALUES (?, ?), (?, ?)`, key.ID, primaryGroupID, key.ID, secondaryGroupID)
+	require.NoError(t, err)
+
+	keys, page, err := repo.ListByGroupID(ctx, secondaryGroupID, pagination.PaginationParams{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), page.Total)
+	require.Len(t, keys, 1)
+	require.Equal(t, key.ID, keys[0].ID)
+
+	count, err := repo.CountByGroupID(ctx, secondaryGroupID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+
+	keyValues, err := repo.ListKeysByGroupID(ctx, secondaryGroupID)
+	require.NoError(t, err)
+	require.Equal(t, []string{key.Key}, keyValues)
+
+	filtered, result, err := repo.ListByUserID(
+		ctx,
+		user.ID,
+		pagination.PaginationParams{Page: 1, PageSize: 10},
+		service.APIKeyListFilters{GroupID: &secondaryGroupID},
+	)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), result.Total)
+	require.Len(t, filtered, 1)
 }

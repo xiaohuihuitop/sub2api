@@ -79,6 +79,9 @@ type Group struct {
 	// 分组排序
 	SortOrder int
 
+	// OpenAIEndpointCapabilities is hydrated for API Key billing-group selection.
+	OpenAIEndpointCapabilities map[string]bool
+
 	// OpenAI Messages 调度配置（仅 openai 平台使用）
 	AllowMessagesDispatch       bool
 	RequireOAuthOnly            bool // 仅允许非 apikey 类型账号关联（OpenAI/Antigravity/Anthropic/Gemini）
