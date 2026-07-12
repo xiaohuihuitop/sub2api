@@ -95,6 +95,11 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
+const usageTableStub = {
+  name: 'UsageTable',
+  props: ['columns'],
+  template: '<div />',
+}
 
 const usageLog = {
   id: 1,
@@ -137,7 +142,7 @@ function mountUsageView() {
         DateRangePicker: true,
         Icon: true,
         UsageStatsCards: chartStub,
-        UsageTable: chartStub,
+        UsageTable: usageTableStub,
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
@@ -206,6 +211,49 @@ describe('user UsageView', () => {
     }))
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).toHaveBeenCalled()
+  })
+
+  it('shows only the requested default usage columns on first visit', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const columns = wrapper.findComponent({ name: 'UsageTable' }).props('columns') as Array<{ key: string }>
+    expect(columns.map((column) => column.key)).toEqual([
+      'api_key',
+      'model',
+      'reasoning_effort',
+      'endpoint',
+      'group',
+      'stream',
+      'tokens',
+      'cost',
+      'latency',
+      'output_speed',
+      'created_at',
+    ])
+  })
+
+  it('preserves the user saved usage column preferences', async () => {
+    localStorage.setItem('user-usage-hidden-columns', JSON.stringify(['model', 'group']))
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const columns = wrapper.findComponent({ name: 'UsageTable' }).props('columns') as Array<{ key: string }>
+    expect(columns.map((column) => column.key)).toEqual([
+      'api_key',
+      'reasoning_effort',
+      'endpoint',
+      'ip_address',
+      'stream',
+      'billing_mode',
+      'tokens',
+      'cost',
+      'latency',
+      'output_speed',
+      'created_at',
+      'user_agent',
+    ])
   })
 
   it('restores the saved date range, granularity, and filters', async () => {
