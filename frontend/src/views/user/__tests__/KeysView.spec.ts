@@ -167,6 +167,9 @@ const DataTableStub = {
       </button>
       <div v-for="row in data" :key="row.id">
         <slot name="cell-name" :value="row.name" :row="row" />
+        <div data-test="group-cell">
+          <slot name="cell-group" :value="row.group" :row="row" />
+        </div>
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -212,6 +215,11 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
+const GroupBadgeStub = {
+  props: ['name'],
+  template: '<span data-test="group-badge">{{ name }}</span>',
+}
+
 const BaseDialogStub = {
   name: 'BaseDialog',
   props: ['show'],
@@ -234,7 +242,7 @@ const mountView = async () => {
         Icon: IconStub,
         UseKeyModal: true,
         EndpointPopover: true,
-        GroupBadge: true,
+        GroupBadge: GroupBadgeStub,
         GroupOptionItem: true,
         Teleport: true,
       },
@@ -385,6 +393,47 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     expect(wrapper.get('[data-test="current-concurrency"]').text()).toBe('3')
+  })
+
+  it('shows every bound group without an inline group selector', async () => {
+    const key = {
+      ...createApiKey(),
+      group_id: 10,
+      group_ids: [10, 20],
+      group: {
+        id: 10,
+        name: 'Plan A',
+        sort_order: 1,
+        subscription_type: 'subscription',
+        platform: 'openai',
+      },
+      groups: [
+        {
+          id: 10,
+          name: 'Plan A',
+          sort_order: 1,
+          subscription_type: 'subscription',
+          platform: 'openai',
+        },
+        {
+          id: 20,
+          name: 'Balance',
+          sort_order: 2,
+          subscription_type: 'standard',
+          platform: 'openai',
+        },
+      ],
+    } as ApiKey
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+
+    const wrapper = await mountView()
+    const groupCell = wrapper.get('[data-test="group-cell"]')
+
+    expect(groupCell.findAll('[data-test="group-badge"]').map((badge) => badge.text())).toEqual([
+      'Plan A',
+      'Balance',
+    ])
+    expect(groupCell.find('button').exists()).toBe(false)
   })
 
   it('marks current concurrency as sortable', async () => {
