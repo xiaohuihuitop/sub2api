@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/stretchr/testify/require"
 )
 
@@ -536,6 +537,59 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabled_Embeddi
 	require.NotNil(t, selection.Account)
 	require.Equal(t, int64(36032), selection.Account.ID)
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_ForcedModesUseMatchingInboundEndpoint(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10114)
+	accounts := []Account{
+		{
+			ID: 36051, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+			Status: StatusActive, Schedulable: true, Concurrency: 1, GroupIDs: []int64{groupID},
+			Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceResponses),
+			},
+		},
+		{
+			ID: 36052, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+			Status: StatusActive, Schedulable: true, Concurrency: 1, GroupIDs: []int64{groupID},
+			Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
+			},
+		},
+	}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.LoadBatchEnabled = false
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	responsesSelection, _, err := svc.SelectAccountWithSchedulerForCapability(
+		ctx, &groupID, "", "", "gpt-5.1", nil,
+		OpenAIUpstreamTransportAny, OpenAIEndpointCapabilityResponses,
+		false, false, PlatformOpenAI,
+	)
+	require.NoError(t, err)
+	require.Equal(t, int64(36051), responsesSelection.Account.ID)
+	if responsesSelection.ReleaseFunc != nil {
+		responsesSelection.ReleaseFunc()
+	}
+
+	chatSelection, _, err := svc.SelectAccountWithSchedulerForCapability(
+		ctx, &groupID, "", "", "gpt-5.1", nil,
+		OpenAIUpstreamTransportAny, OpenAIEndpointCapabilityChatCompletions,
+		false, false, PlatformOpenAI,
+	)
+	require.NoError(t, err)
+	require.Equal(t, int64(36052), chatSelection.Account.ID)
+	if chatSelection.ReleaseFunc != nil {
+		chatSelection.ReleaseFunc()
+	}
 }
 
 func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabled_AllowsGrokChatAccount(t *testing.T) {

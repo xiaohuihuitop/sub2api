@@ -1360,26 +1360,36 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	if a.IsGrok() {
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
+	configured, found := a.openAIEndpointCapabilitySet()
 	switch capability {
-	case OpenAIEndpointCapabilityChatCompletions:
-	case OpenAIEndpointCapabilityResponses:
-		if a.Type == AccountTypeAPIKey &&
-			openai_compat.ResolveResponsesSupport(a.Extra) == openai_compat.ResponsesSupportNo {
+	case OpenAIEndpointCapabilityChatCompletions, OpenAIEndpointCapabilityResponses:
+		if found && !configured[string(OpenAIEndpointCapabilityChatCompletions)] {
 			return false
 		}
+		if a.Type != AccountTypeAPIKey {
+			return true
+		}
+		// Auto exposes both inbound text endpoints; the probe only chooses the
+		// upstream protocol. Forced modes intentionally expose one endpoint.
+		mode := openai_compat.NormalizeResponsesSupportMode(a.GetExtraString(openai_compat.ExtraKeyResponsesMode))
+		if mode == openai_compat.ResponsesSupportModeForceResponses {
+			return capability == OpenAIEndpointCapabilityResponses
+		}
+		if mode == openai_compat.ResponsesSupportModeForceChatCompletions {
+			return capability == OpenAIEndpointCapabilityChatCompletions
+		}
+		return true
 	case OpenAIEndpointCapabilityEmbeddings:
 		if a.Type != AccountTypeAPIKey {
 			return false
 		}
+		if !found {
+			return true
+		}
+		return configured[string(capability)]
 	default:
 		return false
 	}
-
-	configured, found := a.openAIEndpointCapabilitySet()
-	if !found {
-		return true
-	}
-	return configured[string(capability)]
 }
 
 func (a *Account) openAIEndpointCapabilitySet() (map[string]bool, bool) {
@@ -1423,6 +1433,15 @@ func (a *Account) openAIEndpointCapabilitySet() (map[string]bool, bool) {
 			if enabled {
 				add(key)
 			}
+		}
+	case string:
+		var decoded []string
+		if json.Unmarshal([]byte(capabilities), &decoded) == nil {
+			for _, value := range decoded {
+				add(value)
+			}
+		} else {
+			add(capabilities)
 		}
 	}
 

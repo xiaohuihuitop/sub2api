@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -850,68 +849,16 @@ func openAIAccountBillingEndpointCapabilities(account *service.Account) []servic
 	if account == nil || !account.IsOpenAICompatible() {
 		return nil
 	}
-	configured, found := configuredOpenAIEndpointCapabilities(account.Credentials)
-	if !found {
-		if account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityResponses) {
-			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
-		}
-		return nil
-	}
 	result := make([]service.OpenAIEndpointCapability, 0, 2)
 	for _, capability := range []service.OpenAIEndpointCapability{
 		service.OpenAIEndpointCapabilityChatCompletions,
 		service.OpenAIEndpointCapabilityResponses,
 	} {
-		if configured[string(capability)] && account.SupportsOpenAIEndpointCapability(capability) {
+		if account.SupportsOpenAIEndpointCapability(capability) {
 			result = append(result, capability)
 		}
 	}
 	return result
-}
-
-func configuredOpenAIEndpointCapabilities(credentials map[string]any) (map[string]bool, bool) {
-	if credentials == nil {
-		return nil, false
-	}
-	raw, found := credentials["openai_capabilities"]
-	if !found || raw == nil {
-		return nil, false
-	}
-	result := make(map[string]bool)
-	add := func(value string) {
-		value = strings.ToLower(strings.TrimSpace(value))
-		if value != "" {
-			result[value] = true
-		}
-	}
-	switch values := raw.(type) {
-	case []any:
-		for _, value := range values {
-			if text, ok := value.(string); ok {
-				add(text)
-			}
-		}
-	case []string:
-		for _, value := range values {
-			add(value)
-		}
-	case map[string]any:
-		for key, value := range values {
-			if enabled, ok := value.(bool); ok && enabled {
-				add(key)
-			}
-		}
-	case string:
-		var decoded []string
-		if json.Unmarshal([]byte(values), &decoded) == nil {
-			for _, value := range decoded {
-				add(value)
-			}
-		} else {
-			add(values)
-		}
-	}
-	return result, true
 }
 
 // ClearGroupIDByGroupID 将指定分组的所有 API Key 的 group_id 设为 nil

@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 15 // v15: include API key allowed groups
+const apiKeyAuthSnapshotVersion = 16 // v16: refresh OpenAI inbound endpoint capabilities
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int

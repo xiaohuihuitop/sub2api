@@ -482,7 +482,7 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 	})
 
-	t.Run("API key rejected by responses probe does not support responses", func(t *testing.T) {
+	t.Run("API key auto mode supports both inbound endpoints through chat fallback", func(t *testing.T) {
 		account := &Account{
 			Platform: PlatformOpenAI,
 			Type:     AccountTypeAPIKey,
@@ -491,6 +491,33 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 			},
 		}
 
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
+	})
+
+	t.Run("API key force responses supports only inbound responses", func(t *testing.T) {
+		account := &Account{
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceResponses),
+			},
+		}
+
+		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
+	})
+
+	t.Run("API key force chat completions supports only inbound chat completions", func(t *testing.T) {
+		account := &Account{
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
+			},
+		}
+
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
 		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 	})
 
@@ -501,16 +528,18 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 		}
 
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityEmbeddings))
 	})
 
-	t.Run("OpenAI OAuth 默认仅兼容 chat", func(t *testing.T) {
+	t.Run("OpenAI OAuth 默认兼容两个文本入口但不兼容 embeddings", func(t *testing.T) {
 		account := &Account{
 			Platform: PlatformOpenAI,
 			Type:     AccountTypeOAuth,
 		}
 
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityEmbeddings))
 	})
 
@@ -524,6 +553,7 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 		}
 
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityEmbeddings))
 	})
 
@@ -537,6 +567,7 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 		}
 
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityEmbeddings))
 	})
 
@@ -553,6 +584,7 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 		}
 
 		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
 		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityEmbeddings))
 	})
 

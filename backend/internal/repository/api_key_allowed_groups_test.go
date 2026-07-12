@@ -14,18 +14,80 @@ import (
 )
 
 func TestOpenAIAccountBillingEndpointCapabilities(t *testing.T) {
-	oauth := &service.Account{Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth}
-	chatOnly := &service.Account{
-		Platform: service.PlatformOpenAI,
-		Type:     service.AccountTypeAPIKey,
-		Credentials: map[string]any{
-			"openai_capabilities": []any{"chat_completions"},
+	tests := []struct {
+		name     string
+		account  *service.Account
+		expected []service.OpenAIEndpointCapability
+	}{
+		{
+			name:    "oauth accepts both inbound text endpoints",
+			account: &service.Account{Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth},
+			expected: []service.OpenAIEndpointCapability{
+				service.OpenAIEndpointCapabilityChatCompletions,
+				service.OpenAIEndpointCapabilityResponses,
+			},
 		},
-		Extra: map[string]any{openai_compat.ExtraKeyResponsesSupported: false},
+		{
+			name: "auto api key accepts both inbound endpoints when probe supports responses",
+			account: &service.Account{
+				Platform: service.PlatformOpenAI,
+				Type:     service.AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesSupported: true,
+				},
+			},
+			expected: []service.OpenAIEndpointCapability{
+				service.OpenAIEndpointCapabilityChatCompletions,
+				service.OpenAIEndpointCapabilityResponses,
+			},
+		},
+		{
+			name: "auto api key accepts both inbound endpoints when probe requires chat fallback",
+			account: &service.Account{
+				Platform: service.PlatformOpenAI,
+				Type:     service.AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesSupported: false,
+				},
+			},
+			expected: []service.OpenAIEndpointCapability{
+				service.OpenAIEndpointCapabilityChatCompletions,
+				service.OpenAIEndpointCapabilityResponses,
+			},
+		},
+		{
+			name: "force responses accepts only inbound responses",
+			account: &service.Account{
+				Platform: service.PlatformOpenAI,
+				Type:     service.AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceResponses),
+				},
+			},
+			expected: []service.OpenAIEndpointCapability{
+				service.OpenAIEndpointCapabilityResponses,
+			},
+		},
+		{
+			name: "force chat completions accepts only inbound chat completions",
+			account: &service.Account{
+				Platform: service.PlatformOpenAI,
+				Type:     service.AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
+				},
+			},
+			expected: []service.OpenAIEndpointCapability{
+				service.OpenAIEndpointCapabilityChatCompletions,
+			},
+		},
 	}
 
-	require.Equal(t, []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}, openAIAccountBillingEndpointCapabilities(oauth))
-	require.Equal(t, []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityChatCompletions}, openAIAccountBillingEndpointCapabilities(chatOnly))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, openAIAccountBillingEndpointCapabilities(tt.account))
+		})
+	}
 }
 
 func TestAPIKeyRepositoryReplaceAllowedGroupsUsesAtomicStatement(t *testing.T) {
