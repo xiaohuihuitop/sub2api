@@ -13,6 +13,7 @@ const messages: Record<string, string> = {
   'usage.cacheBreakdown': 'Cache Token Breakdown',
   'usage.cacheCreationTokensLabel': 'Cache Creation',
   'usage.cacheReadTokensLabel': 'Cache Read',
+  'usage.cacheHitRate': 'Cache hit rate',
   'usage.totalCost': 'Total Cost',
   'usage.accountCost': 'Cost',
   'usage.standardCost': 'Standard',
@@ -63,5 +64,42 @@ describe('UsageStatsCards', () => {
     expect(text).toContain('12')
     expect(text).toContain('Cache Read')
     expect(text).toContain('22')
+  })
+
+  it('shows cache hit rate as cache reads over all input tokens when enabled', () => {
+    const wrapper = mount(UsageStatsCards, {
+      props: {
+        stats,
+        showCacheHitRate: true,
+      },
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+
+    expect(wrapper.text().replace(/\s+/g, '')).toContain('Cachehitrate:22/13416.4%')
+  })
+
+  it('shows no cache hit rate when the total input is zero', () => {
+    const wrapper = mount(UsageStatsCards, {
+      props: {
+        stats: {
+          ...stats,
+          total_input_tokens: 0,
+          total_cache_creation_tokens: 0,
+          total_cache_read_tokens: 0,
+        },
+        showCacheHitRate: true,
+      },
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+
+    expect(wrapper.text().replace(/\s+/g, '')).toContain('Cachehitrate:-')
   })
 })

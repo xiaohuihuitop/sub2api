@@ -232,7 +232,7 @@ const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 
-const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
+const homePath = '/'
 
 // Track which parent nav groups are expanded
 const expandedGroups = ref<Set<string>>(new Set())

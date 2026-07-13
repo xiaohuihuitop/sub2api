@@ -95,6 +95,13 @@ vi.mock('vue-i18n', async () => {
 
 const simpleStub = { template: '<div><slot /></div>' }
 const chartStub = { template: '<div />' }
+const usageStatsCardsStub = {
+  name: 'UsageStatsCards',
+  props: {
+    showCacheHitRate: Boolean,
+  },
+  template: '<div />',
+}
 const usageTableStub = {
   name: 'UsageTable',
   props: ['columns'],
@@ -141,7 +148,7 @@ function mountUsageView() {
         Select: true,
         DateRangePicker: true,
         Icon: true,
-        UsageStatsCards: chartStub,
+        UsageStatsCards: usageStatsCardsStub,
         UsageTable: usageTableStub,
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
@@ -211,6 +218,12 @@ describe('user UsageView', () => {
     }))
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).toHaveBeenCalled()
+  })
+
+  it('enables cache hit rate on the user usage stats card', () => {
+    const wrapper = mountUsageView()
+
+    expect(wrapper.findComponent({ name: 'UsageStatsCards' }).props('showCacheHitRate')).toBe(true)
   })
 
   it('shows only the requested default usage columns on first visit', async () => {

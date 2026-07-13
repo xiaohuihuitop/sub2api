@@ -55,6 +55,12 @@ describe('AppSidebar header styles', () => {
 })
 
 describe('AppSidebar custom navigation', () => {
+  it('routes both brand links to the public root', () => {
+    expect(componentSource.match(/:to="homePath"/g)).toHaveLength(2)
+    expect(componentSource).toContain("const homePath = '/'")
+    expect(componentSource).not.toContain("isAdmin.value ? '/admin/dashboard' : '/dashboard'")
+  })
+
   it('keeps the official home route while hiding custom-disabled entries', () => {
     expect(componentSource).toContain(':to="homePath"')
     expect(componentSource).not.toContain('<VersionBadge')
