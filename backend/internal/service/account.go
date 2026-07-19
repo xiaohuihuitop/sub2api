@@ -102,8 +102,6 @@ const (
 	// 调度，避免把请求调度到会在 forward 阶段被降级为 Chat Completions 的账号（#4417）。
 )
 
-)
-
 const openAIEndpointCapabilitiesCredentialKey = "openai_capabilities"
 
 // GrokMediaEligibleExtraKey is an optional per-account override stored in
