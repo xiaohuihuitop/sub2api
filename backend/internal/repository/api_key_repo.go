@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 
@@ -842,6 +843,27 @@ func openAIAccountBillingEndpointCapabilities(account *service.Account) []servic
 		return nil
 	}
 	configured, found := configuredOpenAIEndpointCapabilities(account.Credentials)
+	if account.Type == service.AccountTypeAPIKey {
+		// These capabilities select a billing group for an inbound request. In auto
+		// mode, either text endpoint is accepted and the probe chooses the upstream
+		// protocol later. Image scheduling still uses the account-level capability.
+		if found && !configured[string(service.OpenAIEndpointCapabilityChatCompletions)] {
+			return nil
+		}
+		switch openai_compat.NormalizeResponsesSupportMode(
+			account.GetExtraString(openai_compat.ExtraKeyResponsesMode),
+		) {
+		case openai_compat.ResponsesSupportModeForceResponses:
+			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
+		case openai_compat.ResponsesSupportModeForceChatCompletions:
+			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityChatCompletions}
+		default:
+			return []service.OpenAIEndpointCapability{
+				service.OpenAIEndpointCapabilityChatCompletions,
+				service.OpenAIEndpointCapabilityResponses,
+			}
+		}
+	}
 	if !found {
 		if account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityResponses) {
 			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}

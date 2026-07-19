@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
+      <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" show-cache-hit-rate />
 
       <div class="space-y-4">
         <div class="card p-4">
@@ -17,7 +17,7 @@
             <div class="ml-auto flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
               <div class="w-28">
-                <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
+                <Select v-model="granularity" :options="granularityOptions" @change="onGranularityChange" />
               </div>
             </div>
           </div>
@@ -230,6 +230,7 @@ import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import Icon from '@/components/icons/Icon.vue'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { isValidDateRange, readPersistedViewState, writePersistedViewState } from '@/composables/usePersistedViewState'
 import { formatReasoningEffort } from '@/utils/format'
 import { BILLING_MODE_IMAGE, getBillingModeLabel } from '@/utils/billingMode'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
@@ -339,10 +340,46 @@ const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
   return Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24)) <= 1 ? 'hour' : 'day'
 }
 
+type UserUsageViewState = {
+  startDate: string
+  endDate: string
+  granularity: 'day' | 'hour'
+  filters: Partial<UsageQueryParams>
+  page?: number
+}
+
+const USAGE_VIEW_STORAGE_KEY = 'sub2api:user-usage:view-state:v1'
 const defaultRange = getLast24HoursRangeDates()
-const startDate = ref(defaultRange.start)
-const endDate = ref(defaultRange.end)
-const granularity = ref<'day' | 'hour'>(getGranularityForRange(startDate.value, endDate.value))
+const defaultViewState: UserUsageViewState = {
+  startDate: defaultRange.start,
+  endDate: defaultRange.end,
+  granularity: getGranularityForRange(defaultRange.start, defaultRange.end),
+  filters: {},
+  page: 1,
+}
+const persistedUserFilterKeys = new Set([
+  'model', 'api_key_id', 'group_id', 'request_type', 'billing_type', 'billing_mode',
+])
+const isPersistedUserFilters = (value: unknown): value is Partial<UsageQueryParams> => {
+  if (!value || typeof value !== 'object') return false
+  return Object.keys(value).every((key) => persistedUserFilterKeys.has(key))
+}
+const isUserUsageViewState = (value: unknown): value is UserUsageViewState => {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Partial<UserUsageViewState>
+  return isValidDateRange(state.startDate, state.endDate) && state.startDate <= (state.endDate ?? '') &&
+    (state.granularity === 'day' || state.granularity === 'hour') &&
+    isPersistedUserFilters(state.filters) &&
+    (state.page === undefined || (typeof state.page === 'number' && Number.isInteger(state.page) && state.page > 0))
+}
+const initialViewState = readPersistedViewState(
+  USAGE_VIEW_STORAGE_KEY,
+  defaultViewState,
+  isUserUsageViewState,
+)
+const startDate = ref(initialViewState.startDate)
+const endDate = ref(initialViewState.endDate)
+const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
 
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
 const groupDistributionMetric = ref<DistributionMetric>('tokens')
@@ -352,6 +389,7 @@ const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
 
 const filters = ref<UsageQueryParams>({
+  ...initialViewState.filters,
   start_date: startDate.value,
   end_date: endDate.value,
   request_type: undefined,
@@ -360,10 +398,20 @@ const filters = ref<UsageQueryParams>({
 })
 
 const pagination = reactive({
-  page: 1,
+  page: initialViewState.page ?? 1,
   page_size: getPersistedPageSize(),
   total: 0,
 })
+const persistUsageViewState = () => {
+  const { model, api_key_id, group_id, request_type, billing_type, billing_mode } = filters.value
+  writePersistedViewState(USAGE_VIEW_STORAGE_KEY, {
+    startDate: startDate.value,
+    endDate: endDate.value,
+    granularity: granularity.value,
+    filters: { model, api_key_id, group_id, request_type, billing_type, billing_mode },
+    page: pagination.page,
+  })
+}
 const sortState = reactive({
   sort_by: 'created_at',
   sort_order: 'desc' as 'asc' | 'desc',
@@ -526,7 +574,8 @@ const refreshModelOptions = (models: ModelStat[]) => {
 }
 
 const applyFilters = () => {
-  pagination.page = 1
+	  pagination.page = 1
+	  persistUsageViewState()
   void loadLogs()
   void loadStats()
   void loadModelStats()
@@ -567,24 +616,32 @@ const onDateRangeChange = (range: { startDate: string; endDate: string; preset: 
   filters.value.start_date = range.startDate
   filters.value.end_date = range.endDate
   granularity.value = getGranularityForRange(range.startDate, range.endDate)
-  applyFilters()
+	  applyFilters()
+}
+
+const onGranularityChange = () => {
+  persistUsageViewState()
+  void loadChartData()
 }
 
 const handlePageChange = (page: number) => {
-  pagination.page = page
+	  pagination.page = page
+	  persistUsageViewState()
   void loadLogs()
 }
 
 const handlePageSizeChange = (pageSize: number) => {
   pagination.page_size = pageSize
-  pagination.page = 1
+	  pagination.page = 1
+	  persistUsageViewState()
   void loadLogs()
 }
 
 const handleSort = (key: string, order: 'asc' | 'desc') => {
   sortState.sort_by = key
   sortState.sort_order = order
-  pagination.page = 1
+	  pagination.page = 1
+	  persistUsageViewState()
   void loadLogs()
 }
 
@@ -710,6 +767,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'latency', label: t('usage.latency'), sortable: false },
+  { key: 'output_speed', label: t('usage.outputSpeed'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
 ])

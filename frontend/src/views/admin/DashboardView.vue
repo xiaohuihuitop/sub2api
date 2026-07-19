@@ -341,7 +341,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -363,6 +363,7 @@ import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { isValidDateRange, readPersistedViewState, writePersistedViewState } from '@/composables/usePersistedViewState'
 
 import {
   Chart as ChartJS,
@@ -425,10 +426,20 @@ const getLast24HoursRangeDates = (): { start: string; end: string } => {
 }
 
 // Date range
-const granularity = ref<'day' | 'hour'>('hour')
 const defaultRange = getLast24HoursRangeDates()
-const startDate = ref(defaultRange.start)
-const endDate = ref(defaultRange.end)
+type DashboardViewState = { startDate: string; endDate: string; granularity: 'day' | 'hour' }
+const DASHBOARD_VIEW_STORAGE_KEY = 'sub2api:admin-dashboard:view-state:v1'
+const isDashboardViewState = (value: unknown): value is DashboardViewState => {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Partial<DashboardViewState>
+  return isValidDateRange(state.startDate, state.endDate) && state.startDate <= (state.endDate ?? '') && (state.granularity === 'day' || state.granularity === 'hour')
+}
+const initialViewState = readPersistedViewState(DASHBOARD_VIEW_STORAGE_KEY, { startDate: defaultRange.start, endDate: defaultRange.end, granularity: 'hour' as const }, isDashboardViewState)
+const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
+const startDate = ref(initialViewState.startDate)
+const endDate = ref(initialViewState.endDate)
+const persistDashboardViewState = () => writePersistedViewState(DASHBOARD_VIEW_STORAGE_KEY, { startDate: startDate.value, endDate: endDate.value, granularity: granularity.value })
+watch([startDate, endDate, granularity], persistDashboardViewState)
 
 // Granularity options for Select component
 const granularityOptions = computed(() => [

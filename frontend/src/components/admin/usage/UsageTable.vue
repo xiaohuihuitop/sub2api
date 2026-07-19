@@ -216,6 +216,12 @@
           </div>
         </template>
 
+        <template #cell-output_speed="{ row }">
+          <span class="whitespace-nowrap font-mono text-sm font-medium text-primary-700 dark:text-primary-300">
+            {{ formatOutputSpeed(row.output_tokens, row.duration_ms) }}
+          </span>
+        </template>
+
         <template #cell-created_at="{ value }">
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatDateTime(value) }}</span>
         </template>
@@ -511,6 +517,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import IpGeoCell from '@/components/common/IpGeoCell.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { fetchBatch, getEntry } from '@/utils/ipGeoLookup'
+import { formatOutputSpeed } from '@/utils/usageSpeed'
 import type { AdminUsageLog } from '@/types'
 import type { Column } from '@/components/common/types'
 

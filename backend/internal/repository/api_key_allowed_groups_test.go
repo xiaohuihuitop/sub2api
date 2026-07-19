@@ -15,6 +15,28 @@ import (
 
 func TestOpenAIAccountBillingEndpointCapabilities(t *testing.T) {
 	oauth := &service.Account{Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth}
+	autoChatFallback := &service.Account{
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeAPIKey,
+		Extra: map[string]any{
+			openai_compat.ExtraKeyResponsesMode:      string(openai_compat.ResponsesSupportModeAuto),
+			openai_compat.ExtraKeyResponsesSupported: false,
+		},
+	}
+	forceResponses := &service.Account{
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeAPIKey,
+		Extra: map[string]any{
+			openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceResponses),
+		},
+	}
+	forceChatCompletions := &service.Account{
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeAPIKey,
+		Extra: map[string]any{
+			openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
+		},
+	}
 	chatOnly := &service.Account{
 		Platform: service.PlatformOpenAI,
 		Type:     service.AccountTypeAPIKey,
@@ -25,7 +47,16 @@ func TestOpenAIAccountBillingEndpointCapabilities(t *testing.T) {
 	}
 
 	require.Equal(t, []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}, openAIAccountBillingEndpointCapabilities(oauth))
-	require.Equal(t, []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityChatCompletions}, openAIAccountBillingEndpointCapabilities(chatOnly))
+	require.Equal(t, []service.OpenAIEndpointCapability{
+		service.OpenAIEndpointCapabilityChatCompletions,
+		service.OpenAIEndpointCapabilityResponses,
+	}, openAIAccountBillingEndpointCapabilities(autoChatFallback))
+	require.Equal(t, []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}, openAIAccountBillingEndpointCapabilities(forceResponses))
+	require.Equal(t, []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityChatCompletions}, openAIAccountBillingEndpointCapabilities(forceChatCompletions))
+	require.Equal(t, []service.OpenAIEndpointCapability{
+		service.OpenAIEndpointCapabilityChatCompletions,
+		service.OpenAIEndpointCapabilityResponses,
+	}, openAIAccountBillingEndpointCapabilities(chatOnly))
 }
 
 func TestAPIKeyRepositoryReplaceAllowedGroupsUsesAtomicStatement(t *testing.T) {

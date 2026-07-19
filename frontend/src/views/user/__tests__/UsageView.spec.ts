@@ -154,6 +154,7 @@ function mountUsageView() {
 
 describe('user UsageView', () => {
   beforeEach(() => {
+	localStorage.clear()
     query.mockReset()
     getStats.mockReset()
     getDashboardModels.mockReset()

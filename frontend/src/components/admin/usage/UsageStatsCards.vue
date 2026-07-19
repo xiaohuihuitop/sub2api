@@ -56,6 +56,16 @@
             </span>
           </span>
         </p>
+        <p v-if="showCacheHitRate" class="text-xs text-gray-400 dark:text-gray-500">
+          {{ t('usage.cacheHitRate') }}:
+          <template v-if="cacheStats.totalInput > 0">
+            <span class="text-sky-600 dark:text-sky-400">{{ formatTokens(cacheStats.cacheRead) }}</span>
+            <span class="text-gray-400">/</span>
+            <span class="text-gray-600 dark:text-gray-300">{{ formatTokens(cacheStats.totalInput) }}</span>
+            <span class="ml-1">{{ cacheStats.ratePercent }}</span>
+          </template>
+          <template v-else>-</template>
+        </p>
       </div>
     </div>
     <div class="card p-4 flex items-center gap-3">
@@ -99,9 +109,11 @@ const props = withDefaults(defineProps<{
   stats: (AdminUsageStatsResponse | UsageStatsResponse) | null
   showAccountCost?: boolean
   strikeStandardCost?: boolean
+  showCacheHitRate?: boolean
 }>(), {
   showAccountCost: true,
   strikeStandardCost: false,
+  showCacheHitRate: false,
 })
 
 const { t } = useI18n()
@@ -112,6 +124,18 @@ const totalAccountCost = computed(() => {
 })
 const showAccountCost = computed(() => props.showAccountCost)
 const strikeStandardCost = computed(() => props.strikeStandardCost)
+const showCacheHitRate = computed(() => props.showCacheHitRate)
+const cacheStats = computed(() => {
+  const cacheRead = props.stats?.total_cache_read_tokens || 0
+  const cacheCreate = props.stats?.total_cache_creation_tokens || 0
+  const input = props.stats?.total_input_tokens || 0
+  const totalInput = input + cacheCreate + cacheRead
+  return {
+    cacheRead,
+    totalInput,
+    ratePercent: totalInput > 0 ? `${((cacheRead / totalInput) * 100).toFixed(1)}%` : '-',
+  }
+})
 
 const formatDuration = (ms: number) =>
   ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms / 1000).toFixed(2)}s`
