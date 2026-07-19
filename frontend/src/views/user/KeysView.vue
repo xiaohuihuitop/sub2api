@@ -1288,7 +1288,7 @@ const selectableGroups = computed(() => {
 })
 
 const groupOptions = computed(() =>
-  selectableGroups.value
+  [...selectableGroups.value]
   .sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
   .map((group) => ({
     value: group.id,
