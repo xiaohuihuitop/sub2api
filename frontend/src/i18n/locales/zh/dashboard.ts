@@ -56,7 +56,12 @@ export default {
     viewUsage: '查看使用记录',
     checkDetailedLogs: '查看详细的使用日志',
     redeemCode: '兑换码',
-    addBalanceWithCode: '使用兑换码充值'
+    addBalanceWithCode: '使用兑换码充值',
+    subscriptionSummary: {
+      title: '订阅套餐',
+      remaining: '剩余',
+      unlimited: '不限额',
+    }
   },
 
   // Groups (shared)
