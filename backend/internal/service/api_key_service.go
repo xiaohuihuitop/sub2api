@@ -416,7 +416,7 @@ func (s *APIKeyService) validateAPIKeyAllowedGroups(
 			return nil, fmt.Errorf("get group: %w", err)
 		}
 		_, wasAlreadyBound := existingGroupIDs[groupID]
-		if !(s.canUserBindGroup(ctx, user, group) || (wasAlreadyBound && group.IsSubscriptionType())) {
+		if !s.canUserBindGroup(ctx, user, group) && (!wasAlreadyBound || !group.IsSubscriptionType()) {
 			return nil, ErrGroupNotAllowed
 		}
 		groups = append(groups, *group)
