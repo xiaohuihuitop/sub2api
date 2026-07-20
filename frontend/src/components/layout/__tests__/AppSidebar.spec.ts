@@ -53,3 +53,13 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar subscription navigation', () => {
+  it('keeps subscriptions out of the user navigation while retaining the admin entry', () => {
+    const selfNavSource = componentSource.match(/function buildSelfNavItems[\s\S]*?\n}\n\n\/\/ finalizeNav/)?.[0]
+
+    expect(selfNavSource).toBeDefined()
+    expect(selfNavSource).not.toContain("path: '/subscriptions'")
+    expect(componentSource).toContain("path: '/admin/subscriptions'")
+  })
+})

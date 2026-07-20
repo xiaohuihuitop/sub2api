@@ -67,6 +67,14 @@
     </div>
   </div>
 
+  <div v-if="displayedSubscriptions.length > 0" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <UserSubscriptionSummaryCard
+      v-for="subscription in displayedSubscriptions"
+      :key="subscription.id"
+      :subscription="subscription"
+    />
+  </div>
+
   <!-- Row 2: Token Stats -->
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <!-- Today Tokens -->
@@ -226,8 +234,9 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import UserSubscriptionSummaryCard from './UserSubscriptionSummaryCard.vue'
 import type { UserDashboardStats as UserStatsType } from '@/api/usage'
-import type { PlatformQuotaItem } from '@/types'
+import type { PlatformQuotaItem, UserSubscription } from '@/types'
 
 interface FusedPlatformCard {
   platform: string
@@ -244,8 +253,10 @@ const props = defineProps<{
   balance: number
   isSimple: boolean
   platformQuotas?: PlatformQuotaItem[] | null
+  subscriptions?: UserSubscription[] | null
 }>()
 const { t } = useI18n()
+const displayedSubscriptions = computed(() => (props.subscriptions ?? []).slice(0, 4))
 
 const PLATFORM_LABELS: Record<string, string> = {
   anthropic: 'Claude',
