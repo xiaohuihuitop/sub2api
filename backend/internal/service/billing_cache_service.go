@@ -114,13 +114,15 @@ type BillingCacheService struct {
 	circuitBreaker        *billingCircuitBreaker
 	userPlatformQuotaRepo UserPlatformQuotaRepository
 
-	cacheWriteChan     chan cacheWriteTask
-	cacheWriteWg       sync.WaitGroup
-	cacheWriteStopOnce sync.Once
-	cacheWriteMu       sync.RWMutex
-	stopped            atomic.Bool
-	balanceLoadSF      singleflight.Group
-	quotaLoadSF        singleflight.Group
+	cacheWriteChan          chan cacheWriteTask
+	cacheWriteWg            sync.WaitGroup
+	cacheWriteStopOnce      sync.Once
+	cacheWriteMu            sync.RWMutex
+	subAuthCacheMu          sync.RWMutex
+	subAuthCacheInvalidator func(context.Context, int64, int64)
+	stopped                 atomic.Bool
+	balanceLoadSF           singleflight.Group
+	quotaLoadSF             singleflight.Group
 	// 丢弃日志节流计数器（减少高负载下日志噪音）
 	cacheWriteDropFullCount     uint64
 	cacheWriteDropFullLastLog   int64
@@ -499,6 +501,7 @@ func (s *BillingCacheService) UpdateSubscriptionUsage(ctx context.Context, userI
 
 // QueueUpdateSubscriptionUsage 异步更新订阅用量缓存
 func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID int64, costUSD float64) {
+	s.invalidateSubscriptionAuthCache(userID, groupID)
 	if s.cache == nil {
 		return
 	}
@@ -515,6 +518,29 @@ func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID int64
 	defer cancel()
 	if err := s.UpdateSubscriptionUsage(ctx, userID, groupID, costUSD); err != nil {
 		logger.LegacyPrintf("service.billing_cache", "Warning: update subscription cache fallback failed for user %d group %d: %v", userID, groupID, err)
+	}
+}
+
+// RegisterSubscriptionAuthCacheInvalidator 注册本机订阅认证缓存失效回调。
+// 订阅用量写入会先执行该回调，使下一次请求从最新订阅快照选择计费分组。
+func (s *BillingCacheService) RegisterSubscriptionAuthCacheInvalidator(invalidator func(context.Context, int64, int64)) {
+	if s == nil {
+		return
+	}
+	s.subAuthCacheMu.Lock()
+	s.subAuthCacheInvalidator = invalidator
+	s.subAuthCacheMu.Unlock()
+}
+
+func (s *BillingCacheService) invalidateSubscriptionAuthCache(userID, groupID int64) {
+	if s == nil || userID <= 0 || groupID <= 0 {
+		return
+	}
+	s.subAuthCacheMu.RLock()
+	invalidate := s.subAuthCacheInvalidator
+	s.subAuthCacheMu.RUnlock()
+	if invalidate != nil {
+		invalidate(context.Background(), userID, groupID)
 	}
 }
 

@@ -69,6 +69,9 @@ func NewSubscriptionService(groupRepo GroupRepository, userSubRepo UserSubscript
 	}
 	svc.initSubCache(cfg)
 	svc.initMaintenanceQueue(cfg)
+	if billingCacheService != nil {
+		billingCacheService.RegisterSubscriptionAuthCacheInvalidator(svc.invalidateSubscriptionAuthCache)
+	}
 	svc.StartSubCacheInvalidationSubscriber(context.Background())
 	return svc
 }
@@ -158,6 +161,26 @@ func (s *SubscriptionService) invalidateSubCacheKeySync(key string) {
 	}
 	s.subCacheL1.Del(key)
 	s.subCacheL1.Wait()
+}
+
+// invalidateSubscriptionAuthCache 在订阅扣费成功后清除本机认证快照，并通知其他实例。
+// 用量缓存由扣费路径自行更新，因此这里不额外清除。
+func (s *SubscriptionService) invalidateSubscriptionAuthCache(ctx context.Context, userID, groupID int64) {
+	if s == nil || userID <= 0 || groupID <= 0 {
+		return
+	}
+	s.InvalidateSubCacheSync(userID, groupID)
+	if s.billingCacheService == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheWriteTimeout)
+	defer cancel()
+	if err := s.billingCacheService.PublishSubscriptionCacheInvalidation(publishCtx, subCacheKey(userID, groupID)); err != nil {
+		log.Printf("Warning: failed to publish subscription auth cache invalidation for user %d group %d: %v", userID, groupID, err)
+	}
 }
 
 // StartSubCacheInvalidationSubscriber 启动跨实例订阅 L1 缓存失效订阅。
@@ -1007,14 +1030,16 @@ func (s *SubscriptionService) ValidateAndCheckLimits(sub *UserSubscription, grou
 		needsMaintenance = true
 	}
 
-	// 3. 检查用量限额
-	if !sub.CheckDailyLimit(group, 0) {
+	// 3. 检查用量限额。无法预知本次请求的最终费用，已达上限的套餐
+	// 不应继续参与调度。这里与 BillingCacheService 的 >= 语义保持一致；
+	// 带实际费用的扣费校验仍由 CheckUsageLimits 使用原有的 <= 比较。
+	if group.HasDailyLimit() && sub.DailyUsageUSD >= *group.DailyLimitUSD {
 		return needsMaintenance, ErrDailyLimitExceeded
 	}
-	if !sub.CheckWeeklyLimit(group, 0) {
+	if group.HasWeeklyLimit() && sub.WeeklyUsageUSD >= *group.WeeklyLimitUSD {
 		return needsMaintenance, ErrWeeklyLimitExceeded
 	}
-	if !sub.CheckMonthlyLimit(group, 0) {
+	if group.HasMonthlyLimit() && sub.MonthlyUsageUSD >= *group.MonthlyLimitUSD {
 		return needsMaintenance, ErrMonthlyLimitExceeded
 	}
 

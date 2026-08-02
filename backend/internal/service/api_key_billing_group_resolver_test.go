@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -120,6 +121,82 @@ func TestResolveBillingGroupAllowsUnboundKeyToUseBalance(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, sub)
 	require.Nil(t, apiKey.GroupID)
+}
+
+func TestResolveBillingGroupUsesSecondPlanAfterSubscriptionAuthCacheInvalidation(t *testing.T) {
+	const (
+		userID        = int64(7)
+		firstGroupID  = int64(10)
+		secondGroupID = int64(20)
+	)
+	limit := 10.0
+	first := billingTestGroup(firstGroupID, SubscriptionTypeSubscription, 1, PlatformOpenAI)
+	first.DailyLimitUSD = &limit
+	second := billingTestGroup(secondGroupID, SubscriptionTypeSubscription, 2, PlatformOpenAI)
+	second.DailyLimitUSD = &limit
+	apiKey := billingTestAPIKey(first, []Group{first, second}, 0)
+
+	subRepo := &subscriptionAuthCacheUserSubRepoStub{newSubscriptionUserSubRepoStub()}
+	now := time.Now()
+	windowStart := now.Add(-time.Minute)
+	subRepo.seed(&UserSubscription{
+		ID: firstGroupID, UserID: userID, GroupID: firstGroupID, Status: SubscriptionStatusActive,
+		StartsAt: now.Add(-time.Hour), ExpiresAt: now.Add(time.Hour), DailyWindowStart: &windowStart, DailyUsageUSD: 5,
+	})
+	subRepo.seed(&UserSubscription{
+		ID: secondGroupID, UserID: userID, GroupID: secondGroupID, Status: SubscriptionStatusActive,
+		StartsAt: now.Add(-time.Hour), ExpiresAt: now.Add(time.Hour), DailyWindowStart: &windowStart, DailyUsageUSD: 0,
+	})
+	billingCacheService := &BillingCacheService{}
+	subscriptions := NewSubscriptionService(nil, subRepo, billingCacheService, nil, &config.Config{
+		SubscriptionCache: config.SubscriptionCacheConfig{L1Size: 1024, L1TTLSeconds: 60},
+	})
+	t.Cleanup(subscriptions.subCacheL1.Close)
+
+	stale, err := subRepo.GetActiveByUserIDAndGroupID(context.Background(), userID, firstGroupID)
+	require.NoError(t, err)
+	require.True(t, subscriptions.subCacheL1.SetWithTTL(subCacheKey(userID, firstGroupID), stale, 1, time.Minute))
+	subscriptions.subCacheL1.Wait()
+	cachedRaw, cached := subscriptions.subCacheL1.Get(subCacheKey(userID, firstGroupID))
+	require.True(t, cached)
+	require.Equal(t, 5.0, cachedRaw.(*UserSubscription).DailyUsageUSD)
+	subRepo.byID[firstGroupID].DailyUsageUSD = limit
+	subRepo.byUserGroup[subRepo.key(userID, firstGroupID)].DailyUsageUSD = limit
+
+	selected, err := (&APIKeyService{}).ResolveBillingGroupForRequest(
+		context.Background(), apiKey, subscriptions, false, PlatformOpenAI, "/v1/chat/completions",
+	)
+	require.NoError(t, err)
+	require.Equal(t, firstGroupID, selected.GroupID, "test setup must preserve the stale L1 snapshot")
+
+	billingCacheService.QueueUpdateSubscriptionUsage(userID, firstGroupID, 5)
+	_, cached = subscriptions.subCacheL1.Get(subCacheKey(userID, firstGroupID))
+	require.False(t, cached)
+	refreshed, err := subRepo.GetActiveByUserIDAndGroupID(context.Background(), userID, firstGroupID)
+	require.NoError(t, err)
+	require.Equal(t, limit, refreshed.DailyUsageUSD)
+
+	selected, err = (&APIKeyService{}).ResolveBillingGroupForRequest(
+		context.Background(), apiKey, subscriptions, false, PlatformOpenAI, "/v1/chat/completions",
+	)
+	require.NoError(t, err)
+	require.Equal(t, secondGroupID, selected.GroupID)
+	require.Equal(t, secondGroupID, *apiKey.GroupID)
+}
+
+type subscriptionAuthCacheUserSubRepoStub struct {
+	*subscriptionUserSubRepoStub
+}
+
+func (s *subscriptionAuthCacheUserSubRepoStub) GetActiveByUserIDAndGroupID(
+	ctx context.Context,
+	userID, groupID int64,
+) (*UserSubscription, error) {
+	subscription, err := s.GetByUserIDAndGroupID(ctx, userID, groupID)
+	if err != nil || !subscription.IsActive() {
+		return nil, ErrSubscriptionNotFound
+	}
+	return subscription, nil
 }
 
 func billingTestGroup(id int64, subscriptionType string, order int, platform string) Group {
