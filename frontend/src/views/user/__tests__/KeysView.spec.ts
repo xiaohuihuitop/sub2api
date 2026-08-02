@@ -4,6 +4,7 @@ import { nextTick } from 'vue'
 
 import type { ApiKey } from '@/types'
 import KeysView from '../KeysView.vue'
+import keysViewSource from '../KeysView.vue?raw'
 
 const {
   listKeys,
@@ -532,5 +533,11 @@ describe('user KeysView column settings', () => {
       group_id: null,
       group_ids: [],
     }))
+  })
+})
+
+describe('user KeysView multi-group editor', () => {
+  it('imports the group option component used by the multi-group checkbox list', () => {
+    expect(keysViewSource).toContain("import GroupOptionItem from '@/components/common/GroupOptionItem.vue'")
   })
 })

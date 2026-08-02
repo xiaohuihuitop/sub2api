@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 16 // v16: include allowed groups and group web search pricing
+const apiKeyAuthSnapshotVersion = 18 // v18: include allowed groups and current OpenAI group gates
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -427,10 +427,13 @@ func apiKeyAuthGroupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		SortOrder:                       group.SortOrder,
 		OpenAIEndpointCapabilities:      group.OpenAIEndpointCapabilities,
 		AllowMessagesDispatch:           group.AllowMessagesDispatch,
+		AllowLive:                       group.AllowLive,
 		DefaultMappedModel:              group.DefaultMappedModel,
 		MessagesDispatchModelConfig:     group.MessagesDispatchModelConfig,
 		ModelsListConfig:                group.ModelsListConfig,
 		RPMLimit:                        group.RPMLimit,
+		MaxReasoningEffort:              group.MaxReasoningEffort,
+		ReasoningEffortMappings:         group.ReasoningEffortMappings,
 		PeakRateEnabled:                 group.PeakRateEnabled,
 		PeakStart:                       group.PeakStart,
 		PeakEnd:                         group.PeakEnd,
@@ -530,10 +533,13 @@ func apiKeyAuthSnapshotToGroup(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		SortOrder:                       snapshot.SortOrder,
 		OpenAIEndpointCapabilities:      snapshot.OpenAIEndpointCapabilities,
 		AllowMessagesDispatch:           snapshot.AllowMessagesDispatch,
+		AllowLive:                       snapshot.AllowLive,
 		DefaultMappedModel:              snapshot.DefaultMappedModel,
 		MessagesDispatchModelConfig:     snapshot.MessagesDispatchModelConfig,
 		ModelsListConfig:                snapshot.ModelsListConfig,
 		RPMLimit:                        snapshot.RPMLimit,
+		MaxReasoningEffort:              snapshot.MaxReasoningEffort,
+		ReasoningEffortMappings:         snapshot.ReasoningEffortMappings,
 		PeakRateEnabled:                 snapshot.PeakRateEnabled,
 		PeakStart:                       snapshot.PeakStart,
 		PeakEnd:                         snapshot.PeakEnd,

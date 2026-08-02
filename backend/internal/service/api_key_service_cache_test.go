@@ -46,7 +46,7 @@ func (s *authRepoStub) GetByKeyForAuth(ctx context.Context, key string) (*APIKey
 	return s.getByKeyForAuth(ctx, key)
 }
 
-func (s *authRepoStub) Update(ctx context.Context, key *APIKey) error {
+func (s *authRepoStub) Update(ctx context.Context, key *APIKey, _ APIKeyUpdateFields) error {
 	panic("unexpected Update call")
 }
 
@@ -289,7 +289,9 @@ func TestAPIKeyServiceSnapshotRoundTripPreservesAllowedGroups(t *testing.T) {
 		AllowedGroups: []Group{
 			{ID: 10, Status: StatusActive, SortOrder: 1},
 			{
-				ID: 20, Status: StatusActive, SortOrder: 2,
+				ID:                         20,
+				Status:                     StatusActive,
+				SortOrder:                  2,
 				OpenAIEndpointCapabilities: map[string]bool{string(OpenAIEndpointCapabilityResponses): true},
 			},
 		},
@@ -303,6 +305,47 @@ func TestAPIKeyServiceSnapshotRoundTripPreservesAllowedGroups(t *testing.T) {
 	require.Equal(t, int64(20), roundTrip.AllowedGroups[1].ID)
 	require.Equal(t, 2, roundTrip.AllowedGroups[1].SortOrder)
 	require.True(t, roundTrip.AllowedGroups[1].OpenAIEndpointCapabilities[string(OpenAIEndpointCapabilityResponses)])
+}
+
+func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{})
+	groupID := int64(9)
+	apiKey := &APIKey{
+		ID:      1,
+		UserID:  2,
+		GroupID: &groupID,
+		Key:     "k-reasoning-policy",
+		Status:  StatusActive,
+		User: &User{
+			ID:          2,
+			Status:      StatusActive,
+			Role:        RoleUser,
+			Balance:     10,
+			Concurrency: 3,
+		},
+		Group: &Group{
+			ID:                 groupID,
+			Name:               "openai",
+			Platform:           PlatformOpenAI,
+			Status:             StatusActive,
+			SubscriptionType:   SubscriptionTypeStandard,
+			RateMultiplier:     1,
+			AllowLive:          true,
+			MaxReasoningEffort: "medium",
+			ReasoningEffortMappings: []ReasoningEffortMapping{
+				{From: "max", To: "xhigh"},
+			},
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	roundTrip := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+
+	require.NotNil(t, roundTrip)
+	require.NotNil(t, roundTrip.Group)
+	require.True(t, roundTrip.Group.AllowLive)
+	require.Equal(t, "medium", roundTrip.Group.MaxReasoningEffort)
+	require.Equal(t, apiKey.Group.ReasoningEffortMappings, roundTrip.Group.ReasoningEffortMappings)
 }
 
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
