@@ -239,6 +239,28 @@ func (s *UserSubscriptionRepoSuite) TestGetActiveByUserIDAndGroupID_ExpiredIgnor
 	s.Require().Error(err, "expected error for expired subscription")
 }
 
+func (s *UserSubscriptionRepoSuite) TestListActiveByUserIDAndGroupIDOrdersCandidates() {
+	user := s.mustCreateUser("active-candidates@test.com", service.RoleUser)
+	group := s.mustCreateGroup("g-active-candidates")
+	now := time.Now()
+
+	later := s.mustCreateSubscription(user.ID, group.ID, func(c *dbent.UserSubscriptionCreate) {
+		c.SetCreatedAt(now.Add(-2 * time.Hour))
+		c.SetExpiresAt(now.Add(48 * time.Hour))
+	})
+	earliest := s.mustCreateSubscription(user.ID, group.ID, func(c *dbent.UserSubscriptionCreate) {
+		c.SetCreatedAt(now.Add(-time.Hour))
+		c.SetExpiresAt(now.Add(24 * time.Hour))
+	})
+
+	subs, err := s.repo.ListActiveByUserIDAndGroupID(s.ctx, user.ID, group.ID)
+
+	s.Require().NoError(err)
+	s.Require().Len(subs, 2)
+	s.Require().Equal(earliest.ID, subs[0].ID)
+	s.Require().Equal(later.ID, subs[1].ID)
+}
+
 // --- ListByUserID / ListActiveByUserID ---
 
 func (s *UserSubscriptionRepoSuite) TestListByUserID() {

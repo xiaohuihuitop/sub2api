@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
@@ -41,7 +42,8 @@ func NewSubscriptionHandler(subscriptionService *service.SubscriptionService) *S
 // AssignSubscriptionRequest represents assign subscription request
 type AssignSubscriptionRequest struct {
 	UserID       int64  `json:"user_id" binding:"required"`
-	GroupID      int64  `json:"group_id" binding:"required"`
+	GroupID      int64  `json:"group_id"`
+	PlanID       int64  `json:"plan_id"`
 	ValidityDays int    `json:"validity_days" binding:"omitempty,max=36500"` // max 100 years
 	Notes        string `json:"notes"`
 }
@@ -49,9 +51,33 @@ type AssignSubscriptionRequest struct {
 // BulkAssignSubscriptionRequest represents bulk assign subscription request
 type BulkAssignSubscriptionRequest struct {
 	UserIDs      []int64 `json:"user_ids" binding:"required,min=1"`
-	GroupID      int64   `json:"group_id" binding:"required"`
+	GroupID      int64   `json:"group_id"`
+	PlanID       int64   `json:"plan_id"`
 	ValidityDays int     `json:"validity_days" binding:"omitempty,max=36500"` // max 100 years
 	Notes        string  `json:"notes"`
+}
+
+func (r AssignSubscriptionRequest) UsesPlan() bool {
+	return r.PlanID > 0
+}
+
+func (r AssignSubscriptionRequest) ValidateAssignmentSource() error {
+	return validateSubscriptionAssignmentSource(r.PlanID, r.GroupID)
+}
+
+func (r BulkAssignSubscriptionRequest) UsesPlan() bool {
+	return r.PlanID > 0
+}
+
+func (r BulkAssignSubscriptionRequest) ValidateAssignmentSource() error {
+	return validateSubscriptionAssignmentSource(r.PlanID, r.GroupID)
+}
+
+func validateSubscriptionAssignmentSource(planID, groupID int64) error {
+	if planID <= 0 && groupID <= 0 {
+		return errors.New("either plan_id or group_id is required")
+	}
+	return nil
 }
 
 // AdjustSubscriptionRequest represents adjust subscription request (extend or shorten)
@@ -140,17 +166,32 @@ func (h *SubscriptionHandler) Assign(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if err := req.ValidateAssignmentSource(); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
 	// Get admin user ID from context
 	adminID := getAdminIDFromContext(c)
 
-	subscription, err := h.subscriptionService.AssignSubscription(c.Request.Context(), &service.AssignSubscriptionInput{
-		UserID:       req.UserID,
-		GroupID:      req.GroupID,
-		ValidityDays: req.ValidityDays,
-		AssignedBy:   adminID,
-		Notes:        req.Notes,
-	})
+	var subscription *service.UserSubscription
+	var err error
+	if req.UsesPlan() {
+		subscription, err = h.subscriptionService.AssignSubscriptionFromPlan(c.Request.Context(), &service.AssignSubscriptionFromPlanInput{
+			UserID:     req.UserID,
+			PlanID:     req.PlanID,
+			AssignedBy: adminID,
+			Notes:      req.Notes,
+		})
+	} else {
+		subscription, err = h.subscriptionService.AssignSubscription(c.Request.Context(), &service.AssignSubscriptionInput{
+			UserID:       req.UserID,
+			GroupID:      req.GroupID,
+			ValidityDays: req.ValidityDays,
+			AssignedBy:   adminID,
+			Notes:        req.Notes,
+		})
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -167,17 +208,32 @@ func (h *SubscriptionHandler) BulkAssign(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if err := req.ValidateAssignmentSource(); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
 	// Get admin user ID from context
 	adminID := getAdminIDFromContext(c)
 
-	result, err := h.subscriptionService.BulkAssignSubscription(c.Request.Context(), &service.BulkAssignSubscriptionInput{
-		UserIDs:      req.UserIDs,
-		GroupID:      req.GroupID,
-		ValidityDays: req.ValidityDays,
-		AssignedBy:   adminID,
-		Notes:        req.Notes,
-	})
+	var result *service.BulkAssignResult
+	var err error
+	if req.UsesPlan() {
+		result, err = h.subscriptionService.BulkAssignSubscriptionFromPlan(c.Request.Context(), &service.BulkAssignSubscriptionFromPlanInput{
+			UserIDs:    req.UserIDs,
+			PlanID:     req.PlanID,
+			AssignedBy: adminID,
+			Notes:      req.Notes,
+		})
+	} else {
+		result, err = h.subscriptionService.BulkAssignSubscription(c.Request.Context(), &service.BulkAssignSubscriptionInput{
+			UserIDs:      req.UserIDs,
+			GroupID:      req.GroupID,
+			ValidityDays: req.ValidityDays,
+			AssignedBy:   adminID,
+			Notes:        req.Notes,
+		})
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

@@ -322,6 +322,8 @@ export default {
       },
       selectGroup: 'Select Group',
       selectGroupPlaceholder: 'Choose a subscription group',
+      selectPlan: 'Select Plan',
+      selectPlanPlaceholder: 'Choose a subscription plan',
       validityDays: 'Validity Days',
       codeExpiry: 'Code Expiry',
       neverExpires: 'Never expires',
@@ -330,6 +332,7 @@ export default {
       customExpiryDays: 'Custom days',
       expiryDaysRequired: 'Please enter a valid expiry day count',
       groupRequired: 'Please select a subscription group',
+      planRequired: 'Please select a subscription plan',
       days: ' days',
       status: {
         unused: 'Unused',

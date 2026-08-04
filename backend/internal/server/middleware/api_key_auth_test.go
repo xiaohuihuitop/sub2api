@@ -50,7 +50,7 @@ func TestAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 	require.Zero(t, calls.Load())
 }
 
-func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
+func TestSimpleModeBypassesQuotaCheckAndStandardModeFallsBackToBalance(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	limit := 1.0
@@ -154,7 +154,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		}
 	})
 
-	t.Run("standard_mode_revalidates_cas_loser_from_database", func(t *testing.T) {
+	t.Run("standard_mode_revalidates_cas_loser_then_falls_back_to_balance", func(t *testing.T) {
 		cfg := &config.Config{RunMode: config.RunModeStandard}
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
@@ -198,7 +198,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		req.Header.Set("x-api-key", apiKey.Key)
 		router.ServeHTTP(w, req)
 
-		require.Equal(t, http.StatusTooManyRequests, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("simple_mode_bypasses_quota_check", func(t *testing.T) {
@@ -229,7 +229,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code)
 	})
 
-	t.Run("standard_mode_enforces_quota_check", func(t *testing.T) {
+	t.Run("standard_mode_falls_back_to_balance_after_subscription_limit", func(t *testing.T) {
 		cfg := &config.Config{RunMode: config.RunModeStandard}
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
@@ -265,9 +265,73 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		req.Header.Set("x-api-key", apiKey.Key)
 		router.ServeHTTP(w, req)
 
-		require.Equal(t, http.StatusTooManyRequests, w.Code)
-		require.Contains(t, w.Body.String(), "USAGE_LIMIT_EXCEEDED")
+		require.Equal(t, http.StatusOK, w.Code)
 	})
+}
+
+func TestAPIKeyAuthKeepsResolvedSubscriptionForStandardGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	group := &service.Group{
+		ID:               42,
+		Platform:         service.PlatformOpenAI,
+		Status:           service.StatusActive,
+		Hydrated:         true,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
+	apiKey := &service.APIKey{
+		ID: 100, UserID: user.ID, Key: "standard-group-subscription", Status: service.StatusActive,
+		User: user, Group: group,
+	}
+	apiKey.GroupID = &group.ID
+	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			copy := *apiKey
+			return &copy, nil
+		},
+	}, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	now := time.Now()
+	selected := &service.UserSubscription{
+		ID: 101, UserID: user.ID, GroupID: group.ID, Status: service.SubscriptionStatusActive,
+		ExpiresAt: now.Add(time.Hour), DailyWindowStart: &now,
+	}
+	subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{
+		getActive: func(_ context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+			if userID != user.ID || groupID != group.ID {
+				return nil, service.ErrSubscriptionNotFound
+			}
+			copy := *selected
+			return &copy, nil
+		},
+	}, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+	t.Cleanup(subscriptionService.Stop)
+
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(
+		apiKeyService,
+		subscriptionService,
+		&config.Config{RunMode: config.RunModeStandard},
+	)))
+	router.GET("/t", func(c *gin.Context) {
+		value, _ := c.Get(string(ContextKeySubscription))
+		subscription, _ := value.(*service.UserSubscription)
+		if subscription == nil {
+			c.JSON(http.StatusOK, gin.H{"subscription_id": 0})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"subscription_id": subscription.ID})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"subscription_id":101`)
 }
 
 func TestAPIKeyAuthSimpleModeSelectsAllowedGroupByAdminOrder(t *testing.T) {

@@ -45,9 +45,6 @@ type AdminUser struct {
 
 	Notes      string     `json:"notes"`
 	LastUsedAt *time.Time `json:"last_used_at"`
-	// GroupRates 用户专属分组倍率配置
-	// map[groupID]rateMultiplier
-	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
 }
 
 type APIKey struct {
@@ -151,6 +148,30 @@ type Group struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// BillingProfile is the balance billing configuration attached to one routing
+// group. Subscription price and limits are intentionally not present here.
+type BillingProfile struct {
+	GroupID                      int64    `json:"group_id"`
+	BalanceRateMultiplier        float64  `json:"balance_rate_multiplier"`
+	PeakRateEnabled              bool     `json:"peak_rate_enabled"`
+	PeakStart                    string   `json:"peak_start"`
+	PeakEnd                      string   `json:"peak_end"`
+	PeakRateMultiplier           float64  `json:"peak_rate_multiplier"`
+	ImageRateIndependent         bool     `json:"image_rate_independent"`
+	ImageRateMultiplier          float64  `json:"image_rate_multiplier"`
+	ImagePrice1K                 *float64 `json:"image_price_1k"`
+	ImagePrice2K                 *float64 `json:"image_price_2k"`
+	ImagePrice4K                 *float64 `json:"image_price_4k"`
+	BatchImageDiscountMultiplier float64  `json:"batch_image_discount_multiplier"`
+	BatchImageHoldMultiplier     float64  `json:"batch_image_hold_multiplier"`
+	VideoRateIndependent         bool     `json:"video_rate_independent"`
+	VideoRateMultiplier          float64  `json:"video_rate_multiplier"`
+	VideoPrice480P               *float64 `json:"video_price_480p"`
+	VideoPrice720P               *float64 `json:"video_price_720p"`
+	VideoPrice1080P              *float64 `json:"video_price_1080p"`
+	WebSearchPricePerCall        *float64 `json:"web_search_price_per_call"`
 }
 
 // AdminGroup 是管理员接口使用的 group DTO（包含敏感/内部字段）。
@@ -391,8 +412,14 @@ type RedeemCode struct {
 	CreatedAt time.Time  `json:"created_at"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 
-	GroupID      *int64 `json:"group_id"`
-	ValidityDays int    `json:"validity_days"`
+	GroupID                 *int64   `json:"group_id"`
+	SubscriptionPlanID      *int64   `json:"subscription_plan_id,omitempty"`
+	PlanNameSnapshot        string   `json:"plan_name_snapshot,omitempty"`
+	DailyLimitUSDSnapshot   *float64 `json:"daily_limit_usd_snapshot,omitempty"`
+	WeeklyLimitUSDSnapshot  *float64 `json:"weekly_limit_usd_snapshot,omitempty"`
+	MonthlyLimitUSDSnapshot *float64 `json:"monthly_limit_usd_snapshot,omitempty"`
+	RateMultiplierSnapshot  float64  `json:"rate_multiplier_snapshot,omitempty"`
+	ValidityDays            int      `json:"validity_days"`
 
 	// Notes is only populated for admin_balance/admin_concurrency types
 	// so users can see why they were charged or credited
@@ -616,6 +643,13 @@ type UserSubscription struct {
 	ID      int64 `json:"id"`
 	UserID  int64 `json:"user_id"`
 	GroupID int64 `json:"group_id"`
+
+	SubscriptionPlanID      *int64   `json:"subscription_plan_id,omitempty"`
+	PlanNameSnapshot        string   `json:"plan_name_snapshot,omitempty"`
+	DailyLimitUSDSnapshot   *float64 `json:"daily_limit_usd_snapshot,omitempty"`
+	WeeklyLimitUSDSnapshot  *float64 `json:"weekly_limit_usd_snapshot,omitempty"`
+	MonthlyLimitUSDSnapshot *float64 `json:"monthly_limit_usd_snapshot,omitempty"`
+	RateMultiplierSnapshot  float64  `json:"rate_multiplier_snapshot"`
 
 	StartsAt  time.Time `json:"starts_at"`
 	ExpiresAt time.Time `json:"expires_at"`

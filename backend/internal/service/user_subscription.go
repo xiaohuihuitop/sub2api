@@ -9,6 +9,13 @@ type UserSubscription struct {
 	UserID  int64
 	GroupID int64
 
+	SubscriptionPlanID      *int64
+	PlanNameSnapshot        string
+	DailyLimitUSDSnapshot   *float64
+	WeeklyLimitUSDSnapshot  *float64
+	MonthlyLimitUSDSnapshot *float64
+	RateMultiplierSnapshot  float64
+
 	StartsAt  time.Time
 	ExpiresAt time.Time
 	Status    string
@@ -176,24 +183,18 @@ func (s *UserSubscription) MonthlyResetTime() *time.Time {
 }
 
 func (s *UserSubscription) CheckDailyLimit(group *Group, additionalCost float64) bool {
-	if !group.HasDailyLimit() {
-		return true
-	}
-	return s.DailyUsageUSD+additionalCost <= *group.DailyLimitUSD
+	limit := s.dailyLimitUSD(group)
+	return !hasUsageLimit(limit) || s.DailyUsageUSD+additionalCost <= *limit
 }
 
 func (s *UserSubscription) CheckWeeklyLimit(group *Group, additionalCost float64) bool {
-	if !group.HasWeeklyLimit() {
-		return true
-	}
-	return s.WeeklyUsageUSD+additionalCost <= *group.WeeklyLimitUSD
+	limit := s.weeklyLimitUSD(group)
+	return !hasUsageLimit(limit) || s.WeeklyUsageUSD+additionalCost <= *limit
 }
 
 func (s *UserSubscription) CheckMonthlyLimit(group *Group, additionalCost float64) bool {
-	if !group.HasMonthlyLimit() {
-		return true
-	}
-	return s.MonthlyUsageUSD+additionalCost <= *group.MonthlyLimitUSD
+	limit := s.monthlyLimitUSD(group)
+	return !hasUsageLimit(limit) || s.MonthlyUsageUSD+additionalCost <= *limit
 }
 
 func (s *UserSubscription) CheckAllLimits(group *Group, additionalCost float64) (daily, weekly, monthly bool) {
@@ -201,4 +202,56 @@ func (s *UserSubscription) CheckAllLimits(group *Group, additionalCost float64) 
 	weekly = s.CheckWeeklyLimit(group, additionalCost)
 	monthly = s.CheckMonthlyLimit(group, additionalCost)
 	return
+}
+
+func (s *UserSubscription) dailyLimitUSD(group *Group) *float64 {
+	if s != nil && s.DailyLimitUSDSnapshot != nil {
+		return s.DailyLimitUSDSnapshot
+	}
+	if group == nil {
+		return nil
+	}
+	return group.DailyLimitUSD
+}
+
+// DailyLimitUSD returns the immutable plan limit when present and otherwise
+// keeps the legacy group limit as a migration fallback.
+func (s *UserSubscription) DailyLimitUSD(group *Group) *float64 {
+	return s.dailyLimitUSD(group)
+}
+
+func (s *UserSubscription) weeklyLimitUSD(group *Group) *float64 {
+	if s != nil && s.WeeklyLimitUSDSnapshot != nil {
+		return s.WeeklyLimitUSDSnapshot
+	}
+	if group == nil {
+		return nil
+	}
+	return group.WeeklyLimitUSD
+}
+
+// WeeklyLimitUSD returns the immutable plan limit when present and otherwise
+// keeps the legacy group limit as a migration fallback.
+func (s *UserSubscription) WeeklyLimitUSD(group *Group) *float64 {
+	return s.weeklyLimitUSD(group)
+}
+
+func (s *UserSubscription) monthlyLimitUSD(group *Group) *float64 {
+	if s != nil && s.MonthlyLimitUSDSnapshot != nil {
+		return s.MonthlyLimitUSDSnapshot
+	}
+	if group == nil {
+		return nil
+	}
+	return group.MonthlyLimitUSD
+}
+
+// MonthlyLimitUSD returns the immutable plan limit when present and otherwise
+// keeps the legacy group limit as a migration fallback.
+func (s *UserSubscription) MonthlyLimitUSD(group *Group) *float64 {
+	return s.monthlyLimitUSD(group)
+}
+
+func hasUsageLimit(limit *float64) bool {
+	return limit != nil && *limit > 0
 }

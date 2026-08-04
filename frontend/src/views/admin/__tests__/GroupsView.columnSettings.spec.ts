@@ -10,6 +10,7 @@ const {
   getModelsListCandidates,
   getUsageSummary,
   getCapacitySummary,
+  getLiveCapability,
   listAccounts,
   showError,
   showSuccess,
@@ -21,6 +22,7 @@ const {
   getModelsListCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
+  getLiveCapability: vi.fn(),
   listAccounts: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -51,6 +53,7 @@ vi.mock('@/api/admin', () => ({
       getModelsListCandidates,
       getUsageSummary,
       getCapacitySummary,
+      getLiveCapability,
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -227,6 +230,7 @@ describe('admin GroupsView column settings', () => {
     getModelsListCandidates.mockReset()
     getUsageSummary.mockReset()
     getCapacitySummary.mockReset()
+    getLiveCapability.mockReset()
     listAccounts.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
@@ -244,6 +248,7 @@ describe('admin GroupsView column settings', () => {
     getModelsListCandidates.mockResolvedValue([])
     getUsageSummary.mockResolvedValue([])
     getCapacitySummary.mockResolvedValue([])
+    getLiveCapability.mockResolvedValue({ supported: false })
     listAccounts.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
     isCurrentStep.mockReturnValue(false)
   })
@@ -258,8 +263,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -284,8 +287,6 @@ describe('admin GroupsView column settings', () => {
       'name',
       'id',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'status',
@@ -302,8 +303,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -325,8 +324,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -348,8 +345,6 @@ describe('admin GroupsView column settings', () => {
       'name',
       'id',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -360,10 +355,19 @@ describe('admin GroupsView column settings', () => {
     expect(localStorage.getItem('group-hidden-columns')).toBe(JSON.stringify([]))
   })
 
+  it('keeps legacy billing fields out of the routing group editor', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-tour="group-form-multiplier"]').exists()).toBe(false)
+  })
+
   it('skips usage and capacity fetches until consuming columns are shown', async () => {
     localStorage.setItem(
       'group-hidden-columns',
-      JSON.stringify(['billing_type', 'usage', 'capacity']),
+      JSON.stringify(['usage', 'capacity']),
     )
 
     const wrapper = await mountView()

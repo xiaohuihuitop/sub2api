@@ -110,6 +110,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	defaultSubscriptions := make([]dto.DefaultSubscriptionSetting, 0, len(settings.DefaultSubscriptions))
 	for _, sub := range settings.DefaultSubscriptions {
 		defaultSubscriptions = append(defaultSubscriptions, dto.DefaultSubscriptionSetting{
+			PlanID:       sub.PlanID,
 			GroupID:      sub.GroupID,
 			ValidityDays: sub.ValidityDays,
 		})

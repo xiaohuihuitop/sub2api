@@ -21,6 +21,30 @@ export interface LiveCapability {
   reason?: string
 }
 
+export interface BillingProfile {
+  group_id: number
+  balance_rate_multiplier: number
+  peak_rate_enabled: boolean
+  peak_start: string
+  peak_end: string
+  peak_rate_multiplier: number
+  image_rate_independent: boolean
+  image_rate_multiplier: number
+  image_price_1k: number | null
+  image_price_2k: number | null
+  image_price_4k: number | null
+  batch_image_discount_multiplier: number
+  batch_image_hold_multiplier: number
+  video_rate_independent: boolean
+  video_rate_multiplier: number
+  video_price_480p: number | null
+  video_price_720p: number | null
+  video_price_1080p: number | null
+  web_search_price_per_call: number | null
+}
+
+export type UpdateBillingProfileRequest = Omit<BillingProfile, 'group_id'>
+
 /**
  * List all groups with pagination
  * @param page - Page number (default: 1)
@@ -99,6 +123,19 @@ export async function getLiveCapability(): Promise<LiveCapability> {
  */
 export async function getById(id: number): Promise<AdminGroup> {
   const { data } = await apiClient.get<AdminGroup>(`/admin/groups/${id}`)
+  return data
+}
+
+export async function getBillingProfile(id: number): Promise<BillingProfile> {
+  const { data } = await apiClient.get<BillingProfile>(`/admin/groups/${id}/billing-profile`)
+  return data
+}
+
+export async function updateBillingProfile(
+  id: number,
+  profile: UpdateBillingProfileRequest,
+): Promise<BillingProfile> {
+  const { data } = await apiClient.put<BillingProfile>(`/admin/groups/${id}/billing-profile`, profile)
   return data
 }
 
@@ -328,7 +365,7 @@ export async function previewCompositeRoute(
 }
 
 /**
- * Rate multiplier entry for a user in a group
+ * @deprecated 用户专属余额倍率已被移除。保留类型仅用于未挂载旧组件的编译兼容。
  */
 export interface GroupRateMultiplierEntry {
   user_id: number
@@ -340,16 +377,26 @@ export interface GroupRateMultiplierEntry {
   rpm_override?: number | null
 }
 
-/**
- * Get rate multipliers for users in a group
- * @param id - Group ID
- * @returns List of user rate multiplier entries
- */
-export async function getGroupRateMultipliers(id: number): Promise<GroupRateMultiplierEntry[]> {
-  const { data } = await apiClient.get<GroupRateMultiplierEntry[]>(
-    `/admin/groups/${id}/rate-multipliers`
-  )
-  return data
+function userRateMultiplierRemoved(): never {
+  throw new Error('User-specific balance multipliers have been removed')
+}
+
+/** @deprecated 旧功能已下线，调用会直接失败。 */
+export async function getGroupRateMultipliers(_id: number): Promise<GroupRateMultiplierEntry[]> {
+  return userRateMultiplierRemoved()
+}
+
+/** @deprecated 旧功能已下线，调用会直接失败。 */
+export async function clearGroupRateMultipliers(_id: number): Promise<{ message: string }> {
+  return userRateMultiplierRemoved()
+}
+
+/** @deprecated 旧功能已下线，调用会直接失败。 */
+export async function batchSetGroupRateMultipliers(
+  _id: number,
+  _entries: Array<{ user_id: number; rate_multiplier: number }>
+): Promise<{ message: string }> {
+  return userRateMultiplierRemoved()
 }
 
 /**
@@ -367,31 +414,6 @@ export async function updateSortOrder(
 }
 
 /**
- * Clear all rate multipliers for a group
- * @param id - Group ID
- * @returns Success confirmation
- */
-export async function clearGroupRateMultipliers(id: number): Promise<{ message: string }> {
-  const { data } = await apiClient.delete<{ message: string }>(`/admin/groups/${id}/rate-multipliers`)
-  return data
-}
-
-/**
- * Batch set rate multipliers for users in a group
- * Only touches rate_multiplier column; preserves rpm_override on existing rows.
- */
-export async function batchSetGroupRateMultipliers(
-  id: number,
-  entries: Array<{ user_id: number; rate_multiplier: number }>
-): Promise<{ message: string }> {
-  const { data } = await apiClient.put<{ message: string }>(
-    `/admin/groups/${id}/rate-multipliers`,
-    { entries }
-  )
-  return data
-}
-
-/**
  * RPM override entry for a user in a group
  */
 export interface GroupRPMOverrideEntry {
@@ -403,28 +425,17 @@ export interface GroupRPMOverrideEntry {
   rpm_override: number
 }
 
-/**
- * Get RPM overrides for users in a group (subset of rate-multipliers endpoint).
- */
+/** Get RPM overrides for users in a group. */
 export async function getGroupRPMOverrides(id: number): Promise<GroupRPMOverrideEntry[]> {
-  const { data } = await apiClient.get<GroupRateMultiplierEntry[]>(
-    `/admin/groups/${id}/rate-multipliers`
+  const { data } = await apiClient.get<GroupRPMOverrideEntry[]>(
+    `/admin/groups/${id}/rpm-overrides`
   )
   return data
-    .filter(e => e.rpm_override != null)
-    .map(e => ({
-      user_id: e.user_id,
-      user_name: e.user_name,
-      user_email: e.user_email,
-      user_notes: e.user_notes,
-      user_status: e.user_status,
-      rpm_override: e.rpm_override as number
-    }))
 }
 
 /**
  * Batch set RPM overrides for users in a group.
- * Only touches rpm_override column; preserves rate_multiplier on existing rows.
+ * Only updates per-user RPM limits.
  */
 export async function batchSetGroupRPMOverrides(
   id: number,
@@ -438,7 +449,7 @@ export async function batchSetGroupRPMOverrides(
 }
 
 /**
- * Clear all RPM overrides for a group (preserves rate_multiplier).
+ * Clear all RPM overrides for a group.
  */
 export async function clearGroupRPMOverrides(id: number): Promise<{ message: string }> {
   const { data } = await apiClient.delete<{ message: string }>(`/admin/groups/${id}/rpm-overrides`)
@@ -480,6 +491,8 @@ export const groupsAPI = {
   getAllIncludingInactive,
   getLiveCapability,
   getById,
+  getBillingProfile,
+  updateBillingProfile,
   getModelsListCandidates,
   create,
   duplicate,

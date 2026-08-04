@@ -3522,7 +3522,8 @@
                     type="button"
                     class="btn btn-secondary btn-sm"
                     @click="addDefaultSubscription"
-                    :disabled="subscriptionGroups.length === 0"
+                    :disabled="subscriptionPlans.length === 0"
+                    data-testid="add-default-subscription"
                   >
                     {{ t("admin.settings.defaults.addDefaultSubscription") }}
                   </button>
@@ -3539,96 +3540,33 @@
                   <div
                     v-for="(item, index) in form.default_subscriptions"
                     :key="`default-sub-${index}`"
-                    class="grid grid-cols-1 gap-3 rounded border border-gray-200 p-3 md:grid-cols-[1fr_160px_auto] dark:border-dark-600"
+                    class="grid grid-cols-1 gap-3 rounded border border-gray-200 p-3 md:grid-cols-[minmax(0,1fr)_auto] dark:border-dark-600"
                   >
                     <div>
                       <label
                         class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
                       >
-                        {{ t("admin.settings.defaults.subscriptionGroup") }}
+                        {{ t("admin.settings.defaults.subscriptionPlan") }}
                       </label>
-                      <Select
-                        v-model="item.group_id"
-                        class="default-sub-group-select"
-                        :options="defaultSubscriptionGroupOptions"
-                        :placeholder="
-                          t('admin.settings.defaults.subscriptionGroup')
-                        "
-                      >
-                        <template #selected="{ option }">
-                          <GroupBadge
-                            v-if="option"
-                            :name="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).label
-                            "
-                            :platform="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).platform
-                            "
-                            :subscription-type="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).subscriptionType
-                            "
-                            :rate-multiplier="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).rate
-                            "
-                          />
-                          <span v-else class="text-gray-400">
-                            {{ t("admin.settings.defaults.subscriptionGroup") }}
-                          </span>
-                        </template>
-                        <template #option="{ option, selected }">
-                          <GroupOptionItem
-                            :name="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).label
-                            "
-                            :platform="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).platform
-                            "
-                            :subscription-type="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).subscriptionType
-                            "
-                            :rate-multiplier="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).rate
-                            "
-                            :description="
-                              (
-                                option as unknown as DefaultSubscriptionGroupOption
-                              ).description
-                            "
-                            :selected="selected"
-                          />
-                        </template>
-                      </Select>
-                    </div>
-                    <div>
-                      <label
-                        class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                      <p
+                        v-if="isLegacyDefaultSubscription(item)"
+                        class="mb-1 text-xs text-amber-600 dark:text-amber-400"
                       >
                         {{
-                          t("admin.settings.defaults.subscriptionValidityDays")
+                          t("admin.settings.defaults.legacySubscription", {
+                            groupId: item.group_id,
+                            days: item.validity_days,
+                          })
                         }}
-                      </label>
-                      <input
-                        v-model.number="item.validity_days"
-                        type="number"
-                        min="1"
-                        max="36500"
-                        class="input h-[42px]"
+                      </p>
+                      <Select
+                        v-model="item.plan_id"
+                        class="default-sub-plan-select"
+                        :options="defaultSubscriptionPlanOptions"
+                        :placeholder="
+                          t('admin.settings.defaults.subscriptionPlan')
+                        "
+                        data-testid="default-subscription-plan-select"
                       />
                     </div>
                     <div class="flex items-end">
@@ -3845,7 +3783,7 @@
                         @click="
                           addAuthSourceDefaultSubscription(authSource.source)
                         "
-                        :disabled="subscriptionGroups.length === 0"
+                        :disabled="subscriptionPlans.length === 0"
                       >
                         {{
                           t("admin.settings.defaults.addDefaultSubscription")
@@ -3869,100 +3807,32 @@
                           authSource.source
                         ].subscriptions"
                         :key="`${authSource.source}-sub-${index}`"
-                        class="grid grid-cols-1 gap-3 rounded border border-gray-200 p-3 md:grid-cols-[1fr_160px_auto] dark:border-dark-600"
+                        class="grid grid-cols-1 gap-3 rounded border border-gray-200 p-3 md:grid-cols-[minmax(0,1fr)_auto] dark:border-dark-600"
                       >
                         <div>
                           <label
                             class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
                           >
-                            {{ t("admin.settings.defaults.subscriptionGroup") }}
+                            {{ t("admin.settings.defaults.subscriptionPlan") }}
                           </label>
-                          <Select
-                            v-model="item.group_id"
-                            class="default-sub-group-select"
-                            :options="defaultSubscriptionGroupOptions"
-                            :placeholder="
-                              t('admin.settings.defaults.subscriptionGroup')
-                            "
-                          >
-                            <template #selected="{ option }">
-                              <GroupBadge
-                                v-if="option"
-                                :name="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).label
-                                "
-                                :platform="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).platform
-                                "
-                                :subscription-type="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).subscriptionType
-                                "
-                                :rate-multiplier="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).rate
-                                "
-                              />
-                              <span v-else class="text-gray-400">
-                                {{
-                                  t("admin.settings.defaults.subscriptionGroup")
-                                }}
-                              </span>
-                            </template>
-                            <template #option="{ option, selected }">
-                              <GroupOptionItem
-                                :name="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).label
-                                "
-                                :platform="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).platform
-                                "
-                                :subscription-type="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).subscriptionType
-                                "
-                                :rate-multiplier="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).rate
-                                "
-                                :description="
-                                  (
-                                    option as unknown as DefaultSubscriptionGroupOption
-                                  ).description
-                                "
-                                :selected="selected"
-                              />
-                            </template>
-                          </Select>
-                        </div>
-                        <div>
-                          <label
-                            class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                          <p
+                            v-if="isLegacyDefaultSubscription(item)"
+                            class="mb-1 text-xs text-amber-600 dark:text-amber-400"
                           >
                             {{
-                              t(
-                                "admin.settings.defaults.subscriptionValidityDays",
-                              )
+                              t("admin.settings.defaults.legacySubscription", {
+                                groupId: item.group_id,
+                                days: item.validity_days,
+                              })
                             }}
-                          </label>
-                          <input
-                            v-model.number="item.validity_days"
-                            type="number"
-                            min="1"
-                            max="36500"
-                            class="input h-[42px]"
+                          </p>
+                          <Select
+                            v-model="item.plan_id"
+                            class="default-sub-plan-select"
+                            :options="defaultSubscriptionPlanOptions"
+                            :placeholder="
+                              t('admin.settings.defaults.subscriptionPlan')
+                            "
                           />
                         </div>
                         <div class="flex items-end">
@@ -8066,6 +7936,7 @@
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api";
+import { adminPaymentAPI } from "@/api/admin/payment";
 import {
   appendAuthSourceDefaultsToUpdateRequest,
   buildAuthSourceDefaultsState,
@@ -8089,21 +7960,14 @@ import type {
   WebSearchProviderConfig,
   WebSearchTestResult,
 } from "@/api/admin/settings";
-import type {
-  AdminGroup,
-  LoginAgreementDocument,
-  NotifyEmailEntry,
-  Proxy,
-} from "@/types";
-import type { ProviderInstance } from "@/types/payment";
+import type { LoginAgreementDocument, NotifyEmailEntry, Proxy } from "@/types";
+import type { ProviderInstance, SubscriptionPlan } from "@/types/payment";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Icon from "@/components/icons/Icon.vue";
 import Select from "@/components/common/Select.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import PaymentProviderList from "@/components/payment/PaymentProviderList.vue";
 import PaymentProviderDialog from "@/components/payment/PaymentProviderDialog.vue";
-import GroupBadge from "@/components/common/GroupBadge.vue";
-import GroupOptionItem from "@/components/common/GroupOptionItem.vue";
 import Toggle from "@/components/common/Toggle.vue";
 import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
@@ -8252,7 +8116,7 @@ const adminApiKeyExists = ref(false);
 const adminApiKeyMasked = ref("");
 const adminApiKeyOperating = ref(false);
 const newAdminApiKey = ref("");
-const subscriptionGroups = ref<AdminGroup[]>([]);
+const subscriptionPlans = ref<SubscriptionPlan[]>([]);
 
 // Upstream billing probe state
 const upstreamBillingProbeLoading = ref(true);
@@ -8761,13 +8625,10 @@ function resetClaudeOAuthSystemPromptBlocks(): void {
 }
 
 
-interface DefaultSubscriptionGroupOption {
+interface DefaultSubscriptionPlanOption {
   value: number;
   label: string;
-  description: string | null;
-  platform: AdminGroup["platform"];
-  subscriptionType: AdminGroup["subscription_type"];
-  rate: number;
+  description: string;
   [key: string]: unknown;
 }
 
@@ -9399,17 +9260,16 @@ async function saveWebSearchConfig(): Promise<boolean> {
   }
 }
 
-const defaultSubscriptionGroupOptions = computed<
-  DefaultSubscriptionGroupOption[]
+const defaultSubscriptionPlanOptions = computed<
+  DefaultSubscriptionPlanOption[]
 >(() =>
-  subscriptionGroups.value.map((group) => ({
-    value: group.id,
-    label: group.name,
-    description: group.description,
-    platform: group.platform,
-    subscriptionType: group.subscription_type,
-    rate: group.rate_multiplier,
-  })),
+  [...subscriptionPlans.value]
+    .sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
+    .map((plan) => ({
+      value: plan.id,
+      label: plan.group_name ? `${plan.name} - ${plan.group_name}` : plan.name,
+      description: plan.description,
+    })),
 );
 
 const registrationEmailSuffixWhitelistSeparatorKeys = new Set([
@@ -10115,35 +9975,29 @@ async function loadSettings() {
   }
 }
 
-async function loadSubscriptionGroups() {
+async function loadSubscriptionPlans() {
   try {
-    const groups = await adminAPI.groups.getAll();
-    subscriptionGroups.value = groups.filter(
-      (group) =>
-        group.subscription_type === "subscription" && group.status === "active",
-    );
+    const { data } = await adminPaymentAPI.getPlans();
+    subscriptionPlans.value = data ?? [];
   } catch (_error: unknown) {
-    subscriptionGroups.value = [];
+    subscriptionPlans.value = [];
   }
 }
 
-function findNextAvailableSubscriptionGroup(
-  existingGroupIDs: number[],
-): AdminGroup | undefined {
-  const existing = new Set(existingGroupIDs);
-  return subscriptionGroups.value.find((group) => !existing.has(group.id));
+function findNextAvailableSubscriptionPlan(
+  existingPlanIDs: Array<number | undefined>,
+): SubscriptionPlan | undefined {
+  const existing = new Set(existingPlanIDs.filter((id): id is number => typeof id === "number"));
+  return subscriptionPlans.value.find((plan) => !existing.has(plan.id));
 }
 
 function addDefaultSubscription() {
-  if (subscriptionGroups.value.length === 0) return;
-  const candidate = findNextAvailableSubscriptionGroup(
-    form.default_subscriptions.map((item) => item.group_id),
+  if (subscriptionPlans.value.length === 0) return;
+  const candidate = findNextAvailableSubscriptionPlan(
+    form.default_subscriptions.map((item) => item.plan_id),
   );
   if (!candidate) return;
-  form.default_subscriptions.push({
-    group_id: candidate.id,
-    validity_days: 30,
-  });
+  form.default_subscriptions.push({ plan_id: candidate.id });
 }
 
 function removeDefaultSubscription(index: number) {
@@ -10151,15 +10005,12 @@ function removeDefaultSubscription(index: number) {
 }
 
 function addAuthSourceDefaultSubscription(source: AuthSourceType) {
-  if (subscriptionGroups.value.length === 0) return;
-  const candidate = findNextAvailableSubscriptionGroup(
-    authSourceDefaults[source].subscriptions.map((item) => item.group_id),
+  if (subscriptionPlans.value.length === 0) return;
+  const candidate = findNextAvailableSubscriptionPlan(
+    authSourceDefaults[source].subscriptions.map((item) => item.plan_id),
   );
   if (!candidate) return;
-  authSourceDefaults[source].subscriptions.push({
-    group_id: candidate.id,
-    validity_days: 30,
-  });
+  authSourceDefaults[source].subscriptions.push({ plan_id: candidate.id });
 }
 
 function removeAuthSourceDefaultSubscription(
@@ -10172,15 +10023,26 @@ function removeAuthSourceDefaultSubscription(
 function findDuplicateDefaultSubscription(
   subscriptions: DefaultSubscriptionSetting[],
 ): DefaultSubscriptionSetting | undefined {
-  const seenGroupIDs = new Set<number>();
+  const seen = new Set<string>();
 
   return subscriptions.find((item) => {
-    if (seenGroupIDs.has(item.group_id)) {
+    const identity = item.plan_id
+      ? `plan:${item.plan_id}`
+      : `legacy-group:${item.group_id}`;
+    if (seen.has(identity)) {
       return true;
     }
-    seenGroupIDs.add(item.group_id);
+    seen.add(identity);
     return false;
   });
+}
+
+function isLegacyDefaultSubscription(item: DefaultSubscriptionSetting): boolean {
+  return !item.plan_id && Boolean(item.group_id && item.validity_days);
+}
+
+function defaultSubscriptionReference(item: DefaultSubscriptionSetting): string {
+  return item.plan_id ? `#${item.plan_id}` : `#${item.group_id}`;
 }
 
 async function saveSettings() {
@@ -10269,7 +10131,7 @@ async function saveSettings() {
     if (duplicateDefaultSubscription) {
       appStore.showError(
         t("admin.settings.defaults.defaultSubscriptionsDuplicate", {
-          groupId: duplicateDefaultSubscription.group_id,
+          reference: defaultSubscriptionReference(duplicateDefaultSubscription),
         }),
       );
       return;
@@ -10288,7 +10150,7 @@ async function saveSettings() {
           `${authSource.title}: ${t(
             "admin.settings.defaults.defaultSubscriptionsDuplicate",
             {
-              groupId: duplicate.group_id,
+              reference: defaultSubscriptionReference(duplicate),
             },
           )}`,
         );
@@ -11674,7 +11536,7 @@ async function handleDeleteProvider() {
 
 onMounted(() => {
   loadSettings();
-  loadSubscriptionGroups();
+  loadSubscriptionPlans();
   loadAdminApiKey();
   loadUpstreamBillingProbeSettings();
   loadOllamaCloudUsageSettings();
@@ -12057,7 +11919,7 @@ watch(
 </script>
 
 <style scoped>
-.default-sub-group-select :deep(.select-trigger) {
+.default-sub-plan-select :deep(.select-trigger) {
   @apply h-[42px];
 }
 

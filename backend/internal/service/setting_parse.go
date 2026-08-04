@@ -1092,6 +1092,10 @@ func parseDefaultSubscriptions(raw string) []DefaultSubscriptionSetting {
 
 	normalized := make([]DefaultSubscriptionSetting, 0, len(items))
 	for _, item := range items {
+		if item.PlanID > 0 {
+			normalized = append(normalized, DefaultSubscriptionSetting{PlanID: item.PlanID})
+			continue
+		}
 		if item.GroupID <= 0 || item.ValidityDays <= 0 {
 			continue
 		}

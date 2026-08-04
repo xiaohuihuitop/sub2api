@@ -31,6 +31,12 @@ func (r *userSubscriptionRepository) Create(ctx context.Context, sub *service.Us
 	builder := client.UserSubscription.Create().
 		SetUserID(sub.UserID).
 		SetGroupID(sub.GroupID).
+		SetNillableSubscriptionPlanID(sub.SubscriptionPlanID).
+		SetPlanNameSnapshot(sub.PlanNameSnapshot).
+		SetNillableDailyLimitUsdSnapshot(sub.DailyLimitUSDSnapshot).
+		SetNillableWeeklyLimitUsdSnapshot(sub.WeeklyLimitUSDSnapshot).
+		SetNillableMonthlyLimitUsdSnapshot(sub.MonthlyLimitUSDSnapshot).
+		SetRateMultiplierSnapshot(sub.RateMultiplierSnapshot).
 		SetExpiresAt(sub.ExpiresAt).
 		SetNillableDailyWindowStart(sub.DailyWindowStart).
 		SetNillableWeeklyWindowStart(sub.WeeklyWindowStart).
@@ -95,7 +101,12 @@ func (r *userSubscriptionRepository) GetByUserIDAndGroupID(ctx context.Context, 
 	m, err := client.UserSubscription.Query().
 		Where(usersubscription.UserIDEQ(userID), usersubscription.GroupIDEQ(groupID)).
 		WithGroup().
-		Only(ctx)
+		Order(
+			dbent.Asc(usersubscription.FieldExpiresAt),
+			dbent.Asc(usersubscription.FieldCreatedAt),
+			dbent.Asc(usersubscription.FieldID),
+		).
+		First(ctx)
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
 	}
@@ -103,20 +114,14 @@ func (r *userSubscriptionRepository) GetByUserIDAndGroupID(ctx context.Context, 
 }
 
 func (r *userSubscriptionRepository) GetActiveByUserIDAndGroupID(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
-	client := clientFromContext(ctx, r.client)
-	m, err := client.UserSubscription.Query().
-		Where(
-			usersubscription.UserIDEQ(userID),
-			usersubscription.GroupIDEQ(groupID),
-			usersubscription.StatusEQ(service.SubscriptionStatusActive),
-			usersubscription.ExpiresAtGT(time.Now()),
-		).
-		WithGroup().
-		Only(ctx)
+	subs, err := r.ListActiveByUserIDAndGroupID(ctx, userID, groupID)
 	if err != nil {
-		return nil, translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
+		return nil, err
 	}
-	return userSubscriptionEntityToService(m), nil
+	if len(subs) == 0 {
+		return nil, service.ErrSubscriptionNotFound
+	}
+	return &subs[0], nil
 }
 
 func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.UserSubscription) error {
@@ -128,6 +133,12 @@ func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.Us
 	builder := client.UserSubscription.UpdateOneID(sub.ID).
 		SetUserID(sub.UserID).
 		SetGroupID(sub.GroupID).
+		SetNillableSubscriptionPlanID(sub.SubscriptionPlanID).
+		SetPlanNameSnapshot(sub.PlanNameSnapshot).
+		SetNillableDailyLimitUsdSnapshot(sub.DailyLimitUSDSnapshot).
+		SetNillableWeeklyLimitUsdSnapshot(sub.WeeklyLimitUSDSnapshot).
+		SetNillableMonthlyLimitUsdSnapshot(sub.MonthlyLimitUSDSnapshot).
+		SetRateMultiplierSnapshot(sub.RateMultiplierSnapshot).
 		SetStartsAt(sub.StartsAt).
 		SetExpiresAt(sub.ExpiresAt).
 		SetStatus(sub.Status).
@@ -629,24 +640,30 @@ func userSubscriptionEntityToServiceWithStatusMapping(m *dbent.UserSubscription,
 		status = service.SubscriptionStatusRevoked
 	}
 	out := &service.UserSubscription{
-		ID:                 m.ID,
-		UserID:             m.UserID,
-		GroupID:            m.GroupID,
-		StartsAt:           m.StartsAt,
-		ExpiresAt:          m.ExpiresAt,
-		Status:             status,
-		DailyWindowStart:   m.DailyWindowStart,
-		WeeklyWindowStart:  m.WeeklyWindowStart,
-		MonthlyWindowStart: m.MonthlyWindowStart,
-		DailyUsageUSD:      m.DailyUsageUsd,
-		WeeklyUsageUSD:     m.WeeklyUsageUsd,
-		MonthlyUsageUSD:    m.MonthlyUsageUsd,
-		AssignedBy:         m.AssignedBy,
-		AssignedAt:         m.AssignedAt,
-		Notes:              derefString(m.Notes),
-		CreatedAt:          m.CreatedAt,
-		UpdatedAt:          m.UpdatedAt,
-		DeletedAt:          m.DeletedAt,
+		ID:                      m.ID,
+		UserID:                  m.UserID,
+		GroupID:                 m.GroupID,
+		SubscriptionPlanID:      m.SubscriptionPlanID,
+		PlanNameSnapshot:        m.PlanNameSnapshot,
+		DailyLimitUSDSnapshot:   m.DailyLimitUsdSnapshot,
+		WeeklyLimitUSDSnapshot:  m.WeeklyLimitUsdSnapshot,
+		MonthlyLimitUSDSnapshot: m.MonthlyLimitUsdSnapshot,
+		RateMultiplierSnapshot:  m.RateMultiplierSnapshot,
+		StartsAt:                m.StartsAt,
+		ExpiresAt:               m.ExpiresAt,
+		Status:                  status,
+		DailyWindowStart:        m.DailyWindowStart,
+		WeeklyWindowStart:       m.WeeklyWindowStart,
+		MonthlyWindowStart:      m.MonthlyWindowStart,
+		DailyUsageUSD:           m.DailyUsageUsd,
+		WeeklyUsageUSD:          m.WeeklyUsageUsd,
+		MonthlyUsageUSD:         m.MonthlyUsageUsd,
+		AssignedBy:              m.AssignedBy,
+		AssignedAt:              m.AssignedAt,
+		Notes:                   derefString(m.Notes),
+		CreatedAt:               m.CreatedAt,
+		UpdatedAt:               m.UpdatedAt,
+		DeletedAt:               m.DeletedAt,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)

@@ -22,6 +22,7 @@ const {
   updateUpstreamBillingProbeSettings,
   getOllamaCloudUsageSettings,
   updateOllamaCloudUsageSettings,
+  getPlans,
   getGroups,
   listProxies,
   getProviders,
@@ -63,6 +64,7 @@ const {
     debounce_minutes: 1,
   }),
   updateOllamaCloudUsageSettings: vi.fn().mockImplementation(async (payload) => payload),
+  getPlans: vi.fn(),
   getGroups: vi.fn(),
   listProxies: vi.fn(),
   getProviders: vi.fn(),
@@ -112,6 +114,15 @@ vi.mock("@/api", () => ({
       createProvider,
       deleteProvider,
     },
+  },
+}));
+
+vi.mock("@/api/admin/payment", () => ({
+  adminPaymentAPI: {
+    getPlans,
+  },
+  default: {
+    getPlans,
   },
 }));
 
@@ -604,6 +615,7 @@ describe("admin SettingsView payment visible method controls", () => {
     updateUpstreamBillingProbeSettings.mockReset();
     getOllamaCloudUsageSettings.mockReset();
     updateOllamaCloudUsageSettings.mockReset();
+    getPlans.mockReset();
     getGroups.mockReset();
     listProxies.mockReset();
     getProviders.mockReset();
@@ -670,6 +682,24 @@ describe("admin SettingsView payment visible method controls", () => {
       debounce_minutes: 1,
     });
     updateOllamaCloudUsageSettings.mockImplementation(async (payload) => payload);
+    getPlans.mockResolvedValue({
+      data: [
+        {
+          id: 77,
+          group_id: 9,
+          group_name: "Pro group",
+          name: "Starter plan",
+          description: "",
+          rate_multiplier: 1,
+          price: 0,
+          validity_days: 30,
+          validity_unit: "days",
+          features: [],
+          for_sale: true,
+          sort_order: 0,
+        },
+      ],
+    });
     getGroups.mockResolvedValue([]);
     listProxies.mockResolvedValue({
       items: [],
@@ -694,6 +724,24 @@ describe("admin SettingsView payment visible method controls", () => {
 
     expect(updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({ compact_home_enabled: true }),
+    );
+  });
+
+  it("saves new default subscriptions as plan references", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(getPlans).toHaveBeenCalledOnce();
+
+    await openUsersTab(wrapper);
+    await wrapper.get('[data-testid="add-default-subscription"]').trigger("click");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        default_subscriptions: [{ plan_id: 77 }],
+      }),
     );
   });
 

@@ -12,9 +12,11 @@ import (
 )
 
 type billingGroupSubscriptionResolverStub struct {
-	subs         map[int64]*UserSubscription
-	validateErrs map[int64]error
-	checked      []int64
+	subs                       map[int64]*UserSubscription
+	candidates                 map[int64][]*UserSubscription
+	validateErrs               map[int64]error
+	validateErrsBySubscription map[int64]error
+	checked                    []int64
 }
 
 func (s *billingGroupSubscriptionResolverStub) GetActiveSubscription(_ context.Context, userID, groupID int64) (*UserSubscription, error) {
@@ -26,8 +28,31 @@ func (s *billingGroupSubscriptionResolverStub) GetActiveSubscription(_ context.C
 	return &copy, nil
 }
 
-func (s *billingGroupSubscriptionResolverStub) ValidateAndCheckLimits(_ *UserSubscription, group *Group) (bool, error) {
+func (s *billingGroupSubscriptionResolverStub) ListActiveSubscriptions(_ context.Context, userID, groupID int64) ([]UserSubscription, error) {
+	candidates := s.candidates[groupID]
+	if len(candidates) == 0 {
+		subscription, err := s.GetActiveSubscription(context.Background(), userID, groupID)
+		if err != nil {
+			return nil, err
+		}
+		return []UserSubscription{*subscription}, nil
+	}
+
+	result := make([]UserSubscription, 0, len(candidates))
+	for _, subscription := range candidates {
+		if subscription == nil {
+			continue
+		}
+		result = append(result, *subscription)
+	}
+	return result, nil
+}
+
+func (s *billingGroupSubscriptionResolverStub) ValidateAndCheckLimits(subscription *UserSubscription, group *Group) (bool, error) {
 	s.checked = append(s.checked, group.ID)
+	if subscription != nil && s.validateErrsBySubscription != nil {
+		return false, s.validateErrsBySubscription[subscription.ID]
+	}
 	return false, s.validateErrs[group.ID]
 }
 
@@ -52,7 +77,7 @@ func TestResolveBillingGroupUsesAdminOrder(t *testing.T) {
 	require.Equal(t, []int64{10}, resolver.checked)
 }
 
-func TestResolveBillingGroupSkipsLimitedPlanThenUsesBalance(t *testing.T) {
+func TestResolveBillingGroupSkipsLimitedPlanThenUsesFirstAllowedBalanceGroup(t *testing.T) {
 	plan := billingTestGroup(10, SubscriptionTypeSubscription, 1, PlatformOpenAI)
 	balance := billingTestGroup(20, SubscriptionTypeStandard, 2, PlatformOpenAI)
 	apiKey := billingTestAPIKey(plan, []Group{plan, balance}, 5)
@@ -65,7 +90,32 @@ func TestResolveBillingGroupSkipsLimitedPlanThenUsesBalance(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Nil(t, sub)
-	require.Equal(t, int64(20), *apiKey.GroupID)
+	require.Equal(t, int64(10), *apiKey.GroupID)
+}
+
+func TestResolveBillingGroupUsesNextSubscriptionInSameStandardGroupBeforeBalance(t *testing.T) {
+	group := billingTestGroup(10, SubscriptionTypeStandard, 1, PlatformOpenAI)
+	balance := billingTestGroup(20, SubscriptionTypeStandard, 2, PlatformOpenAI)
+	apiKey := billingTestAPIKey(group, []Group{group, balance}, 5)
+	first := billingTestSubscription(group.ID)
+	first.ID = 101
+	second := billingTestSubscription(group.ID)
+	second.ID = 102
+	resolver := &billingGroupSubscriptionResolverStub{
+		candidates: map[int64][]*UserSubscription{group.ID: {first, second}},
+		validateErrsBySubscription: map[int64]error{
+			first.ID: ErrDailyLimitExceeded,
+		},
+	}
+
+	subscription, err := (&APIKeyService{}).ResolveBillingGroupForRequest(
+		context.Background(), apiKey, resolver, false, PlatformOpenAI, "/v1/chat/completions",
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, subscription)
+	require.Equal(t, second.ID, subscription.ID)
+	require.Equal(t, group.ID, *apiKey.GroupID)
 }
 
 func TestResolveBillingGroupFiltersPlatformAndEndpoint(t *testing.T) {
@@ -123,6 +173,24 @@ func TestResolveBillingGroupAllowsUnboundKeyToUseBalance(t *testing.T) {
 	require.Nil(t, apiKey.GroupID)
 }
 
+func TestResolveBillingGroupTreatsTypedNilSubscriptionServiceAsUnavailable(t *testing.T) {
+	group := billingTestGroup(10, SubscriptionTypeStandard, 1, PlatformOpenAI)
+	apiKey := billingTestAPIKey(group, []Group{group}, 5)
+	var subscriptions *SubscriptionService
+
+	var selected *UserSubscription
+	var err error
+	require.NotPanics(t, func() {
+		selected, err = (&APIKeyService{}).ResolveBillingGroupForRequest(
+			context.Background(), apiKey, subscriptions, false, PlatformOpenAI, "/v1/chat/completions",
+		)
+	})
+
+	require.NoError(t, err)
+	require.Nil(t, selected)
+	require.Equal(t, group.ID, *apiKey.GroupID)
+}
+
 func TestResolveBillingGroupUsesSecondPlanAfterSubscriptionAuthCacheInvalidation(t *testing.T) {
 	const (
 		userID        = int64(7)
@@ -169,7 +237,7 @@ func TestResolveBillingGroupUsesSecondPlanAfterSubscriptionAuthCacheInvalidation
 	require.NoError(t, err)
 	require.Equal(t, firstGroupID, selected.GroupID, "test setup must preserve the stale L1 snapshot")
 
-	billingCacheService.QueueUpdateSubscriptionUsage(userID, firstGroupID, 5)
+	billingCacheService.QueueUpdateSubscriptionUsage(userID, firstGroupID, firstGroupID, 5)
 	_, cached = subscriptions.subCacheL1.Get(subCacheKey(userID, firstGroupID))
 	require.False(t, cached)
 	refreshed, err := subRepo.GetActiveByUserIDAndGroupID(context.Background(), userID, firstGroupID)

@@ -105,8 +105,6 @@ export interface AdminUser extends User {
   // 管理员备注（普通用户接口不返回）
   notes: string
   last_used_at?: string | null
-  // 用户专属分组倍率配置 (group_id -> rate_multiplier)
-  group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
 }
@@ -950,6 +948,7 @@ export interface UpstreamBillingData {
   schema_version: 1
   billing_scope: 'token'
   group_rate_multiplier: number
+  // 上游探测可能报告其自身的用户倍率；本系统不再提供该计费能力。
   user_rate_multiplier?: number
   resolved_rate_multiplier: number
   peak_rate_enabled: boolean
@@ -1592,6 +1591,12 @@ export interface UsageLog {
 
   created_at: string
 
+  subscription_plan_id?: number | null
+  plan_name_snapshot?: string
+  daily_limit_usd_snapshot?: number | null
+  weekly_limit_usd_snapshot?: number | null
+  monthly_limit_usd_snapshot?: number | null
+  rate_multiplier_snapshot?: number
   user?: User
   api_key?: ApiKey
   group?: Group
@@ -1670,6 +1675,7 @@ export interface GenerateRedeemCodesRequest {
   count: number
   type: RedeemCodeType
   value: number
+  subscription_plan_id?: number | null
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
   expires_at?: string | null
@@ -1870,9 +1876,6 @@ export interface UpdateUserRequest {
   rpm_limit?: number
   status?: 'active' | 'disabled'
   allowed_groups?: number[] | null
-  // 用户专属分组倍率配置 (group_id -> rate_multiplier | null)
-  // null 表示删除该分组的专属倍率
-  group_rates?: Record<number, number | null>
 }
 
 export interface ChangePasswordRequest {
@@ -1886,6 +1889,12 @@ export interface UserSubscription {
   id: number
   user_id: number
   group_id: number
+  subscription_plan_id?: number | null
+  plan_name_snapshot?: string
+  daily_limit_usd_snapshot?: number | null
+  weekly_limit_usd_snapshot?: number | null
+  monthly_limit_usd_snapshot?: number | null
+  rate_multiplier_snapshot?: number
   status: 'active' | 'expired' | 'revoked' | 'suspended'
   starts_at: string
   daily_usage_usd: number
@@ -1928,14 +1937,18 @@ export interface SubscriptionProgress {
 
 export interface AssignSubscriptionRequest {
   user_id: number
-  group_id: number
+  plan_id?: number
+  group_id?: number
   validity_days?: number
+  notes?: string
 }
 
 export interface BulkAssignSubscriptionRequest {
   user_ids: number[]
-  group_id: number
+  plan_id?: number
+  group_id?: number
   validity_days?: number
+  notes?: string
 }
 
 export interface ExtendSubscriptionRequest {

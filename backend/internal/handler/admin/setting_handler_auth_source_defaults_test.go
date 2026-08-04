@@ -206,6 +206,50 @@ func TestSettingHandler_UpdateSettings_PreservesOmittedAuthSourceDefaults(t *tes
 	require.Equal(t, true, data["force_email_on_third_party_signup"])
 }
 
+func TestSettingHandler_UpdateSettings_PersistsPlanDefaultSubscriptions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &settingHandlerRepoStub{
+		values: map[string]string{
+			service.SettingKeyPromoCodeEnabled: "true",
+		},
+	}
+	svc := service.NewSettingService(repo, &config.Config{Default: config.DefaultConfig{UserConcurrency: 5}})
+	handler := NewSettingHandler(svc, nil, nil, nil, nil, nil, nil)
+
+	body := map[string]any{
+		"promo_code_enabled": true,
+		"default_subscriptions": []map[string]any{{
+			"plan_id":       51,
+			"group_id":      9,
+			"validity_days": 30,
+		}},
+		"auth_source_default_github_subscriptions": []map[string]any{{
+			"plan_id":       52,
+			"group_id":      10,
+			"validity_days": 60,
+		}},
+		"auth_source_default_google_subscriptions": []map[string]any{{
+			"plan_id":       53,
+			"group_id":      11,
+			"validity_days": 90,
+		}},
+	}
+	rawBody, err := json.Marshal(body)
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(rawBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.UpdateSettings(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, `[{"plan_id":51}]`, repo.values[service.SettingKeyDefaultSubscriptions])
+	require.Equal(t, `[{"plan_id":52}]`, repo.values[service.SettingKeyAuthSourceDefaultGitHubSubscriptions])
+	require.Equal(t, `[{"plan_id":53}]`, repo.values[service.SettingKeyAuthSourceDefaultGoogleSubscriptions])
+}
+
 func TestSettingHandler_UpdateSettings_PersistsPaymentVisibleMethodsAndAdvancedScheduler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &settingHandlerRepoStub{

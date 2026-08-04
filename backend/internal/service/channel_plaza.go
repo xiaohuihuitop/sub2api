@@ -30,18 +30,17 @@ type PlazaModel struct {
 // 与 AvailableGroupRef 相比多了 Description 与 Models；Models 来自该分组关联渠道的
 // 支持模型（按分组平台隔离，防跨平台泄漏），与「可用渠道」页口径一致。
 type PlazaGroup struct {
-	ID                 int64
-	Name               string
-	Description        string
-	Platform           string
-	SubscriptionType   string
-	RateMultiplier     float64
-	PeakRateEnabled    bool
-	PeakStart          string
-	PeakEnd            string
-	PeakRateMultiplier float64
-	IsExclusive        bool
-	Models             []PlazaModel
+	ID                        int64
+	Name                      string
+	Description               string
+	Platform                  string
+	BalanceRateMultiplier     float64
+	BalancePeakRateEnabled    bool
+	BalancePeakStart          string
+	BalancePeakEnd            string
+	BalancePeakRateMultiplier float64
+	IsExclusive               bool
+	Models                    []PlazaModel
 }
 
 // ListPlazaGroups 返回模型广场数据：每个活跃分组附带其可用模型与定价。
@@ -74,17 +73,16 @@ func (s *ChannelService) ListPlazaGroups(ctx context.Context) ([]PlazaGroup, err
 	for i := range groups {
 		g := groups[i]
 		byGroup[g.ID] = &PlazaGroup{
-			ID:                 g.ID,
-			Name:               g.Name,
-			Description:        g.Description,
-			Platform:           g.Platform,
-			SubscriptionType:   g.SubscriptionType,
-			RateMultiplier:     g.RateMultiplier,
-			PeakRateEnabled:    g.PeakRateEnabled,
-			PeakStart:          g.PeakStart,
-			PeakEnd:            g.PeakEnd,
-			PeakRateMultiplier: g.PeakRateMultiplier,
-			IsExclusive:        g.IsExclusive,
+			ID:                        g.ID,
+			Name:                      g.Name,
+			Description:               g.Description,
+			Platform:                  g.Platform,
+			BalanceRateMultiplier:     g.RateMultiplier,
+			BalancePeakRateEnabled:    g.PeakRateEnabled,
+			BalancePeakStart:          g.PeakStart,
+			BalancePeakEnd:            g.PeakEnd,
+			BalancePeakRateMultiplier: g.PeakRateMultiplier,
+			IsExclusive:               g.IsExclusive,
 		}
 		order = append(order, g.ID)
 	}
@@ -147,8 +145,8 @@ func (s *ChannelService) ListPlazaGroups(ctx context.Context) ([]PlazaGroup, err
 	}
 
 	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].RateMultiplier != out[j].RateMultiplier {
-			return out[i].RateMultiplier < out[j].RateMultiplier
+		if out[i].BalanceRateMultiplier != out[j].BalanceRateMultiplier {
+			return out[i].BalanceRateMultiplier < out[j].BalanceRateMultiplier
 		}
 		return out[i].Name < out[j].Name
 	})

@@ -253,7 +253,7 @@ func parseMinutes(hhmm string) (int, bool) {
 //
 // 该方法是纯函数，不读取任何外部状态，便于单测。
 func (g *Group) PeakMultiplierAt(now time.Time) float64 {
-	if g == nil || !g.IsSubscriptionType() || !g.PeakRateEnabled || g.PeakStart == "" || g.PeakEnd == "" {
+	if g == nil || !g.PeakRateEnabled || g.PeakStart == "" || g.PeakEnd == "" {
 		return 1.0
 	}
 	start, ok1 := parseMinutes(g.PeakStart)
@@ -326,7 +326,7 @@ func NormalizePeakRateConfig(subscriptionType string, enabled bool, start, end s
 	return enabled, start, end, multiplier
 }
 
-// computePeakAwareMultipliers 把"基础 token 倍率 base"（已含系统/分组/用户级倍率，但不含高峰）
+// computePeakAwareMultipliers 把"基础 token 倍率 base"（来自套餐快照或余额计费资料，但不含高峰）
 // 拆分为最终 token 倍率与图片按次倍率：图片按次倍率基于 base 现算、不受高峰影响；token 倍率在 base 上叠加高峰因子。
 // gateway_service.recordUsageCore 与 openai_gateway_service.RecordUsage 共用此函数，
 // 锁死"高峰因子只乘入 token 倍率、图片按次倍率不受影响"这一叠加顺序——任何调换都会被 group_peak_rate_test 覆盖。

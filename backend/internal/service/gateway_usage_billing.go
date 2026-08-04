@@ -12,6 +12,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 )
 
+// getUserGroupRateMultiplier is retained for legacy compatibility. RecordUsage
+// now selects its multiplier from BillingProfile or a subscription snapshot.
 func (s *GatewayService) getUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
 	if s == nil {
 		return groupDefaultMultiplier
@@ -29,7 +31,7 @@ func (s *GatewayService) getUserGroupRateMultiplier(ctx context.Context, userID,
 	return resolver.Resolve(ctx, userID, groupID, groupDefaultMultiplier)
 }
 
-// ResolveUserGroupRateMultiplier resolves the same cached multiplier used by usage billing.
+// ResolveUserGroupRateMultiplier exposes the legacy compatibility helper.
 func (s *GatewayService) ResolveUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
 	return s.getUserGroupRateMultiplier(ctx, userID, groupID, groupDefaultMultiplier)
 }
@@ -138,13 +140,13 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 	cost := p.Cost
 
 	if p.IsSubscriptionBill {
-		// Subscription usage tracked by ActualCost so group rate multiplier
+		// Subscription usage tracks ActualCost so the plan snapshot multiplier
 		// consumes the quota at the expected speed.
 		if cost.ActualCost > 0 {
 			if err := deps.userSubRepo.IncrementUsage(billingCtx, p.Subscription.ID, cost.ActualCost); err != nil {
 				slog.Error("increment subscription usage failed", "subscription_id", p.Subscription.ID, "error", err)
-			} else if deps.billingCacheService != nil && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
-				deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, cost.ActualCost)
+			} else if deps.billingCacheService != nil && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil && p.Subscription != nil {
+				deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Subscription.ID, cost.ActualCost)
 			}
 		}
 	} else {
@@ -266,9 +268,9 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 		}
 	}
 
-	// Record subscription / balance cost using ActualCost so the group (and any
-	// user-specific) rate multiplier consumes subscription quota at the expected
-	// speed. TotalCost remains the raw (pre-multiplier) value; downstream guards
+	// Record subscription / balance cost using ActualCost so the selected billing
+	// multiplier consumes subscription quota at the expected speed. TotalCost
+	// remains the raw (pre-multiplier) value; downstream guards
 	// on "> 0" still correctly skip free subscriptions (RateMultiplier == 0).
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
 		cmd.SubscriptionID = &p.Subscription.ID
@@ -331,8 +333,8 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 	}
 
 	if p.IsSubscriptionBill {
-		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.ActualCost)
+		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil && p.Subscription != nil {
+			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Subscription.ID, p.Cost.ActualCost)
 		}
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
 		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
@@ -676,18 +678,12 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		cacheTTLOverridden = (result.Usage.CacheCreation5mTokens + result.Usage.CacheCreation1hTokens) > 0
 	}
 
-	// 获取费率倍数（优先级：用户专属 > 分组默认 > 系统默认）
-	multiplier := 1.0
+	// 套餐实例倍率优先于余额计费资料；余额请求才读取分组倍率。
+	fallbackMultiplier := 1.0
 	if s.cfg != nil {
-		multiplier = s.cfg.Default.RateMultiplier
+		fallbackMultiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
-		groupDefault := apiKey.Group.RateMultiplier
-		multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, groupDefault)
-	}
-	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
-	// 不并入上面的 getUserGroupRateMultiplier，以免污染 user:group 倍率缓存。
-	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, multiplier, timezone.Now())
+	multiplier, imageMultiplier, _ := resolveBillingMultipliers(apiKey, subscription, fallbackMultiplier, timezone.Now())
 
 	// 确定计费模型
 	concreteBillingModel := forwardResultBillingModel(result.Model, result.UpstreamModel)
@@ -719,7 +715,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	cost := s.calculateRecordUsageCost(ctx, result, apiKey, billingModel, multiplier, imageMultiplier, opts)
 
 	// 判断计费方式：订阅模式 vs 余额模式
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	isSubscriptionBilling := subscription != nil
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
 		billingType = BillingTypeSubscription

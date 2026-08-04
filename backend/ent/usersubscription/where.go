@@ -80,6 +80,36 @@ func GroupID(v int64) predicate.UserSubscription {
 	return predicate.UserSubscription(sql.FieldEQ(FieldGroupID, v))
 }
 
+// SubscriptionPlanID applies equality check predicate on the "subscription_plan_id" field. It's identical to SubscriptionPlanIDEQ.
+func SubscriptionPlanID(v int64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldSubscriptionPlanID, v))
+}
+
+// PlanNameSnapshot applies equality check predicate on the "plan_name_snapshot" field. It's identical to PlanNameSnapshotEQ.
+func PlanNameSnapshot(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldPlanNameSnapshot, v))
+}
+
+// DailyLimitUsdSnapshot applies equality check predicate on the "daily_limit_usd_snapshot" field. It's identical to DailyLimitUsdSnapshotEQ.
+func DailyLimitUsdSnapshot(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldDailyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshot applies equality check predicate on the "weekly_limit_usd_snapshot" field. It's identical to WeeklyLimitUsdSnapshotEQ.
+func WeeklyLimitUsdSnapshot(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshot applies equality check predicate on the "monthly_limit_usd_snapshot" field. It's identical to MonthlyLimitUsdSnapshotEQ.
+func MonthlyLimitUsdSnapshot(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// RateMultiplierSnapshot applies equality check predicate on the "rate_multiplier_snapshot" field. It's identical to RateMultiplierSnapshotEQ.
+func RateMultiplierSnapshot(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldRateMultiplierSnapshot, v))
+}
+
 // StartsAt applies equality check predicate on the "starts_at" field. It's identical to StartsAtEQ.
 func StartsAt(v time.Time) predicate.UserSubscription {
 	return predicate.UserSubscription(sql.FieldEQ(FieldStartsAt, v))
@@ -308,6 +338,291 @@ func GroupIDIn(vs ...int64) predicate.UserSubscription {
 // GroupIDNotIn applies the NotIn predicate on the "group_id" field.
 func GroupIDNotIn(vs ...int64) predicate.UserSubscription {
 	return predicate.UserSubscription(sql.FieldNotIn(FieldGroupID, vs...))
+}
+
+// SubscriptionPlanIDEQ applies the EQ predicate on the "subscription_plan_id" field.
+func SubscriptionPlanIDEQ(v int64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldSubscriptionPlanID, v))
+}
+
+// SubscriptionPlanIDNEQ applies the NEQ predicate on the "subscription_plan_id" field.
+func SubscriptionPlanIDNEQ(v int64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldSubscriptionPlanID, v))
+}
+
+// SubscriptionPlanIDIn applies the In predicate on the "subscription_plan_id" field.
+func SubscriptionPlanIDIn(vs ...int64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIn(FieldSubscriptionPlanID, vs...))
+}
+
+// SubscriptionPlanIDNotIn applies the NotIn predicate on the "subscription_plan_id" field.
+func SubscriptionPlanIDNotIn(vs ...int64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotIn(FieldSubscriptionPlanID, vs...))
+}
+
+// SubscriptionPlanIDIsNil applies the IsNil predicate on the "subscription_plan_id" field.
+func SubscriptionPlanIDIsNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIsNull(FieldSubscriptionPlanID))
+}
+
+// SubscriptionPlanIDNotNil applies the NotNil predicate on the "subscription_plan_id" field.
+func SubscriptionPlanIDNotNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotNull(FieldSubscriptionPlanID))
+}
+
+// PlanNameSnapshotEQ applies the EQ predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotEQ(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotNEQ applies the NEQ predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotNEQ(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotIn applies the In predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotIn(vs ...string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIn(FieldPlanNameSnapshot, vs...))
+}
+
+// PlanNameSnapshotNotIn applies the NotIn predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotNotIn(vs ...string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotIn(FieldPlanNameSnapshot, vs...))
+}
+
+// PlanNameSnapshotGT applies the GT predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotGT(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGT(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotGTE applies the GTE predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotGTE(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGTE(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotLT applies the LT predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotLT(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLT(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotLTE applies the LTE predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotLTE(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLTE(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotContains applies the Contains predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotContains(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldContains(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotHasPrefix applies the HasPrefix predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotHasPrefix(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldHasPrefix(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotHasSuffix applies the HasSuffix predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotHasSuffix(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldHasSuffix(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotEqualFold applies the EqualFold predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotEqualFold(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEqualFold(FieldPlanNameSnapshot, v))
+}
+
+// PlanNameSnapshotContainsFold applies the ContainsFold predicate on the "plan_name_snapshot" field.
+func PlanNameSnapshotContainsFold(v string) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldContainsFold(FieldPlanNameSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotEQ applies the EQ predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldDailyLimitUsdSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotNEQ applies the NEQ predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotNEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldDailyLimitUsdSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotIn applies the In predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIn(FieldDailyLimitUsdSnapshot, vs...))
+}
+
+// DailyLimitUsdSnapshotNotIn applies the NotIn predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotNotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotIn(FieldDailyLimitUsdSnapshot, vs...))
+}
+
+// DailyLimitUsdSnapshotGT applies the GT predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotGT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGT(FieldDailyLimitUsdSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotGTE applies the GTE predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotGTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGTE(FieldDailyLimitUsdSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotLT applies the LT predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotLT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLT(FieldDailyLimitUsdSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotLTE applies the LTE predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotLTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLTE(FieldDailyLimitUsdSnapshot, v))
+}
+
+// DailyLimitUsdSnapshotIsNil applies the IsNil predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotIsNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIsNull(FieldDailyLimitUsdSnapshot))
+}
+
+// DailyLimitUsdSnapshotNotNil applies the NotNil predicate on the "daily_limit_usd_snapshot" field.
+func DailyLimitUsdSnapshotNotNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotNull(FieldDailyLimitUsdSnapshot))
+}
+
+// WeeklyLimitUsdSnapshotEQ applies the EQ predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshotNEQ applies the NEQ predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotNEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshotIn applies the In predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIn(FieldWeeklyLimitUsdSnapshot, vs...))
+}
+
+// WeeklyLimitUsdSnapshotNotIn applies the NotIn predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotNotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotIn(FieldWeeklyLimitUsdSnapshot, vs...))
+}
+
+// WeeklyLimitUsdSnapshotGT applies the GT predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotGT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGT(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshotGTE applies the GTE predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotGTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGTE(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshotLT applies the LT predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotLT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLT(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshotLTE applies the LTE predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotLTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLTE(FieldWeeklyLimitUsdSnapshot, v))
+}
+
+// WeeklyLimitUsdSnapshotIsNil applies the IsNil predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotIsNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIsNull(FieldWeeklyLimitUsdSnapshot))
+}
+
+// WeeklyLimitUsdSnapshotNotNil applies the NotNil predicate on the "weekly_limit_usd_snapshot" field.
+func WeeklyLimitUsdSnapshotNotNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotNull(FieldWeeklyLimitUsdSnapshot))
+}
+
+// MonthlyLimitUsdSnapshotEQ applies the EQ predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshotNEQ applies the NEQ predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotNEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshotIn applies the In predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIn(FieldMonthlyLimitUsdSnapshot, vs...))
+}
+
+// MonthlyLimitUsdSnapshotNotIn applies the NotIn predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotNotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotIn(FieldMonthlyLimitUsdSnapshot, vs...))
+}
+
+// MonthlyLimitUsdSnapshotGT applies the GT predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotGT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGT(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshotGTE applies the GTE predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotGTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGTE(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshotLT applies the LT predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotLT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLT(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshotLTE applies the LTE predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotLTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLTE(FieldMonthlyLimitUsdSnapshot, v))
+}
+
+// MonthlyLimitUsdSnapshotIsNil applies the IsNil predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotIsNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIsNull(FieldMonthlyLimitUsdSnapshot))
+}
+
+// MonthlyLimitUsdSnapshotNotNil applies the NotNil predicate on the "monthly_limit_usd_snapshot" field.
+func MonthlyLimitUsdSnapshotNotNil() predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotNull(FieldMonthlyLimitUsdSnapshot))
+}
+
+// RateMultiplierSnapshotEQ applies the EQ predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldRateMultiplierSnapshot, v))
+}
+
+// RateMultiplierSnapshotNEQ applies the NEQ predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotNEQ(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldRateMultiplierSnapshot, v))
+}
+
+// RateMultiplierSnapshotIn applies the In predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldIn(FieldRateMultiplierSnapshot, vs...))
+}
+
+// RateMultiplierSnapshotNotIn applies the NotIn predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotNotIn(vs ...float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNotIn(FieldRateMultiplierSnapshot, vs...))
+}
+
+// RateMultiplierSnapshotGT applies the GT predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotGT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGT(FieldRateMultiplierSnapshot, v))
+}
+
+// RateMultiplierSnapshotGTE applies the GTE predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotGTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldGTE(FieldRateMultiplierSnapshot, v))
+}
+
+// RateMultiplierSnapshotLT applies the LT predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotLT(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLT(FieldRateMultiplierSnapshot, v))
+}
+
+// RateMultiplierSnapshotLTE applies the LTE predicate on the "rate_multiplier_snapshot" field.
+func RateMultiplierSnapshotLTE(v float64) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldLTE(FieldRateMultiplierSnapshot, v))
 }
 
 // StartsAtEQ applies the EQ predicate on the "starts_at" field.
@@ -908,6 +1223,29 @@ func HasGroup() predicate.UserSubscription {
 func HasGroupWith(preds ...predicate.Group) predicate.UserSubscription {
 	return predicate.UserSubscription(func(s *sql.Selector) {
 		step := newGroupStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasSubscriptionPlan applies the HasEdge predicate on the "subscription_plan" edge.
+func HasSubscriptionPlan() predicate.UserSubscription {
+	return predicate.UserSubscription(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, SubscriptionPlanTable, SubscriptionPlanColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSubscriptionPlanWith applies the HasEdge predicate on the "subscription_plan" edge with a given conditions (other predicates).
+func HasSubscriptionPlanWith(preds ...predicate.SubscriptionPlan) predicate.UserSubscription {
+	return predicate.UserSubscription(func(s *sql.Selector) {
+		step := newSubscriptionPlanStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

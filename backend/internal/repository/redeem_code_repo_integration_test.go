@@ -355,6 +355,40 @@ func (s *RedeemCodeRepoSuite) TestBatchUpdate_UsedCodeRejectsSensitiveFields() {
 	s.Require().Equal(service.StatusUsed, got.Status)
 }
 
+func (s *RedeemCodeRepoSuite) TestBatchUpdate_RejectsGroupChangeForSubscriptionPlanSnapshot() {
+	sourceGroup := s.createGroup(uniqueTestValue(s.T(), "snapshot-source"))
+	targetGroup := s.createGroup(uniqueTestValue(s.T(), "snapshot-target"))
+	plan, err := s.client.SubscriptionPlan.Create().
+		SetGroupID(sourceGroup.ID).
+		SetName(uniqueTestValue(s.T(), "snapshot-plan")).
+		SetPrice(10).
+		Save(s.ctx)
+	s.Require().NoError(err)
+
+	planID := plan.ID
+	sourceGroupID := sourceGroup.ID
+	code := &service.RedeemCode{
+		Code:               uniqueTestValue(s.T(), "snapshot-code"),
+		Type:               service.RedeemTypeSubscription,
+		Status:             service.StatusUnused,
+		SubscriptionPlanID: &planID,
+		PlanNameSnapshot:   plan.Name,
+		GroupID:            &sourceGroupID,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, code))
+
+	targetGroupID := targetGroup.ID
+	_, err = s.repo.BatchUpdate(s.ctx, []int64{code.ID}, service.RedeemCodeBatchUpdateFields{
+		GroupID: service.NullableInt64Update{Set: true, Value: &targetGroupID},
+	})
+	s.Require().ErrorIs(err, service.ErrRedeemCodeSubscriptionTermsImmutable)
+
+	got, getErr := s.repo.GetByID(s.ctx, code.ID)
+	s.Require().NoError(getErr)
+	s.Require().NotNil(got.GroupID)
+	s.Require().Equal(sourceGroupID, *got.GroupID)
+}
+
 // --- Use ---
 
 func (s *RedeemCodeRepoSuite) TestUse() {

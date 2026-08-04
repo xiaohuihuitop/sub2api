@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendAuthSourceDefaultsToUpdateRequest,
   buildAuthSourceDefaultsState,
+  normalizeDefaultSubscriptionSettings,
   normalizePlatformQuotasMap,
   sanitizePlatformQuotasMap,
   type UpdateSettingsRequest,
@@ -19,6 +20,16 @@ const allNullQuotas: DefaultPlatformQuotasMap = {
 }
 
 describe("admin settings auth source defaults helpers", () => {
+  it("keeps plan defaults separate from legacy group defaults", () => {
+    expect(normalizeDefaultSubscriptionSettings([
+      { plan_id: 42, group_id: 9, validity_days: 30 },
+      { group_id: 5, validity_days: 7 },
+    ])).toEqual([
+      { plan_id: 42 },
+      { group_id: 5, validity_days: 7 },
+    ])
+  })
+
   it("builds auth source defaults state from flat settings fields", () => {
     const state = buildAuthSourceDefaultsState({
       auth_source_default_email_balance: 9.5,

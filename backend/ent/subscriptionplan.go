@@ -41,11 +41,51 @@ type SubscriptionPlan struct {
 	ForSale bool `json:"for_sale,omitempty"`
 	// SortOrder holds the value of the "sort_order" field.
 	SortOrder int `json:"sort_order,omitempty"`
+	// DailyLimitUsd holds the value of the "daily_limit_usd" field.
+	DailyLimitUsd *float64 `json:"daily_limit_usd,omitempty"`
+	// WeeklyLimitUsd holds the value of the "weekly_limit_usd" field.
+	WeeklyLimitUsd *float64 `json:"weekly_limit_usd,omitempty"`
+	// MonthlyLimitUsd holds the value of the "monthly_limit_usd" field.
+	MonthlyLimitUsd *float64 `json:"monthly_limit_usd,omitempty"`
+	// RateMultiplier holds the value of the "rate_multiplier" field.
+	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the SubscriptionPlanQuery when eager-loading is set.
+	Edges        SubscriptionPlanEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// SubscriptionPlanEdges holds the relations/edges for other nodes in the graph.
+type SubscriptionPlanEdges struct {
+	// Subscriptions holds the value of the subscriptions edge.
+	Subscriptions []*UserSubscription `json:"subscriptions,omitempty"`
+	// RedeemCodes holds the value of the redeem_codes edge.
+	RedeemCodes []*RedeemCode `json:"redeem_codes,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [2]bool
+}
+
+// SubscriptionsOrErr returns the Subscriptions value or an error if the edge
+// was not loaded in eager-loading.
+func (e SubscriptionPlanEdges) SubscriptionsOrErr() ([]*UserSubscription, error) {
+	if e.loadedTypes[0] {
+		return e.Subscriptions, nil
+	}
+	return nil, &NotLoadedError{edge: "subscriptions"}
+}
+
+// RedeemCodesOrErr returns the RedeemCodes value or an error if the edge
+// was not loaded in eager-loading.
+func (e SubscriptionPlanEdges) RedeemCodesOrErr() ([]*RedeemCode, error) {
+	if e.loadedTypes[1] {
+		return e.RedeemCodes, nil
+	}
+	return nil, &NotLoadedError{edge: "redeem_codes"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -55,7 +95,7 @@ func (*SubscriptionPlan) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case subscriptionplan.FieldForSale:
 			values[i] = new(sql.NullBool)
-		case subscriptionplan.FieldPrice, subscriptionplan.FieldOriginalPrice:
+		case subscriptionplan.FieldPrice, subscriptionplan.FieldOriginalPrice, subscriptionplan.FieldDailyLimitUsd, subscriptionplan.FieldWeeklyLimitUsd, subscriptionplan.FieldMonthlyLimitUsd, subscriptionplan.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
 		case subscriptionplan.FieldID, subscriptionplan.FieldGroupID, subscriptionplan.FieldValidityDays, subscriptionplan.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
@@ -157,6 +197,33 @@ func (_m *SubscriptionPlan) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.SortOrder = int(value.Int64)
 			}
+		case subscriptionplan.FieldDailyLimitUsd:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field daily_limit_usd", values[i])
+			} else if value.Valid {
+				_m.DailyLimitUsd = new(float64)
+				*_m.DailyLimitUsd = value.Float64
+			}
+		case subscriptionplan.FieldWeeklyLimitUsd:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_limit_usd", values[i])
+			} else if value.Valid {
+				_m.WeeklyLimitUsd = new(float64)
+				*_m.WeeklyLimitUsd = value.Float64
+			}
+		case subscriptionplan.FieldMonthlyLimitUsd:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field monthly_limit_usd", values[i])
+			} else if value.Valid {
+				_m.MonthlyLimitUsd = new(float64)
+				*_m.MonthlyLimitUsd = value.Float64
+			}
+		case subscriptionplan.FieldRateMultiplier:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.RateMultiplier = value.Float64
+			}
 		case subscriptionplan.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -180,6 +247,16 @@ func (_m *SubscriptionPlan) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (_m *SubscriptionPlan) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QuerySubscriptions queries the "subscriptions" edge of the SubscriptionPlan entity.
+func (_m *SubscriptionPlan) QuerySubscriptions() *UserSubscriptionQuery {
+	return NewSubscriptionPlanClient(_m.config).QuerySubscriptions(_m)
+}
+
+// QueryRedeemCodes queries the "redeem_codes" edge of the SubscriptionPlan entity.
+func (_m *SubscriptionPlan) QueryRedeemCodes() *RedeemCodeQuery {
+	return NewSubscriptionPlanClient(_m.config).QueryRedeemCodes(_m)
 }
 
 // Update returns a builder for updating this SubscriptionPlan.
@@ -242,6 +319,24 @@ func (_m *SubscriptionPlan) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("sort_order=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))
+	builder.WriteString(", ")
+	if v := _m.DailyLimitUsd; v != nil {
+		builder.WriteString("daily_limit_usd=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.WeeklyLimitUsd; v != nil {
+		builder.WriteString("weekly_limit_usd=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MonthlyLimitUsd; v != nil {
+		builder.WriteString("monthly_limit_usd=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplier))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

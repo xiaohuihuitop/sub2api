@@ -122,6 +122,7 @@ function checkoutInfoWithPlansFixture(options: {
   checkout?: Partial<CheckoutInfoResponse>
   method?: Partial<MethodLimit>
   plan?: Partial<SubscriptionPlan>
+  plans?: SubscriptionPlan[]
 } = {}) {
   const base = checkoutInfoFixture(options.checkout).data
   const plan: SubscriptionPlan = {
@@ -155,7 +156,7 @@ function checkoutInfoWithPlansFixture(options: {
           ...options.method,
         },
       },
-      plans: [plan],
+      plans: options.plans ?? [plan],
     },
   }
 }
@@ -200,13 +201,13 @@ function oauthOrderFixture() {
   }
 }
 
-async function mountSubscriptionConfirm(options: Parameters<typeof checkoutInfoWithPlansFixture>[0] = {}) {
+async function mountSubscriptionConfirm(
+  options: Parameters<typeof checkoutInfoWithPlansFixture>[0] = {},
+  query: Record<string, string> = { tab: 'subscription', group: '3' },
+) {
   vi.useRealTimers()
   routeState.path = '/purchase'
-  routeState.query = {
-    tab: 'subscription',
-    group: '3',
-  }
+  routeState.query = query
   routerReplace.mockReset().mockResolvedValue(undefined)
   routerPush.mockReset().mockResolvedValue(undefined)
   routerResolve.mockClear()
@@ -293,6 +294,19 @@ describe('PaymentView subscription plan grid', () => {
 })
 
 describe('PaymentView subscription confirmation amounts', () => {
+  it('selects the exact plan from a renewal URL before falling back to its group', async () => {
+    const firstPlan = checkoutInfoWithPlansFixture().data.plans[0]
+    const wrapper = await mountSubscriptionConfirm({
+      plans: [
+        { ...firstPlan, id: 7, name: 'First plan' },
+        { ...firstPlan, id: 8, name: 'Exact renewal plan' },
+      ],
+    }, { tab: 'subscription', plan: '8' })
+
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
+    expect(wrapper.text()).toContain('Exact renewal plan')
+  })
+
   it('shows converted CNY pay amount using the subscription rate, not the balance multiplier', async () => {
     const wrapper = await mountSubscriptionConfirm({
       checkout: {

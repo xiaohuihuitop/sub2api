@@ -326,8 +326,9 @@ export default {
         defaultSubscriptionsHint: 'Auto-assign these subscriptions when a new user is created or registered',
         addDefaultSubscription: 'Add Default Subscription',
         defaultSubscriptionsEmpty: 'No default subscriptions configured.',
-        defaultSubscriptionsDuplicate:
-          'Duplicate subscription group: {groupId}. Each group can only appear once.',
+        defaultSubscriptionsDuplicate: 'Duplicate default subscription: {reference}.',
+        subscriptionPlan: 'Subscription Plan',
+        legacySubscription: 'Legacy configuration: group #{groupId}, {days} days',
         subscriptionGroup: 'Subscription Group',
         subscriptionValidityDays: 'Validity (days)',
         defaultPlatformQuotas: 'Default Platform Quotas (on signup)',

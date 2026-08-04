@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -37,12 +38,38 @@ const (
 	FieldForSale = "for_sale"
 	// FieldSortOrder holds the string denoting the sort_order field in the database.
 	FieldSortOrder = "sort_order"
+	// FieldDailyLimitUsd holds the string denoting the daily_limit_usd field in the database.
+	FieldDailyLimitUsd = "daily_limit_usd"
+	// FieldWeeklyLimitUsd holds the string denoting the weekly_limit_usd field in the database.
+	FieldWeeklyLimitUsd = "weekly_limit_usd"
+	// FieldMonthlyLimitUsd holds the string denoting the monthly_limit_usd field in the database.
+	FieldMonthlyLimitUsd = "monthly_limit_usd"
+	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
+	FieldRateMultiplier = "rate_multiplier"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeSubscriptions holds the string denoting the subscriptions edge name in mutations.
+	EdgeSubscriptions = "subscriptions"
+	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
+	EdgeRedeemCodes = "redeem_codes"
 	// Table holds the table name of the subscriptionplan in the database.
 	Table = "subscription_plans"
+	// SubscriptionsTable is the table that holds the subscriptions relation/edge.
+	SubscriptionsTable = "user_subscriptions"
+	// SubscriptionsInverseTable is the table name for the UserSubscription entity.
+	// It exists in this package in order to avoid circular dependency with the "usersubscription" package.
+	SubscriptionsInverseTable = "user_subscriptions"
+	// SubscriptionsColumn is the table column denoting the subscriptions relation/edge.
+	SubscriptionsColumn = "subscription_plan_id"
+	// RedeemCodesTable is the table that holds the redeem_codes relation/edge.
+	RedeemCodesTable = "redeem_codes"
+	// RedeemCodesInverseTable is the table name for the RedeemCode entity.
+	// It exists in this package in order to avoid circular dependency with the "redeemcode" package.
+	RedeemCodesInverseTable = "redeem_codes"
+	// RedeemCodesColumn is the table column denoting the redeem_codes relation/edge.
+	RedeemCodesColumn = "subscription_plan_id"
 )
 
 // Columns holds all SQL columns for subscriptionplan fields.
@@ -60,6 +87,10 @@ var Columns = []string{
 	FieldProductName,
 	FieldForSale,
 	FieldSortOrder,
+	FieldDailyLimitUsd,
+	FieldWeeklyLimitUsd,
+	FieldMonthlyLimitUsd,
+	FieldRateMultiplier,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -99,6 +130,8 @@ var (
 	DefaultForSale bool
 	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
 	DefaultSortOrder int
+	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
+	DefaultRateMultiplier float64
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -175,6 +208,26 @@ func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSortOrder, opts...).ToFunc()
 }
 
+// ByDailyLimitUsd orders the results by the daily_limit_usd field.
+func ByDailyLimitUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDailyLimitUsd, opts...).ToFunc()
+}
+
+// ByWeeklyLimitUsd orders the results by the weekly_limit_usd field.
+func ByWeeklyLimitUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyLimitUsd, opts...).ToFunc()
+}
+
+// ByMonthlyLimitUsd orders the results by the monthly_limit_usd field.
+func ByMonthlyLimitUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMonthlyLimitUsd, opts...).ToFunc()
+}
+
+// ByRateMultiplier orders the results by the rate_multiplier field.
+func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
+}
+
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
@@ -183,4 +236,46 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// BySubscriptionsCount orders the results by subscriptions count.
+func BySubscriptionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newSubscriptionsStep(), opts...)
+	}
+}
+
+// BySubscriptions orders the results by subscriptions terms.
+func BySubscriptions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSubscriptionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByRedeemCodesCount orders the results by redeem_codes count.
+func ByRedeemCodesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRedeemCodesStep(), opts...)
+	}
+}
+
+// ByRedeemCodes orders the results by redeem_codes terms.
+func ByRedeemCodes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRedeemCodesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newSubscriptionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SubscriptionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, SubscriptionsTable, SubscriptionsColumn),
+	)
+}
+func newRedeemCodesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RedeemCodesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RedeemCodesTable, RedeemCodesColumn),
+	)
 }

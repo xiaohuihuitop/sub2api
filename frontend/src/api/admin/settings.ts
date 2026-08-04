@@ -12,8 +12,9 @@ import type {
 } from "@/types";
 
 export interface DefaultSubscriptionSetting {
-  group_id: number;
-  validity_days: number;
+  plan_id?: number;
+  group_id?: number;
+  validity_days?: number;
 }
 
 // ── 平台限额类型 ──────────────────────────────────────────────────
@@ -197,15 +198,23 @@ export function normalizeDefaultSubscriptionSettings(
 ): DefaultSubscriptionSetting[] {
   if (!Array.isArray(subscriptions)) return [];
 
-  return subscriptions
-    .filter((item) => item.group_id > 0 && item.validity_days > 0)
-    .map((item) => ({
-      group_id: Math.floor(item.group_id),
-      validity_days: Math.min(
-        36500,
-        Math.max(1, Math.floor(item.validity_days)),
-      ),
-    }));
+  return subscriptions.flatMap<DefaultSubscriptionSetting>((item): DefaultSubscriptionSetting[] => {
+    const planID = Math.floor(Number(item.plan_id));
+    if (Number.isFinite(planID) && planID > 0) {
+      return [{ plan_id: planID }];
+    }
+
+    const groupID = Math.floor(Number(item.group_id));
+    const validityDays = Math.floor(Number(item.validity_days));
+    if (!Number.isFinite(groupID) || groupID <= 0 || !Number.isFinite(validityDays) || validityDays <= 0) {
+      return [];
+    }
+
+    return [{
+      group_id: groupID,
+      validity_days: Math.min(36500, Math.max(1, validityDays)),
+    }];
+  });
 }
 
 export function buildAuthSourceDefaultsState(

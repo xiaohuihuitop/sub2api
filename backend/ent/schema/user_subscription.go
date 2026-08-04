@@ -37,6 +37,27 @@ func (UserSubscription) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("user_id"),
 		field.Int64("group_id"),
+		field.Int64("subscription_plan_id").
+			Optional().
+			Nillable(),
+		field.String("plan_name_snapshot").
+			MaxLen(100).
+			Default(""),
+		field.Float("daily_limit_usd_snapshot").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("weekly_limit_usd_snapshot").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("monthly_limit_usd_snapshot").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("rate_multiplier_snapshot").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			Default(1.0),
 
 		field.Time("starts_at").
 			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
@@ -94,6 +115,10 @@ func (UserSubscription) Edges() []ent.Edge {
 			Field("group_id").
 			Unique().
 			Required(),
+		edge.From("subscription_plan", SubscriptionPlan.Type).
+			Ref("subscriptions").
+			Field("subscription_plan_id").
+			Unique(),
 		edge.From("assigned_by_user", User.Type).
 			Ref("assigned_subscriptions").
 			Field("assigned_by").
@@ -111,9 +136,12 @@ func (UserSubscription) Indexes() []ent.Index {
 		// 活跃订阅查询复合索引（线上由 SQL 迁移创建部分索引，schema 仅用于模型可读性对齐）
 		index.Fields("user_id", "status", "expires_at"),
 		index.Fields("assigned_by"),
-		// 唯一约束通过部分索引实现（WHERE deleted_at IS NULL），支持软删除后重新订阅
-		// 见迁移文件 016_soft_delete_partial_unique_indexes.sql
-		index.Fields("user_id", "group_id"),
+		// 活跃候选按用户、分组、状态、到期和创建时间排序；迁移 192 移除了
+		// 旧的活跃用户/分组唯一索引，以支持同一分组的并行订阅实例。
+		index.Fields("user_id", "group_id", "status", "expires_at", "created_at").
+			StorageKey("idx_user_subscriptions_active_candidates").
+			Annotations(entsql.IndexWhere("deleted_at IS NULL")),
+		index.Fields("subscription_plan_id"),
 		index.Fields("deleted_at"),
 	}
 }

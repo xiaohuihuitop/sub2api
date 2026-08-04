@@ -12,7 +12,7 @@ export interface UserAvailableGroup {
   platform: string
   /** 'standard' | 'subscription' — 订阅分组视觉加深，和 API 密钥页保持一致。 */
   subscription_type: string
-  /** 分组默认倍率。用户专属倍率（若有）通过 /groups/rates 获取后在前端 join。 */
+  /** 余额计费资料倍率；不会叠加用户专属倍率。 */
   rate_multiplier: number
   peak_rate_enabled: boolean
   peak_start: string

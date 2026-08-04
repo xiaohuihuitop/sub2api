@@ -1,0 +1,168 @@
+name: My2 Preview Release
+
+on:
+  push:
+    tags:
+      - 'my2-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'My2 preview tag (for example, my2-v0.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: my2-preview-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Resolve preview metadata
+        id: metadata
+        shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="$INPUT_TAG"
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
+
+          case "$TAG_NAME" in
+            my2-v*) ;;
+            *)
+              echo "Expected a my2-v<version> tag, got: $TAG_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          VERSION="${TAG_NAME#my2-v}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache-dependency-path: backend/go.sum
+
+      - name: Build embedded server
+        shell: bash
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p .release/my2
+          printf '%s\n' "$VERSION" > backend/cmd/server/VERSION
+          go build -C backend -tags=embed -trimpath \
+            -ldflags "-s -w -X main.Commit=${GITHUB_SHA} -X main.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.BuildType=my2" \
+            -o ../.release/my2/sub2api ./cmd/server
+
+      - name: Prepare Docker build context
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .release/my2/backend/resources .release/my2/deploy
+          cp Dockerfile.goreleaser .release/my2/Dockerfile
+          cp -R backend/resources/. .release/my2/backend/resources/
+          cp deploy/docker-entrypoint.sh .release/my2/deploy/docker-entrypoint.sh
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish my2 image
+        shell: bash
+        env:
+          IMAGE: ${{ steps.metadata.outputs.image }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/amd64 --pull --load \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            -f .release/my2/Dockerfile \
+            -t "sub2api:my2-latest" \
+            -t "sub2api:my2-$VERSION" \
+            -t "$IMAGE:my2-latest" \
+            -t "$IMAGE:my2-$VERSION" \
+            .release/my2
+          docker push "$IMAGE:my2-latest"
+          docker push "$IMAGE:my2-$VERSION"
+
+      - name: Create offline Docker package
+        shell: bash
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker save "sub2api:my2-latest" "sub2api:my2-$VERSION" | gzip -9 > sub2api_my2_latest.tar
+          sha256sum sub2api_my2_latest.tar > sub2api_my2_latest.tar.sha256
+
+      - name: Publish my2 prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.tag_name }}
+          name: Sub2API My2 ${{ steps.metadata.outputs.version }}
+          prerelease: true
+          body: |
+            My2 test channel. This release does not replace the stable `latest` image.
+
+            Docker image:
+            ```bash
+            docker pull ${{ steps.metadata.outputs.image }}:my2-${{ steps.metadata.outputs.version }}
+            ```
+
+            Offline package:
+            ```bash
+            docker load -i sub2api_my2_latest.tar
+            # Use sub2api:my2-latest in the test deployment.
+            ```
+          files: |
+            sub2api_my2_latest.tar
+            sub2api_my2_latest.tar.sha256

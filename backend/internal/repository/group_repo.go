@@ -122,7 +122,35 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 	groupIn.ID = created.ID
 	groupIn.CreatedAt = created.CreatedAt
 	groupIn.UpdatedAt = created.UpdatedAt
+	if err := createBillingProfileRecord(ctx, client, groupIn); err != nil {
+		return fmt.Errorf("create billing profile: %w", err)
+	}
 	return nil
+}
+
+func createBillingProfileRecord(ctx context.Context, client *dbent.Client, groupIn *service.Group) error {
+	_, err := client.BillingProfile.Create().
+		SetGroupID(groupIn.ID).
+		SetBalanceRateMultiplier(groupIn.RateMultiplier).
+		SetPeakRateEnabled(groupIn.PeakRateEnabled).
+		SetPeakStart(groupIn.PeakStart).
+		SetPeakEnd(groupIn.PeakEnd).
+		SetPeakRateMultiplier(groupIn.PeakRateMultiplier).
+		SetImageRateIndependent(groupIn.ImageRateIndependent).
+		SetImageRateMultiplier(groupIn.ImageRateMultiplier).
+		SetNillableImagePrice1k(groupIn.ImagePrice1K).
+		SetNillableImagePrice2k(groupIn.ImagePrice2K).
+		SetNillableImagePrice4k(groupIn.ImagePrice4K).
+		SetBatchImageDiscountMultiplier(groupIn.BatchImageDiscountMultiplier).
+		SetBatchImageHoldMultiplier(groupIn.BatchImageHoldMultiplier).
+		SetVideoRateIndependent(groupIn.VideoRateIndependent).
+		SetVideoRateMultiplier(groupIn.VideoRateMultiplier).
+		SetNillableVideoPrice480p(groupIn.VideoPrice480P).
+		SetNillableVideoPrice720p(groupIn.VideoPrice720P).
+		SetNillableVideoPrice1080p(groupIn.VideoPrice1080P).
+		SetNillableWebSearchPricePerCall(groupIn.WebSearchPricePerCall).
+		Save(ctx)
+	return err
 }
 
 func (r *groupRepository) FindByDuplicateOperationID(ctx context.Context, operationID string) (*service.Group, error) {
@@ -132,6 +160,7 @@ func (r *groupRepository) FindByDuplicateOperationID(ctx context.Context, operat
 	}
 	row, err := r.client.Group.Query().
 		Where(group.DuplicateOperationIDEQ(operationID)).
+		WithBillingProfile().
 		Order(dbent.Asc(group.FieldID)).
 		First(ctx)
 	if dbent.IsNotFound(err) {
@@ -218,6 +247,7 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 	// AccountCount is intentionally not loaded here; use GetByID when needed.
 	m, err := r.client.Group.Query().
 		Where(group.IDEQ(id)).
+		WithBillingProfile().
 		Only(ctx)
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrGroupNotFound, nil)
@@ -400,6 +430,7 @@ func (r *groupRepository) ListWithFilters(ctx context.Context, params pagination
 	}
 
 	groupsQuery := q.
+		WithBillingProfile().
 		Offset(params.Offset()).
 		Limit(params.Limit())
 	for _, order := range groupListOrder(params) {
@@ -499,6 +530,7 @@ func (r *groupRepository) listWithAccountCountSort(ctx context.Context, q *dbent
 
 	groups, err := r.client.Group.Query().
 		Where(group.IDIn(pageIDs...)).
+		WithBillingProfile().
 		All(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -576,6 +608,7 @@ func groupListOrder(params pagination.PaginationParams) []func(*entsql.Selector)
 func (r *groupRepository) ListActive(ctx context.Context) ([]service.Group, error) {
 	groups, err := r.client.Group.Query().
 		Where(group.StatusEQ(service.StatusActive)).
+		WithBillingProfile().
 		Order(dbent.Asc(group.FieldSortOrder), dbent.Asc(group.FieldID)).
 		All(ctx)
 	if err != nil {
@@ -649,6 +682,7 @@ func (r *groupRepository) ListActiveIDs(ctx context.Context) ([]int64, error) {
 func (r *groupRepository) ListActiveByPlatform(ctx context.Context, platform string) ([]service.Group, error) {
 	groups, err := r.client.Group.Query().
 		Where(group.StatusEQ(service.StatusActive), group.PlatformEQ(platform)).
+		WithBillingProfile().
 		Order(dbent.Asc(group.FieldSortOrder), dbent.Asc(group.FieldID)).
 		All(ctx)
 	if err != nil {

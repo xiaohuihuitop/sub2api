@@ -25,6 +25,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/batchimageevent"
 	"github.com/Wei-Shaw/sub2api/ent/batchimageitem"
 	"github.com/Wei-Shaw/sub2api/ent/batchimagejob"
+	"github.com/Wei-Shaw/sub2api/ent/billingprofile"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -83,6 +84,8 @@ type Client struct {
 	BatchImageItem *BatchImageItemClient
 	// BatchImageJob is the client for interacting with the BatchImageJob builders.
 	BatchImageJob *BatchImageJobClient
+	// BillingProfile is the client for interacting with the BillingProfile builders.
+	BillingProfile *BillingProfileClient
 	// ChannelMonitor is the client for interacting with the ChannelMonitor builders.
 	ChannelMonitor *ChannelMonitorClient
 	// ChannelMonitorDailyRollup is the client for interacting with the ChannelMonitorDailyRollup builders.
@@ -162,6 +165,7 @@ func (c *Client) init() {
 	c.BatchImageEvent = NewBatchImageEventClient(c.config)
 	c.BatchImageItem = NewBatchImageItemClient(c.config)
 	c.BatchImageJob = NewBatchImageJobClient(c.config)
+	c.BillingProfile = NewBillingProfileClient(c.config)
 	c.ChannelMonitor = NewChannelMonitorClient(c.config)
 	c.ChannelMonitorDailyRollup = NewChannelMonitorDailyRollupClient(c.config)
 	c.ChannelMonitorHistory = NewChannelMonitorHistoryClient(c.config)
@@ -293,6 +297,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BatchImageEvent:               NewBatchImageEventClient(cfg),
 		BatchImageItem:                NewBatchImageItemClient(cfg),
 		BatchImageJob:                 NewBatchImageJobClient(cfg),
+		BillingProfile:                NewBillingProfileClient(cfg),
 		ChannelMonitor:                NewChannelMonitorClient(cfg),
 		ChannelMonitorDailyRollup:     NewChannelMonitorDailyRollupClient(cfg),
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
@@ -351,6 +356,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BatchImageEvent:               NewBatchImageEventClient(cfg),
 		BatchImageItem:                NewBatchImageItemClient(cfg),
 		BatchImageJob:                 NewBatchImageJobClient(cfg),
+		BillingProfile:                NewBillingProfileClient(cfg),
 		ChannelMonitor:                NewChannelMonitorClient(cfg),
 		ChannelMonitorDailyRollup:     NewChannelMonitorDailyRollupClient(cfg),
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
@@ -411,14 +417,14 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
 		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.BatchImageJob, c.BillingProfile, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
+		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -431,14 +437,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
 		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.CompositeModelRoute, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.BatchImageJob, c.BillingProfile, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
+		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -468,6 +474,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BatchImageItem.mutate(ctx, m)
 	case *BatchImageJobMutation:
 		return c.BatchImageJob.mutate(ctx, m)
+	case *BillingProfileMutation:
+		return c.BillingProfile.mutate(ctx, m)
 	case *ChannelMonitorMutation:
 		return c.ChannelMonitor.mutate(ctx, m)
 	case *ChannelMonitorDailyRollupMutation:
@@ -2104,6 +2112,155 @@ func (c *BatchImageJobClient) mutate(ctx context.Context, m *BatchImageJobMutati
 	}
 }
 
+// BillingProfileClient is a client for the BillingProfile schema.
+type BillingProfileClient struct {
+	config
+}
+
+// NewBillingProfileClient returns a client for the BillingProfile from the given config.
+func NewBillingProfileClient(c config) *BillingProfileClient {
+	return &BillingProfileClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `billingprofile.Hooks(f(g(h())))`.
+func (c *BillingProfileClient) Use(hooks ...Hook) {
+	c.hooks.BillingProfile = append(c.hooks.BillingProfile, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `billingprofile.Intercept(f(g(h())))`.
+func (c *BillingProfileClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BillingProfile = append(c.inters.BillingProfile, interceptors...)
+}
+
+// Create returns a builder for creating a BillingProfile entity.
+func (c *BillingProfileClient) Create() *BillingProfileCreate {
+	mutation := newBillingProfileMutation(c.config, OpCreate)
+	return &BillingProfileCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BillingProfile entities.
+func (c *BillingProfileClient) CreateBulk(builders ...*BillingProfileCreate) *BillingProfileCreateBulk {
+	return &BillingProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BillingProfileClient) MapCreateBulk(slice any, setFunc func(*BillingProfileCreate, int)) *BillingProfileCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BillingProfileCreateBulk{err: fmt.Errorf("calling to BillingProfileClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BillingProfileCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BillingProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BillingProfile.
+func (c *BillingProfileClient) Update() *BillingProfileUpdate {
+	mutation := newBillingProfileMutation(c.config, OpUpdate)
+	return &BillingProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BillingProfileClient) UpdateOne(_m *BillingProfile) *BillingProfileUpdateOne {
+	mutation := newBillingProfileMutation(c.config, OpUpdateOne, withBillingProfile(_m))
+	return &BillingProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BillingProfileClient) UpdateOneID(id int64) *BillingProfileUpdateOne {
+	mutation := newBillingProfileMutation(c.config, OpUpdateOne, withBillingProfileID(id))
+	return &BillingProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BillingProfile.
+func (c *BillingProfileClient) Delete() *BillingProfileDelete {
+	mutation := newBillingProfileMutation(c.config, OpDelete)
+	return &BillingProfileDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BillingProfileClient) DeleteOne(_m *BillingProfile) *BillingProfileDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BillingProfileClient) DeleteOneID(id int64) *BillingProfileDeleteOne {
+	builder := c.Delete().Where(billingprofile.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BillingProfileDeleteOne{builder}
+}
+
+// Query returns a query builder for BillingProfile.
+func (c *BillingProfileClient) Query() *BillingProfileQuery {
+	return &BillingProfileQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBillingProfile},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BillingProfile entity by its id.
+func (c *BillingProfileClient) Get(ctx context.Context, id int64) (*BillingProfile, error) {
+	return c.Query().Where(billingprofile.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BillingProfileClient) GetX(ctx context.Context, id int64) *BillingProfile {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryGroup queries the group edge of a BillingProfile.
+func (c *BillingProfileClient) QueryGroup(_m *BillingProfile) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(billingprofile.Table, billingprofile.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, billingprofile.GroupTable, billingprofile.GroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *BillingProfileClient) Hooks() []Hook {
+	return c.hooks.BillingProfile
+}
+
+// Interceptors returns the client interceptors.
+func (c *BillingProfileClient) Interceptors() []Interceptor {
+	return c.inters.BillingProfile
+}
+
+func (c *BillingProfileClient) mutate(ctx context.Context, m *BillingProfileMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BillingProfileCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BillingProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BillingProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BillingProfileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BillingProfile mutation op: %q", m.Op())
+	}
+}
+
 // ChannelMonitorClient is a client for the ChannelMonitor schema.
 type ChannelMonitorClient struct {
 	config
@@ -3122,6 +3279,22 @@ func (c *GroupClient) GetX(ctx context.Context, id int64) *Group {
 		panic(err)
 	}
 	return obj
+}
+
+// QueryBillingProfile queries the billing_profile edge of a Group.
+func (c *GroupClient) QueryBillingProfile(_m *Group) *BillingProfileQuery {
+	query := (&BillingProfileClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(group.Table, group.FieldID, id),
+			sqlgraph.To(billingprofile.Table, billingprofile.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, group.BillingProfileTable, group.BillingProfileColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // QueryAPIKeys queries the api_keys edge of a Group.
@@ -4778,6 +4951,22 @@ func (c *RedeemCodeClient) QueryGroup(_m *RedeemCode) *GroupQuery {
 	return query
 }
 
+// QuerySubscriptionPlan queries the subscription_plan edge of a RedeemCode.
+func (c *RedeemCodeClient) QuerySubscriptionPlan(_m *RedeemCode) *SubscriptionPlanQuery {
+	query := (&SubscriptionPlanClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(redeemcode.Table, redeemcode.FieldID, id),
+			sqlgraph.To(subscriptionplan.Table, subscriptionplan.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, redeemcode.SubscriptionPlanTable, redeemcode.SubscriptionPlanColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *RedeemCodeClient) Hooks() []Hook {
 	return c.hooks.RedeemCode
@@ -5175,6 +5364,38 @@ func (c *SubscriptionPlanClient) GetX(ctx context.Context, id int64) *Subscripti
 		panic(err)
 	}
 	return obj
+}
+
+// QuerySubscriptions queries the subscriptions edge of a SubscriptionPlan.
+func (c *SubscriptionPlanClient) QuerySubscriptions(_m *SubscriptionPlan) *UserSubscriptionQuery {
+	query := (&UserSubscriptionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(subscriptionplan.Table, subscriptionplan.FieldID, id),
+			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, subscriptionplan.SubscriptionsTable, subscriptionplan.SubscriptionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryRedeemCodes queries the redeem_codes edge of a SubscriptionPlan.
+func (c *SubscriptionPlanClient) QueryRedeemCodes(_m *SubscriptionPlan) *RedeemCodeQuery {
+	query := (&RedeemCodeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(subscriptionplan.Table, subscriptionplan.FieldID, id),
+			sqlgraph.To(redeemcode.Table, redeemcode.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, subscriptionplan.RedeemCodesTable, subscriptionplan.RedeemCodesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // Hooks returns the client hooks.
@@ -6763,6 +6984,22 @@ func (c *UserSubscriptionClient) QueryGroup(_m *UserSubscription) *GroupQuery {
 	return query
 }
 
+// QuerySubscriptionPlan queries the subscription_plan edge of a UserSubscription.
+func (c *UserSubscriptionClient) QuerySubscriptionPlan(_m *UserSubscription) *SubscriptionPlanQuery {
+	query := (&SubscriptionPlanClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usersubscription.Table, usersubscription.FieldID, id),
+			sqlgraph.To(subscriptionplan.Table, subscriptionplan.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, usersubscription.SubscriptionPlanTable, usersubscription.SubscriptionPlanColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryAssignedByUser queries the assigned_by_user edge of a UserSubscription.
 func (c *UserSubscriptionClient) QueryAssignedByUser(_m *UserSubscription) *UserQuery {
 	query := (&UserClient{config: c.config}).Query()
@@ -6827,8 +7064,8 @@ type (
 	hooks struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute,
+		BillingProfile, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
 		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
 		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
@@ -6839,8 +7076,8 @@ type (
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, CompositeModelRoute,
+		BillingProfile, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
 		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
 		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,

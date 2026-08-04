@@ -67,8 +67,9 @@ type emailCacheStub struct {
 }
 
 type defaultSubscriptionAssignerStub struct {
-	calls []AssignSubscriptionInput
-	err   error
+	calls     []AssignSubscriptionInput
+	planCalls []AssignSubscriptionFromPlanInput
+	err       error
 }
 
 type refreshTokenCacheStub struct{}
@@ -117,6 +118,16 @@ func (s *defaultSubscriptionAssignerStub) AssignOrExtendSubscription(_ context.C
 		return nil, false, s.err
 	}
 	return &UserSubscription{UserID: input.UserID, GroupID: input.GroupID}, false, nil
+}
+
+func (s *defaultSubscriptionAssignerStub) AssignSubscriptionFromPlan(_ context.Context, input *AssignSubscriptionFromPlanInput) (*UserSubscription, error) {
+	if input != nil {
+		s.planCalls = append(s.planCalls, *input)
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &UserSubscription{UserID: input.UserID}, nil
 }
 
 func (s *refreshTokenCacheStub) StoreRefreshToken(context.Context, string, *RefreshTokenData, time.Duration) error {
@@ -641,6 +652,27 @@ func TestAuthService_Register_AssignsDefaultSubscriptions(t *testing.T) {
 	require.Equal(t, 30, assigner.calls[0].ValidityDays)
 	require.Equal(t, int64(12), assigner.calls[1].GroupID)
 	require.Equal(t, 7, assigner.calls[1].ValidityDays)
+}
+
+func TestAuthService_Register_AssignsDefaultPlanSubscriptions(t *testing.T) {
+	repo := &userRepoStub{nextID: 43}
+	assigner := &defaultSubscriptionAssignerStub{}
+	service := newAuthService(repo, map[string]string{
+		SettingKeyRegistrationEnabled:                 "true",
+		SettingKeyDefaultSubscriptions:                `[{"plan_id":81}]`,
+		SettingKeyAuthSourceDefaultEmailGrantOnSignup: "false",
+	}, nil, nil)
+	service.defaultSubAssigner = assigner
+
+	_, user, err := service.Register(context.Background(), "default-plan@test.com", "password")
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.Empty(t, assigner.calls)
+	require.Equal(t, []AssignSubscriptionFromPlanInput{{
+		UserID: 43,
+		PlanID: 81,
+		Notes:  "auto assigned by signup defaults",
+	}}, assigner.planCalls)
 }
 
 func TestAuthService_Register_UsesEmailAuthSourceDefaultsWhenGrantEnabled(t *testing.T) {

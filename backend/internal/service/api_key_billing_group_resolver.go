@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -14,6 +15,10 @@ type apiKeySubscriptionResolver interface {
 	GetActiveSubscription(ctx context.Context, userID, groupID int64) (*UserSubscription, error)
 	ValidateAndCheckLimits(sub *UserSubscription, group *Group) (bool, error)
 	EnsureWindowMaintenance(ctx context.Context, sub *UserSubscription) (*UserSubscription, error)
+}
+
+type apiKeySubscriptionCandidateLister interface {
+	ListActiveSubscriptions(ctx context.Context, userID, groupID int64) ([]UserSubscription, error)
 }
 
 func (s *APIKeyService) ResolveBillingGroupForRequest(
@@ -35,54 +40,61 @@ func (s *APIKeyService) ResolveBillingGroupForRequest(
 		return nil, ErrNoUsableBillingGroup
 	}
 
-	plans, balances := splitAPIKeyBillingGroups(candidates)
-	var lastUnavailable error
-	for i := range plans {
-		group := &plans[i]
-		if skipBilling {
-			applyAPIKeyBillingGroup(apiKey, group)
-			return nil, nil
-		}
-		if subscriptions == nil {
-			continue
-		}
-		subscription, err := subscriptions.GetActiveSubscription(ctx, apiKey.UserID, group.ID)
-		if err != nil {
-			if errors.Is(err, ErrSubscriptionNotFound) {
-				lastUnavailable = err
-				continue
-			}
-			return nil, err
-		}
-		needsMaintenance, err := subscriptions.ValidateAndCheckLimits(subscription, group)
-		if needsMaintenance {
-			subscription, err = subscriptions.EnsureWindowMaintenance(ctx, subscription)
-			if err == nil {
-				_, err = subscriptions.ValidateAndCheckLimits(subscription, group)
-			}
-		}
-		if err != nil {
-			if isSubscriptionUsageLimitError(err) {
-				lastUnavailable = err
-				continue
-			}
-			return nil, err
-		}
-		applyAPIKeyBillingGroup(apiKey, group)
-		return subscription, nil
-	}
-
-	if len(balances) > 0 {
-		if !skipBilling && (apiKey.User == nil || apiKey.User.Balance <= 0) {
-			return nil, ErrInsufficientBalance
-		}
-		applyAPIKeyBillingGroup(apiKey, &balances[0])
+	if skipBilling {
+		applyAPIKeyBillingGroup(apiKey, &candidates[0])
 		return nil, nil
 	}
-	if lastUnavailable != nil {
-		return nil, lastUnavailable
+
+	if hasSubscriptionResolver(subscriptions) {
+		for i := range candidates {
+			group := &candidates[i]
+			subscriptionsForGroup, err := listBillingGroupSubscriptions(ctx, subscriptions, apiKey.UserID, group.ID)
+			if err != nil {
+				if isSubscriptionCandidateUnavailableError(err) {
+					continue
+				}
+				return nil, err
+			}
+
+			for i := range subscriptionsForGroup {
+				subscription := &subscriptionsForGroup[i]
+				needsMaintenance, err := subscriptions.ValidateAndCheckLimits(subscription, group)
+				if needsMaintenance {
+					subscription, err = subscriptions.EnsureWindowMaintenance(ctx, subscription)
+					if err == nil {
+						_, err = subscriptions.ValidateAndCheckLimits(subscription, group)
+					}
+				}
+				if err != nil {
+					if isSubscriptionCandidateUnavailableError(err) {
+						continue
+					}
+					return nil, err
+				}
+				applyAPIKeyBillingGroup(apiKey, group)
+				return subscription, nil
+			}
+		}
 	}
-	return nil, ErrNoUsableBillingGroup
+
+	if apiKey.User == nil || apiKey.User.Balance <= 0 {
+		return nil, ErrInsufficientBalance
+	}
+	applyAPIKeyBillingGroup(apiKey, &candidates[0])
+	return nil, nil
+}
+
+func hasSubscriptionResolver(subscriptions apiKeySubscriptionResolver) bool {
+	if subscriptions == nil {
+		return false
+	}
+	value := reflect.ValueOf(subscriptions)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return !value.IsNil()
+	default:
+		return true
+	}
 }
 
 func billingGroupCandidates(apiKey *APIKey, platform, endpoint string) []Group {
@@ -107,17 +119,23 @@ func billingGroupCandidates(apiKey *APIKey, platform, endpoint string) []Group {
 	return sortAPIKeyAllowedGroups(candidates)
 }
 
-func splitAPIKeyBillingGroups(groups []Group) ([]Group, []Group) {
-	plans := make([]Group, 0, len(groups))
-	balances := make([]Group, 0, len(groups))
-	for _, group := range groups {
-		if group.IsSubscriptionType() {
-			plans = append(plans, group)
-		} else {
-			balances = append(balances, group)
-		}
+func listBillingGroupSubscriptions(
+	ctx context.Context,
+	subscriptions apiKeySubscriptionResolver,
+	userID, groupID int64,
+) ([]UserSubscription, error) {
+	if lister, ok := subscriptions.(apiKeySubscriptionCandidateLister); ok {
+		return lister.ListActiveSubscriptions(ctx, userID, groupID)
 	}
-	return plans, balances
+
+	subscription, err := subscriptions.GetActiveSubscription(ctx, userID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if subscription == nil {
+		return nil, ErrSubscriptionNotFound
+	}
+	return []UserSubscription{*subscription}, nil
 }
 
 func billingEndpointCapability(endpoint string) OpenAIEndpointCapability {
@@ -142,6 +160,14 @@ func isSubscriptionUsageLimitError(err error) bool {
 	return errors.Is(err, ErrDailyLimitExceeded) ||
 		errors.Is(err, ErrWeeklyLimitExceeded) ||
 		errors.Is(err, ErrMonthlyLimitExceeded)
+}
+
+func isSubscriptionCandidateUnavailableError(err error) bool {
+	return isSubscriptionUsageLimitError(err) ||
+		errors.Is(err, ErrSubscriptionNotFound) ||
+		errors.Is(err, ErrSubscriptionInvalid) ||
+		errors.Is(err, ErrSubscriptionExpired) ||
+		errors.Is(err, ErrSubscriptionSuspended)
 }
 
 func applyAPIKeyBillingGroup(apiKey *APIKey, group *Group) {

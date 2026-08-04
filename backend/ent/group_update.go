@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/billingprofile"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
@@ -953,6 +954,25 @@ func (_u *GroupUpdate) AppendReasoningEffortMappings(v []domain.ReasoningEffortM
 	return _u
 }
 
+// SetBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by ID.
+func (_u *GroupUpdate) SetBillingProfileID(id int64) *GroupUpdate {
+	_u.mutation.SetBillingProfileID(id)
+	return _u
+}
+
+// SetNillableBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by ID if the given value is not nil.
+func (_u *GroupUpdate) SetNillableBillingProfileID(id *int64) *GroupUpdate {
+	if id != nil {
+		_u = _u.SetBillingProfileID(*id)
+	}
+	return _u
+}
+
+// SetBillingProfile sets the "billing_profile" edge to the BillingProfile entity.
+func (_u *GroupUpdate) SetBillingProfile(v *BillingProfile) *GroupUpdate {
+	return _u.SetBillingProfileID(v.ID)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdate) AddAPIKeyIDs(ids ...int64) *GroupUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1046,6 +1066,12 @@ func (_u *GroupUpdate) AddAllowedUsers(v ...*User) *GroupUpdate {
 // Mutation returns the GroupMutation object of the builder.
 func (_u *GroupUpdate) Mutation() *GroupMutation {
 	return _u.mutation
+}
+
+// ClearBillingProfile clears the "billing_profile" edge to the BillingProfile entity.
+func (_u *GroupUpdate) ClearBillingProfile() *GroupUpdate {
+	_u.mutation.ClearBillingProfile()
+	return _u
 }
 
 // ClearAPIKeys clears all "api_keys" edges to the APIKey entity.
@@ -1543,6 +1569,35 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, group.FieldReasoningEffortMappings, value)
 		})
+	}
+	if _u.mutation.BillingProfileCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   group.BillingProfileTable,
+			Columns: []string{group.BillingProfileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingprofile.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.BillingProfileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   group.BillingProfileTable,
+			Columns: []string{group.BillingProfileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingprofile.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -2775,6 +2830,25 @@ func (_u *GroupUpdateOne) AppendReasoningEffortMappings(v []domain.ReasoningEffo
 	return _u
 }
 
+// SetBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by ID.
+func (_u *GroupUpdateOne) SetBillingProfileID(id int64) *GroupUpdateOne {
+	_u.mutation.SetBillingProfileID(id)
+	return _u
+}
+
+// SetNillableBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by ID if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableBillingProfileID(id *int64) *GroupUpdateOne {
+	if id != nil {
+		_u = _u.SetBillingProfileID(*id)
+	}
+	return _u
+}
+
+// SetBillingProfile sets the "billing_profile" edge to the BillingProfile entity.
+func (_u *GroupUpdateOne) SetBillingProfile(v *BillingProfile) *GroupUpdateOne {
+	return _u.SetBillingProfileID(v.ID)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdateOne) AddAPIKeyIDs(ids ...int64) *GroupUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -2868,6 +2942,12 @@ func (_u *GroupUpdateOne) AddAllowedUsers(v ...*User) *GroupUpdateOne {
 // Mutation returns the GroupMutation object of the builder.
 func (_u *GroupUpdateOne) Mutation() *GroupMutation {
 	return _u.mutation
+}
+
+// ClearBillingProfile clears the "billing_profile" edge to the BillingProfile entity.
+func (_u *GroupUpdateOne) ClearBillingProfile() *GroupUpdateOne {
+	_u.mutation.ClearBillingProfile()
+	return _u
 }
 
 // ClearAPIKeys clears all "api_keys" edges to the APIKey entity.
@@ -3395,6 +3475,35 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, group.FieldReasoningEffortMappings, value)
 		})
+	}
+	if _u.mutation.BillingProfileCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   group.BillingProfileTable,
+			Columns: []string{group.BillingProfileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingprofile.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.BillingProfileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   group.BillingProfileTable,
+			Columns: []string{group.BillingProfileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingprofile.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

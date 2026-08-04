@@ -2190,6 +2190,29 @@ func MaxReasoningEffortContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldMaxReasoningEffort, v))
 }
 
+// HasBillingProfile applies the HasEdge predicate on the "billing_profile" edge.
+func HasBillingProfile() predicate.Group {
+	return predicate.Group(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, BillingProfileTable, BillingProfileColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasBillingProfileWith applies the HasEdge predicate on the "billing_profile" edge with a given conditions (other predicates).
+func HasBillingProfileWith(preds ...predicate.BillingProfile) predicate.Group {
+	return predicate.Group(func(s *sql.Selector) {
+		step := newBillingProfileStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasAPIKeys applies the HasEdge predicate on the "api_keys" edge.
 func HasAPIKeys() predicate.Group {
 	return predicate.Group(func(s *sql.Selector) {

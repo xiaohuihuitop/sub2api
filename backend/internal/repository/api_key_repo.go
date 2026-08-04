@@ -111,7 +111,9 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
 		WithUser().
-		WithGroup().
+		WithGroup(func(q *dbent.GroupQuery) {
+			q.WithBillingProfile()
+		}).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -153,7 +155,9 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 				gq.Select(group.FieldID)
 			})
 		}).
-		WithGroup().
+		WithGroup(func(q *dbent.GroupQuery) {
+			q.WithBillingProfile()
+		}).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -210,6 +214,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			})
 		}).
 		WithGroup(func(q *dbent.GroupQuery) {
+			q.WithBillingProfile()
 			q.Select(
 				group.FieldID,
 				group.FieldName,
@@ -491,7 +496,9 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	}
 
 	keysQuery := q.
-		WithGroup().
+		WithGroup(func(q *dbent.GroupQuery) {
+			q.WithBillingProfile()
+		}).
 		Offset(params.Offset()).
 		Limit(params.Limit())
 	for _, order := range apiKeyListOrder(params) {
@@ -519,7 +526,9 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 
 func (r *apiKeyRepository) ListAllByUserID(ctx context.Context, userID int64, filters service.APIKeyListFilters) ([]service.APIKey, error) {
 	keys, err := r.apiKeyListByUserIDQuery(userID, filters).
-		WithGroup().
+		WithGroup(func(q *dbent.GroupQuery) {
+			q.WithBillingProfile()
+		}).
 		Order(dbent.Asc(apikey.FieldID)).
 		All(ctx)
 	if err != nil {
@@ -806,6 +815,7 @@ func (r *apiKeyRepository) ListAllowedGroups(ctx context.Context, keyID int64) (
 
 	entities, err := clientFromContext(ctx, r.client).Group.Query().
 		Where(group.IDIn(groupIDs...), group.DeletedAtIsNil()).
+		WithBillingProfile().
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -1291,7 +1301,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 	if g == nil {
 		return nil
 	}
-	return &service.Group{
+	mapped := &service.Group{
 		ID:                              g.ID,
 		Name:                            g.Name,
 		Description:                     derefString(g.Description),
@@ -1346,6 +1356,27 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}
+	if profile := g.Edges.BillingProfile; profile != nil {
+		mapped.RateMultiplier = profile.BalanceRateMultiplier
+		mapped.PeakRateEnabled = profile.PeakRateEnabled
+		mapped.PeakStart = profile.PeakStart
+		mapped.PeakEnd = profile.PeakEnd
+		mapped.PeakRateMultiplier = profile.PeakRateMultiplier
+		mapped.ImageRateIndependent = profile.ImageRateIndependent
+		mapped.ImageRateMultiplier = profile.ImageRateMultiplier
+		mapped.ImagePrice1K = profile.ImagePrice1k
+		mapped.ImagePrice2K = profile.ImagePrice2k
+		mapped.ImagePrice4K = profile.ImagePrice4k
+		mapped.BatchImageDiscountMultiplier = profile.BatchImageDiscountMultiplier
+		mapped.BatchImageHoldMultiplier = profile.BatchImageHoldMultiplier
+		mapped.VideoRateIndependent = profile.VideoRateIndependent
+		mapped.VideoRateMultiplier = profile.VideoRateMultiplier
+		mapped.VideoPrice480P = profile.VideoPrice480p
+		mapped.VideoPrice720P = profile.VideoPrice720p
+		mapped.VideoPrice1080P = profile.VideoPrice1080p
+		mapped.WebSearchPricePerCall = profile.WebSearchPricePerCall
+	}
+	return mapped
 }
 
 func derefString(s *string) string {

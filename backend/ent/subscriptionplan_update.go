@@ -12,7 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
+	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
 
 // SubscriptionPlanUpdate is the builder for updating SubscriptionPlan entities.
@@ -237,15 +239,189 @@ func (_u *SubscriptionPlanUpdate) AddSortOrder(v int) *SubscriptionPlanUpdate {
 	return _u
 }
 
+// SetDailyLimitUsd sets the "daily_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) SetDailyLimitUsd(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.ResetDailyLimitUsd()
+	_u.mutation.SetDailyLimitUsd(v)
+	return _u
+}
+
+// SetNillableDailyLimitUsd sets the "daily_limit_usd" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdate) SetNillableDailyLimitUsd(v *float64) *SubscriptionPlanUpdate {
+	if v != nil {
+		_u.SetDailyLimitUsd(*v)
+	}
+	return _u
+}
+
+// AddDailyLimitUsd adds value to the "daily_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) AddDailyLimitUsd(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.AddDailyLimitUsd(v)
+	return _u
+}
+
+// ClearDailyLimitUsd clears the value of the "daily_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) ClearDailyLimitUsd() *SubscriptionPlanUpdate {
+	_u.mutation.ClearDailyLimitUsd()
+	return _u
+}
+
+// SetWeeklyLimitUsd sets the "weekly_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) SetWeeklyLimitUsd(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.ResetWeeklyLimitUsd()
+	_u.mutation.SetWeeklyLimitUsd(v)
+	return _u
+}
+
+// SetNillableWeeklyLimitUsd sets the "weekly_limit_usd" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdate) SetNillableWeeklyLimitUsd(v *float64) *SubscriptionPlanUpdate {
+	if v != nil {
+		_u.SetWeeklyLimitUsd(*v)
+	}
+	return _u
+}
+
+// AddWeeklyLimitUsd adds value to the "weekly_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) AddWeeklyLimitUsd(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.AddWeeklyLimitUsd(v)
+	return _u
+}
+
+// ClearWeeklyLimitUsd clears the value of the "weekly_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) ClearWeeklyLimitUsd() *SubscriptionPlanUpdate {
+	_u.mutation.ClearWeeklyLimitUsd()
+	return _u
+}
+
+// SetMonthlyLimitUsd sets the "monthly_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) SetMonthlyLimitUsd(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.ResetMonthlyLimitUsd()
+	_u.mutation.SetMonthlyLimitUsd(v)
+	return _u
+}
+
+// SetNillableMonthlyLimitUsd sets the "monthly_limit_usd" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdate) SetNillableMonthlyLimitUsd(v *float64) *SubscriptionPlanUpdate {
+	if v != nil {
+		_u.SetMonthlyLimitUsd(*v)
+	}
+	return _u
+}
+
+// AddMonthlyLimitUsd adds value to the "monthly_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) AddMonthlyLimitUsd(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.AddMonthlyLimitUsd(v)
+	return _u
+}
+
+// ClearMonthlyLimitUsd clears the value of the "monthly_limit_usd" field.
+func (_u *SubscriptionPlanUpdate) ClearMonthlyLimitUsd() *SubscriptionPlanUpdate {
+	_u.mutation.ClearMonthlyLimitUsd()
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *SubscriptionPlanUpdate) SetRateMultiplier(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.ResetRateMultiplier()
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdate) SetNillableRateMultiplier(v *float64) *SubscriptionPlanUpdate {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplier adds value to the "rate_multiplier" field.
+func (_u *SubscriptionPlanUpdate) AddRateMultiplier(v float64) *SubscriptionPlanUpdate {
+	_u.mutation.AddRateMultiplier(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *SubscriptionPlanUpdate) SetUpdatedAt(v time.Time) *SubscriptionPlanUpdate {
 	_u.mutation.SetUpdatedAt(v)
 	return _u
 }
 
+// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
+func (_u *SubscriptionPlanUpdate) AddSubscriptionIDs(ids ...int64) *SubscriptionPlanUpdate {
+	_u.mutation.AddSubscriptionIDs(ids...)
+	return _u
+}
+
+// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
+func (_u *SubscriptionPlanUpdate) AddSubscriptions(v ...*UserSubscription) *SubscriptionPlanUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddSubscriptionIDs(ids...)
+}
+
+// AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by IDs.
+func (_u *SubscriptionPlanUpdate) AddRedeemCodeIDs(ids ...int64) *SubscriptionPlanUpdate {
+	_u.mutation.AddRedeemCodeIDs(ids...)
+	return _u
+}
+
+// AddRedeemCodes adds the "redeem_codes" edges to the RedeemCode entity.
+func (_u *SubscriptionPlanUpdate) AddRedeemCodes(v ...*RedeemCode) *SubscriptionPlanUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRedeemCodeIDs(ids...)
+}
+
 // Mutation returns the SubscriptionPlanMutation object of the builder.
 func (_u *SubscriptionPlanUpdate) Mutation() *SubscriptionPlanMutation {
 	return _u.mutation
+}
+
+// ClearSubscriptions clears all "subscriptions" edges to the UserSubscription entity.
+func (_u *SubscriptionPlanUpdate) ClearSubscriptions() *SubscriptionPlanUpdate {
+	_u.mutation.ClearSubscriptions()
+	return _u
+}
+
+// RemoveSubscriptionIDs removes the "subscriptions" edge to UserSubscription entities by IDs.
+func (_u *SubscriptionPlanUpdate) RemoveSubscriptionIDs(ids ...int64) *SubscriptionPlanUpdate {
+	_u.mutation.RemoveSubscriptionIDs(ids...)
+	return _u
+}
+
+// RemoveSubscriptions removes "subscriptions" edges to UserSubscription entities.
+func (_u *SubscriptionPlanUpdate) RemoveSubscriptions(v ...*UserSubscription) *SubscriptionPlanUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveSubscriptionIDs(ids...)
+}
+
+// ClearRedeemCodes clears all "redeem_codes" edges to the RedeemCode entity.
+func (_u *SubscriptionPlanUpdate) ClearRedeemCodes() *SubscriptionPlanUpdate {
+	_u.mutation.ClearRedeemCodes()
+	return _u
+}
+
+// RemoveRedeemCodeIDs removes the "redeem_codes" edge to RedeemCode entities by IDs.
+func (_u *SubscriptionPlanUpdate) RemoveRedeemCodeIDs(ids ...int64) *SubscriptionPlanUpdate {
+	_u.mutation.RemoveRedeemCodeIDs(ids...)
+	return _u
+}
+
+// RemoveRedeemCodes removes "redeem_codes" edges to RedeemCode entities.
+func (_u *SubscriptionPlanUpdate) RemoveRedeemCodes(v ...*RedeemCode) *SubscriptionPlanUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRedeemCodeIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -375,8 +551,131 @@ func (_u *SubscriptionPlanUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if value, ok := _u.mutation.AddedSortOrder(); ok {
 		_spec.AddField(subscriptionplan.FieldSortOrder, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.DailyLimitUsd(); ok {
+		_spec.SetField(subscriptionplan.FieldDailyLimitUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyLimitUsd(); ok {
+		_spec.AddField(subscriptionplan.FieldDailyLimitUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.DailyLimitUsdCleared() {
+		_spec.ClearField(subscriptionplan.FieldDailyLimitUsd, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.WeeklyLimitUsd(); ok {
+		_spec.SetField(subscriptionplan.FieldWeeklyLimitUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyLimitUsd(); ok {
+		_spec.AddField(subscriptionplan.FieldWeeklyLimitUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.WeeklyLimitUsdCleared() {
+		_spec.ClearField(subscriptionplan.FieldWeeklyLimitUsd, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.MonthlyLimitUsd(); ok {
+		_spec.SetField(subscriptionplan.FieldMonthlyLimitUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyLimitUsd(); ok {
+		_spec.AddField(subscriptionplan.FieldMonthlyLimitUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.MonthlyLimitUsdCleared() {
+		_spec.ClearField(subscriptionplan.FieldMonthlyLimitUsd, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(subscriptionplan.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
+		_spec.AddField(subscriptionplan.FieldRateMultiplier, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(subscriptionplan.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.SubscriptionsTable,
+			Columns: []string{subscriptionplan.SubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSubscriptionsIDs(); len(nodes) > 0 && !_u.mutation.SubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.SubscriptionsTable,
+			Columns: []string{subscriptionplan.SubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.SubscriptionsTable,
+			Columns: []string{subscriptionplan.SubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RedeemCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.RedeemCodesTable,
+			Columns: []string{subscriptionplan.RedeemCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRedeemCodesIDs(); len(nodes) > 0 && !_u.mutation.RedeemCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.RedeemCodesTable,
+			Columns: []string{subscriptionplan.RedeemCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RedeemCodesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.RedeemCodesTable,
+			Columns: []string{subscriptionplan.RedeemCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -607,15 +906,189 @@ func (_u *SubscriptionPlanUpdateOne) AddSortOrder(v int) *SubscriptionPlanUpdate
 	return _u
 }
 
+// SetDailyLimitUsd sets the "daily_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) SetDailyLimitUsd(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.ResetDailyLimitUsd()
+	_u.mutation.SetDailyLimitUsd(v)
+	return _u
+}
+
+// SetNillableDailyLimitUsd sets the "daily_limit_usd" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdateOne) SetNillableDailyLimitUsd(v *float64) *SubscriptionPlanUpdateOne {
+	if v != nil {
+		_u.SetDailyLimitUsd(*v)
+	}
+	return _u
+}
+
+// AddDailyLimitUsd adds value to the "daily_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) AddDailyLimitUsd(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddDailyLimitUsd(v)
+	return _u
+}
+
+// ClearDailyLimitUsd clears the value of the "daily_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) ClearDailyLimitUsd() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearDailyLimitUsd()
+	return _u
+}
+
+// SetWeeklyLimitUsd sets the "weekly_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) SetWeeklyLimitUsd(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.ResetWeeklyLimitUsd()
+	_u.mutation.SetWeeklyLimitUsd(v)
+	return _u
+}
+
+// SetNillableWeeklyLimitUsd sets the "weekly_limit_usd" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdateOne) SetNillableWeeklyLimitUsd(v *float64) *SubscriptionPlanUpdateOne {
+	if v != nil {
+		_u.SetWeeklyLimitUsd(*v)
+	}
+	return _u
+}
+
+// AddWeeklyLimitUsd adds value to the "weekly_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) AddWeeklyLimitUsd(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddWeeklyLimitUsd(v)
+	return _u
+}
+
+// ClearWeeklyLimitUsd clears the value of the "weekly_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) ClearWeeklyLimitUsd() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearWeeklyLimitUsd()
+	return _u
+}
+
+// SetMonthlyLimitUsd sets the "monthly_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) SetMonthlyLimitUsd(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.ResetMonthlyLimitUsd()
+	_u.mutation.SetMonthlyLimitUsd(v)
+	return _u
+}
+
+// SetNillableMonthlyLimitUsd sets the "monthly_limit_usd" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdateOne) SetNillableMonthlyLimitUsd(v *float64) *SubscriptionPlanUpdateOne {
+	if v != nil {
+		_u.SetMonthlyLimitUsd(*v)
+	}
+	return _u
+}
+
+// AddMonthlyLimitUsd adds value to the "monthly_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) AddMonthlyLimitUsd(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddMonthlyLimitUsd(v)
+	return _u
+}
+
+// ClearMonthlyLimitUsd clears the value of the "monthly_limit_usd" field.
+func (_u *SubscriptionPlanUpdateOne) ClearMonthlyLimitUsd() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearMonthlyLimitUsd()
+	return _u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_u *SubscriptionPlanUpdateOne) SetRateMultiplier(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.ResetRateMultiplier()
+	_u.mutation.SetRateMultiplier(v)
+	return _u
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_u *SubscriptionPlanUpdateOne) SetNillableRateMultiplier(v *float64) *SubscriptionPlanUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplier(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplier adds value to the "rate_multiplier" field.
+func (_u *SubscriptionPlanUpdateOne) AddRateMultiplier(v float64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddRateMultiplier(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *SubscriptionPlanUpdateOne) SetUpdatedAt(v time.Time) *SubscriptionPlanUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
 	return _u
 }
 
+// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
+func (_u *SubscriptionPlanUpdateOne) AddSubscriptionIDs(ids ...int64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddSubscriptionIDs(ids...)
+	return _u
+}
+
+// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
+func (_u *SubscriptionPlanUpdateOne) AddSubscriptions(v ...*UserSubscription) *SubscriptionPlanUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddSubscriptionIDs(ids...)
+}
+
+// AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by IDs.
+func (_u *SubscriptionPlanUpdateOne) AddRedeemCodeIDs(ids ...int64) *SubscriptionPlanUpdateOne {
+	_u.mutation.AddRedeemCodeIDs(ids...)
+	return _u
+}
+
+// AddRedeemCodes adds the "redeem_codes" edges to the RedeemCode entity.
+func (_u *SubscriptionPlanUpdateOne) AddRedeemCodes(v ...*RedeemCode) *SubscriptionPlanUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRedeemCodeIDs(ids...)
+}
+
 // Mutation returns the SubscriptionPlanMutation object of the builder.
 func (_u *SubscriptionPlanUpdateOne) Mutation() *SubscriptionPlanMutation {
 	return _u.mutation
+}
+
+// ClearSubscriptions clears all "subscriptions" edges to the UserSubscription entity.
+func (_u *SubscriptionPlanUpdateOne) ClearSubscriptions() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearSubscriptions()
+	return _u
+}
+
+// RemoveSubscriptionIDs removes the "subscriptions" edge to UserSubscription entities by IDs.
+func (_u *SubscriptionPlanUpdateOne) RemoveSubscriptionIDs(ids ...int64) *SubscriptionPlanUpdateOne {
+	_u.mutation.RemoveSubscriptionIDs(ids...)
+	return _u
+}
+
+// RemoveSubscriptions removes "subscriptions" edges to UserSubscription entities.
+func (_u *SubscriptionPlanUpdateOne) RemoveSubscriptions(v ...*UserSubscription) *SubscriptionPlanUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveSubscriptionIDs(ids...)
+}
+
+// ClearRedeemCodes clears all "redeem_codes" edges to the RedeemCode entity.
+func (_u *SubscriptionPlanUpdateOne) ClearRedeemCodes() *SubscriptionPlanUpdateOne {
+	_u.mutation.ClearRedeemCodes()
+	return _u
+}
+
+// RemoveRedeemCodeIDs removes the "redeem_codes" edge to RedeemCode entities by IDs.
+func (_u *SubscriptionPlanUpdateOne) RemoveRedeemCodeIDs(ids ...int64) *SubscriptionPlanUpdateOne {
+	_u.mutation.RemoveRedeemCodeIDs(ids...)
+	return _u
+}
+
+// RemoveRedeemCodes removes "redeem_codes" edges to RedeemCode entities.
+func (_u *SubscriptionPlanUpdateOne) RemoveRedeemCodes(v ...*RedeemCode) *SubscriptionPlanUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRedeemCodeIDs(ids...)
 }
 
 // Where appends a list predicates to the SubscriptionPlanUpdate builder.
@@ -775,8 +1248,131 @@ func (_u *SubscriptionPlanUpdateOne) sqlSave(ctx context.Context) (_node *Subscr
 	if value, ok := _u.mutation.AddedSortOrder(); ok {
 		_spec.AddField(subscriptionplan.FieldSortOrder, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.DailyLimitUsd(); ok {
+		_spec.SetField(subscriptionplan.FieldDailyLimitUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyLimitUsd(); ok {
+		_spec.AddField(subscriptionplan.FieldDailyLimitUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.DailyLimitUsdCleared() {
+		_spec.ClearField(subscriptionplan.FieldDailyLimitUsd, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.WeeklyLimitUsd(); ok {
+		_spec.SetField(subscriptionplan.FieldWeeklyLimitUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyLimitUsd(); ok {
+		_spec.AddField(subscriptionplan.FieldWeeklyLimitUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.WeeklyLimitUsdCleared() {
+		_spec.ClearField(subscriptionplan.FieldWeeklyLimitUsd, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.MonthlyLimitUsd(); ok {
+		_spec.SetField(subscriptionplan.FieldMonthlyLimitUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyLimitUsd(); ok {
+		_spec.AddField(subscriptionplan.FieldMonthlyLimitUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.MonthlyLimitUsdCleared() {
+		_spec.ClearField(subscriptionplan.FieldMonthlyLimitUsd, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplier(); ok {
+		_spec.SetField(subscriptionplan.FieldRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
+		_spec.AddField(subscriptionplan.FieldRateMultiplier, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(subscriptionplan.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.SubscriptionsTable,
+			Columns: []string{subscriptionplan.SubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSubscriptionsIDs(); len(nodes) > 0 && !_u.mutation.SubscriptionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.SubscriptionsTable,
+			Columns: []string{subscriptionplan.SubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.SubscriptionsTable,
+			Columns: []string{subscriptionplan.SubscriptionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RedeemCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.RedeemCodesTable,
+			Columns: []string{subscriptionplan.RedeemCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRedeemCodesIDs(); len(nodes) > 0 && !_u.mutation.RedeemCodesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.RedeemCodesTable,
+			Columns: []string{subscriptionplan.RedeemCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RedeemCodesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   subscriptionplan.RedeemCodesTable,
+			Columns: []string{subscriptionplan.RedeemCodesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &SubscriptionPlan{config: _u.config}
 	_spec.Assign = _node.assignValues

@@ -3,6 +3,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -236,4 +237,32 @@ func TestNormalizePlanCurrency_NonLetter(t *testing.T) {
 	_, err := normalizePlanCurrency("N2D")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "currency")
+}
+
+func TestPaymentConfigServiceCreatePlanPersistsIndependentBillingTerms(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	svc := &PaymentConfigService{entClient: client}
+	daily := 12.5
+	weekly := 30.5
+	monthly := 90.5
+	multiplier := 1.75
+
+	plan, err := svc.CreatePlan(ctx, CreatePlanRequest{
+		GroupID:         7,
+		Name:            "Independent Pro",
+		Price:           9.9,
+		ValidityDays:    30,
+		ValidityUnit:    "day",
+		DailyLimitUSD:   &daily,
+		WeeklyLimitUSD:  &weekly,
+		MonthlyLimitUSD: &monthly,
+		RateMultiplier:  &multiplier,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, &daily, plan.DailyLimitUsd)
+	require.Equal(t, &weekly, plan.WeeklyLimitUsd)
+	require.Equal(t, &monthly, plan.MonthlyLimitUsd)
+	require.Equal(t, multiplier, plan.RateMultiplier)
 }

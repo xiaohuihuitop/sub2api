@@ -63,7 +63,7 @@ func TestCreateAndRedeem_TypeDefaultsToBalance(t *testing.T) {
 		"omitting type should default to balance and pass validation")
 }
 
-func TestCreateAndRedeem_SubscriptionRequiresGroupID(t *testing.T) {
+func TestCreateAndRedeem_SubscriptionRequiresPlanOrLegacyGroupID(t *testing.T) {
 	h := newCreateAndRedeemHandler()
 	code := postCreateAndRedeemValidation(t, h, map[string]any{
 		"code":          "test-sub-no-group",
@@ -75,6 +75,21 @@ func TestCreateAndRedeem_SubscriptionRequiresGroupID(t *testing.T) {
 	})
 
 	assert.Equal(t, http.StatusBadRequest, code)
+}
+
+func TestCreateAndRedeem_SubscriptionPlanPassesValidationWithoutLegacyValidityDays(t *testing.T) {
+	planID := int64(9)
+	h := newCreateAndRedeemHandler()
+	code := postCreateAndRedeemValidation(t, h, map[string]any{
+		"code":                 "test-sub-plan-only",
+		"type":                 "subscription",
+		"value":                29.9,
+		"user_id":              1,
+		"subscription_plan_id": planID,
+	})
+
+	assert.NotEqual(t, http.StatusBadRequest, code,
+		"subscription_plan_id should replace legacy group_id and validity_days")
 }
 
 func TestCreateAndRedeem_SubscriptionRequiresNonZeroValidityDays(t *testing.T) {

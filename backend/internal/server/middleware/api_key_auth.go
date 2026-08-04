@@ -162,7 +162,8 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				return
 			}
 		}
-		resolveSkipBilling := c.Request.URL.Path == "/v1/usage" || cfg.RunMode == config.RunModeSimple
+		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
+		resolveSkipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || cfg.RunMode == config.RunModeSimple
 		targetPlatform, _ := c.Request.Context().Value(ctxkey.ForcePlatform).(string)
 		if targetPlatform == "" && apiKey.Group != nil {
 			targetPlatform = apiKey.Group.Platform
@@ -187,7 +188,6 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
 		c.Request = c.Request.WithContext(ctx)
-		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
 		// Async image task polling only reads data that already belongs to the
 		// authenticated key and must remain available after the completed
 		// generation consumes the key's remaining balance.
@@ -215,26 +215,10 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// ── 5. 按端点需要加载订阅 ───────────────────────────────────
 
-		var subscription *service.UserSubscription
-		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
-
-		// 倍率自省不需要订阅数据；/v1/usage 仍保留原有订阅读取行为。
-		if isSubscriptionType && subscriptionService != nil && !billingInfoRequest {
-			sub, subErr := subscriptionService.GetActiveSubscription(
-				c.Request.Context(),
-				apiKey.User.ID,
-				apiKey.Group.ID,
-			)
-			if subErr != nil {
-				if !skipBilling {
-					AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
-					return
-				}
-				// skipBilling: 订阅不存在也放行，handler 会返回可用的数据
-			} else {
-				subscription = sub
-			}
-		}
+		// ResolveBillingGroupForRequest already selected the concrete package.
+		// Do not re-select based on the legacy group subscription type: a group
+		// can now contain several independently billable package instances.
+		subscription := resolvedSubscription
 
 		// ── 6. 计费执行（skipBilling 时整块跳过） ────────────────────
 

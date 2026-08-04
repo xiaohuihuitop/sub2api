@@ -34,6 +34,12 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 		SetNillableUsedBy(code.UsedBy).
 		SetNillableUsedAt(code.UsedAt).
 		SetNillableGroupID(code.GroupID).
+		SetNillableSubscriptionPlanID(code.SubscriptionPlanID).
+		SetPlanNameSnapshot(code.PlanNameSnapshot).
+		SetNillableDailyLimitUsdSnapshot(code.DailyLimitUSDSnapshot).
+		SetNillableWeeklyLimitUsdSnapshot(code.WeeklyLimitUSDSnapshot).
+		SetNillableMonthlyLimitUsdSnapshot(code.MonthlyLimitUSDSnapshot).
+		SetRateMultiplierSnapshot(code.RateMultiplierSnapshot).
 		Save(ctx)
 	if err == nil {
 		code.ID = created.ID
@@ -60,7 +66,13 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 			SetNillableExpiresAt(c.ExpiresAt).
 			SetNillableUsedBy(c.UsedBy).
 			SetNillableUsedAt(c.UsedAt).
-			SetNillableGroupID(c.GroupID)
+			SetNillableGroupID(c.GroupID).
+			SetNillableSubscriptionPlanID(c.SubscriptionPlanID).
+			SetPlanNameSnapshot(c.PlanNameSnapshot).
+			SetNillableDailyLimitUsdSnapshot(c.DailyLimitUSDSnapshot).
+			SetNillableWeeklyLimitUsdSnapshot(c.WeeklyLimitUSDSnapshot).
+			SetNillableMonthlyLimitUsdSnapshot(c.MonthlyLimitUSDSnapshot).
+			SetRateMultiplierSnapshot(c.RateMultiplierSnapshot)
 		builders = append(builders, b)
 	}
 
@@ -219,6 +231,14 @@ func (r *redeemCodeRepository) Update(ctx context.Context, code *service.RedeemC
 	} else {
 		up.ClearGroupID()
 	}
+	if code.SubscriptionPlanID != nil {
+		up.SetSubscriptionPlanID(*code.SubscriptionPlanID)
+	} else {
+		up.ClearSubscriptionPlanID()
+	}
+	up.SetPlanNameSnapshot(code.PlanNameSnapshot).
+		SetRateMultiplierSnapshot(code.RateMultiplierSnapshot)
+	setRedeemCodeSnapshotLimits(up, code)
 	if code.ExpiresAt != nil {
 		up.SetExpiresAt(*code.ExpiresAt)
 	} else {
@@ -285,6 +305,13 @@ func (r *redeemCodeRepository) batchUpdate(ctx context.Context, client *dbent.Cl
 		for _, code := range existing {
 			if code.Status == service.StatusUsed {
 				return 0, service.ErrRedeemCodeUsed
+			}
+		}
+	}
+	if fields.GroupID.Set {
+		for _, code := range existing {
+			if code.SubscriptionPlanID != nil {
+				return 0, service.ErrRedeemCodeSubscriptionTermsImmutable
 			}
 		}
 	}
@@ -413,18 +440,24 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		return nil
 	}
 	out := &service.RedeemCode{
-		ID:           m.ID,
-		Code:         m.Code,
-		Type:         m.Type,
-		Value:        m.Value,
-		Status:       m.Status,
-		UsedBy:       m.UsedBy,
-		UsedAt:       m.UsedAt,
-		Notes:        derefString(m.Notes),
-		CreatedAt:    m.CreatedAt,
-		ExpiresAt:    m.ExpiresAt,
-		GroupID:      m.GroupID,
-		ValidityDays: m.ValidityDays,
+		ID:                      m.ID,
+		Code:                    m.Code,
+		Type:                    m.Type,
+		Value:                   m.Value,
+		Status:                  m.Status,
+		UsedBy:                  m.UsedBy,
+		UsedAt:                  m.UsedAt,
+		Notes:                   derefString(m.Notes),
+		CreatedAt:               m.CreatedAt,
+		ExpiresAt:               m.ExpiresAt,
+		GroupID:                 m.GroupID,
+		SubscriptionPlanID:      m.SubscriptionPlanID,
+		PlanNameSnapshot:        m.PlanNameSnapshot,
+		DailyLimitUSDSnapshot:   m.DailyLimitUsdSnapshot,
+		WeeklyLimitUSDSnapshot:  m.WeeklyLimitUsdSnapshot,
+		MonthlyLimitUSDSnapshot: m.MonthlyLimitUsdSnapshot,
+		RateMultiplierSnapshot:  m.RateMultiplierSnapshot,
+		ValidityDays:            m.ValidityDays,
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
@@ -433,6 +466,24 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		out.Group = groupEntityToService(m.Edges.Group)
 	}
 	return out
+}
+
+func setRedeemCodeSnapshotLimits(up *dbent.RedeemCodeUpdateOne, code *service.RedeemCode) {
+	if code.DailyLimitUSDSnapshot == nil {
+		up.ClearDailyLimitUsdSnapshot()
+	} else {
+		up.SetDailyLimitUsdSnapshot(*code.DailyLimitUSDSnapshot)
+	}
+	if code.WeeklyLimitUSDSnapshot == nil {
+		up.ClearWeeklyLimitUsdSnapshot()
+	} else {
+		up.SetWeeklyLimitUsdSnapshot(*code.WeeklyLimitUSDSnapshot)
+	}
+	if code.MonthlyLimitUSDSnapshot == nil {
+		up.ClearMonthlyLimitUsdSnapshot()
+	} else {
+		up.SetMonthlyLimitUsdSnapshot(*code.MonthlyLimitUSDSnapshot)
+	}
 }
 
 func redeemCodeEntitiesToService(models []*dbent.RedeemCode) []service.RedeemCode {

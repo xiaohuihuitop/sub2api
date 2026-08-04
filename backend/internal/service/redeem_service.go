@@ -16,9 +16,13 @@ import (
 )
 
 var (
-	ErrRedeemCodeNotFound  = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
-	ErrRedeemCodeUsed      = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
-	ErrRedeemCodeExpired   = infraerrors.Conflict("REDEEM_CODE_EXPIRED", "redeem code expired")
+	ErrRedeemCodeNotFound                   = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
+	ErrRedeemCodeUsed                       = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
+	ErrRedeemCodeExpired                    = infraerrors.Conflict("REDEEM_CODE_EXPIRED", "redeem code expired")
+	ErrRedeemCodeSubscriptionTermsImmutable = infraerrors.Conflict(
+		"REDEEM_CODE_SUBSCRIPTION_TERMS_IMMUTABLE",
+		"subscription plan terms cannot be batch updated",
+	)
 	ErrInsufficientBalance = infraerrors.BadRequest("INSUFFICIENT_BALANCE", "insufficient balance")
 	ErrRedeemRateLimited   = infraerrors.TooManyRequests("REDEEM_RATE_LIMITED", "too many failed attempts, please try again later")
 	ErrRedeemCodeLocked    = infraerrors.Conflict("REDEEM_CODE_LOCKED", "redeem code is being processed, please try again")
@@ -263,11 +267,31 @@ func (s *RedeemService) CreateCode(ctx context.Context, code *RedeemCode) error 
 	if code.IsExpired() {
 		return ErrRedeemCodeExpired
 	}
+	if err := s.hydrateSubscriptionRedeemCode(ctx, code); err != nil {
+		return err
+	}
 
 	if err := s.redeemRepo.Create(ctx, code); err != nil {
 		return fmt.Errorf("create redeem code: %w", err)
 	}
 	return nil
+}
+
+func (s *RedeemService) hydrateSubscriptionRedeemCode(ctx context.Context, code *RedeemCode) error {
+	if code.Type != RedeemTypeSubscription || code.SubscriptionPlanID == nil {
+		return nil
+	}
+	if *code.SubscriptionPlanID <= 0 || s.entClient == nil {
+		return ErrSubscriptionPlanInvalid
+	}
+	plan, err := s.entClient.SubscriptionPlan.Get(ctx, *code.SubscriptionPlanID)
+	if dbent.IsNotFound(err) {
+		return ErrSubscriptionPlanNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("get subscription plan: %w", err)
+	}
+	return applySubscriptionPlanToRedeemCode(code, plan)
 }
 
 func (s *RedeemService) BatchUpdate(ctx context.Context, input *RedeemCodeBatchUpdateInput) (*RedeemCodeBatchUpdateResult, error) {
@@ -482,6 +506,12 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 		}
 
 	case RedeemTypeSubscription:
+		if redeemCode.hasSubscriptionPlanSnapshot() {
+			if err := s.assignSubscriptionFromRedeemCode(txCtx, userID, redeemCode); err != nil {
+				return nil, err
+			}
+			break
+		}
 		validityDays := redeemCode.ValidityDays
 		if validityDays < 0 {
 			// 负数天数：缩短订阅，减到 0 则取消订阅
@@ -530,6 +560,25 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	return redeemCode, nil
 }
 
+func (s *RedeemService) assignSubscriptionFromRedeemCode(
+	ctx context.Context,
+	userID int64,
+	code *RedeemCode,
+) error {
+	if s.subscriptionService == nil {
+		return errors.New("subscription service is unavailable")
+	}
+	notes := fmt.Sprintf("redeemed code %s", code.Code)
+	subscription, err := subscriptionFromRedeemCode(code, userID, notes, time.Now())
+	if err != nil {
+		return err
+	}
+	if err := s.subscriptionService.userSubRepo.Create(ctx, subscription); err != nil {
+		return fmt.Errorf("create subscription from redeem code: %w", err)
+	}
+	return nil
+}
+
 // invalidateRedeemCaches 失效兑换相关的缓存
 func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64, redeemCode *RedeemCode) {
 	switch redeemCode.Type {
@@ -562,9 +611,7 @@ func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64
 		if redeemCode.GroupID != nil {
 			groupID := *redeemCode.GroupID
 			go func() {
-				cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				_ = s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID)
+				s.billingCacheService.InvalidateSubscriptionGroup(userID, groupID)
 			}()
 		}
 	}

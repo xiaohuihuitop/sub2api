@@ -36,6 +36,9 @@ type BatchImageItem func(*sql.Selector)
 // BatchImageJob is the predicate function for batchimagejob builders.
 type BatchImageJob func(*sql.Selector)
 
+// BillingProfile is the predicate function for billingprofile builders.
+type BillingProfile func(*sql.Selector)
+
 // ChannelMonitor is the predicate function for channelmonitor builders.
 type ChannelMonitor func(*sql.Selector)
 

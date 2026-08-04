@@ -948,6 +948,7 @@ export default {
       unsavedChanges: '有未保存的修改',
       revertChanges: '撤销修改',
       userInfo: '用户信息',
+      balanceBilling: '余额计费',
       subscription: {
         title: '订阅设置',
         type: '计费类型',

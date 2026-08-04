@@ -24,9 +24,14 @@ const subscription = {
   daily_window_start: '2026-07-11T00:00:00Z',
   weekly_window_start: null,
   monthly_window_start: null,
+  plan_name_snapshot: 'Premium plan',
+  daily_limit_usd_snapshot: 10,
+  weekly_limit_usd_snapshot: null,
+  monthly_limit_usd_snapshot: null,
+  rate_multiplier_snapshot: 0.8,
   group: {
-    name: 'Premium',
-    daily_limit_usd: 10,
+    name: 'Routing group',
+    daily_limit_usd: 99,
   },
 } as UserSubscription
 
@@ -37,7 +42,8 @@ describe('UserSubscriptionSummaryCard', () => {
       global: { stubs: { Icon: true } },
     })
 
-    expect(wrapper.text()).toContain('Premium')
+    expect(wrapper.text()).toContain('Premium plan')
+    expect(wrapper.text()).not.toContain('Routing group')
     expect(wrapper.text()).toContain('$3.00 / $10.00')
     expect(wrapper.text()).toContain('$7.00')
     expect(wrapper.get('[data-testid="subscription-progress"]').attributes('style')).toContain('30%')
@@ -48,13 +54,17 @@ describe('UserSubscriptionSummaryCard', () => {
       props: {
         subscription: {
           ...subscription,
+          plan_name_snapshot: 'Unlimited plan',
+          daily_limit_usd_snapshot: null,
+          weekly_limit_usd_snapshot: null,
+          monthly_limit_usd_snapshot: null,
           group: { name: 'Unlimited' },
         },
       },
       global: { stubs: { Icon: true } },
     })
 
-    expect(wrapper.text()).toContain('Unlimited')
+    expect(wrapper.text()).toContain('Unlimited plan')
     expect(wrapper.text()).toContain('dashboard.subscriptionSummary.unlimited')
     expect(wrapper.find('[data-testid="subscription-progress"]').exists()).toBe(false)
   })

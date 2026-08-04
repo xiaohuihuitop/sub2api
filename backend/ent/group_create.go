@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/billingprofile"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -725,6 +726,25 @@ func (_c *GroupCreate) SetReasoningEffortMappings(v []domain.ReasoningEffortMapp
 	return _c
 }
 
+// SetBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by ID.
+func (_c *GroupCreate) SetBillingProfileID(id int64) *GroupCreate {
+	_c.mutation.SetBillingProfileID(id)
+	return _c
+}
+
+// SetNillableBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by ID if the given value is not nil.
+func (_c *GroupCreate) SetNillableBillingProfileID(id *int64) *GroupCreate {
+	if id != nil {
+		_c = _c.SetBillingProfileID(*id)
+	}
+	return _c
+}
+
+// SetBillingProfile sets the "billing_profile" edge to the BillingProfile entity.
+func (_c *GroupCreate) SetBillingProfile(v *BillingProfile) *GroupCreate {
+	return _c.SetBillingProfileID(v.ID)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_c *GroupCreate) AddAPIKeyIDs(ids ...int64) *GroupCreate {
 	_c.mutation.AddAPIKeyIDs(ids...)
@@ -1390,6 +1410,22 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ReasoningEffortMappings(); ok {
 		_spec.SetField(group.FieldReasoningEffortMappings, field.TypeJSON, value)
 		_node.ReasoningEffortMappings = value
+	}
+	if nodes := _c.mutation.BillingProfileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   group.BillingProfileTable,
+			Columns: []string{group.BillingProfileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingprofile.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.APIKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

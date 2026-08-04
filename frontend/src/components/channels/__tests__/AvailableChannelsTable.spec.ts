@@ -29,6 +29,11 @@ describe('AvailableChannelsTable scroll integration', () => {
   it('does not clip content with its own overflow-hidden card wrapper', () => {
     expect(componentSource).not.toMatch(/<div class="card overflow-hidden">/)
   })
+
+  it('does not render legacy group pricing or peak-rate controls', () => {
+    expect(componentSource).not.toMatch(/always-show-rate/)
+    expect(componentSource).not.toMatch(/hasPeakRate\(/)
+  })
 })
 
 const rows: UserAvailableChannel[] = [
@@ -75,7 +80,7 @@ const baseProps = {
     name: 'Channel',
     description: 'Description',
     platform: 'Platform',
-    groups: 'Groups and rates',
+    groups: 'Groups',
     supportedModels: 'Models and pricing',
   },
   rows,
@@ -84,7 +89,6 @@ const baseProps = {
   noPricingLabel: 'No pricing',
   noModelsLabel: 'No models',
   emptyLabel: 'No channels',
-  userGroupRates: { 1: 0.8 },
 }
 
 function mountTable(props = {}) {
@@ -96,9 +100,9 @@ function mountTable(props = {}) {
         Icon: { props: ['name'], template: '<i :data-icon="name" />' },
         PlatformIcon: { template: '<i data-platform-icon />' },
         GroupBadge: {
-          props: ['name', 'rateMultiplier', 'userRateMultiplier'],
+          props: ['name', 'rateMultiplier', 'showRate'],
           template:
-            '<span data-group-badge>{{ name }}:{{ rateMultiplier }}:{{ userRateMultiplier }}</span>',
+            '<span data-group-badge :data-rate="rateMultiplier ?? null" :data-show-rate="String(showRate)">{{ name }}</span>',
         },
         SupportedModelChip: {
           props: ['model', 'noPricingLabel'],
@@ -125,7 +129,7 @@ describe('AvailableChannelsTable responsive surfaces', () => {
     expect(desktop.get('[data-model-chip]').text()).toContain('claude-test:No pricing')
   })
 
-  it('renders a mobile-only readable surface with groups, rates, peaks, and model pricing chips', () => {
+  it('renders a mobile-only readable surface with routing groups and model pricing chips', () => {
     const wrapper = mountTable()
     const mobile = wrapper.get('[data-testid="mobile-channels"]')
 
@@ -133,16 +137,17 @@ describe('AvailableChannelsTable responsive surfaces', () => {
     expect(mobile.classes()).toContain('overflow-x-hidden')
     expect(mobile.text()).toContain('Primary channel')
     expect(mobile.text()).toContain('Fast and reliable access')
-    expect(mobile.text()).toContain('Groups and rates')
+    expect(mobile.text()).toContain('Groups')
     expect(mobile.text()).toContain('Models and pricing')
     expect(mobile.text()).toContain('availableChannels.exclusive')
     expect(mobile.text()).toContain('availableChannels.public')
-    expect(mobile.get('[data-group-badge]').text()).toBe('Exclusive Pro:1.2:0.8')
+    expect(mobile.get('[data-group-badge]').text()).toBe('Exclusive Pro')
     expect(mobile.findAll('[data-group-badge]')).toHaveLength(2)
-    expect(mobile.get('[data-icon="clock"]')).toBeTruthy()
-    expect(mobile.text()).toContain('08:00')
-    expect(mobile.text()).toContain('10:00')
-    expect(mobile.text()).toContain('×1.5')
+    expect(mobile.find('[data-icon="clock"]').exists()).toBe(false)
+    expect(mobile.text()).not.toContain('08:00')
+    expect(mobile.text()).not.toContain('10:00')
+    expect(mobile.get('[data-group-badge]').attributes('data-rate')).toBeUndefined()
+    expect(mobile.get('[data-group-badge]').attributes('data-show-rate')).toBe('false')
     expect(mobile.get('[data-model-chip]').text()).toBe('claude-test:No pricing')
     expect(mobile.findAll('.max-w-full')).not.toHaveLength(0)
   })

@@ -533,16 +533,16 @@ export default {
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
     title: '模型广场',
-    description: '按分组浏览可用模型与价格',
+    description: '按分组浏览可用模型与余额价格',
     loading: '加载中...',
     empty: '暂无可展示的分组',
     loadFailed: '加载模型广场失败',
     noSearchResult: '没有匹配的模型',
-    anonymousHint: '登录后可查看你的专属分组与专属倍率',
+    anonymousHint: '登录后可查看专属分组',
     filters: {
       platformLabel: '平台',
       groupLabel: '分组',
-      rateLabel: '倍率',
+      rateLabel: '余额倍率',
       modelLabel: '模型',
       searchPlaceholder: '搜索模型名称',
       all: '全部'
@@ -554,7 +554,7 @@ export default {
     detail: {
       noModels: '该分组暂未配置模型',
       noPricing: '未配置定价',
-      peakNote: '高峰时段 {window} 计费倍率 ×{multiplier}'
+      peakNote: '余额高峰时段 {window} 计费倍率 ×{multiplier}'
     },
     table: {
       model: '模型',
@@ -563,9 +563,9 @@ export default {
       cache: '缓存',
       cacheWrite: '写入',
       cacheRead: '读取',
-      paidPrice: '实付价格(折后)',
+      balancePrice: '余额价格',
       officialPrice: '官方价格',
-      rate: '折扣倍率',
+      balanceRate: '余额倍率',
       unitPerMillion: '$ / 1M token',
       perUnitRequest: '/ 次',
       perUnitImage: '/ 张',

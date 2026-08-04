@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,6 +23,8 @@ type paymentFulfillmentTestProvider struct {
 	key            string
 	supportedTypes []payment.PaymentType
 }
+
+var paymentFulfillmentTestSequence atomic.Int64
 
 func (p paymentFulfillmentTestProvider) Name() string        { return p.key }
 func (p paymentFulfillmentTestProvider) ProviderKey() string { return p.key }
@@ -830,6 +833,83 @@ func TestExecuteSubscriptionFulfillmentRecoversCommittedAssignmentWithoutExtendi
 	require.Equal(t, 1, assignmentAuditCount)
 }
 
+type planFulfillmentSubscriptionRepoStub struct {
+	*subscriptionUserSubRepoStub
+}
+
+func (r *planFulfillmentSubscriptionRepoStub) ExtendExpiry(_ context.Context, subscriptionID int64, expiresAt time.Time) error {
+	subscription := r.byID[subscriptionID]
+	if subscription == nil {
+		return ErrSubscriptionNotFound
+	}
+	subscription.ExpiresAt = expiresAt
+	return nil
+}
+
+func (r *planFulfillmentSubscriptionRepoStub) UpdateNotes(_ context.Context, subscriptionID int64, notes string) error {
+	subscription := r.byID[subscriptionID]
+	if subscription == nil {
+		return ErrSubscriptionNotFound
+	}
+	subscription.Notes = notes
+	return nil
+}
+
+func TestExecuteSubscriptionFulfillmentCreatesIndependentInstancesFromPlan(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	ensurePaymentAuditOrderActionUniqueIndex(t, ctx, client)
+
+	dailyLimit := 12.0
+	plan, err := client.SubscriptionPlan.Create().
+		SetGroupID(7).
+		SetName("Independent plan").
+		SetPrice(9.9).
+		SetValidityDays(7).
+		SetDailyLimitUsd(dailyLimit).
+		SetRateMultiplier(1.5).
+		Save(ctx)
+	require.NoError(t, err)
+
+	firstOrder := createPaymentFulfillmentSubscriptionOrder(t, ctx, client, OrderStatusPaid, time.Now())
+	secondOrder := createPaymentFulfillmentSubscriptionOrder(t, ctx, client, OrderStatusPaid, time.Now())
+	secondOrder, err = client.PaymentOrder.UpdateOneID(secondOrder.ID).
+		SetUserID(firstOrder.UserID).
+		SetUserEmail(firstOrder.UserEmail).
+		SetUserName(firstOrder.UserName).
+		Save(ctx)
+	require.NoError(t, err)
+	firstOrder, err = client.PaymentOrder.UpdateOneID(firstOrder.ID).
+		SetPlanID(plan.ID).
+		ClearSubscriptionGroupID().
+		ClearSubscriptionDays().
+		Save(ctx)
+	require.NoError(t, err)
+	_, err = client.PaymentOrder.UpdateOneID(secondOrder.ID).SetPlanID(plan.ID).Save(ctx)
+	require.NoError(t, err)
+
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription},
+	}
+	subscriptionRepo := &planFulfillmentSubscriptionRepoStub{subscriptionUserSubRepoStub: newSubscriptionUserSubRepoStub()}
+	svc := &PaymentService{
+		entClient:       client,
+		groupRepo:       groupRepo,
+		subscriptionSvc: NewSubscriptionService(groupRepo, subscriptionRepo, nil, client, nil),
+	}
+
+	require.NoError(t, svc.ExecuteSubscriptionFulfillment(ctx, firstOrder.ID))
+	require.NoError(t, svc.ExecuteSubscriptionFulfillment(ctx, secondOrder.ID))
+
+	require.Len(t, subscriptionRepo.byID, 2)
+	for _, subscription := range subscriptionRepo.byID {
+		require.Equal(t, plan.ID, *subscription.SubscriptionPlanID)
+		require.Equal(t, "Independent plan", subscription.PlanNameSnapshot)
+		require.Equal(t, dailyLimit, *subscription.DailyLimitUSDSnapshot)
+		require.Equal(t, 1.5, subscription.RateMultiplierSnapshot)
+	}
+}
+
 func TestHasPaymentSubscriptionOrderNoteRequiresIndependentExactLine(t *testing.T) {
 	t.Parallel()
 	require.True(t, hasPaymentSubscriptionOrderNote("before\r\npayment order 42\r\nafter", "payment order 42"))
@@ -845,8 +925,9 @@ func createPaymentFulfillmentSubscriptionOrder(
 	updatedAt time.Time,
 ) *dbent.PaymentOrder {
 	t.Helper()
+	uniqueSuffix := strconv.FormatInt(time.Now().UnixNano(), 10) + "-" + strconv.FormatInt(paymentFulfillmentTestSequence.Add(1), 10)
 	user, err := client.User.Create().
-		SetEmail("fulfillment-" + strconv.FormatInt(time.Now().UnixNano(), 10) + "@example.com").
+		SetEmail("fulfillment-" + uniqueSuffix + "@example.com").
 		SetPasswordHash("hash").
 		SetUsername("payment-fulfillment-user").
 		Save(ctx)
@@ -859,8 +940,8 @@ func createPaymentFulfillmentSubscriptionOrder(
 		SetAmount(80).
 		SetPayAmount(80).
 		SetFeeRate(0).
-		SetRechargeCode("PAY-SUB-" + strconv.FormatInt(time.Now().UnixNano(), 10)).
-		SetOutTradeNo("sub2_fulfillment_" + strconv.FormatInt(time.Now().UnixNano(), 10)).
+		SetRechargeCode("PAY-SUB-" + uniqueSuffix).
+		SetOutTradeNo("sub2_fulfillment_" + uniqueSuffix).
 		SetPaymentType(payment.TypeAlipay).
 		SetPaymentTradeNo("trade-fulfillment").
 		SetOrderType(payment.OrderTypeSubscription).

@@ -22,6 +22,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/batchimageevent"
 	"github.com/Wei-Shaw/sub2api/ent/batchimageitem"
 	"github.com/Wei-Shaw/sub2api/ent/batchimagejob"
+	"github.com/Wei-Shaw/sub2api/ent/billingprofile"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -74,6 +75,7 @@ const (
 	TypeBatchImageEvent               = "BatchImageEvent"
 	TypeBatchImageItem                = "BatchImageItem"
 	TypeBatchImageJob                 = "BatchImageJob"
+	TypeBillingProfile                = "BillingProfile"
 	TypeChannelMonitor                = "ChannelMonitor"
 	TypeChannelMonitorDailyRollup     = "ChannelMonitorDailyRollup"
 	TypeChannelMonitorHistory         = "ChannelMonitorHistory"
@@ -14598,6 +14600,2041 @@ func (m *BatchImageJobMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown BatchImageJob edge %s", name)
 }
 
+// BillingProfileMutation represents an operation that mutates the BillingProfile nodes in the graph.
+type BillingProfileMutation struct {
+	config
+	op                                 Op
+	typ                                string
+	id                                 *int64
+	created_at                         *time.Time
+	updated_at                         *time.Time
+	balance_rate_multiplier            *float64
+	addbalance_rate_multiplier         *float64
+	peak_rate_enabled                  *bool
+	peak_start                         *string
+	peak_end                           *string
+	peak_rate_multiplier               *float64
+	addpeak_rate_multiplier            *float64
+	image_rate_independent             *bool
+	image_rate_multiplier              *float64
+	addimage_rate_multiplier           *float64
+	image_price_1k                     *float64
+	addimage_price_1k                  *float64
+	image_price_2k                     *float64
+	addimage_price_2k                  *float64
+	image_price_4k                     *float64
+	addimage_price_4k                  *float64
+	batch_image_discount_multiplier    *float64
+	addbatch_image_discount_multiplier *float64
+	batch_image_hold_multiplier        *float64
+	addbatch_image_hold_multiplier     *float64
+	video_rate_independent             *bool
+	video_rate_multiplier              *float64
+	addvideo_rate_multiplier           *float64
+	video_price_480p                   *float64
+	addvideo_price_480p                *float64
+	video_price_720p                   *float64
+	addvideo_price_720p                *float64
+	video_price_1080p                  *float64
+	addvideo_price_1080p               *float64
+	web_search_price_per_call          *float64
+	addweb_search_price_per_call       *float64
+	clearedFields                      map[string]struct{}
+	group                              *int64
+	clearedgroup                       bool
+	done                               bool
+	oldValue                           func(context.Context) (*BillingProfile, error)
+	predicates                         []predicate.BillingProfile
+}
+
+var _ ent.Mutation = (*BillingProfileMutation)(nil)
+
+// billingprofileOption allows management of the mutation configuration using functional options.
+type billingprofileOption func(*BillingProfileMutation)
+
+// newBillingProfileMutation creates new mutation for the BillingProfile entity.
+func newBillingProfileMutation(c config, op Op, opts ...billingprofileOption) *BillingProfileMutation {
+	m := &BillingProfileMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBillingProfile,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBillingProfileID sets the ID field of the mutation.
+func withBillingProfileID(id int64) billingprofileOption {
+	return func(m *BillingProfileMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *BillingProfile
+		)
+		m.oldValue = func(ctx context.Context) (*BillingProfile, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().BillingProfile.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBillingProfile sets the old BillingProfile of the mutation.
+func withBillingProfile(node *BillingProfile) billingprofileOption {
+	return func(m *BillingProfileMutation) {
+		m.oldValue = func(context.Context) (*BillingProfile, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BillingProfileMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BillingProfileMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BillingProfileMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BillingProfileMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().BillingProfile.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *BillingProfileMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *BillingProfileMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *BillingProfileMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *BillingProfileMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *BillingProfileMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *BillingProfileMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetGroupID sets the "group_id" field.
+func (m *BillingProfileMutation) SetGroupID(i int64) {
+	m.group = &i
+}
+
+// GroupID returns the value of the "group_id" field in the mutation.
+func (m *BillingProfileMutation) GroupID() (r int64, exists bool) {
+	v := m.group
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupID returns the old "group_id" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldGroupID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupID: %w", err)
+	}
+	return oldValue.GroupID, nil
+}
+
+// ResetGroupID resets all changes to the "group_id" field.
+func (m *BillingProfileMutation) ResetGroupID() {
+	m.group = nil
+}
+
+// SetBalanceRateMultiplier sets the "balance_rate_multiplier" field.
+func (m *BillingProfileMutation) SetBalanceRateMultiplier(f float64) {
+	m.balance_rate_multiplier = &f
+	m.addbalance_rate_multiplier = nil
+}
+
+// BalanceRateMultiplier returns the value of the "balance_rate_multiplier" field in the mutation.
+func (m *BillingProfileMutation) BalanceRateMultiplier() (r float64, exists bool) {
+	v := m.balance_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceRateMultiplier returns the old "balance_rate_multiplier" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldBalanceRateMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceRateMultiplier: %w", err)
+	}
+	return oldValue.BalanceRateMultiplier, nil
+}
+
+// AddBalanceRateMultiplier adds f to the "balance_rate_multiplier" field.
+func (m *BillingProfileMutation) AddBalanceRateMultiplier(f float64) {
+	if m.addbalance_rate_multiplier != nil {
+		*m.addbalance_rate_multiplier += f
+	} else {
+		m.addbalance_rate_multiplier = &f
+	}
+}
+
+// AddedBalanceRateMultiplier returns the value that was added to the "balance_rate_multiplier" field in this mutation.
+func (m *BillingProfileMutation) AddedBalanceRateMultiplier() (r float64, exists bool) {
+	v := m.addbalance_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBalanceRateMultiplier resets all changes to the "balance_rate_multiplier" field.
+func (m *BillingProfileMutation) ResetBalanceRateMultiplier() {
+	m.balance_rate_multiplier = nil
+	m.addbalance_rate_multiplier = nil
+}
+
+// SetPeakRateEnabled sets the "peak_rate_enabled" field.
+func (m *BillingProfileMutation) SetPeakRateEnabled(b bool) {
+	m.peak_rate_enabled = &b
+}
+
+// PeakRateEnabled returns the value of the "peak_rate_enabled" field in the mutation.
+func (m *BillingProfileMutation) PeakRateEnabled() (r bool, exists bool) {
+	v := m.peak_rate_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPeakRateEnabled returns the old "peak_rate_enabled" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldPeakRateEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPeakRateEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPeakRateEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPeakRateEnabled: %w", err)
+	}
+	return oldValue.PeakRateEnabled, nil
+}
+
+// ResetPeakRateEnabled resets all changes to the "peak_rate_enabled" field.
+func (m *BillingProfileMutation) ResetPeakRateEnabled() {
+	m.peak_rate_enabled = nil
+}
+
+// SetPeakStart sets the "peak_start" field.
+func (m *BillingProfileMutation) SetPeakStart(s string) {
+	m.peak_start = &s
+}
+
+// PeakStart returns the value of the "peak_start" field in the mutation.
+func (m *BillingProfileMutation) PeakStart() (r string, exists bool) {
+	v := m.peak_start
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPeakStart returns the old "peak_start" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldPeakStart(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPeakStart is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPeakStart requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPeakStart: %w", err)
+	}
+	return oldValue.PeakStart, nil
+}
+
+// ResetPeakStart resets all changes to the "peak_start" field.
+func (m *BillingProfileMutation) ResetPeakStart() {
+	m.peak_start = nil
+}
+
+// SetPeakEnd sets the "peak_end" field.
+func (m *BillingProfileMutation) SetPeakEnd(s string) {
+	m.peak_end = &s
+}
+
+// PeakEnd returns the value of the "peak_end" field in the mutation.
+func (m *BillingProfileMutation) PeakEnd() (r string, exists bool) {
+	v := m.peak_end
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPeakEnd returns the old "peak_end" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldPeakEnd(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPeakEnd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPeakEnd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPeakEnd: %w", err)
+	}
+	return oldValue.PeakEnd, nil
+}
+
+// ResetPeakEnd resets all changes to the "peak_end" field.
+func (m *BillingProfileMutation) ResetPeakEnd() {
+	m.peak_end = nil
+}
+
+// SetPeakRateMultiplier sets the "peak_rate_multiplier" field.
+func (m *BillingProfileMutation) SetPeakRateMultiplier(f float64) {
+	m.peak_rate_multiplier = &f
+	m.addpeak_rate_multiplier = nil
+}
+
+// PeakRateMultiplier returns the value of the "peak_rate_multiplier" field in the mutation.
+func (m *BillingProfileMutation) PeakRateMultiplier() (r float64, exists bool) {
+	v := m.peak_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPeakRateMultiplier returns the old "peak_rate_multiplier" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldPeakRateMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPeakRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPeakRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPeakRateMultiplier: %w", err)
+	}
+	return oldValue.PeakRateMultiplier, nil
+}
+
+// AddPeakRateMultiplier adds f to the "peak_rate_multiplier" field.
+func (m *BillingProfileMutation) AddPeakRateMultiplier(f float64) {
+	if m.addpeak_rate_multiplier != nil {
+		*m.addpeak_rate_multiplier += f
+	} else {
+		m.addpeak_rate_multiplier = &f
+	}
+}
+
+// AddedPeakRateMultiplier returns the value that was added to the "peak_rate_multiplier" field in this mutation.
+func (m *BillingProfileMutation) AddedPeakRateMultiplier() (r float64, exists bool) {
+	v := m.addpeak_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPeakRateMultiplier resets all changes to the "peak_rate_multiplier" field.
+func (m *BillingProfileMutation) ResetPeakRateMultiplier() {
+	m.peak_rate_multiplier = nil
+	m.addpeak_rate_multiplier = nil
+}
+
+// SetImageRateIndependent sets the "image_rate_independent" field.
+func (m *BillingProfileMutation) SetImageRateIndependent(b bool) {
+	m.image_rate_independent = &b
+}
+
+// ImageRateIndependent returns the value of the "image_rate_independent" field in the mutation.
+func (m *BillingProfileMutation) ImageRateIndependent() (r bool, exists bool) {
+	v := m.image_rate_independent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageRateIndependent returns the old "image_rate_independent" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldImageRateIndependent(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageRateIndependent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageRateIndependent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageRateIndependent: %w", err)
+	}
+	return oldValue.ImageRateIndependent, nil
+}
+
+// ResetImageRateIndependent resets all changes to the "image_rate_independent" field.
+func (m *BillingProfileMutation) ResetImageRateIndependent() {
+	m.image_rate_independent = nil
+}
+
+// SetImageRateMultiplier sets the "image_rate_multiplier" field.
+func (m *BillingProfileMutation) SetImageRateMultiplier(f float64) {
+	m.image_rate_multiplier = &f
+	m.addimage_rate_multiplier = nil
+}
+
+// ImageRateMultiplier returns the value of the "image_rate_multiplier" field in the mutation.
+func (m *BillingProfileMutation) ImageRateMultiplier() (r float64, exists bool) {
+	v := m.image_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageRateMultiplier returns the old "image_rate_multiplier" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldImageRateMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageRateMultiplier: %w", err)
+	}
+	return oldValue.ImageRateMultiplier, nil
+}
+
+// AddImageRateMultiplier adds f to the "image_rate_multiplier" field.
+func (m *BillingProfileMutation) AddImageRateMultiplier(f float64) {
+	if m.addimage_rate_multiplier != nil {
+		*m.addimage_rate_multiplier += f
+	} else {
+		m.addimage_rate_multiplier = &f
+	}
+}
+
+// AddedImageRateMultiplier returns the value that was added to the "image_rate_multiplier" field in this mutation.
+func (m *BillingProfileMutation) AddedImageRateMultiplier() (r float64, exists bool) {
+	v := m.addimage_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetImageRateMultiplier resets all changes to the "image_rate_multiplier" field.
+func (m *BillingProfileMutation) ResetImageRateMultiplier() {
+	m.image_rate_multiplier = nil
+	m.addimage_rate_multiplier = nil
+}
+
+// SetImagePrice1k sets the "image_price_1k" field.
+func (m *BillingProfileMutation) SetImagePrice1k(f float64) {
+	m.image_price_1k = &f
+	m.addimage_price_1k = nil
+}
+
+// ImagePrice1k returns the value of the "image_price_1k" field in the mutation.
+func (m *BillingProfileMutation) ImagePrice1k() (r float64, exists bool) {
+	v := m.image_price_1k
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImagePrice1k returns the old "image_price_1k" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldImagePrice1k(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImagePrice1k is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImagePrice1k requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImagePrice1k: %w", err)
+	}
+	return oldValue.ImagePrice1k, nil
+}
+
+// AddImagePrice1k adds f to the "image_price_1k" field.
+func (m *BillingProfileMutation) AddImagePrice1k(f float64) {
+	if m.addimage_price_1k != nil {
+		*m.addimage_price_1k += f
+	} else {
+		m.addimage_price_1k = &f
+	}
+}
+
+// AddedImagePrice1k returns the value that was added to the "image_price_1k" field in this mutation.
+func (m *BillingProfileMutation) AddedImagePrice1k() (r float64, exists bool) {
+	v := m.addimage_price_1k
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearImagePrice1k clears the value of the "image_price_1k" field.
+func (m *BillingProfileMutation) ClearImagePrice1k() {
+	m.image_price_1k = nil
+	m.addimage_price_1k = nil
+	m.clearedFields[billingprofile.FieldImagePrice1k] = struct{}{}
+}
+
+// ImagePrice1kCleared returns if the "image_price_1k" field was cleared in this mutation.
+func (m *BillingProfileMutation) ImagePrice1kCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldImagePrice1k]
+	return ok
+}
+
+// ResetImagePrice1k resets all changes to the "image_price_1k" field.
+func (m *BillingProfileMutation) ResetImagePrice1k() {
+	m.image_price_1k = nil
+	m.addimage_price_1k = nil
+	delete(m.clearedFields, billingprofile.FieldImagePrice1k)
+}
+
+// SetImagePrice2k sets the "image_price_2k" field.
+func (m *BillingProfileMutation) SetImagePrice2k(f float64) {
+	m.image_price_2k = &f
+	m.addimage_price_2k = nil
+}
+
+// ImagePrice2k returns the value of the "image_price_2k" field in the mutation.
+func (m *BillingProfileMutation) ImagePrice2k() (r float64, exists bool) {
+	v := m.image_price_2k
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImagePrice2k returns the old "image_price_2k" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldImagePrice2k(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImagePrice2k is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImagePrice2k requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImagePrice2k: %w", err)
+	}
+	return oldValue.ImagePrice2k, nil
+}
+
+// AddImagePrice2k adds f to the "image_price_2k" field.
+func (m *BillingProfileMutation) AddImagePrice2k(f float64) {
+	if m.addimage_price_2k != nil {
+		*m.addimage_price_2k += f
+	} else {
+		m.addimage_price_2k = &f
+	}
+}
+
+// AddedImagePrice2k returns the value that was added to the "image_price_2k" field in this mutation.
+func (m *BillingProfileMutation) AddedImagePrice2k() (r float64, exists bool) {
+	v := m.addimage_price_2k
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearImagePrice2k clears the value of the "image_price_2k" field.
+func (m *BillingProfileMutation) ClearImagePrice2k() {
+	m.image_price_2k = nil
+	m.addimage_price_2k = nil
+	m.clearedFields[billingprofile.FieldImagePrice2k] = struct{}{}
+}
+
+// ImagePrice2kCleared returns if the "image_price_2k" field was cleared in this mutation.
+func (m *BillingProfileMutation) ImagePrice2kCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldImagePrice2k]
+	return ok
+}
+
+// ResetImagePrice2k resets all changes to the "image_price_2k" field.
+func (m *BillingProfileMutation) ResetImagePrice2k() {
+	m.image_price_2k = nil
+	m.addimage_price_2k = nil
+	delete(m.clearedFields, billingprofile.FieldImagePrice2k)
+}
+
+// SetImagePrice4k sets the "image_price_4k" field.
+func (m *BillingProfileMutation) SetImagePrice4k(f float64) {
+	m.image_price_4k = &f
+	m.addimage_price_4k = nil
+}
+
+// ImagePrice4k returns the value of the "image_price_4k" field in the mutation.
+func (m *BillingProfileMutation) ImagePrice4k() (r float64, exists bool) {
+	v := m.image_price_4k
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImagePrice4k returns the old "image_price_4k" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldImagePrice4k(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImagePrice4k is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImagePrice4k requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImagePrice4k: %w", err)
+	}
+	return oldValue.ImagePrice4k, nil
+}
+
+// AddImagePrice4k adds f to the "image_price_4k" field.
+func (m *BillingProfileMutation) AddImagePrice4k(f float64) {
+	if m.addimage_price_4k != nil {
+		*m.addimage_price_4k += f
+	} else {
+		m.addimage_price_4k = &f
+	}
+}
+
+// AddedImagePrice4k returns the value that was added to the "image_price_4k" field in this mutation.
+func (m *BillingProfileMutation) AddedImagePrice4k() (r float64, exists bool) {
+	v := m.addimage_price_4k
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearImagePrice4k clears the value of the "image_price_4k" field.
+func (m *BillingProfileMutation) ClearImagePrice4k() {
+	m.image_price_4k = nil
+	m.addimage_price_4k = nil
+	m.clearedFields[billingprofile.FieldImagePrice4k] = struct{}{}
+}
+
+// ImagePrice4kCleared returns if the "image_price_4k" field was cleared in this mutation.
+func (m *BillingProfileMutation) ImagePrice4kCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldImagePrice4k]
+	return ok
+}
+
+// ResetImagePrice4k resets all changes to the "image_price_4k" field.
+func (m *BillingProfileMutation) ResetImagePrice4k() {
+	m.image_price_4k = nil
+	m.addimage_price_4k = nil
+	delete(m.clearedFields, billingprofile.FieldImagePrice4k)
+}
+
+// SetBatchImageDiscountMultiplier sets the "batch_image_discount_multiplier" field.
+func (m *BillingProfileMutation) SetBatchImageDiscountMultiplier(f float64) {
+	m.batch_image_discount_multiplier = &f
+	m.addbatch_image_discount_multiplier = nil
+}
+
+// BatchImageDiscountMultiplier returns the value of the "batch_image_discount_multiplier" field in the mutation.
+func (m *BillingProfileMutation) BatchImageDiscountMultiplier() (r float64, exists bool) {
+	v := m.batch_image_discount_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBatchImageDiscountMultiplier returns the old "batch_image_discount_multiplier" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldBatchImageDiscountMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBatchImageDiscountMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBatchImageDiscountMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBatchImageDiscountMultiplier: %w", err)
+	}
+	return oldValue.BatchImageDiscountMultiplier, nil
+}
+
+// AddBatchImageDiscountMultiplier adds f to the "batch_image_discount_multiplier" field.
+func (m *BillingProfileMutation) AddBatchImageDiscountMultiplier(f float64) {
+	if m.addbatch_image_discount_multiplier != nil {
+		*m.addbatch_image_discount_multiplier += f
+	} else {
+		m.addbatch_image_discount_multiplier = &f
+	}
+}
+
+// AddedBatchImageDiscountMultiplier returns the value that was added to the "batch_image_discount_multiplier" field in this mutation.
+func (m *BillingProfileMutation) AddedBatchImageDiscountMultiplier() (r float64, exists bool) {
+	v := m.addbatch_image_discount_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBatchImageDiscountMultiplier resets all changes to the "batch_image_discount_multiplier" field.
+func (m *BillingProfileMutation) ResetBatchImageDiscountMultiplier() {
+	m.batch_image_discount_multiplier = nil
+	m.addbatch_image_discount_multiplier = nil
+}
+
+// SetBatchImageHoldMultiplier sets the "batch_image_hold_multiplier" field.
+func (m *BillingProfileMutation) SetBatchImageHoldMultiplier(f float64) {
+	m.batch_image_hold_multiplier = &f
+	m.addbatch_image_hold_multiplier = nil
+}
+
+// BatchImageHoldMultiplier returns the value of the "batch_image_hold_multiplier" field in the mutation.
+func (m *BillingProfileMutation) BatchImageHoldMultiplier() (r float64, exists bool) {
+	v := m.batch_image_hold_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBatchImageHoldMultiplier returns the old "batch_image_hold_multiplier" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldBatchImageHoldMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBatchImageHoldMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBatchImageHoldMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBatchImageHoldMultiplier: %w", err)
+	}
+	return oldValue.BatchImageHoldMultiplier, nil
+}
+
+// AddBatchImageHoldMultiplier adds f to the "batch_image_hold_multiplier" field.
+func (m *BillingProfileMutation) AddBatchImageHoldMultiplier(f float64) {
+	if m.addbatch_image_hold_multiplier != nil {
+		*m.addbatch_image_hold_multiplier += f
+	} else {
+		m.addbatch_image_hold_multiplier = &f
+	}
+}
+
+// AddedBatchImageHoldMultiplier returns the value that was added to the "batch_image_hold_multiplier" field in this mutation.
+func (m *BillingProfileMutation) AddedBatchImageHoldMultiplier() (r float64, exists bool) {
+	v := m.addbatch_image_hold_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBatchImageHoldMultiplier resets all changes to the "batch_image_hold_multiplier" field.
+func (m *BillingProfileMutation) ResetBatchImageHoldMultiplier() {
+	m.batch_image_hold_multiplier = nil
+	m.addbatch_image_hold_multiplier = nil
+}
+
+// SetVideoRateIndependent sets the "video_rate_independent" field.
+func (m *BillingProfileMutation) SetVideoRateIndependent(b bool) {
+	m.video_rate_independent = &b
+}
+
+// VideoRateIndependent returns the value of the "video_rate_independent" field in the mutation.
+func (m *BillingProfileMutation) VideoRateIndependent() (r bool, exists bool) {
+	v := m.video_rate_independent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoRateIndependent returns the old "video_rate_independent" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldVideoRateIndependent(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoRateIndependent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoRateIndependent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoRateIndependent: %w", err)
+	}
+	return oldValue.VideoRateIndependent, nil
+}
+
+// ResetVideoRateIndependent resets all changes to the "video_rate_independent" field.
+func (m *BillingProfileMutation) ResetVideoRateIndependent() {
+	m.video_rate_independent = nil
+}
+
+// SetVideoRateMultiplier sets the "video_rate_multiplier" field.
+func (m *BillingProfileMutation) SetVideoRateMultiplier(f float64) {
+	m.video_rate_multiplier = &f
+	m.addvideo_rate_multiplier = nil
+}
+
+// VideoRateMultiplier returns the value of the "video_rate_multiplier" field in the mutation.
+func (m *BillingProfileMutation) VideoRateMultiplier() (r float64, exists bool) {
+	v := m.video_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoRateMultiplier returns the old "video_rate_multiplier" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldVideoRateMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoRateMultiplier: %w", err)
+	}
+	return oldValue.VideoRateMultiplier, nil
+}
+
+// AddVideoRateMultiplier adds f to the "video_rate_multiplier" field.
+func (m *BillingProfileMutation) AddVideoRateMultiplier(f float64) {
+	if m.addvideo_rate_multiplier != nil {
+		*m.addvideo_rate_multiplier += f
+	} else {
+		m.addvideo_rate_multiplier = &f
+	}
+}
+
+// AddedVideoRateMultiplier returns the value that was added to the "video_rate_multiplier" field in this mutation.
+func (m *BillingProfileMutation) AddedVideoRateMultiplier() (r float64, exists bool) {
+	v := m.addvideo_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVideoRateMultiplier resets all changes to the "video_rate_multiplier" field.
+func (m *BillingProfileMutation) ResetVideoRateMultiplier() {
+	m.video_rate_multiplier = nil
+	m.addvideo_rate_multiplier = nil
+}
+
+// SetVideoPrice480p sets the "video_price_480p" field.
+func (m *BillingProfileMutation) SetVideoPrice480p(f float64) {
+	m.video_price_480p = &f
+	m.addvideo_price_480p = nil
+}
+
+// VideoPrice480p returns the value of the "video_price_480p" field in the mutation.
+func (m *BillingProfileMutation) VideoPrice480p() (r float64, exists bool) {
+	v := m.video_price_480p
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoPrice480p returns the old "video_price_480p" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldVideoPrice480p(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoPrice480p is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoPrice480p requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoPrice480p: %w", err)
+	}
+	return oldValue.VideoPrice480p, nil
+}
+
+// AddVideoPrice480p adds f to the "video_price_480p" field.
+func (m *BillingProfileMutation) AddVideoPrice480p(f float64) {
+	if m.addvideo_price_480p != nil {
+		*m.addvideo_price_480p += f
+	} else {
+		m.addvideo_price_480p = &f
+	}
+}
+
+// AddedVideoPrice480p returns the value that was added to the "video_price_480p" field in this mutation.
+func (m *BillingProfileMutation) AddedVideoPrice480p() (r float64, exists bool) {
+	v := m.addvideo_price_480p
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearVideoPrice480p clears the value of the "video_price_480p" field.
+func (m *BillingProfileMutation) ClearVideoPrice480p() {
+	m.video_price_480p = nil
+	m.addvideo_price_480p = nil
+	m.clearedFields[billingprofile.FieldVideoPrice480p] = struct{}{}
+}
+
+// VideoPrice480pCleared returns if the "video_price_480p" field was cleared in this mutation.
+func (m *BillingProfileMutation) VideoPrice480pCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldVideoPrice480p]
+	return ok
+}
+
+// ResetVideoPrice480p resets all changes to the "video_price_480p" field.
+func (m *BillingProfileMutation) ResetVideoPrice480p() {
+	m.video_price_480p = nil
+	m.addvideo_price_480p = nil
+	delete(m.clearedFields, billingprofile.FieldVideoPrice480p)
+}
+
+// SetVideoPrice720p sets the "video_price_720p" field.
+func (m *BillingProfileMutation) SetVideoPrice720p(f float64) {
+	m.video_price_720p = &f
+	m.addvideo_price_720p = nil
+}
+
+// VideoPrice720p returns the value of the "video_price_720p" field in the mutation.
+func (m *BillingProfileMutation) VideoPrice720p() (r float64, exists bool) {
+	v := m.video_price_720p
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoPrice720p returns the old "video_price_720p" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldVideoPrice720p(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoPrice720p is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoPrice720p requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoPrice720p: %w", err)
+	}
+	return oldValue.VideoPrice720p, nil
+}
+
+// AddVideoPrice720p adds f to the "video_price_720p" field.
+func (m *BillingProfileMutation) AddVideoPrice720p(f float64) {
+	if m.addvideo_price_720p != nil {
+		*m.addvideo_price_720p += f
+	} else {
+		m.addvideo_price_720p = &f
+	}
+}
+
+// AddedVideoPrice720p returns the value that was added to the "video_price_720p" field in this mutation.
+func (m *BillingProfileMutation) AddedVideoPrice720p() (r float64, exists bool) {
+	v := m.addvideo_price_720p
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearVideoPrice720p clears the value of the "video_price_720p" field.
+func (m *BillingProfileMutation) ClearVideoPrice720p() {
+	m.video_price_720p = nil
+	m.addvideo_price_720p = nil
+	m.clearedFields[billingprofile.FieldVideoPrice720p] = struct{}{}
+}
+
+// VideoPrice720pCleared returns if the "video_price_720p" field was cleared in this mutation.
+func (m *BillingProfileMutation) VideoPrice720pCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldVideoPrice720p]
+	return ok
+}
+
+// ResetVideoPrice720p resets all changes to the "video_price_720p" field.
+func (m *BillingProfileMutation) ResetVideoPrice720p() {
+	m.video_price_720p = nil
+	m.addvideo_price_720p = nil
+	delete(m.clearedFields, billingprofile.FieldVideoPrice720p)
+}
+
+// SetVideoPrice1080p sets the "video_price_1080p" field.
+func (m *BillingProfileMutation) SetVideoPrice1080p(f float64) {
+	m.video_price_1080p = &f
+	m.addvideo_price_1080p = nil
+}
+
+// VideoPrice1080p returns the value of the "video_price_1080p" field in the mutation.
+func (m *BillingProfileMutation) VideoPrice1080p() (r float64, exists bool) {
+	v := m.video_price_1080p
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoPrice1080p returns the old "video_price_1080p" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldVideoPrice1080p(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoPrice1080p is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoPrice1080p requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoPrice1080p: %w", err)
+	}
+	return oldValue.VideoPrice1080p, nil
+}
+
+// AddVideoPrice1080p adds f to the "video_price_1080p" field.
+func (m *BillingProfileMutation) AddVideoPrice1080p(f float64) {
+	if m.addvideo_price_1080p != nil {
+		*m.addvideo_price_1080p += f
+	} else {
+		m.addvideo_price_1080p = &f
+	}
+}
+
+// AddedVideoPrice1080p returns the value that was added to the "video_price_1080p" field in this mutation.
+func (m *BillingProfileMutation) AddedVideoPrice1080p() (r float64, exists bool) {
+	v := m.addvideo_price_1080p
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearVideoPrice1080p clears the value of the "video_price_1080p" field.
+func (m *BillingProfileMutation) ClearVideoPrice1080p() {
+	m.video_price_1080p = nil
+	m.addvideo_price_1080p = nil
+	m.clearedFields[billingprofile.FieldVideoPrice1080p] = struct{}{}
+}
+
+// VideoPrice1080pCleared returns if the "video_price_1080p" field was cleared in this mutation.
+func (m *BillingProfileMutation) VideoPrice1080pCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldVideoPrice1080p]
+	return ok
+}
+
+// ResetVideoPrice1080p resets all changes to the "video_price_1080p" field.
+func (m *BillingProfileMutation) ResetVideoPrice1080p() {
+	m.video_price_1080p = nil
+	m.addvideo_price_1080p = nil
+	delete(m.clearedFields, billingprofile.FieldVideoPrice1080p)
+}
+
+// SetWebSearchPricePerCall sets the "web_search_price_per_call" field.
+func (m *BillingProfileMutation) SetWebSearchPricePerCall(f float64) {
+	m.web_search_price_per_call = &f
+	m.addweb_search_price_per_call = nil
+}
+
+// WebSearchPricePerCall returns the value of the "web_search_price_per_call" field in the mutation.
+func (m *BillingProfileMutation) WebSearchPricePerCall() (r float64, exists bool) {
+	v := m.web_search_price_per_call
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWebSearchPricePerCall returns the old "web_search_price_per_call" field's value of the BillingProfile entity.
+// If the BillingProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BillingProfileMutation) OldWebSearchPricePerCall(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWebSearchPricePerCall is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWebSearchPricePerCall requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWebSearchPricePerCall: %w", err)
+	}
+	return oldValue.WebSearchPricePerCall, nil
+}
+
+// AddWebSearchPricePerCall adds f to the "web_search_price_per_call" field.
+func (m *BillingProfileMutation) AddWebSearchPricePerCall(f float64) {
+	if m.addweb_search_price_per_call != nil {
+		*m.addweb_search_price_per_call += f
+	} else {
+		m.addweb_search_price_per_call = &f
+	}
+}
+
+// AddedWebSearchPricePerCall returns the value that was added to the "web_search_price_per_call" field in this mutation.
+func (m *BillingProfileMutation) AddedWebSearchPricePerCall() (r float64, exists bool) {
+	v := m.addweb_search_price_per_call
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWebSearchPricePerCall clears the value of the "web_search_price_per_call" field.
+func (m *BillingProfileMutation) ClearWebSearchPricePerCall() {
+	m.web_search_price_per_call = nil
+	m.addweb_search_price_per_call = nil
+	m.clearedFields[billingprofile.FieldWebSearchPricePerCall] = struct{}{}
+}
+
+// WebSearchPricePerCallCleared returns if the "web_search_price_per_call" field was cleared in this mutation.
+func (m *BillingProfileMutation) WebSearchPricePerCallCleared() bool {
+	_, ok := m.clearedFields[billingprofile.FieldWebSearchPricePerCall]
+	return ok
+}
+
+// ResetWebSearchPricePerCall resets all changes to the "web_search_price_per_call" field.
+func (m *BillingProfileMutation) ResetWebSearchPricePerCall() {
+	m.web_search_price_per_call = nil
+	m.addweb_search_price_per_call = nil
+	delete(m.clearedFields, billingprofile.FieldWebSearchPricePerCall)
+}
+
+// ClearGroup clears the "group" edge to the Group entity.
+func (m *BillingProfileMutation) ClearGroup() {
+	m.clearedgroup = true
+	m.clearedFields[billingprofile.FieldGroupID] = struct{}{}
+}
+
+// GroupCleared reports if the "group" edge to the Group entity was cleared.
+func (m *BillingProfileMutation) GroupCleared() bool {
+	return m.clearedgroup
+}
+
+// GroupIDs returns the "group" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// GroupID instead. It exists only for internal usage by the builders.
+func (m *BillingProfileMutation) GroupIDs() (ids []int64) {
+	if id := m.group; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetGroup resets all changes to the "group" edge.
+func (m *BillingProfileMutation) ResetGroup() {
+	m.group = nil
+	m.clearedgroup = false
+}
+
+// Where appends a list predicates to the BillingProfileMutation builder.
+func (m *BillingProfileMutation) Where(ps ...predicate.BillingProfile) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BillingProfileMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BillingProfileMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.BillingProfile, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BillingProfileMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BillingProfileMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (BillingProfile).
+func (m *BillingProfileMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BillingProfileMutation) Fields() []string {
+	fields := make([]string, 0, 21)
+	if m.created_at != nil {
+		fields = append(fields, billingprofile.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, billingprofile.FieldUpdatedAt)
+	}
+	if m.group != nil {
+		fields = append(fields, billingprofile.FieldGroupID)
+	}
+	if m.balance_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldBalanceRateMultiplier)
+	}
+	if m.peak_rate_enabled != nil {
+		fields = append(fields, billingprofile.FieldPeakRateEnabled)
+	}
+	if m.peak_start != nil {
+		fields = append(fields, billingprofile.FieldPeakStart)
+	}
+	if m.peak_end != nil {
+		fields = append(fields, billingprofile.FieldPeakEnd)
+	}
+	if m.peak_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldPeakRateMultiplier)
+	}
+	if m.image_rate_independent != nil {
+		fields = append(fields, billingprofile.FieldImageRateIndependent)
+	}
+	if m.image_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldImageRateMultiplier)
+	}
+	if m.image_price_1k != nil {
+		fields = append(fields, billingprofile.FieldImagePrice1k)
+	}
+	if m.image_price_2k != nil {
+		fields = append(fields, billingprofile.FieldImagePrice2k)
+	}
+	if m.image_price_4k != nil {
+		fields = append(fields, billingprofile.FieldImagePrice4k)
+	}
+	if m.batch_image_discount_multiplier != nil {
+		fields = append(fields, billingprofile.FieldBatchImageDiscountMultiplier)
+	}
+	if m.batch_image_hold_multiplier != nil {
+		fields = append(fields, billingprofile.FieldBatchImageHoldMultiplier)
+	}
+	if m.video_rate_independent != nil {
+		fields = append(fields, billingprofile.FieldVideoRateIndependent)
+	}
+	if m.video_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldVideoRateMultiplier)
+	}
+	if m.video_price_480p != nil {
+		fields = append(fields, billingprofile.FieldVideoPrice480p)
+	}
+	if m.video_price_720p != nil {
+		fields = append(fields, billingprofile.FieldVideoPrice720p)
+	}
+	if m.video_price_1080p != nil {
+		fields = append(fields, billingprofile.FieldVideoPrice1080p)
+	}
+	if m.web_search_price_per_call != nil {
+		fields = append(fields, billingprofile.FieldWebSearchPricePerCall)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BillingProfileMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case billingprofile.FieldCreatedAt:
+		return m.CreatedAt()
+	case billingprofile.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case billingprofile.FieldGroupID:
+		return m.GroupID()
+	case billingprofile.FieldBalanceRateMultiplier:
+		return m.BalanceRateMultiplier()
+	case billingprofile.FieldPeakRateEnabled:
+		return m.PeakRateEnabled()
+	case billingprofile.FieldPeakStart:
+		return m.PeakStart()
+	case billingprofile.FieldPeakEnd:
+		return m.PeakEnd()
+	case billingprofile.FieldPeakRateMultiplier:
+		return m.PeakRateMultiplier()
+	case billingprofile.FieldImageRateIndependent:
+		return m.ImageRateIndependent()
+	case billingprofile.FieldImageRateMultiplier:
+		return m.ImageRateMultiplier()
+	case billingprofile.FieldImagePrice1k:
+		return m.ImagePrice1k()
+	case billingprofile.FieldImagePrice2k:
+		return m.ImagePrice2k()
+	case billingprofile.FieldImagePrice4k:
+		return m.ImagePrice4k()
+	case billingprofile.FieldBatchImageDiscountMultiplier:
+		return m.BatchImageDiscountMultiplier()
+	case billingprofile.FieldBatchImageHoldMultiplier:
+		return m.BatchImageHoldMultiplier()
+	case billingprofile.FieldVideoRateIndependent:
+		return m.VideoRateIndependent()
+	case billingprofile.FieldVideoRateMultiplier:
+		return m.VideoRateMultiplier()
+	case billingprofile.FieldVideoPrice480p:
+		return m.VideoPrice480p()
+	case billingprofile.FieldVideoPrice720p:
+		return m.VideoPrice720p()
+	case billingprofile.FieldVideoPrice1080p:
+		return m.VideoPrice1080p()
+	case billingprofile.FieldWebSearchPricePerCall:
+		return m.WebSearchPricePerCall()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BillingProfileMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case billingprofile.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case billingprofile.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case billingprofile.FieldGroupID:
+		return m.OldGroupID(ctx)
+	case billingprofile.FieldBalanceRateMultiplier:
+		return m.OldBalanceRateMultiplier(ctx)
+	case billingprofile.FieldPeakRateEnabled:
+		return m.OldPeakRateEnabled(ctx)
+	case billingprofile.FieldPeakStart:
+		return m.OldPeakStart(ctx)
+	case billingprofile.FieldPeakEnd:
+		return m.OldPeakEnd(ctx)
+	case billingprofile.FieldPeakRateMultiplier:
+		return m.OldPeakRateMultiplier(ctx)
+	case billingprofile.FieldImageRateIndependent:
+		return m.OldImageRateIndependent(ctx)
+	case billingprofile.FieldImageRateMultiplier:
+		return m.OldImageRateMultiplier(ctx)
+	case billingprofile.FieldImagePrice1k:
+		return m.OldImagePrice1k(ctx)
+	case billingprofile.FieldImagePrice2k:
+		return m.OldImagePrice2k(ctx)
+	case billingprofile.FieldImagePrice4k:
+		return m.OldImagePrice4k(ctx)
+	case billingprofile.FieldBatchImageDiscountMultiplier:
+		return m.OldBatchImageDiscountMultiplier(ctx)
+	case billingprofile.FieldBatchImageHoldMultiplier:
+		return m.OldBatchImageHoldMultiplier(ctx)
+	case billingprofile.FieldVideoRateIndependent:
+		return m.OldVideoRateIndependent(ctx)
+	case billingprofile.FieldVideoRateMultiplier:
+		return m.OldVideoRateMultiplier(ctx)
+	case billingprofile.FieldVideoPrice480p:
+		return m.OldVideoPrice480p(ctx)
+	case billingprofile.FieldVideoPrice720p:
+		return m.OldVideoPrice720p(ctx)
+	case billingprofile.FieldVideoPrice1080p:
+		return m.OldVideoPrice1080p(ctx)
+	case billingprofile.FieldWebSearchPricePerCall:
+		return m.OldWebSearchPricePerCall(ctx)
+	}
+	return nil, fmt.Errorf("unknown BillingProfile field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BillingProfileMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case billingprofile.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case billingprofile.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case billingprofile.FieldGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupID(v)
+		return nil
+	case billingprofile.FieldBalanceRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceRateMultiplier(v)
+		return nil
+	case billingprofile.FieldPeakRateEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPeakRateEnabled(v)
+		return nil
+	case billingprofile.FieldPeakStart:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPeakStart(v)
+		return nil
+	case billingprofile.FieldPeakEnd:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPeakEnd(v)
+		return nil
+	case billingprofile.FieldPeakRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPeakRateMultiplier(v)
+		return nil
+	case billingprofile.FieldImageRateIndependent:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageRateIndependent(v)
+		return nil
+	case billingprofile.FieldImageRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageRateMultiplier(v)
+		return nil
+	case billingprofile.FieldImagePrice1k:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImagePrice1k(v)
+		return nil
+	case billingprofile.FieldImagePrice2k:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImagePrice2k(v)
+		return nil
+	case billingprofile.FieldImagePrice4k:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImagePrice4k(v)
+		return nil
+	case billingprofile.FieldBatchImageDiscountMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBatchImageDiscountMultiplier(v)
+		return nil
+	case billingprofile.FieldBatchImageHoldMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBatchImageHoldMultiplier(v)
+		return nil
+	case billingprofile.FieldVideoRateIndependent:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoRateIndependent(v)
+		return nil
+	case billingprofile.FieldVideoRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoRateMultiplier(v)
+		return nil
+	case billingprofile.FieldVideoPrice480p:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoPrice480p(v)
+		return nil
+	case billingprofile.FieldVideoPrice720p:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoPrice720p(v)
+		return nil
+	case billingprofile.FieldVideoPrice1080p:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoPrice1080p(v)
+		return nil
+	case billingprofile.FieldWebSearchPricePerCall:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWebSearchPricePerCall(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BillingProfile field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BillingProfileMutation) AddedFields() []string {
+	var fields []string
+	if m.addbalance_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldBalanceRateMultiplier)
+	}
+	if m.addpeak_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldPeakRateMultiplier)
+	}
+	if m.addimage_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldImageRateMultiplier)
+	}
+	if m.addimage_price_1k != nil {
+		fields = append(fields, billingprofile.FieldImagePrice1k)
+	}
+	if m.addimage_price_2k != nil {
+		fields = append(fields, billingprofile.FieldImagePrice2k)
+	}
+	if m.addimage_price_4k != nil {
+		fields = append(fields, billingprofile.FieldImagePrice4k)
+	}
+	if m.addbatch_image_discount_multiplier != nil {
+		fields = append(fields, billingprofile.FieldBatchImageDiscountMultiplier)
+	}
+	if m.addbatch_image_hold_multiplier != nil {
+		fields = append(fields, billingprofile.FieldBatchImageHoldMultiplier)
+	}
+	if m.addvideo_rate_multiplier != nil {
+		fields = append(fields, billingprofile.FieldVideoRateMultiplier)
+	}
+	if m.addvideo_price_480p != nil {
+		fields = append(fields, billingprofile.FieldVideoPrice480p)
+	}
+	if m.addvideo_price_720p != nil {
+		fields = append(fields, billingprofile.FieldVideoPrice720p)
+	}
+	if m.addvideo_price_1080p != nil {
+		fields = append(fields, billingprofile.FieldVideoPrice1080p)
+	}
+	if m.addweb_search_price_per_call != nil {
+		fields = append(fields, billingprofile.FieldWebSearchPricePerCall)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BillingProfileMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case billingprofile.FieldBalanceRateMultiplier:
+		return m.AddedBalanceRateMultiplier()
+	case billingprofile.FieldPeakRateMultiplier:
+		return m.AddedPeakRateMultiplier()
+	case billingprofile.FieldImageRateMultiplier:
+		return m.AddedImageRateMultiplier()
+	case billingprofile.FieldImagePrice1k:
+		return m.AddedImagePrice1k()
+	case billingprofile.FieldImagePrice2k:
+		return m.AddedImagePrice2k()
+	case billingprofile.FieldImagePrice4k:
+		return m.AddedImagePrice4k()
+	case billingprofile.FieldBatchImageDiscountMultiplier:
+		return m.AddedBatchImageDiscountMultiplier()
+	case billingprofile.FieldBatchImageHoldMultiplier:
+		return m.AddedBatchImageHoldMultiplier()
+	case billingprofile.FieldVideoRateMultiplier:
+		return m.AddedVideoRateMultiplier()
+	case billingprofile.FieldVideoPrice480p:
+		return m.AddedVideoPrice480p()
+	case billingprofile.FieldVideoPrice720p:
+		return m.AddedVideoPrice720p()
+	case billingprofile.FieldVideoPrice1080p:
+		return m.AddedVideoPrice1080p()
+	case billingprofile.FieldWebSearchPricePerCall:
+		return m.AddedWebSearchPricePerCall()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BillingProfileMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case billingprofile.FieldBalanceRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBalanceRateMultiplier(v)
+		return nil
+	case billingprofile.FieldPeakRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPeakRateMultiplier(v)
+		return nil
+	case billingprofile.FieldImageRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddImageRateMultiplier(v)
+		return nil
+	case billingprofile.FieldImagePrice1k:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddImagePrice1k(v)
+		return nil
+	case billingprofile.FieldImagePrice2k:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddImagePrice2k(v)
+		return nil
+	case billingprofile.FieldImagePrice4k:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddImagePrice4k(v)
+		return nil
+	case billingprofile.FieldBatchImageDiscountMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBatchImageDiscountMultiplier(v)
+		return nil
+	case billingprofile.FieldBatchImageHoldMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBatchImageHoldMultiplier(v)
+		return nil
+	case billingprofile.FieldVideoRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVideoRateMultiplier(v)
+		return nil
+	case billingprofile.FieldVideoPrice480p:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVideoPrice480p(v)
+		return nil
+	case billingprofile.FieldVideoPrice720p:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVideoPrice720p(v)
+		return nil
+	case billingprofile.FieldVideoPrice1080p:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVideoPrice1080p(v)
+		return nil
+	case billingprofile.FieldWebSearchPricePerCall:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWebSearchPricePerCall(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BillingProfile numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BillingProfileMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(billingprofile.FieldImagePrice1k) {
+		fields = append(fields, billingprofile.FieldImagePrice1k)
+	}
+	if m.FieldCleared(billingprofile.FieldImagePrice2k) {
+		fields = append(fields, billingprofile.FieldImagePrice2k)
+	}
+	if m.FieldCleared(billingprofile.FieldImagePrice4k) {
+		fields = append(fields, billingprofile.FieldImagePrice4k)
+	}
+	if m.FieldCleared(billingprofile.FieldVideoPrice480p) {
+		fields = append(fields, billingprofile.FieldVideoPrice480p)
+	}
+	if m.FieldCleared(billingprofile.FieldVideoPrice720p) {
+		fields = append(fields, billingprofile.FieldVideoPrice720p)
+	}
+	if m.FieldCleared(billingprofile.FieldVideoPrice1080p) {
+		fields = append(fields, billingprofile.FieldVideoPrice1080p)
+	}
+	if m.FieldCleared(billingprofile.FieldWebSearchPricePerCall) {
+		fields = append(fields, billingprofile.FieldWebSearchPricePerCall)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BillingProfileMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BillingProfileMutation) ClearField(name string) error {
+	switch name {
+	case billingprofile.FieldImagePrice1k:
+		m.ClearImagePrice1k()
+		return nil
+	case billingprofile.FieldImagePrice2k:
+		m.ClearImagePrice2k()
+		return nil
+	case billingprofile.FieldImagePrice4k:
+		m.ClearImagePrice4k()
+		return nil
+	case billingprofile.FieldVideoPrice480p:
+		m.ClearVideoPrice480p()
+		return nil
+	case billingprofile.FieldVideoPrice720p:
+		m.ClearVideoPrice720p()
+		return nil
+	case billingprofile.FieldVideoPrice1080p:
+		m.ClearVideoPrice1080p()
+		return nil
+	case billingprofile.FieldWebSearchPricePerCall:
+		m.ClearWebSearchPricePerCall()
+		return nil
+	}
+	return fmt.Errorf("unknown BillingProfile nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BillingProfileMutation) ResetField(name string) error {
+	switch name {
+	case billingprofile.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case billingprofile.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case billingprofile.FieldGroupID:
+		m.ResetGroupID()
+		return nil
+	case billingprofile.FieldBalanceRateMultiplier:
+		m.ResetBalanceRateMultiplier()
+		return nil
+	case billingprofile.FieldPeakRateEnabled:
+		m.ResetPeakRateEnabled()
+		return nil
+	case billingprofile.FieldPeakStart:
+		m.ResetPeakStart()
+		return nil
+	case billingprofile.FieldPeakEnd:
+		m.ResetPeakEnd()
+		return nil
+	case billingprofile.FieldPeakRateMultiplier:
+		m.ResetPeakRateMultiplier()
+		return nil
+	case billingprofile.FieldImageRateIndependent:
+		m.ResetImageRateIndependent()
+		return nil
+	case billingprofile.FieldImageRateMultiplier:
+		m.ResetImageRateMultiplier()
+		return nil
+	case billingprofile.FieldImagePrice1k:
+		m.ResetImagePrice1k()
+		return nil
+	case billingprofile.FieldImagePrice2k:
+		m.ResetImagePrice2k()
+		return nil
+	case billingprofile.FieldImagePrice4k:
+		m.ResetImagePrice4k()
+		return nil
+	case billingprofile.FieldBatchImageDiscountMultiplier:
+		m.ResetBatchImageDiscountMultiplier()
+		return nil
+	case billingprofile.FieldBatchImageHoldMultiplier:
+		m.ResetBatchImageHoldMultiplier()
+		return nil
+	case billingprofile.FieldVideoRateIndependent:
+		m.ResetVideoRateIndependent()
+		return nil
+	case billingprofile.FieldVideoRateMultiplier:
+		m.ResetVideoRateMultiplier()
+		return nil
+	case billingprofile.FieldVideoPrice480p:
+		m.ResetVideoPrice480p()
+		return nil
+	case billingprofile.FieldVideoPrice720p:
+		m.ResetVideoPrice720p()
+		return nil
+	case billingprofile.FieldVideoPrice1080p:
+		m.ResetVideoPrice1080p()
+		return nil
+	case billingprofile.FieldWebSearchPricePerCall:
+		m.ResetWebSearchPricePerCall()
+		return nil
+	}
+	return fmt.Errorf("unknown BillingProfile field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BillingProfileMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.group != nil {
+		edges = append(edges, billingprofile.EdgeGroup)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BillingProfileMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case billingprofile.EdgeGroup:
+		if id := m.group; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BillingProfileMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BillingProfileMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BillingProfileMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedgroup {
+		edges = append(edges, billingprofile.EdgeGroup)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BillingProfileMutation) EdgeCleared(name string) bool {
+	switch name {
+	case billingprofile.EdgeGroup:
+		return m.clearedgroup
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BillingProfileMutation) ClearEdge(name string) error {
+	switch name {
+	case billingprofile.EdgeGroup:
+		m.ClearGroup()
+		return nil
+	}
+	return fmt.Errorf("unknown BillingProfile unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BillingProfileMutation) ResetEdge(name string) error {
+	switch name {
+	case billingprofile.EdgeGroup:
+		m.ResetGroup()
+		return nil
+	}
+	return fmt.Errorf("unknown BillingProfile edge %s", name)
+}
+
 // ChannelMonitorMutation represents an operation that mutates the ChannelMonitor nodes in the graph.
 type ChannelMonitorMutation struct {
 	config
@@ -21923,6 +23960,8 @@ type GroupMutation struct {
 	reasoning_effort_mappings               *[]domain.ReasoningEffortMapping
 	appendreasoning_effort_mappings         []domain.ReasoningEffortMapping
 	clearedFields                           map[string]struct{}
+	billing_profile                         *int64
+	clearedbilling_profile                  bool
 	api_keys                                map[int64]struct{}
 	removedapi_keys                         map[int64]struct{}
 	clearedapi_keys                         bool
@@ -24586,6 +26625,45 @@ func (m *GroupMutation) ResetReasoningEffortMappings() {
 	m.appendreasoning_effort_mappings = nil
 }
 
+// SetBillingProfileID sets the "billing_profile" edge to the BillingProfile entity by id.
+func (m *GroupMutation) SetBillingProfileID(id int64) {
+	m.billing_profile = &id
+}
+
+// ClearBillingProfile clears the "billing_profile" edge to the BillingProfile entity.
+func (m *GroupMutation) ClearBillingProfile() {
+	m.clearedbilling_profile = true
+}
+
+// BillingProfileCleared reports if the "billing_profile" edge to the BillingProfile entity was cleared.
+func (m *GroupMutation) BillingProfileCleared() bool {
+	return m.clearedbilling_profile
+}
+
+// BillingProfileID returns the "billing_profile" edge ID in the mutation.
+func (m *GroupMutation) BillingProfileID() (id int64, exists bool) {
+	if m.billing_profile != nil {
+		return *m.billing_profile, true
+	}
+	return
+}
+
+// BillingProfileIDs returns the "billing_profile" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// BillingProfileID instead. It exists only for internal usage by the builders.
+func (m *GroupMutation) BillingProfileIDs() (ids []int64) {
+	if id := m.billing_profile; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetBillingProfile resets all changes to the "billing_profile" edge.
+func (m *GroupMutation) ResetBillingProfile() {
+	m.billing_profile = nil
+	m.clearedbilling_profile = false
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
 func (m *GroupMutation) AddAPIKeyIDs(ids ...int64) {
 	if m.api_keys == nil {
@@ -26264,7 +28342,10 @@ func (m *GroupMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *GroupMutation) AddedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
+	if m.billing_profile != nil {
+		edges = append(edges, group.EdgeBillingProfile)
+	}
 	if m.api_keys != nil {
 		edges = append(edges, group.EdgeAPIKeys)
 	}
@@ -26290,6 +28371,10 @@ func (m *GroupMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *GroupMutation) AddedIDs(name string) []ent.Value {
 	switch name {
+	case group.EdgeBillingProfile:
+		if id := m.billing_profile; id != nil {
+			return []ent.Value{*id}
+		}
 	case group.EdgeAPIKeys:
 		ids := make([]ent.Value, 0, len(m.api_keys))
 		for id := range m.api_keys {
@@ -26332,7 +28417,7 @@ func (m *GroupMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *GroupMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.removedapi_keys != nil {
 		edges = append(edges, group.EdgeAPIKeys)
 	}
@@ -26400,7 +28485,10 @@ func (m *GroupMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *GroupMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
+	if m.clearedbilling_profile {
+		edges = append(edges, group.EdgeBillingProfile)
+	}
 	if m.clearedapi_keys {
 		edges = append(edges, group.EdgeAPIKeys)
 	}
@@ -26426,6 +28514,8 @@ func (m *GroupMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *GroupMutation) EdgeCleared(name string) bool {
 	switch name {
+	case group.EdgeBillingProfile:
+		return m.clearedbilling_profile
 	case group.EdgeAPIKeys:
 		return m.clearedapi_keys
 	case group.EdgeRedeemCodes:
@@ -26446,6 +28536,9 @@ func (m *GroupMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *GroupMutation) ClearEdge(name string) error {
 	switch name {
+	case group.EdgeBillingProfile:
+		m.ClearBillingProfile()
+		return nil
 	}
 	return fmt.Errorf("unknown Group unique edge %s", name)
 }
@@ -26454,6 +28547,9 @@ func (m *GroupMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *GroupMutation) ResetEdge(name string) error {
 	switch name {
+	case group.EdgeBillingProfile:
+		m.ResetBillingProfile()
+		return nil
 	case group.EdgeAPIKeys:
 		m.ResetAPIKeys()
 		return nil
@@ -37377,28 +39473,39 @@ func (m *ProxyMutation) ResetEdge(name string) error {
 // RedeemCodeMutation represents an operation that mutates the RedeemCode nodes in the graph.
 type RedeemCodeMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *int64
-	code             *string
-	_type            *string
-	value            *float64
-	addvalue         *float64
-	status           *string
-	used_at          *time.Time
-	notes            *string
-	created_at       *time.Time
-	expires_at       *time.Time
-	validity_days    *int
-	addvalidity_days *int
-	clearedFields    map[string]struct{}
-	user             *int64
-	cleareduser      bool
-	group            *int64
-	clearedgroup     bool
-	done             bool
-	oldValue         func(context.Context) (*RedeemCode, error)
-	predicates       []predicate.RedeemCode
+	op                            Op
+	typ                           string
+	id                            *int64
+	code                          *string
+	_type                         *string
+	value                         *float64
+	addvalue                      *float64
+	status                        *string
+	used_at                       *time.Time
+	notes                         *string
+	created_at                    *time.Time
+	expires_at                    *time.Time
+	plan_name_snapshot            *string
+	daily_limit_usd_snapshot      *float64
+	adddaily_limit_usd_snapshot   *float64
+	weekly_limit_usd_snapshot     *float64
+	addweekly_limit_usd_snapshot  *float64
+	monthly_limit_usd_snapshot    *float64
+	addmonthly_limit_usd_snapshot *float64
+	rate_multiplier_snapshot      *float64
+	addrate_multiplier_snapshot   *float64
+	validity_days                 *int
+	addvalidity_days              *int
+	clearedFields                 map[string]struct{}
+	user                          *int64
+	cleareduser                   bool
+	group                         *int64
+	clearedgroup                  bool
+	subscription_plan             *int64
+	clearedsubscription_plan      bool
+	done                          bool
+	oldValue                      func(context.Context) (*RedeemCode, error)
+	predicates                    []predicate.RedeemCode
 }
 
 var _ ent.Mutation = (*RedeemCodeMutation)(nil)
@@ -37944,6 +40051,357 @@ func (m *RedeemCodeMutation) ResetGroupID() {
 	delete(m.clearedFields, redeemcode.FieldGroupID)
 }
 
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (m *RedeemCodeMutation) SetSubscriptionPlanID(i int64) {
+	m.subscription_plan = &i
+}
+
+// SubscriptionPlanID returns the value of the "subscription_plan_id" field in the mutation.
+func (m *RedeemCodeMutation) SubscriptionPlanID() (r int64, exists bool) {
+	v := m.subscription_plan
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionPlanID returns the old "subscription_plan_id" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldSubscriptionPlanID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionPlanID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionPlanID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionPlanID: %w", err)
+	}
+	return oldValue.SubscriptionPlanID, nil
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (m *RedeemCodeMutation) ClearSubscriptionPlanID() {
+	m.subscription_plan = nil
+	m.clearedFields[redeemcode.FieldSubscriptionPlanID] = struct{}{}
+}
+
+// SubscriptionPlanIDCleared returns if the "subscription_plan_id" field was cleared in this mutation.
+func (m *RedeemCodeMutation) SubscriptionPlanIDCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldSubscriptionPlanID]
+	return ok
+}
+
+// ResetSubscriptionPlanID resets all changes to the "subscription_plan_id" field.
+func (m *RedeemCodeMutation) ResetSubscriptionPlanID() {
+	m.subscription_plan = nil
+	delete(m.clearedFields, redeemcode.FieldSubscriptionPlanID)
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (m *RedeemCodeMutation) SetPlanNameSnapshot(s string) {
+	m.plan_name_snapshot = &s
+}
+
+// PlanNameSnapshot returns the value of the "plan_name_snapshot" field in the mutation.
+func (m *RedeemCodeMutation) PlanNameSnapshot() (r string, exists bool) {
+	v := m.plan_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlanNameSnapshot returns the old "plan_name_snapshot" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldPlanNameSnapshot(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlanNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlanNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlanNameSnapshot: %w", err)
+	}
+	return oldValue.PlanNameSnapshot, nil
+}
+
+// ResetPlanNameSnapshot resets all changes to the "plan_name_snapshot" field.
+func (m *RedeemCodeMutation) ResetPlanNameSnapshot() {
+	m.plan_name_snapshot = nil
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) SetDailyLimitUsdSnapshot(f float64) {
+	m.daily_limit_usd_snapshot = &f
+	m.adddaily_limit_usd_snapshot = nil
+}
+
+// DailyLimitUsdSnapshot returns the value of the "daily_limit_usd_snapshot" field in the mutation.
+func (m *RedeemCodeMutation) DailyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.daily_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDailyLimitUsdSnapshot returns the old "daily_limit_usd_snapshot" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldDailyLimitUsdSnapshot(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDailyLimitUsdSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDailyLimitUsdSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDailyLimitUsdSnapshot: %w", err)
+	}
+	return oldValue.DailyLimitUsdSnapshot, nil
+}
+
+// AddDailyLimitUsdSnapshot adds f to the "daily_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) AddDailyLimitUsdSnapshot(f float64) {
+	if m.adddaily_limit_usd_snapshot != nil {
+		*m.adddaily_limit_usd_snapshot += f
+	} else {
+		m.adddaily_limit_usd_snapshot = &f
+	}
+}
+
+// AddedDailyLimitUsdSnapshot returns the value that was added to the "daily_limit_usd_snapshot" field in this mutation.
+func (m *RedeemCodeMutation) AddedDailyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.adddaily_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) ClearDailyLimitUsdSnapshot() {
+	m.daily_limit_usd_snapshot = nil
+	m.adddaily_limit_usd_snapshot = nil
+	m.clearedFields[redeemcode.FieldDailyLimitUsdSnapshot] = struct{}{}
+}
+
+// DailyLimitUsdSnapshotCleared returns if the "daily_limit_usd_snapshot" field was cleared in this mutation.
+func (m *RedeemCodeMutation) DailyLimitUsdSnapshotCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldDailyLimitUsdSnapshot]
+	return ok
+}
+
+// ResetDailyLimitUsdSnapshot resets all changes to the "daily_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) ResetDailyLimitUsdSnapshot() {
+	m.daily_limit_usd_snapshot = nil
+	m.adddaily_limit_usd_snapshot = nil
+	delete(m.clearedFields, redeemcode.FieldDailyLimitUsdSnapshot)
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) SetWeeklyLimitUsdSnapshot(f float64) {
+	m.weekly_limit_usd_snapshot = &f
+	m.addweekly_limit_usd_snapshot = nil
+}
+
+// WeeklyLimitUsdSnapshot returns the value of the "weekly_limit_usd_snapshot" field in the mutation.
+func (m *RedeemCodeMutation) WeeklyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.weekly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeeklyLimitUsdSnapshot returns the old "weekly_limit_usd_snapshot" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldWeeklyLimitUsdSnapshot(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeeklyLimitUsdSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeeklyLimitUsdSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeeklyLimitUsdSnapshot: %w", err)
+	}
+	return oldValue.WeeklyLimitUsdSnapshot, nil
+}
+
+// AddWeeklyLimitUsdSnapshot adds f to the "weekly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) AddWeeklyLimitUsdSnapshot(f float64) {
+	if m.addweekly_limit_usd_snapshot != nil {
+		*m.addweekly_limit_usd_snapshot += f
+	} else {
+		m.addweekly_limit_usd_snapshot = &f
+	}
+}
+
+// AddedWeeklyLimitUsdSnapshot returns the value that was added to the "weekly_limit_usd_snapshot" field in this mutation.
+func (m *RedeemCodeMutation) AddedWeeklyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.addweekly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) ClearWeeklyLimitUsdSnapshot() {
+	m.weekly_limit_usd_snapshot = nil
+	m.addweekly_limit_usd_snapshot = nil
+	m.clearedFields[redeemcode.FieldWeeklyLimitUsdSnapshot] = struct{}{}
+}
+
+// WeeklyLimitUsdSnapshotCleared returns if the "weekly_limit_usd_snapshot" field was cleared in this mutation.
+func (m *RedeemCodeMutation) WeeklyLimitUsdSnapshotCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldWeeklyLimitUsdSnapshot]
+	return ok
+}
+
+// ResetWeeklyLimitUsdSnapshot resets all changes to the "weekly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) ResetWeeklyLimitUsdSnapshot() {
+	m.weekly_limit_usd_snapshot = nil
+	m.addweekly_limit_usd_snapshot = nil
+	delete(m.clearedFields, redeemcode.FieldWeeklyLimitUsdSnapshot)
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) SetMonthlyLimitUsdSnapshot(f float64) {
+	m.monthly_limit_usd_snapshot = &f
+	m.addmonthly_limit_usd_snapshot = nil
+}
+
+// MonthlyLimitUsdSnapshot returns the value of the "monthly_limit_usd_snapshot" field in the mutation.
+func (m *RedeemCodeMutation) MonthlyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.monthly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMonthlyLimitUsdSnapshot returns the old "monthly_limit_usd_snapshot" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldMonthlyLimitUsdSnapshot(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMonthlyLimitUsdSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMonthlyLimitUsdSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMonthlyLimitUsdSnapshot: %w", err)
+	}
+	return oldValue.MonthlyLimitUsdSnapshot, nil
+}
+
+// AddMonthlyLimitUsdSnapshot adds f to the "monthly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) AddMonthlyLimitUsdSnapshot(f float64) {
+	if m.addmonthly_limit_usd_snapshot != nil {
+		*m.addmonthly_limit_usd_snapshot += f
+	} else {
+		m.addmonthly_limit_usd_snapshot = &f
+	}
+}
+
+// AddedMonthlyLimitUsdSnapshot returns the value that was added to the "monthly_limit_usd_snapshot" field in this mutation.
+func (m *RedeemCodeMutation) AddedMonthlyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.addmonthly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) ClearMonthlyLimitUsdSnapshot() {
+	m.monthly_limit_usd_snapshot = nil
+	m.addmonthly_limit_usd_snapshot = nil
+	m.clearedFields[redeemcode.FieldMonthlyLimitUsdSnapshot] = struct{}{}
+}
+
+// MonthlyLimitUsdSnapshotCleared returns if the "monthly_limit_usd_snapshot" field was cleared in this mutation.
+func (m *RedeemCodeMutation) MonthlyLimitUsdSnapshotCleared() bool {
+	_, ok := m.clearedFields[redeemcode.FieldMonthlyLimitUsdSnapshot]
+	return ok
+}
+
+// ResetMonthlyLimitUsdSnapshot resets all changes to the "monthly_limit_usd_snapshot" field.
+func (m *RedeemCodeMutation) ResetMonthlyLimitUsdSnapshot() {
+	m.monthly_limit_usd_snapshot = nil
+	m.addmonthly_limit_usd_snapshot = nil
+	delete(m.clearedFields, redeemcode.FieldMonthlyLimitUsdSnapshot)
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (m *RedeemCodeMutation) SetRateMultiplierSnapshot(f float64) {
+	m.rate_multiplier_snapshot = &f
+	m.addrate_multiplier_snapshot = nil
+}
+
+// RateMultiplierSnapshot returns the value of the "rate_multiplier_snapshot" field in the mutation.
+func (m *RedeemCodeMutation) RateMultiplierSnapshot() (r float64, exists bool) {
+	v := m.rate_multiplier_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplierSnapshot returns the old "rate_multiplier_snapshot" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldRateMultiplierSnapshot(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplierSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplierSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplierSnapshot: %w", err)
+	}
+	return oldValue.RateMultiplierSnapshot, nil
+}
+
+// AddRateMultiplierSnapshot adds f to the "rate_multiplier_snapshot" field.
+func (m *RedeemCodeMutation) AddRateMultiplierSnapshot(f float64) {
+	if m.addrate_multiplier_snapshot != nil {
+		*m.addrate_multiplier_snapshot += f
+	} else {
+		m.addrate_multiplier_snapshot = &f
+	}
+}
+
+// AddedRateMultiplierSnapshot returns the value that was added to the "rate_multiplier_snapshot" field in this mutation.
+func (m *RedeemCodeMutation) AddedRateMultiplierSnapshot() (r float64, exists bool) {
+	v := m.addrate_multiplier_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRateMultiplierSnapshot resets all changes to the "rate_multiplier_snapshot" field.
+func (m *RedeemCodeMutation) ResetRateMultiplierSnapshot() {
+	m.rate_multiplier_snapshot = nil
+	m.addrate_multiplier_snapshot = nil
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (m *RedeemCodeMutation) SetValidityDays(i int) {
 	m.validity_days = &i
@@ -38067,6 +40525,33 @@ func (m *RedeemCodeMutation) ResetGroup() {
 	m.clearedgroup = false
 }
 
+// ClearSubscriptionPlan clears the "subscription_plan" edge to the SubscriptionPlan entity.
+func (m *RedeemCodeMutation) ClearSubscriptionPlan() {
+	m.clearedsubscription_plan = true
+	m.clearedFields[redeemcode.FieldSubscriptionPlanID] = struct{}{}
+}
+
+// SubscriptionPlanCleared reports if the "subscription_plan" edge to the SubscriptionPlan entity was cleared.
+func (m *RedeemCodeMutation) SubscriptionPlanCleared() bool {
+	return m.SubscriptionPlanIDCleared() || m.clearedsubscription_plan
+}
+
+// SubscriptionPlanIDs returns the "subscription_plan" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SubscriptionPlanID instead. It exists only for internal usage by the builders.
+func (m *RedeemCodeMutation) SubscriptionPlanIDs() (ids []int64) {
+	if id := m.subscription_plan; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSubscriptionPlan resets all changes to the "subscription_plan" edge.
+func (m *RedeemCodeMutation) ResetSubscriptionPlan() {
+	m.subscription_plan = nil
+	m.clearedsubscription_plan = false
+}
+
 // Where appends a list predicates to the RedeemCodeMutation builder.
 func (m *RedeemCodeMutation) Where(ps ...predicate.RedeemCode) {
 	m.predicates = append(m.predicates, ps...)
@@ -38101,7 +40586,7 @@ func (m *RedeemCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RedeemCodeMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 17)
 	if m.code != nil {
 		fields = append(fields, redeemcode.FieldCode)
 	}
@@ -38131,6 +40616,24 @@ func (m *RedeemCodeMutation) Fields() []string {
 	}
 	if m.group != nil {
 		fields = append(fields, redeemcode.FieldGroupID)
+	}
+	if m.subscription_plan != nil {
+		fields = append(fields, redeemcode.FieldSubscriptionPlanID)
+	}
+	if m.plan_name_snapshot != nil {
+		fields = append(fields, redeemcode.FieldPlanNameSnapshot)
+	}
+	if m.daily_limit_usd_snapshot != nil {
+		fields = append(fields, redeemcode.FieldDailyLimitUsdSnapshot)
+	}
+	if m.weekly_limit_usd_snapshot != nil {
+		fields = append(fields, redeemcode.FieldWeeklyLimitUsdSnapshot)
+	}
+	if m.monthly_limit_usd_snapshot != nil {
+		fields = append(fields, redeemcode.FieldMonthlyLimitUsdSnapshot)
+	}
+	if m.rate_multiplier_snapshot != nil {
+		fields = append(fields, redeemcode.FieldRateMultiplierSnapshot)
 	}
 	if m.validity_days != nil {
 		fields = append(fields, redeemcode.FieldValidityDays)
@@ -38163,6 +40666,18 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.ExpiresAt()
 	case redeemcode.FieldGroupID:
 		return m.GroupID()
+	case redeemcode.FieldSubscriptionPlanID:
+		return m.SubscriptionPlanID()
+	case redeemcode.FieldPlanNameSnapshot:
+		return m.PlanNameSnapshot()
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		return m.DailyLimitUsdSnapshot()
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		return m.WeeklyLimitUsdSnapshot()
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		return m.MonthlyLimitUsdSnapshot()
+	case redeemcode.FieldRateMultiplierSnapshot:
+		return m.RateMultiplierSnapshot()
 	case redeemcode.FieldValidityDays:
 		return m.ValidityDays()
 	}
@@ -38194,6 +40709,18 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldExpiresAt(ctx)
 	case redeemcode.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case redeemcode.FieldSubscriptionPlanID:
+		return m.OldSubscriptionPlanID(ctx)
+	case redeemcode.FieldPlanNameSnapshot:
+		return m.OldPlanNameSnapshot(ctx)
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		return m.OldDailyLimitUsdSnapshot(ctx)
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		return m.OldWeeklyLimitUsdSnapshot(ctx)
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		return m.OldMonthlyLimitUsdSnapshot(ctx)
+	case redeemcode.FieldRateMultiplierSnapshot:
+		return m.OldRateMultiplierSnapshot(ctx)
 	case redeemcode.FieldValidityDays:
 		return m.OldValidityDays(ctx)
 	}
@@ -38275,6 +40802,48 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetGroupID(v)
 		return nil
+	case redeemcode.FieldSubscriptionPlanID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionPlanID(v)
+		return nil
+	case redeemcode.FieldPlanNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlanNameSnapshot(v)
+		return nil
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDailyLimitUsdSnapshot(v)
+		return nil
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeeklyLimitUsdSnapshot(v)
+		return nil
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMonthlyLimitUsdSnapshot(v)
+		return nil
+	case redeemcode.FieldRateMultiplierSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplierSnapshot(v)
+		return nil
 	case redeemcode.FieldValidityDays:
 		v, ok := value.(int)
 		if !ok {
@@ -38293,6 +40862,18 @@ func (m *RedeemCodeMutation) AddedFields() []string {
 	if m.addvalue != nil {
 		fields = append(fields, redeemcode.FieldValue)
 	}
+	if m.adddaily_limit_usd_snapshot != nil {
+		fields = append(fields, redeemcode.FieldDailyLimitUsdSnapshot)
+	}
+	if m.addweekly_limit_usd_snapshot != nil {
+		fields = append(fields, redeemcode.FieldWeeklyLimitUsdSnapshot)
+	}
+	if m.addmonthly_limit_usd_snapshot != nil {
+		fields = append(fields, redeemcode.FieldMonthlyLimitUsdSnapshot)
+	}
+	if m.addrate_multiplier_snapshot != nil {
+		fields = append(fields, redeemcode.FieldRateMultiplierSnapshot)
+	}
 	if m.addvalidity_days != nil {
 		fields = append(fields, redeemcode.FieldValidityDays)
 	}
@@ -38306,6 +40887,14 @@ func (m *RedeemCodeMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case redeemcode.FieldValue:
 		return m.AddedValue()
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		return m.AddedDailyLimitUsdSnapshot()
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		return m.AddedWeeklyLimitUsdSnapshot()
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		return m.AddedMonthlyLimitUsdSnapshot()
+	case redeemcode.FieldRateMultiplierSnapshot:
+		return m.AddedRateMultiplierSnapshot()
 	case redeemcode.FieldValidityDays:
 		return m.AddedValidityDays()
 	}
@@ -38323,6 +40912,34 @@ func (m *RedeemCodeMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddValue(v)
+		return nil
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDailyLimitUsdSnapshot(v)
+		return nil
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWeeklyLimitUsdSnapshot(v)
+		return nil
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMonthlyLimitUsdSnapshot(v)
+		return nil
+	case redeemcode.FieldRateMultiplierSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRateMultiplierSnapshot(v)
 		return nil
 	case redeemcode.FieldValidityDays:
 		v, ok := value.(int)
@@ -38354,6 +40971,18 @@ func (m *RedeemCodeMutation) ClearedFields() []string {
 	if m.FieldCleared(redeemcode.FieldGroupID) {
 		fields = append(fields, redeemcode.FieldGroupID)
 	}
+	if m.FieldCleared(redeemcode.FieldSubscriptionPlanID) {
+		fields = append(fields, redeemcode.FieldSubscriptionPlanID)
+	}
+	if m.FieldCleared(redeemcode.FieldDailyLimitUsdSnapshot) {
+		fields = append(fields, redeemcode.FieldDailyLimitUsdSnapshot)
+	}
+	if m.FieldCleared(redeemcode.FieldWeeklyLimitUsdSnapshot) {
+		fields = append(fields, redeemcode.FieldWeeklyLimitUsdSnapshot)
+	}
+	if m.FieldCleared(redeemcode.FieldMonthlyLimitUsdSnapshot) {
+		fields = append(fields, redeemcode.FieldMonthlyLimitUsdSnapshot)
+	}
 	return fields
 }
 
@@ -38382,6 +41011,18 @@ func (m *RedeemCodeMutation) ClearField(name string) error {
 		return nil
 	case redeemcode.FieldGroupID:
 		m.ClearGroupID()
+		return nil
+	case redeemcode.FieldSubscriptionPlanID:
+		m.ClearSubscriptionPlanID()
+		return nil
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		m.ClearDailyLimitUsdSnapshot()
+		return nil
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		m.ClearWeeklyLimitUsdSnapshot()
+		return nil
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		m.ClearMonthlyLimitUsdSnapshot()
 		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode nullable field %s", name)
@@ -38421,6 +41062,24 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 	case redeemcode.FieldGroupID:
 		m.ResetGroupID()
 		return nil
+	case redeemcode.FieldSubscriptionPlanID:
+		m.ResetSubscriptionPlanID()
+		return nil
+	case redeemcode.FieldPlanNameSnapshot:
+		m.ResetPlanNameSnapshot()
+		return nil
+	case redeemcode.FieldDailyLimitUsdSnapshot:
+		m.ResetDailyLimitUsdSnapshot()
+		return nil
+	case redeemcode.FieldWeeklyLimitUsdSnapshot:
+		m.ResetWeeklyLimitUsdSnapshot()
+		return nil
+	case redeemcode.FieldMonthlyLimitUsdSnapshot:
+		m.ResetMonthlyLimitUsdSnapshot()
+		return nil
+	case redeemcode.FieldRateMultiplierSnapshot:
+		m.ResetRateMultiplierSnapshot()
+		return nil
 	case redeemcode.FieldValidityDays:
 		m.ResetValidityDays()
 		return nil
@@ -38430,12 +41089,15 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *RedeemCodeMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.user != nil {
 		edges = append(edges, redeemcode.EdgeUser)
 	}
 	if m.group != nil {
 		edges = append(edges, redeemcode.EdgeGroup)
+	}
+	if m.subscription_plan != nil {
+		edges = append(edges, redeemcode.EdgeSubscriptionPlan)
 	}
 	return edges
 }
@@ -38452,13 +41114,17 @@ func (m *RedeemCodeMutation) AddedIDs(name string) []ent.Value {
 		if id := m.group; id != nil {
 			return []ent.Value{*id}
 		}
+	case redeemcode.EdgeSubscriptionPlan:
+		if id := m.subscription_plan; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *RedeemCodeMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	return edges
 }
 
@@ -38470,12 +41136,15 @@ func (m *RedeemCodeMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *RedeemCodeMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.cleareduser {
 		edges = append(edges, redeemcode.EdgeUser)
 	}
 	if m.clearedgroup {
 		edges = append(edges, redeemcode.EdgeGroup)
+	}
+	if m.clearedsubscription_plan {
+		edges = append(edges, redeemcode.EdgeSubscriptionPlan)
 	}
 	return edges
 }
@@ -38488,6 +41157,8 @@ func (m *RedeemCodeMutation) EdgeCleared(name string) bool {
 		return m.cleareduser
 	case redeemcode.EdgeGroup:
 		return m.clearedgroup
+	case redeemcode.EdgeSubscriptionPlan:
+		return m.clearedsubscription_plan
 	}
 	return false
 }
@@ -38502,6 +41173,9 @@ func (m *RedeemCodeMutation) ClearEdge(name string) error {
 	case redeemcode.EdgeGroup:
 		m.ClearGroup()
 		return nil
+	case redeemcode.EdgeSubscriptionPlan:
+		m.ClearSubscriptionPlan()
+		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode unique edge %s", name)
 }
@@ -38515,6 +41189,9 @@ func (m *RedeemCodeMutation) ResetEdge(name string) error {
 		return nil
 	case redeemcode.EdgeGroup:
 		m.ResetGroup()
+		return nil
+	case redeemcode.EdgeSubscriptionPlan:
+		m.ResetSubscriptionPlan()
 		return nil
 	}
 	return fmt.Errorf("unknown RedeemCode edge %s", name)
@@ -39445,32 +42122,46 @@ func (m *SettingMutation) ResetEdge(name string) error {
 // SubscriptionPlanMutation represents an operation that mutates the SubscriptionPlan nodes in the graph.
 type SubscriptionPlanMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int64
-	group_id          *int64
-	addgroup_id       *int64
-	name              *string
-	description       *string
-	price             *float64
-	addprice          *float64
-	original_price    *float64
-	addoriginal_price *float64
-	currency          *string
-	validity_days     *int
-	addvalidity_days  *int
-	validity_unit     *string
-	features          *string
-	product_name      *string
-	for_sale          *bool
-	sort_order        *int
-	addsort_order     *int
-	created_at        *time.Time
-	updated_at        *time.Time
-	clearedFields     map[string]struct{}
-	done              bool
-	oldValue          func(context.Context) (*SubscriptionPlan, error)
-	predicates        []predicate.SubscriptionPlan
+	op                   Op
+	typ                  string
+	id                   *int64
+	group_id             *int64
+	addgroup_id          *int64
+	name                 *string
+	description          *string
+	price                *float64
+	addprice             *float64
+	original_price       *float64
+	addoriginal_price    *float64
+	currency             *string
+	validity_days        *int
+	addvalidity_days     *int
+	validity_unit        *string
+	features             *string
+	product_name         *string
+	for_sale             *bool
+	sort_order           *int
+	addsort_order        *int
+	daily_limit_usd      *float64
+	adddaily_limit_usd   *float64
+	weekly_limit_usd     *float64
+	addweekly_limit_usd  *float64
+	monthly_limit_usd    *float64
+	addmonthly_limit_usd *float64
+	rate_multiplier      *float64
+	addrate_multiplier   *float64
+	created_at           *time.Time
+	updated_at           *time.Time
+	clearedFields        map[string]struct{}
+	subscriptions        map[int64]struct{}
+	removedsubscriptions map[int64]struct{}
+	clearedsubscriptions bool
+	redeem_codes         map[int64]struct{}
+	removedredeem_codes  map[int64]struct{}
+	clearedredeem_codes  bool
+	done                 bool
+	oldValue             func(context.Context) (*SubscriptionPlan, error)
+	predicates           []predicate.SubscriptionPlan
 }
 
 var _ ent.Mutation = (*SubscriptionPlanMutation)(nil)
@@ -40117,6 +42808,272 @@ func (m *SubscriptionPlanMutation) ResetSortOrder() {
 	m.addsort_order = nil
 }
 
+// SetDailyLimitUsd sets the "daily_limit_usd" field.
+func (m *SubscriptionPlanMutation) SetDailyLimitUsd(f float64) {
+	m.daily_limit_usd = &f
+	m.adddaily_limit_usd = nil
+}
+
+// DailyLimitUsd returns the value of the "daily_limit_usd" field in the mutation.
+func (m *SubscriptionPlanMutation) DailyLimitUsd() (r float64, exists bool) {
+	v := m.daily_limit_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDailyLimitUsd returns the old "daily_limit_usd" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldDailyLimitUsd(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDailyLimitUsd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDailyLimitUsd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDailyLimitUsd: %w", err)
+	}
+	return oldValue.DailyLimitUsd, nil
+}
+
+// AddDailyLimitUsd adds f to the "daily_limit_usd" field.
+func (m *SubscriptionPlanMutation) AddDailyLimitUsd(f float64) {
+	if m.adddaily_limit_usd != nil {
+		*m.adddaily_limit_usd += f
+	} else {
+		m.adddaily_limit_usd = &f
+	}
+}
+
+// AddedDailyLimitUsd returns the value that was added to the "daily_limit_usd" field in this mutation.
+func (m *SubscriptionPlanMutation) AddedDailyLimitUsd() (r float64, exists bool) {
+	v := m.adddaily_limit_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDailyLimitUsd clears the value of the "daily_limit_usd" field.
+func (m *SubscriptionPlanMutation) ClearDailyLimitUsd() {
+	m.daily_limit_usd = nil
+	m.adddaily_limit_usd = nil
+	m.clearedFields[subscriptionplan.FieldDailyLimitUsd] = struct{}{}
+}
+
+// DailyLimitUsdCleared returns if the "daily_limit_usd" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) DailyLimitUsdCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldDailyLimitUsd]
+	return ok
+}
+
+// ResetDailyLimitUsd resets all changes to the "daily_limit_usd" field.
+func (m *SubscriptionPlanMutation) ResetDailyLimitUsd() {
+	m.daily_limit_usd = nil
+	m.adddaily_limit_usd = nil
+	delete(m.clearedFields, subscriptionplan.FieldDailyLimitUsd)
+}
+
+// SetWeeklyLimitUsd sets the "weekly_limit_usd" field.
+func (m *SubscriptionPlanMutation) SetWeeklyLimitUsd(f float64) {
+	m.weekly_limit_usd = &f
+	m.addweekly_limit_usd = nil
+}
+
+// WeeklyLimitUsd returns the value of the "weekly_limit_usd" field in the mutation.
+func (m *SubscriptionPlanMutation) WeeklyLimitUsd() (r float64, exists bool) {
+	v := m.weekly_limit_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeeklyLimitUsd returns the old "weekly_limit_usd" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldWeeklyLimitUsd(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeeklyLimitUsd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeeklyLimitUsd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeeklyLimitUsd: %w", err)
+	}
+	return oldValue.WeeklyLimitUsd, nil
+}
+
+// AddWeeklyLimitUsd adds f to the "weekly_limit_usd" field.
+func (m *SubscriptionPlanMutation) AddWeeklyLimitUsd(f float64) {
+	if m.addweekly_limit_usd != nil {
+		*m.addweekly_limit_usd += f
+	} else {
+		m.addweekly_limit_usd = &f
+	}
+}
+
+// AddedWeeklyLimitUsd returns the value that was added to the "weekly_limit_usd" field in this mutation.
+func (m *SubscriptionPlanMutation) AddedWeeklyLimitUsd() (r float64, exists bool) {
+	v := m.addweekly_limit_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWeeklyLimitUsd clears the value of the "weekly_limit_usd" field.
+func (m *SubscriptionPlanMutation) ClearWeeklyLimitUsd() {
+	m.weekly_limit_usd = nil
+	m.addweekly_limit_usd = nil
+	m.clearedFields[subscriptionplan.FieldWeeklyLimitUsd] = struct{}{}
+}
+
+// WeeklyLimitUsdCleared returns if the "weekly_limit_usd" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) WeeklyLimitUsdCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldWeeklyLimitUsd]
+	return ok
+}
+
+// ResetWeeklyLimitUsd resets all changes to the "weekly_limit_usd" field.
+func (m *SubscriptionPlanMutation) ResetWeeklyLimitUsd() {
+	m.weekly_limit_usd = nil
+	m.addweekly_limit_usd = nil
+	delete(m.clearedFields, subscriptionplan.FieldWeeklyLimitUsd)
+}
+
+// SetMonthlyLimitUsd sets the "monthly_limit_usd" field.
+func (m *SubscriptionPlanMutation) SetMonthlyLimitUsd(f float64) {
+	m.monthly_limit_usd = &f
+	m.addmonthly_limit_usd = nil
+}
+
+// MonthlyLimitUsd returns the value of the "monthly_limit_usd" field in the mutation.
+func (m *SubscriptionPlanMutation) MonthlyLimitUsd() (r float64, exists bool) {
+	v := m.monthly_limit_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMonthlyLimitUsd returns the old "monthly_limit_usd" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldMonthlyLimitUsd(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMonthlyLimitUsd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMonthlyLimitUsd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMonthlyLimitUsd: %w", err)
+	}
+	return oldValue.MonthlyLimitUsd, nil
+}
+
+// AddMonthlyLimitUsd adds f to the "monthly_limit_usd" field.
+func (m *SubscriptionPlanMutation) AddMonthlyLimitUsd(f float64) {
+	if m.addmonthly_limit_usd != nil {
+		*m.addmonthly_limit_usd += f
+	} else {
+		m.addmonthly_limit_usd = &f
+	}
+}
+
+// AddedMonthlyLimitUsd returns the value that was added to the "monthly_limit_usd" field in this mutation.
+func (m *SubscriptionPlanMutation) AddedMonthlyLimitUsd() (r float64, exists bool) {
+	v := m.addmonthly_limit_usd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMonthlyLimitUsd clears the value of the "monthly_limit_usd" field.
+func (m *SubscriptionPlanMutation) ClearMonthlyLimitUsd() {
+	m.monthly_limit_usd = nil
+	m.addmonthly_limit_usd = nil
+	m.clearedFields[subscriptionplan.FieldMonthlyLimitUsd] = struct{}{}
+}
+
+// MonthlyLimitUsdCleared returns if the "monthly_limit_usd" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) MonthlyLimitUsdCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldMonthlyLimitUsd]
+	return ok
+}
+
+// ResetMonthlyLimitUsd resets all changes to the "monthly_limit_usd" field.
+func (m *SubscriptionPlanMutation) ResetMonthlyLimitUsd() {
+	m.monthly_limit_usd = nil
+	m.addmonthly_limit_usd = nil
+	delete(m.clearedFields, subscriptionplan.FieldMonthlyLimitUsd)
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (m *SubscriptionPlanMutation) SetRateMultiplier(f float64) {
+	m.rate_multiplier = &f
+	m.addrate_multiplier = nil
+}
+
+// RateMultiplier returns the value of the "rate_multiplier" field in the mutation.
+func (m *SubscriptionPlanMutation) RateMultiplier() (r float64, exists bool) {
+	v := m.rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplier returns the old "rate_multiplier" field's value of the SubscriptionPlan entity.
+// If the SubscriptionPlan object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionPlanMutation) OldRateMultiplier(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplier: %w", err)
+	}
+	return oldValue.RateMultiplier, nil
+}
+
+// AddRateMultiplier adds f to the "rate_multiplier" field.
+func (m *SubscriptionPlanMutation) AddRateMultiplier(f float64) {
+	if m.addrate_multiplier != nil {
+		*m.addrate_multiplier += f
+	} else {
+		m.addrate_multiplier = &f
+	}
+}
+
+// AddedRateMultiplier returns the value that was added to the "rate_multiplier" field in this mutation.
+func (m *SubscriptionPlanMutation) AddedRateMultiplier() (r float64, exists bool) {
+	v := m.addrate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRateMultiplier resets all changes to the "rate_multiplier" field.
+func (m *SubscriptionPlanMutation) ResetRateMultiplier() {
+	m.rate_multiplier = nil
+	m.addrate_multiplier = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *SubscriptionPlanMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -40189,6 +43146,114 @@ func (m *SubscriptionPlanMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
+// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by ids.
+func (m *SubscriptionPlanMutation) AddSubscriptionIDs(ids ...int64) {
+	if m.subscriptions == nil {
+		m.subscriptions = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.subscriptions[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSubscriptions clears the "subscriptions" edge to the UserSubscription entity.
+func (m *SubscriptionPlanMutation) ClearSubscriptions() {
+	m.clearedsubscriptions = true
+}
+
+// SubscriptionsCleared reports if the "subscriptions" edge to the UserSubscription entity was cleared.
+func (m *SubscriptionPlanMutation) SubscriptionsCleared() bool {
+	return m.clearedsubscriptions
+}
+
+// RemoveSubscriptionIDs removes the "subscriptions" edge to the UserSubscription entity by IDs.
+func (m *SubscriptionPlanMutation) RemoveSubscriptionIDs(ids ...int64) {
+	if m.removedsubscriptions == nil {
+		m.removedsubscriptions = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.subscriptions, ids[i])
+		m.removedsubscriptions[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSubscriptions returns the removed IDs of the "subscriptions" edge to the UserSubscription entity.
+func (m *SubscriptionPlanMutation) RemovedSubscriptionsIDs() (ids []int64) {
+	for id := range m.removedsubscriptions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SubscriptionsIDs returns the "subscriptions" edge IDs in the mutation.
+func (m *SubscriptionPlanMutation) SubscriptionsIDs() (ids []int64) {
+	for id := range m.subscriptions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSubscriptions resets all changes to the "subscriptions" edge.
+func (m *SubscriptionPlanMutation) ResetSubscriptions() {
+	m.subscriptions = nil
+	m.clearedsubscriptions = false
+	m.removedsubscriptions = nil
+}
+
+// AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by ids.
+func (m *SubscriptionPlanMutation) AddRedeemCodeIDs(ids ...int64) {
+	if m.redeem_codes == nil {
+		m.redeem_codes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.redeem_codes[ids[i]] = struct{}{}
+	}
+}
+
+// ClearRedeemCodes clears the "redeem_codes" edge to the RedeemCode entity.
+func (m *SubscriptionPlanMutation) ClearRedeemCodes() {
+	m.clearedredeem_codes = true
+}
+
+// RedeemCodesCleared reports if the "redeem_codes" edge to the RedeemCode entity was cleared.
+func (m *SubscriptionPlanMutation) RedeemCodesCleared() bool {
+	return m.clearedredeem_codes
+}
+
+// RemoveRedeemCodeIDs removes the "redeem_codes" edge to the RedeemCode entity by IDs.
+func (m *SubscriptionPlanMutation) RemoveRedeemCodeIDs(ids ...int64) {
+	if m.removedredeem_codes == nil {
+		m.removedredeem_codes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.redeem_codes, ids[i])
+		m.removedredeem_codes[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedRedeemCodes returns the removed IDs of the "redeem_codes" edge to the RedeemCode entity.
+func (m *SubscriptionPlanMutation) RemovedRedeemCodesIDs() (ids []int64) {
+	for id := range m.removedredeem_codes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// RedeemCodesIDs returns the "redeem_codes" edge IDs in the mutation.
+func (m *SubscriptionPlanMutation) RedeemCodesIDs() (ids []int64) {
+	for id := range m.redeem_codes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetRedeemCodes resets all changes to the "redeem_codes" edge.
+func (m *SubscriptionPlanMutation) ResetRedeemCodes() {
+	m.redeem_codes = nil
+	m.clearedredeem_codes = false
+	m.removedredeem_codes = nil
+}
+
 // Where appends a list predicates to the SubscriptionPlanMutation builder.
 func (m *SubscriptionPlanMutation) Where(ps ...predicate.SubscriptionPlan) {
 	m.predicates = append(m.predicates, ps...)
@@ -40223,7 +43288,7 @@ func (m *SubscriptionPlanMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubscriptionPlanMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 18)
 	if m.group_id != nil {
 		fields = append(fields, subscriptionplan.FieldGroupID)
 	}
@@ -40259,6 +43324,18 @@ func (m *SubscriptionPlanMutation) Fields() []string {
 	}
 	if m.sort_order != nil {
 		fields = append(fields, subscriptionplan.FieldSortOrder)
+	}
+	if m.daily_limit_usd != nil {
+		fields = append(fields, subscriptionplan.FieldDailyLimitUsd)
+	}
+	if m.weekly_limit_usd != nil {
+		fields = append(fields, subscriptionplan.FieldWeeklyLimitUsd)
+	}
+	if m.monthly_limit_usd != nil {
+		fields = append(fields, subscriptionplan.FieldMonthlyLimitUsd)
+	}
+	if m.rate_multiplier != nil {
+		fields = append(fields, subscriptionplan.FieldRateMultiplier)
 	}
 	if m.created_at != nil {
 		fields = append(fields, subscriptionplan.FieldCreatedAt)
@@ -40298,6 +43375,14 @@ func (m *SubscriptionPlanMutation) Field(name string) (ent.Value, bool) {
 		return m.ForSale()
 	case subscriptionplan.FieldSortOrder:
 		return m.SortOrder()
+	case subscriptionplan.FieldDailyLimitUsd:
+		return m.DailyLimitUsd()
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		return m.WeeklyLimitUsd()
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		return m.MonthlyLimitUsd()
+	case subscriptionplan.FieldRateMultiplier:
+		return m.RateMultiplier()
 	case subscriptionplan.FieldCreatedAt:
 		return m.CreatedAt()
 	case subscriptionplan.FieldUpdatedAt:
@@ -40335,6 +43420,14 @@ func (m *SubscriptionPlanMutation) OldField(ctx context.Context, name string) (e
 		return m.OldForSale(ctx)
 	case subscriptionplan.FieldSortOrder:
 		return m.OldSortOrder(ctx)
+	case subscriptionplan.FieldDailyLimitUsd:
+		return m.OldDailyLimitUsd(ctx)
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		return m.OldWeeklyLimitUsd(ctx)
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		return m.OldMonthlyLimitUsd(ctx)
+	case subscriptionplan.FieldRateMultiplier:
+		return m.OldRateMultiplier(ctx)
 	case subscriptionplan.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case subscriptionplan.FieldUpdatedAt:
@@ -40432,6 +43525,34 @@ func (m *SubscriptionPlanMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetSortOrder(v)
 		return nil
+	case subscriptionplan.FieldDailyLimitUsd:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDailyLimitUsd(v)
+		return nil
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeeklyLimitUsd(v)
+		return nil
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMonthlyLimitUsd(v)
+		return nil
+	case subscriptionplan.FieldRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplier(v)
+		return nil
 	case subscriptionplan.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -40469,6 +43590,18 @@ func (m *SubscriptionPlanMutation) AddedFields() []string {
 	if m.addsort_order != nil {
 		fields = append(fields, subscriptionplan.FieldSortOrder)
 	}
+	if m.adddaily_limit_usd != nil {
+		fields = append(fields, subscriptionplan.FieldDailyLimitUsd)
+	}
+	if m.addweekly_limit_usd != nil {
+		fields = append(fields, subscriptionplan.FieldWeeklyLimitUsd)
+	}
+	if m.addmonthly_limit_usd != nil {
+		fields = append(fields, subscriptionplan.FieldMonthlyLimitUsd)
+	}
+	if m.addrate_multiplier != nil {
+		fields = append(fields, subscriptionplan.FieldRateMultiplier)
+	}
 	return fields
 }
 
@@ -40487,6 +43620,14 @@ func (m *SubscriptionPlanMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedValidityDays()
 	case subscriptionplan.FieldSortOrder:
 		return m.AddedSortOrder()
+	case subscriptionplan.FieldDailyLimitUsd:
+		return m.AddedDailyLimitUsd()
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		return m.AddedWeeklyLimitUsd()
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		return m.AddedMonthlyLimitUsd()
+	case subscriptionplan.FieldRateMultiplier:
+		return m.AddedRateMultiplier()
 	}
 	return nil, false
 }
@@ -40531,6 +43672,34 @@ func (m *SubscriptionPlanMutation) AddField(name string, value ent.Value) error 
 		}
 		m.AddSortOrder(v)
 		return nil
+	case subscriptionplan.FieldDailyLimitUsd:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDailyLimitUsd(v)
+		return nil
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWeeklyLimitUsd(v)
+		return nil
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMonthlyLimitUsd(v)
+		return nil
+	case subscriptionplan.FieldRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRateMultiplier(v)
+		return nil
 	}
 	return fmt.Errorf("unknown SubscriptionPlan numeric field %s", name)
 }
@@ -40541,6 +43710,15 @@ func (m *SubscriptionPlanMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(subscriptionplan.FieldOriginalPrice) {
 		fields = append(fields, subscriptionplan.FieldOriginalPrice)
+	}
+	if m.FieldCleared(subscriptionplan.FieldDailyLimitUsd) {
+		fields = append(fields, subscriptionplan.FieldDailyLimitUsd)
+	}
+	if m.FieldCleared(subscriptionplan.FieldWeeklyLimitUsd) {
+		fields = append(fields, subscriptionplan.FieldWeeklyLimitUsd)
+	}
+	if m.FieldCleared(subscriptionplan.FieldMonthlyLimitUsd) {
+		fields = append(fields, subscriptionplan.FieldMonthlyLimitUsd)
 	}
 	return fields
 }
@@ -40558,6 +43736,15 @@ func (m *SubscriptionPlanMutation) ClearField(name string) error {
 	switch name {
 	case subscriptionplan.FieldOriginalPrice:
 		m.ClearOriginalPrice()
+		return nil
+	case subscriptionplan.FieldDailyLimitUsd:
+		m.ClearDailyLimitUsd()
+		return nil
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		m.ClearWeeklyLimitUsd()
+		return nil
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		m.ClearMonthlyLimitUsd()
 		return nil
 	}
 	return fmt.Errorf("unknown SubscriptionPlan nullable field %s", name)
@@ -40603,6 +43790,18 @@ func (m *SubscriptionPlanMutation) ResetField(name string) error {
 	case subscriptionplan.FieldSortOrder:
 		m.ResetSortOrder()
 		return nil
+	case subscriptionplan.FieldDailyLimitUsd:
+		m.ResetDailyLimitUsd()
+		return nil
+	case subscriptionplan.FieldWeeklyLimitUsd:
+		m.ResetWeeklyLimitUsd()
+		return nil
+	case subscriptionplan.FieldMonthlyLimitUsd:
+		m.ResetMonthlyLimitUsd()
+		return nil
+	case subscriptionplan.FieldRateMultiplier:
+		m.ResetRateMultiplier()
+		return nil
 	case subscriptionplan.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
@@ -40615,49 +43814,111 @@ func (m *SubscriptionPlanMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SubscriptionPlanMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 2)
+	if m.subscriptions != nil {
+		edges = append(edges, subscriptionplan.EdgeSubscriptions)
+	}
+	if m.redeem_codes != nil {
+		edges = append(edges, subscriptionplan.EdgeRedeemCodes)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *SubscriptionPlanMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case subscriptionplan.EdgeSubscriptions:
+		ids := make([]ent.Value, 0, len(m.subscriptions))
+		for id := range m.subscriptions {
+			ids = append(ids, id)
+		}
+		return ids
+	case subscriptionplan.EdgeRedeemCodes:
+		ids := make([]ent.Value, 0, len(m.redeem_codes))
+		for id := range m.redeem_codes {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SubscriptionPlanMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 2)
+	if m.removedsubscriptions != nil {
+		edges = append(edges, subscriptionplan.EdgeSubscriptions)
+	}
+	if m.removedredeem_codes != nil {
+		edges = append(edges, subscriptionplan.EdgeRedeemCodes)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *SubscriptionPlanMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case subscriptionplan.EdgeSubscriptions:
+		ids := make([]ent.Value, 0, len(m.removedsubscriptions))
+		for id := range m.removedsubscriptions {
+			ids = append(ids, id)
+		}
+		return ids
+	case subscriptionplan.EdgeRedeemCodes:
+		ids := make([]ent.Value, 0, len(m.removedredeem_codes))
+		for id := range m.removedredeem_codes {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SubscriptionPlanMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 2)
+	if m.clearedsubscriptions {
+		edges = append(edges, subscriptionplan.EdgeSubscriptions)
+	}
+	if m.clearedredeem_codes {
+		edges = append(edges, subscriptionplan.EdgeRedeemCodes)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *SubscriptionPlanMutation) EdgeCleared(name string) bool {
+	switch name {
+	case subscriptionplan.EdgeSubscriptions:
+		return m.clearedsubscriptions
+	case subscriptionplan.EdgeRedeemCodes:
+		return m.clearedredeem_codes
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *SubscriptionPlanMutation) ClearEdge(name string) error {
+	switch name {
+	}
 	return fmt.Errorf("unknown SubscriptionPlan unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *SubscriptionPlanMutation) ResetEdge(name string) error {
+	switch name {
+	case subscriptionplan.EdgeSubscriptions:
+		m.ResetSubscriptions()
+		return nil
+	case subscriptionplan.EdgeRedeemCodes:
+		m.ResetRedeemCodes()
+		return nil
+	}
 	return fmt.Errorf("unknown SubscriptionPlan edge %s", name)
 }
 
@@ -53759,39 +57020,50 @@ func (m *UserPlatformQuotaMutation) ResetEdge(name string) error {
 // UserSubscriptionMutation represents an operation that mutates the UserSubscription nodes in the graph.
 type UserSubscriptionMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *int64
-	created_at              *time.Time
-	updated_at              *time.Time
-	deleted_at              *time.Time
-	starts_at               *time.Time
-	expires_at              *time.Time
-	status                  *string
-	daily_window_start      *time.Time
-	weekly_window_start     *time.Time
-	monthly_window_start    *time.Time
-	daily_usage_usd         *float64
-	adddaily_usage_usd      *float64
-	weekly_usage_usd        *float64
-	addweekly_usage_usd     *float64
-	monthly_usage_usd       *float64
-	addmonthly_usage_usd    *float64
-	assigned_at             *time.Time
-	notes                   *string
-	clearedFields           map[string]struct{}
-	user                    *int64
-	cleareduser             bool
-	group                   *int64
-	clearedgroup            bool
-	assigned_by_user        *int64
-	clearedassigned_by_user bool
-	usage_logs              map[int64]struct{}
-	removedusage_logs       map[int64]struct{}
-	clearedusage_logs       bool
-	done                    bool
-	oldValue                func(context.Context) (*UserSubscription, error)
-	predicates              []predicate.UserSubscription
+	op                            Op
+	typ                           string
+	id                            *int64
+	created_at                    *time.Time
+	updated_at                    *time.Time
+	deleted_at                    *time.Time
+	plan_name_snapshot            *string
+	daily_limit_usd_snapshot      *float64
+	adddaily_limit_usd_snapshot   *float64
+	weekly_limit_usd_snapshot     *float64
+	addweekly_limit_usd_snapshot  *float64
+	monthly_limit_usd_snapshot    *float64
+	addmonthly_limit_usd_snapshot *float64
+	rate_multiplier_snapshot      *float64
+	addrate_multiplier_snapshot   *float64
+	starts_at                     *time.Time
+	expires_at                    *time.Time
+	status                        *string
+	daily_window_start            *time.Time
+	weekly_window_start           *time.Time
+	monthly_window_start          *time.Time
+	daily_usage_usd               *float64
+	adddaily_usage_usd            *float64
+	weekly_usage_usd              *float64
+	addweekly_usage_usd           *float64
+	monthly_usage_usd             *float64
+	addmonthly_usage_usd          *float64
+	assigned_at                   *time.Time
+	notes                         *string
+	clearedFields                 map[string]struct{}
+	user                          *int64
+	cleareduser                   bool
+	group                         *int64
+	clearedgroup                  bool
+	subscription_plan             *int64
+	clearedsubscription_plan      bool
+	assigned_by_user              *int64
+	clearedassigned_by_user       bool
+	usage_logs                    map[int64]struct{}
+	removedusage_logs             map[int64]struct{}
+	clearedusage_logs             bool
+	done                          bool
+	oldValue                      func(context.Context) (*UserSubscription, error)
+	predicates                    []predicate.UserSubscription
 }
 
 var _ ent.Mutation = (*UserSubscriptionMutation)(nil)
@@ -54083,6 +57355,357 @@ func (m *UserSubscriptionMutation) OldGroupID(ctx context.Context) (v int64, err
 // ResetGroupID resets all changes to the "group_id" field.
 func (m *UserSubscriptionMutation) ResetGroupID() {
 	m.group = nil
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (m *UserSubscriptionMutation) SetSubscriptionPlanID(i int64) {
+	m.subscription_plan = &i
+}
+
+// SubscriptionPlanID returns the value of the "subscription_plan_id" field in the mutation.
+func (m *UserSubscriptionMutation) SubscriptionPlanID() (r int64, exists bool) {
+	v := m.subscription_plan
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionPlanID returns the old "subscription_plan_id" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldSubscriptionPlanID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionPlanID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionPlanID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionPlanID: %w", err)
+	}
+	return oldValue.SubscriptionPlanID, nil
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (m *UserSubscriptionMutation) ClearSubscriptionPlanID() {
+	m.subscription_plan = nil
+	m.clearedFields[usersubscription.FieldSubscriptionPlanID] = struct{}{}
+}
+
+// SubscriptionPlanIDCleared returns if the "subscription_plan_id" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) SubscriptionPlanIDCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldSubscriptionPlanID]
+	return ok
+}
+
+// ResetSubscriptionPlanID resets all changes to the "subscription_plan_id" field.
+func (m *UserSubscriptionMutation) ResetSubscriptionPlanID() {
+	m.subscription_plan = nil
+	delete(m.clearedFields, usersubscription.FieldSubscriptionPlanID)
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (m *UserSubscriptionMutation) SetPlanNameSnapshot(s string) {
+	m.plan_name_snapshot = &s
+}
+
+// PlanNameSnapshot returns the value of the "plan_name_snapshot" field in the mutation.
+func (m *UserSubscriptionMutation) PlanNameSnapshot() (r string, exists bool) {
+	v := m.plan_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlanNameSnapshot returns the old "plan_name_snapshot" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldPlanNameSnapshot(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlanNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlanNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlanNameSnapshot: %w", err)
+	}
+	return oldValue.PlanNameSnapshot, nil
+}
+
+// ResetPlanNameSnapshot resets all changes to the "plan_name_snapshot" field.
+func (m *UserSubscriptionMutation) ResetPlanNameSnapshot() {
+	m.plan_name_snapshot = nil
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) SetDailyLimitUsdSnapshot(f float64) {
+	m.daily_limit_usd_snapshot = &f
+	m.adddaily_limit_usd_snapshot = nil
+}
+
+// DailyLimitUsdSnapshot returns the value of the "daily_limit_usd_snapshot" field in the mutation.
+func (m *UserSubscriptionMutation) DailyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.daily_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDailyLimitUsdSnapshot returns the old "daily_limit_usd_snapshot" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldDailyLimitUsdSnapshot(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDailyLimitUsdSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDailyLimitUsdSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDailyLimitUsdSnapshot: %w", err)
+	}
+	return oldValue.DailyLimitUsdSnapshot, nil
+}
+
+// AddDailyLimitUsdSnapshot adds f to the "daily_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) AddDailyLimitUsdSnapshot(f float64) {
+	if m.adddaily_limit_usd_snapshot != nil {
+		*m.adddaily_limit_usd_snapshot += f
+	} else {
+		m.adddaily_limit_usd_snapshot = &f
+	}
+}
+
+// AddedDailyLimitUsdSnapshot returns the value that was added to the "daily_limit_usd_snapshot" field in this mutation.
+func (m *UserSubscriptionMutation) AddedDailyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.adddaily_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) ClearDailyLimitUsdSnapshot() {
+	m.daily_limit_usd_snapshot = nil
+	m.adddaily_limit_usd_snapshot = nil
+	m.clearedFields[usersubscription.FieldDailyLimitUsdSnapshot] = struct{}{}
+}
+
+// DailyLimitUsdSnapshotCleared returns if the "daily_limit_usd_snapshot" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) DailyLimitUsdSnapshotCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldDailyLimitUsdSnapshot]
+	return ok
+}
+
+// ResetDailyLimitUsdSnapshot resets all changes to the "daily_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) ResetDailyLimitUsdSnapshot() {
+	m.daily_limit_usd_snapshot = nil
+	m.adddaily_limit_usd_snapshot = nil
+	delete(m.clearedFields, usersubscription.FieldDailyLimitUsdSnapshot)
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) SetWeeklyLimitUsdSnapshot(f float64) {
+	m.weekly_limit_usd_snapshot = &f
+	m.addweekly_limit_usd_snapshot = nil
+}
+
+// WeeklyLimitUsdSnapshot returns the value of the "weekly_limit_usd_snapshot" field in the mutation.
+func (m *UserSubscriptionMutation) WeeklyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.weekly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWeeklyLimitUsdSnapshot returns the old "weekly_limit_usd_snapshot" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldWeeklyLimitUsdSnapshot(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWeeklyLimitUsdSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWeeklyLimitUsdSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWeeklyLimitUsdSnapshot: %w", err)
+	}
+	return oldValue.WeeklyLimitUsdSnapshot, nil
+}
+
+// AddWeeklyLimitUsdSnapshot adds f to the "weekly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) AddWeeklyLimitUsdSnapshot(f float64) {
+	if m.addweekly_limit_usd_snapshot != nil {
+		*m.addweekly_limit_usd_snapshot += f
+	} else {
+		m.addweekly_limit_usd_snapshot = &f
+	}
+}
+
+// AddedWeeklyLimitUsdSnapshot returns the value that was added to the "weekly_limit_usd_snapshot" field in this mutation.
+func (m *UserSubscriptionMutation) AddedWeeklyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.addweekly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) ClearWeeklyLimitUsdSnapshot() {
+	m.weekly_limit_usd_snapshot = nil
+	m.addweekly_limit_usd_snapshot = nil
+	m.clearedFields[usersubscription.FieldWeeklyLimitUsdSnapshot] = struct{}{}
+}
+
+// WeeklyLimitUsdSnapshotCleared returns if the "weekly_limit_usd_snapshot" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) WeeklyLimitUsdSnapshotCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldWeeklyLimitUsdSnapshot]
+	return ok
+}
+
+// ResetWeeklyLimitUsdSnapshot resets all changes to the "weekly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) ResetWeeklyLimitUsdSnapshot() {
+	m.weekly_limit_usd_snapshot = nil
+	m.addweekly_limit_usd_snapshot = nil
+	delete(m.clearedFields, usersubscription.FieldWeeklyLimitUsdSnapshot)
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) SetMonthlyLimitUsdSnapshot(f float64) {
+	m.monthly_limit_usd_snapshot = &f
+	m.addmonthly_limit_usd_snapshot = nil
+}
+
+// MonthlyLimitUsdSnapshot returns the value of the "monthly_limit_usd_snapshot" field in the mutation.
+func (m *UserSubscriptionMutation) MonthlyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.monthly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMonthlyLimitUsdSnapshot returns the old "monthly_limit_usd_snapshot" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldMonthlyLimitUsdSnapshot(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMonthlyLimitUsdSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMonthlyLimitUsdSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMonthlyLimitUsdSnapshot: %w", err)
+	}
+	return oldValue.MonthlyLimitUsdSnapshot, nil
+}
+
+// AddMonthlyLimitUsdSnapshot adds f to the "monthly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) AddMonthlyLimitUsdSnapshot(f float64) {
+	if m.addmonthly_limit_usd_snapshot != nil {
+		*m.addmonthly_limit_usd_snapshot += f
+	} else {
+		m.addmonthly_limit_usd_snapshot = &f
+	}
+}
+
+// AddedMonthlyLimitUsdSnapshot returns the value that was added to the "monthly_limit_usd_snapshot" field in this mutation.
+func (m *UserSubscriptionMutation) AddedMonthlyLimitUsdSnapshot() (r float64, exists bool) {
+	v := m.addmonthly_limit_usd_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) ClearMonthlyLimitUsdSnapshot() {
+	m.monthly_limit_usd_snapshot = nil
+	m.addmonthly_limit_usd_snapshot = nil
+	m.clearedFields[usersubscription.FieldMonthlyLimitUsdSnapshot] = struct{}{}
+}
+
+// MonthlyLimitUsdSnapshotCleared returns if the "monthly_limit_usd_snapshot" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) MonthlyLimitUsdSnapshotCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldMonthlyLimitUsdSnapshot]
+	return ok
+}
+
+// ResetMonthlyLimitUsdSnapshot resets all changes to the "monthly_limit_usd_snapshot" field.
+func (m *UserSubscriptionMutation) ResetMonthlyLimitUsdSnapshot() {
+	m.monthly_limit_usd_snapshot = nil
+	m.addmonthly_limit_usd_snapshot = nil
+	delete(m.clearedFields, usersubscription.FieldMonthlyLimitUsdSnapshot)
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (m *UserSubscriptionMutation) SetRateMultiplierSnapshot(f float64) {
+	m.rate_multiplier_snapshot = &f
+	m.addrate_multiplier_snapshot = nil
+}
+
+// RateMultiplierSnapshot returns the value of the "rate_multiplier_snapshot" field in the mutation.
+func (m *UserSubscriptionMutation) RateMultiplierSnapshot() (r float64, exists bool) {
+	v := m.rate_multiplier_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRateMultiplierSnapshot returns the old "rate_multiplier_snapshot" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldRateMultiplierSnapshot(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRateMultiplierSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRateMultiplierSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRateMultiplierSnapshot: %w", err)
+	}
+	return oldValue.RateMultiplierSnapshot, nil
+}
+
+// AddRateMultiplierSnapshot adds f to the "rate_multiplier_snapshot" field.
+func (m *UserSubscriptionMutation) AddRateMultiplierSnapshot(f float64) {
+	if m.addrate_multiplier_snapshot != nil {
+		*m.addrate_multiplier_snapshot += f
+	} else {
+		m.addrate_multiplier_snapshot = &f
+	}
+}
+
+// AddedRateMultiplierSnapshot returns the value that was added to the "rate_multiplier_snapshot" field in this mutation.
+func (m *UserSubscriptionMutation) AddedRateMultiplierSnapshot() (r float64, exists bool) {
+	v := m.addrate_multiplier_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRateMultiplierSnapshot resets all changes to the "rate_multiplier_snapshot" field.
+func (m *UserSubscriptionMutation) ResetRateMultiplierSnapshot() {
+	m.rate_multiplier_snapshot = nil
+	m.addrate_multiplier_snapshot = nil
 }
 
 // SetStartsAt sets the "starts_at" field.
@@ -54696,6 +58319,33 @@ func (m *UserSubscriptionMutation) ResetGroup() {
 	m.clearedgroup = false
 }
 
+// ClearSubscriptionPlan clears the "subscription_plan" edge to the SubscriptionPlan entity.
+func (m *UserSubscriptionMutation) ClearSubscriptionPlan() {
+	m.clearedsubscription_plan = true
+	m.clearedFields[usersubscription.FieldSubscriptionPlanID] = struct{}{}
+}
+
+// SubscriptionPlanCleared reports if the "subscription_plan" edge to the SubscriptionPlan entity was cleared.
+func (m *UserSubscriptionMutation) SubscriptionPlanCleared() bool {
+	return m.SubscriptionPlanIDCleared() || m.clearedsubscription_plan
+}
+
+// SubscriptionPlanIDs returns the "subscription_plan" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SubscriptionPlanID instead. It exists only for internal usage by the builders.
+func (m *UserSubscriptionMutation) SubscriptionPlanIDs() (ids []int64) {
+	if id := m.subscription_plan; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSubscriptionPlan resets all changes to the "subscription_plan" edge.
+func (m *UserSubscriptionMutation) ResetSubscriptionPlan() {
+	m.subscription_plan = nil
+	m.clearedsubscription_plan = false
+}
+
 // SetAssignedByUserID sets the "assigned_by_user" edge to the User entity by id.
 func (m *UserSubscriptionMutation) SetAssignedByUserID(id int64) {
 	m.assigned_by_user = &id
@@ -54824,7 +58474,7 @@ func (m *UserSubscriptionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserSubscriptionMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 23)
 	if m.created_at != nil {
 		fields = append(fields, usersubscription.FieldCreatedAt)
 	}
@@ -54839,6 +58489,24 @@ func (m *UserSubscriptionMutation) Fields() []string {
 	}
 	if m.group != nil {
 		fields = append(fields, usersubscription.FieldGroupID)
+	}
+	if m.subscription_plan != nil {
+		fields = append(fields, usersubscription.FieldSubscriptionPlanID)
+	}
+	if m.plan_name_snapshot != nil {
+		fields = append(fields, usersubscription.FieldPlanNameSnapshot)
+	}
+	if m.daily_limit_usd_snapshot != nil {
+		fields = append(fields, usersubscription.FieldDailyLimitUsdSnapshot)
+	}
+	if m.weekly_limit_usd_snapshot != nil {
+		fields = append(fields, usersubscription.FieldWeeklyLimitUsdSnapshot)
+	}
+	if m.monthly_limit_usd_snapshot != nil {
+		fields = append(fields, usersubscription.FieldMonthlyLimitUsdSnapshot)
+	}
+	if m.rate_multiplier_snapshot != nil {
+		fields = append(fields, usersubscription.FieldRateMultiplierSnapshot)
 	}
 	if m.starts_at != nil {
 		fields = append(fields, usersubscription.FieldStartsAt)
@@ -54894,6 +58562,18 @@ func (m *UserSubscriptionMutation) Field(name string) (ent.Value, bool) {
 		return m.UserID()
 	case usersubscription.FieldGroupID:
 		return m.GroupID()
+	case usersubscription.FieldSubscriptionPlanID:
+		return m.SubscriptionPlanID()
+	case usersubscription.FieldPlanNameSnapshot:
+		return m.PlanNameSnapshot()
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		return m.DailyLimitUsdSnapshot()
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		return m.WeeklyLimitUsdSnapshot()
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		return m.MonthlyLimitUsdSnapshot()
+	case usersubscription.FieldRateMultiplierSnapshot:
+		return m.RateMultiplierSnapshot()
 	case usersubscription.FieldStartsAt:
 		return m.StartsAt()
 	case usersubscription.FieldExpiresAt:
@@ -54937,6 +58617,18 @@ func (m *UserSubscriptionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldUserID(ctx)
 	case usersubscription.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case usersubscription.FieldSubscriptionPlanID:
+		return m.OldSubscriptionPlanID(ctx)
+	case usersubscription.FieldPlanNameSnapshot:
+		return m.OldPlanNameSnapshot(ctx)
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		return m.OldDailyLimitUsdSnapshot(ctx)
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		return m.OldWeeklyLimitUsdSnapshot(ctx)
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		return m.OldMonthlyLimitUsdSnapshot(ctx)
+	case usersubscription.FieldRateMultiplierSnapshot:
+		return m.OldRateMultiplierSnapshot(ctx)
 	case usersubscription.FieldStartsAt:
 		return m.OldStartsAt(ctx)
 	case usersubscription.FieldExpiresAt:
@@ -55004,6 +58696,48 @@ func (m *UserSubscriptionMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupID(v)
+		return nil
+	case usersubscription.FieldSubscriptionPlanID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionPlanID(v)
+		return nil
+	case usersubscription.FieldPlanNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlanNameSnapshot(v)
+		return nil
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDailyLimitUsdSnapshot(v)
+		return nil
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeeklyLimitUsdSnapshot(v)
+		return nil
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMonthlyLimitUsdSnapshot(v)
+		return nil
+	case usersubscription.FieldRateMultiplierSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRateMultiplierSnapshot(v)
 		return nil
 	case usersubscription.FieldStartsAt:
 		v, ok := value.(time.Time)
@@ -55097,6 +58831,18 @@ func (m *UserSubscriptionMutation) SetField(name string, value ent.Value) error 
 // this mutation.
 func (m *UserSubscriptionMutation) AddedFields() []string {
 	var fields []string
+	if m.adddaily_limit_usd_snapshot != nil {
+		fields = append(fields, usersubscription.FieldDailyLimitUsdSnapshot)
+	}
+	if m.addweekly_limit_usd_snapshot != nil {
+		fields = append(fields, usersubscription.FieldWeeklyLimitUsdSnapshot)
+	}
+	if m.addmonthly_limit_usd_snapshot != nil {
+		fields = append(fields, usersubscription.FieldMonthlyLimitUsdSnapshot)
+	}
+	if m.addrate_multiplier_snapshot != nil {
+		fields = append(fields, usersubscription.FieldRateMultiplierSnapshot)
+	}
 	if m.adddaily_usage_usd != nil {
 		fields = append(fields, usersubscription.FieldDailyUsageUsd)
 	}
@@ -55114,6 +58860,14 @@ func (m *UserSubscriptionMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *UserSubscriptionMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		return m.AddedDailyLimitUsdSnapshot()
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		return m.AddedWeeklyLimitUsdSnapshot()
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		return m.AddedMonthlyLimitUsdSnapshot()
+	case usersubscription.FieldRateMultiplierSnapshot:
+		return m.AddedRateMultiplierSnapshot()
 	case usersubscription.FieldDailyUsageUsd:
 		return m.AddedDailyUsageUsd()
 	case usersubscription.FieldWeeklyUsageUsd:
@@ -55129,6 +58883,34 @@ func (m *UserSubscriptionMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UserSubscriptionMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDailyLimitUsdSnapshot(v)
+		return nil
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWeeklyLimitUsdSnapshot(v)
+		return nil
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMonthlyLimitUsdSnapshot(v)
+		return nil
+	case usersubscription.FieldRateMultiplierSnapshot:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRateMultiplierSnapshot(v)
+		return nil
 	case usersubscription.FieldDailyUsageUsd:
 		v, ok := value.(float64)
 		if !ok {
@@ -55161,6 +58943,18 @@ func (m *UserSubscriptionMutation) ClearedFields() []string {
 	if m.FieldCleared(usersubscription.FieldDeletedAt) {
 		fields = append(fields, usersubscription.FieldDeletedAt)
 	}
+	if m.FieldCleared(usersubscription.FieldSubscriptionPlanID) {
+		fields = append(fields, usersubscription.FieldSubscriptionPlanID)
+	}
+	if m.FieldCleared(usersubscription.FieldDailyLimitUsdSnapshot) {
+		fields = append(fields, usersubscription.FieldDailyLimitUsdSnapshot)
+	}
+	if m.FieldCleared(usersubscription.FieldWeeklyLimitUsdSnapshot) {
+		fields = append(fields, usersubscription.FieldWeeklyLimitUsdSnapshot)
+	}
+	if m.FieldCleared(usersubscription.FieldMonthlyLimitUsdSnapshot) {
+		fields = append(fields, usersubscription.FieldMonthlyLimitUsdSnapshot)
+	}
 	if m.FieldCleared(usersubscription.FieldDailyWindowStart) {
 		fields = append(fields, usersubscription.FieldDailyWindowStart)
 	}
@@ -55192,6 +58986,18 @@ func (m *UserSubscriptionMutation) ClearField(name string) error {
 	switch name {
 	case usersubscription.FieldDeletedAt:
 		m.ClearDeletedAt()
+		return nil
+	case usersubscription.FieldSubscriptionPlanID:
+		m.ClearSubscriptionPlanID()
+		return nil
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		m.ClearDailyLimitUsdSnapshot()
+		return nil
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		m.ClearWeeklyLimitUsdSnapshot()
+		return nil
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		m.ClearMonthlyLimitUsdSnapshot()
 		return nil
 	case usersubscription.FieldDailyWindowStart:
 		m.ClearDailyWindowStart()
@@ -55230,6 +59036,24 @@ func (m *UserSubscriptionMutation) ResetField(name string) error {
 		return nil
 	case usersubscription.FieldGroupID:
 		m.ResetGroupID()
+		return nil
+	case usersubscription.FieldSubscriptionPlanID:
+		m.ResetSubscriptionPlanID()
+		return nil
+	case usersubscription.FieldPlanNameSnapshot:
+		m.ResetPlanNameSnapshot()
+		return nil
+	case usersubscription.FieldDailyLimitUsdSnapshot:
+		m.ResetDailyLimitUsdSnapshot()
+		return nil
+	case usersubscription.FieldWeeklyLimitUsdSnapshot:
+		m.ResetWeeklyLimitUsdSnapshot()
+		return nil
+	case usersubscription.FieldMonthlyLimitUsdSnapshot:
+		m.ResetMonthlyLimitUsdSnapshot()
+		return nil
+	case usersubscription.FieldRateMultiplierSnapshot:
+		m.ResetRateMultiplierSnapshot()
 		return nil
 	case usersubscription.FieldStartsAt:
 		m.ResetStartsAt()
@@ -55273,12 +59097,15 @@ func (m *UserSubscriptionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UserSubscriptionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.user != nil {
 		edges = append(edges, usersubscription.EdgeUser)
 	}
 	if m.group != nil {
 		edges = append(edges, usersubscription.EdgeGroup)
+	}
+	if m.subscription_plan != nil {
+		edges = append(edges, usersubscription.EdgeSubscriptionPlan)
 	}
 	if m.assigned_by_user != nil {
 		edges = append(edges, usersubscription.EdgeAssignedByUser)
@@ -55301,6 +59128,10 @@ func (m *UserSubscriptionMutation) AddedIDs(name string) []ent.Value {
 		if id := m.group; id != nil {
 			return []ent.Value{*id}
 		}
+	case usersubscription.EdgeSubscriptionPlan:
+		if id := m.subscription_plan; id != nil {
+			return []ent.Value{*id}
+		}
 	case usersubscription.EdgeAssignedByUser:
 		if id := m.assigned_by_user; id != nil {
 			return []ent.Value{*id}
@@ -55317,7 +59148,7 @@ func (m *UserSubscriptionMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UserSubscriptionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedusage_logs != nil {
 		edges = append(edges, usersubscription.EdgeUsageLogs)
 	}
@@ -55340,12 +59171,15 @@ func (m *UserSubscriptionMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UserSubscriptionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.cleareduser {
 		edges = append(edges, usersubscription.EdgeUser)
 	}
 	if m.clearedgroup {
 		edges = append(edges, usersubscription.EdgeGroup)
+	}
+	if m.clearedsubscription_plan {
+		edges = append(edges, usersubscription.EdgeSubscriptionPlan)
 	}
 	if m.clearedassigned_by_user {
 		edges = append(edges, usersubscription.EdgeAssignedByUser)
@@ -55364,6 +59198,8 @@ func (m *UserSubscriptionMutation) EdgeCleared(name string) bool {
 		return m.cleareduser
 	case usersubscription.EdgeGroup:
 		return m.clearedgroup
+	case usersubscription.EdgeSubscriptionPlan:
+		return m.clearedsubscription_plan
 	case usersubscription.EdgeAssignedByUser:
 		return m.clearedassigned_by_user
 	case usersubscription.EdgeUsageLogs:
@@ -55382,6 +59218,9 @@ func (m *UserSubscriptionMutation) ClearEdge(name string) error {
 	case usersubscription.EdgeGroup:
 		m.ClearGroup()
 		return nil
+	case usersubscription.EdgeSubscriptionPlan:
+		m.ClearSubscriptionPlan()
+		return nil
 	case usersubscription.EdgeAssignedByUser:
 		m.ClearAssignedByUser()
 		return nil
@@ -55398,6 +59237,9 @@ func (m *UserSubscriptionMutation) ResetEdge(name string) error {
 		return nil
 	case usersubscription.EdgeGroup:
 		m.ResetGroup()
+		return nil
+	case usersubscription.EdgeSubscriptionPlan:
+		m.ResetSubscriptionPlan()
 		return nil
 	case usersubscription.EdgeAssignedByUser:
 		m.ResetAssignedByUser()

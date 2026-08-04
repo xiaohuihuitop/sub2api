@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
@@ -82,6 +83,142 @@ func (_u *UserSubscriptionUpdate) SetNillableGroupID(v *int64) *UserSubscription
 	if v != nil {
 		_u.SetGroupID(*v)
 	}
+	return _u
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (_u *UserSubscriptionUpdate) SetSubscriptionPlanID(v int64) *UserSubscriptionUpdate {
+	_u.mutation.SetSubscriptionPlanID(v)
+	return _u
+}
+
+// SetNillableSubscriptionPlanID sets the "subscription_plan_id" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableSubscriptionPlanID(v *int64) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetSubscriptionPlanID(*v)
+	}
+	return _u
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (_u *UserSubscriptionUpdate) ClearSubscriptionPlanID() *UserSubscriptionUpdate {
+	_u.mutation.ClearSubscriptionPlanID()
+	return _u
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (_u *UserSubscriptionUpdate) SetPlanNameSnapshot(v string) *UserSubscriptionUpdate {
+	_u.mutation.SetPlanNameSnapshot(v)
+	return _u
+}
+
+// SetNillablePlanNameSnapshot sets the "plan_name_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillablePlanNameSnapshot(v *string) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetPlanNameSnapshot(*v)
+	}
+	return _u
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) SetDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.ResetDailyLimitUsdSnapshot()
+	_u.mutation.SetDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableDailyLimitUsdSnapshot(v *float64) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetDailyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddDailyLimitUsdSnapshot adds value to the "daily_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) AddDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.AddDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) ClearDailyLimitUsdSnapshot() *UserSubscriptionUpdate {
+	_u.mutation.ClearDailyLimitUsdSnapshot()
+	return _u
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) SetWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.ResetWeeklyLimitUsdSnapshot()
+	_u.mutation.SetWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableWeeklyLimitUsdSnapshot(v *float64) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetWeeklyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddWeeklyLimitUsdSnapshot adds value to the "weekly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) AddWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.AddWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) ClearWeeklyLimitUsdSnapshot() *UserSubscriptionUpdate {
+	_u.mutation.ClearWeeklyLimitUsdSnapshot()
+	return _u
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) SetMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.ResetMonthlyLimitUsdSnapshot()
+	_u.mutation.SetMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableMonthlyLimitUsdSnapshot(v *float64) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetMonthlyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddMonthlyLimitUsdSnapshot adds value to the "monthly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) AddMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.AddMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdate) ClearMonthlyLimitUsdSnapshot() *UserSubscriptionUpdate {
+	_u.mutation.ClearMonthlyLimitUsdSnapshot()
+	return _u
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (_u *UserSubscriptionUpdate) SetRateMultiplierSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.ResetRateMultiplierSnapshot()
+	_u.mutation.SetRateMultiplierSnapshot(v)
+	return _u
+}
+
+// SetNillableRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableRateMultiplierSnapshot(v *float64) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetRateMultiplierSnapshot(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplierSnapshot adds value to the "rate_multiplier_snapshot" field.
+func (_u *UserSubscriptionUpdate) AddRateMultiplierSnapshot(v float64) *UserSubscriptionUpdate {
+	_u.mutation.AddRateMultiplierSnapshot(v)
 	return _u
 }
 
@@ -314,6 +451,11 @@ func (_u *UserSubscriptionUpdate) SetGroup(v *Group) *UserSubscriptionUpdate {
 	return _u.SetGroupID(v.ID)
 }
 
+// SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *UserSubscriptionUpdate) SetSubscriptionPlan(v *SubscriptionPlan) *UserSubscriptionUpdate {
+	return _u.SetSubscriptionPlanID(v.ID)
+}
+
 // SetAssignedByUserID sets the "assigned_by_user" edge to the User entity by ID.
 func (_u *UserSubscriptionUpdate) SetAssignedByUserID(id int64) *UserSubscriptionUpdate {
 	_u.mutation.SetAssignedByUserID(id)
@@ -362,6 +504,12 @@ func (_u *UserSubscriptionUpdate) ClearUser() *UserSubscriptionUpdate {
 // ClearGroup clears the "group" edge to the Group entity.
 func (_u *UserSubscriptionUpdate) ClearGroup() *UserSubscriptionUpdate {
 	_u.mutation.ClearGroup()
+	return _u
+}
+
+// ClearSubscriptionPlan clears the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *UserSubscriptionUpdate) ClearSubscriptionPlan() *UserSubscriptionUpdate {
+	_u.mutation.ClearSubscriptionPlan()
 	return _u
 }
 
@@ -436,6 +584,11 @@ func (_u *UserSubscriptionUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *UserSubscriptionUpdate) check() error {
+	if v, ok := _u.mutation.PlanNameSnapshot(); ok {
+		if err := usersubscription.PlanNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "plan_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "UserSubscription.plan_name_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := usersubscription.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "UserSubscription.status": %w`, err)}
@@ -470,6 +623,42 @@ func (_u *UserSubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(usersubscription.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.PlanNameSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldPlanNameSnapshot, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyLimitUsdSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.DailyLimitUsdSnapshotCleared() {
+		_spec.ClearField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.WeeklyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyLimitUsdSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.WeeklyLimitUsdSnapshotCleared() {
+		_spec.ClearField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.MonthlyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyLimitUsdSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.MonthlyLimitUsdSnapshotCleared() {
+		_spec.ClearField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplierSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplierSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(usersubscription.FieldStartsAt, field.TypeTime, value)
@@ -576,6 +765,35 @@ func (_u *UserSubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SubscriptionPlanCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usersubscription.SubscriptionPlanTable,
+			Columns: []string{usersubscription.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usersubscription.SubscriptionPlanTable,
+			Columns: []string{usersubscription.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -728,6 +946,142 @@ func (_u *UserSubscriptionUpdateOne) SetNillableGroupID(v *int64) *UserSubscript
 	if v != nil {
 		_u.SetGroupID(*v)
 	}
+	return _u
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (_u *UserSubscriptionUpdateOne) SetSubscriptionPlanID(v int64) *UserSubscriptionUpdateOne {
+	_u.mutation.SetSubscriptionPlanID(v)
+	return _u
+}
+
+// SetNillableSubscriptionPlanID sets the "subscription_plan_id" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableSubscriptionPlanID(v *int64) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetSubscriptionPlanID(*v)
+	}
+	return _u
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (_u *UserSubscriptionUpdateOne) ClearSubscriptionPlanID() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearSubscriptionPlanID()
+	return _u
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) SetPlanNameSnapshot(v string) *UserSubscriptionUpdateOne {
+	_u.mutation.SetPlanNameSnapshot(v)
+	return _u
+}
+
+// SetNillablePlanNameSnapshot sets the "plan_name_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillablePlanNameSnapshot(v *string) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetPlanNameSnapshot(*v)
+	}
+	return _u
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) SetDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.ResetDailyLimitUsdSnapshot()
+	_u.mutation.SetDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableDailyLimitUsdSnapshot(v *float64) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetDailyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddDailyLimitUsdSnapshot adds value to the "daily_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) AddDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.AddDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) ClearDailyLimitUsdSnapshot() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearDailyLimitUsdSnapshot()
+	return _u
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) SetWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.ResetWeeklyLimitUsdSnapshot()
+	_u.mutation.SetWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableWeeklyLimitUsdSnapshot(v *float64) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetWeeklyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddWeeklyLimitUsdSnapshot adds value to the "weekly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) AddWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.AddWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) ClearWeeklyLimitUsdSnapshot() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearWeeklyLimitUsdSnapshot()
+	return _u
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) SetMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.ResetMonthlyLimitUsdSnapshot()
+	_u.mutation.SetMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableMonthlyLimitUsdSnapshot(v *float64) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetMonthlyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddMonthlyLimitUsdSnapshot adds value to the "monthly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) AddMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.AddMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) ClearMonthlyLimitUsdSnapshot() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearMonthlyLimitUsdSnapshot()
+	return _u
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) SetRateMultiplierSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.ResetRateMultiplierSnapshot()
+	_u.mutation.SetRateMultiplierSnapshot(v)
+	return _u
+}
+
+// SetNillableRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableRateMultiplierSnapshot(v *float64) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplierSnapshot(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplierSnapshot adds value to the "rate_multiplier_snapshot" field.
+func (_u *UserSubscriptionUpdateOne) AddRateMultiplierSnapshot(v float64) *UserSubscriptionUpdateOne {
+	_u.mutation.AddRateMultiplierSnapshot(v)
 	return _u
 }
 
@@ -960,6 +1314,11 @@ func (_u *UserSubscriptionUpdateOne) SetGroup(v *Group) *UserSubscriptionUpdateO
 	return _u.SetGroupID(v.ID)
 }
 
+// SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *UserSubscriptionUpdateOne) SetSubscriptionPlan(v *SubscriptionPlan) *UserSubscriptionUpdateOne {
+	return _u.SetSubscriptionPlanID(v.ID)
+}
+
 // SetAssignedByUserID sets the "assigned_by_user" edge to the User entity by ID.
 func (_u *UserSubscriptionUpdateOne) SetAssignedByUserID(id int64) *UserSubscriptionUpdateOne {
 	_u.mutation.SetAssignedByUserID(id)
@@ -1008,6 +1367,12 @@ func (_u *UserSubscriptionUpdateOne) ClearUser() *UserSubscriptionUpdateOne {
 // ClearGroup clears the "group" edge to the Group entity.
 func (_u *UserSubscriptionUpdateOne) ClearGroup() *UserSubscriptionUpdateOne {
 	_u.mutation.ClearGroup()
+	return _u
+}
+
+// ClearSubscriptionPlan clears the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *UserSubscriptionUpdateOne) ClearSubscriptionPlan() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearSubscriptionPlan()
 	return _u
 }
 
@@ -1095,6 +1460,11 @@ func (_u *UserSubscriptionUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *UserSubscriptionUpdateOne) check() error {
+	if v, ok := _u.mutation.PlanNameSnapshot(); ok {
+		if err := usersubscription.PlanNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "plan_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "UserSubscription.plan_name_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := usersubscription.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "UserSubscription.status": %w`, err)}
@@ -1146,6 +1516,42 @@ func (_u *UserSubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *UserSu
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(usersubscription.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.PlanNameSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldPlanNameSnapshot, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyLimitUsdSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.DailyLimitUsdSnapshotCleared() {
+		_spec.ClearField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.WeeklyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyLimitUsdSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.WeeklyLimitUsdSnapshotCleared() {
+		_spec.ClearField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.MonthlyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyLimitUsdSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.MonthlyLimitUsdSnapshotCleared() {
+		_spec.ClearField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplierSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplierSnapshot(); ok {
+		_spec.AddField(usersubscription.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(usersubscription.FieldStartsAt, field.TypeTime, value)
@@ -1252,6 +1658,35 @@ func (_u *UserSubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *UserSu
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SubscriptionPlanCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usersubscription.SubscriptionPlanTable,
+			Columns: []string{usersubscription.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usersubscription.SubscriptionPlanTable,
+			Columns: []string{usersubscription.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

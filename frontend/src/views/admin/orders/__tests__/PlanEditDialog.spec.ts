@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
 
 import PlanEditDialog from '../PlanEditDialog.vue'
 import type { AdminGroup } from '@/types'
+
+const { createPlan, updatePlan } = vi.hoisted(() => ({
+  createPlan: vi.fn(),
+  updatePlan: vi.fn(),
+}))
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
@@ -24,8 +29,8 @@ vi.mock('@/stores/app', () => ({
 
 vi.mock('@/api/admin/payment', () => ({
   adminPaymentAPI: {
-    createPlan: vi.fn(),
-    updatePlan: vi.fn(),
+    createPlan,
+    updatePlan,
   },
 }))
 
@@ -139,6 +144,12 @@ function mountDialog({
 }
 
 describe('PlanEditDialog', () => {
+  beforeEach(() => {
+    createPlan.mockReset()
+    updatePlan.mockReset()
+    createPlan.mockResolvedValue({})
+  })
+
   it('shows CNY channel charge using the configured subscription rate and fee', async () => {
     const wrapper = mountDialog({
       paymentConfig: {
@@ -169,7 +180,7 @@ describe('PlanEditDialog', () => {
     expect(wrapper.text()).not.toContain('¥71.43')
   })
 
-  it('allows composite subscription groups for payment plans', () => {
+  it('uses independent plan terms and accepts every active routing group', async () => {
     const wrapper = mountDialog({
       groups: [
         groupFixture({
@@ -185,12 +196,36 @@ describe('PlanEditDialog', () => {
           platform: 'openai',
           subscription_type: 'standard',
         }),
+        groupFixture({
+          id: 12,
+          name: 'Disabled route',
+          platform: 'openai',
+          status: 'disabled',
+        }),
       ],
     })
 
     const options = wrapper.findAll('option').map(option => option.text())
 
-    expect(options).toContain('OpenAI + Claude + Gemini + Grok — composite (1.2x)')
-    expect(options).not.toContain('Standard OpenAI — openai (1x)')
+    expect(options).toContain('OpenAI + Claude + Gemini + Grok — composite')
+    expect(options).toContain('Standard OpenAI — openai')
+    expect(options).not.toContain('Disabled route — openai')
+
+    await wrapper.get('[data-testid="plan-name"]').setValue('Independent plan')
+    await wrapper.get('[data-testid="plan-group"]').setValue('11')
+    await wrapper.get('[data-testid="plan-description"]').setValue('Owns its terms')
+    await wrapper.get('[data-testid="plan-price"]').setValue('9.99')
+    await wrapper.get('[data-testid="plan-rate-multiplier"]').setValue('0')
+    await wrapper.get('[data-testid="plan-daily-limit"]').setValue('12.5')
+    await wrapper.get('[data-testid="plan-monthly-limit"]').setValue('200')
+    await wrapper.get('form').trigger('submit')
+
+    expect(createPlan).toHaveBeenCalledWith(expect.objectContaining({
+      group_id: 11,
+      rate_multiplier: 0,
+      daily_limit_usd: 12.5,
+      weekly_limit_usd: 0,
+      monthly_limit_usd: 200,
+    }))
   })
 })

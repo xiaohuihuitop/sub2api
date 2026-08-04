@@ -101,7 +101,9 @@ func (s *OpenAIGatewayService) RecordCyberPolicyUsageLog(ctx context.Context, in
 	}
 }
 
-// ResolveUserGroupRateMultiplier resolves the same cached multiplier used by OpenAI usage billing.
+// ResolveUserGroupRateMultiplier is a legacy compatibility helper.
+// OpenAI usage billing no longer calls it: balance billing uses BillingProfile
+// and subscription billing uses the instance snapshot multiplier.
 func (s *OpenAIGatewayService) ResolveUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
 	if s == nil {
 		return groupDefaultMultiplier
@@ -151,19 +153,13 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageOutputTokens:   result.Usage.ImageOutputTokens,
 	}
 
-	// Get rate multiplier
-	multiplier := 1.0
+	// 套餐实例倍率优先于余额计费资料；余额请求才读取分组倍率。
+	fallbackMultiplier := 1.0
 	if s.cfg != nil {
-		multiplier = s.cfg.Default.RateMultiplier
+		fallbackMultiplier = s.cfg.Default.RateMultiplier
 	}
-	if apiKey.GroupID != nil && apiKey.Group != nil {
-		multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, apiKey.Group.RateMultiplier)
-	}
-	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
-	// 不并入上面的 Resolve，以免污染 user:group 倍率缓存。
-	baseMultiplier := multiplier
-	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, baseMultiplier, timezone.Now())
-	videoMultiplier := resolveVideoRateMultiplier(apiKey, baseMultiplier)
+	baseMultiplier := resolveBillingRateMultiplier(apiKey, subscription, fallbackMultiplier)
+	multiplier, imageMultiplier, videoMultiplier := resolveBillingMultipliers(apiKey, subscription, fallbackMultiplier, timezone.Now())
 
 	var cost *CostBreakdown
 	var err error
@@ -227,7 +223,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 
 	// Determine billing type
-	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
+	isSubscriptionBilling := subscription != nil
 	billingType := BillingTypeBalance
 	if isSubscriptionBilling {
 		billingType = BillingTypeSubscription
@@ -410,7 +406,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取
 		// 分组覆盖价（nil 时默认 0.01 = 官方 $10/1000 次），不参与渠道级模型定价。
 		// 倍率与 image/video 按次口径一致：使用不含高峰因子的基础倍率
-		//（用户专属 > 分组 rate_multiplier > 系统默认），与分组表单的价格预览承诺一致。
+		//（套餐实例快照或余额 BillingProfile），与价格预览口径一致。
 		return s.billingService.CalculateWebSearchCost(result.WebSearchCalls, webSearchPricePerCallFromAPIKey(apiKey), webSearchMultiplier), nil
 	}
 	if isGrokVideoUsageResult(result, billingModels) {

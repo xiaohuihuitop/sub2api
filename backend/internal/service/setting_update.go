@@ -99,7 +99,7 @@ func (s *SettingService) refreshCachedSettingsAfterWrite(ctx context.Context, se
 }
 
 func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, settings *SystemSettings) (map[string]string, error) {
-	if err := s.validateDefaultSubscriptionGroups(ctx, settings.DefaultSubscriptions); err != nil {
+	if err := s.validateDefaultSubscriptions(ctx, settings.DefaultSubscriptions); err != nil {
 		return nil, err
 	}
 	normalizedWhitelist, err := NormalizeRegistrationEmailSuffixWhitelist(settings.RegistrationEmailSuffixWhitelist)
@@ -525,7 +525,7 @@ func (s *SettingService) buildAuthSourceDefaultUpdates(ctx context.Context, sett
 		settings.Google.Subscriptions,
 		settings.DingTalk.Subscriptions,
 	} {
-		if err := s.validateDefaultSubscriptionGroups(ctx, subscriptions); err != nil {
+		if err := s.validateDefaultSubscriptions(ctx, subscriptions); err != nil {
 			return nil, err
 		}
 	}
@@ -658,22 +658,40 @@ func (s *SettingService) defaultRewriteMessageCacheControl() bool {
 	return false
 }
 
-func (s *SettingService) validateDefaultSubscriptionGroups(ctx context.Context, items []DefaultSubscriptionSetting) error {
+func (s *SettingService) validateDefaultSubscriptions(ctx context.Context, items []DefaultSubscriptionSetting) error {
 	if len(items) == 0 {
 		return nil
 	}
 
-	checked := make(map[int64]struct{}, len(items))
+	checkedGroupIDs := make(map[int64]struct{}, len(items))
+	checkedPlanIDs := make(map[int64]struct{}, len(items))
 	for _, item := range items {
+		if item.PlanID > 0 {
+			if _, ok := checkedPlanIDs[item.PlanID]; ok {
+				return ErrDefaultSubPlanDuplicate.WithMetadata(map[string]string{
+					"plan_id": strconv.FormatInt(item.PlanID, 10),
+				})
+			}
+			checkedPlanIDs[item.PlanID] = struct{}{}
+			if s.defaultSubPlanReader == nil {
+				continue
+			}
+			if _, err := s.defaultSubPlanReader.GetPlan(ctx, item.PlanID); err != nil {
+				return ErrDefaultSubPlanInvalid.WithMetadata(map[string]string{
+					"plan_id": strconv.FormatInt(item.PlanID, 10),
+				})
+			}
+			continue
+		}
 		if item.GroupID <= 0 {
 			continue
 		}
-		if _, ok := checked[item.GroupID]; ok {
+		if _, ok := checkedGroupIDs[item.GroupID]; ok {
 			return ErrDefaultSubGroupDuplicate.WithMetadata(map[string]string{
 				"group_id": strconv.FormatInt(item.GroupID, 10),
 			})
 		}
-		checked[item.GroupID] = struct{}{}
+		checkedGroupIDs[item.GroupID] = struct{}{}
 		if s.defaultSubGroupReader == nil {
 			continue
 		}

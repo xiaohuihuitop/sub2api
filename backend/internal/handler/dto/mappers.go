@@ -71,7 +71,6 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 		User:       *base,
 		Notes:      u.Notes,
 		LastUsedAt: u.LastUsedAt,
-		GroupRates: u.GroupRates,
 	}
 }
 
@@ -143,6 +142,33 @@ func GroupFromService(g *service.Group) *Group {
 		return nil
 	}
 	return GroupFromServiceShallow(g)
+}
+
+func BillingProfileFromService(profile *service.BillingProfile) *BillingProfile {
+	if profile == nil {
+		return nil
+	}
+	return &BillingProfile{
+		GroupID:                      profile.GroupID,
+		BalanceRateMultiplier:        profile.BalanceRateMultiplier,
+		PeakRateEnabled:              profile.PeakRateEnabled,
+		PeakStart:                    profile.PeakStart,
+		PeakEnd:                      profile.PeakEnd,
+		PeakRateMultiplier:           profile.PeakRateMultiplier,
+		ImageRateIndependent:         profile.ImageRateIndependent,
+		ImageRateMultiplier:          profile.ImageRateMultiplier,
+		ImagePrice1K:                 profile.ImagePrice1K,
+		ImagePrice2K:                 profile.ImagePrice2K,
+		ImagePrice4K:                 profile.ImagePrice4K,
+		BatchImageDiscountMultiplier: profile.BatchImageDiscountMultiplier,
+		BatchImageHoldMultiplier:     profile.BatchImageHoldMultiplier,
+		VideoRateIndependent:         profile.VideoRateIndependent,
+		VideoRateMultiplier:          profile.VideoRateMultiplier,
+		VideoPrice480P:               profile.VideoPrice480P,
+		VideoPrice720P:               profile.VideoPrice720P,
+		VideoPrice1080P:              profile.VideoPrice1080P,
+		WebSearchPricePerCall:        profile.WebSearchPricePerCall,
+	}
 }
 
 // GroupFromServiceAdmin converts a service Group to DTO for admin users.
@@ -585,19 +611,25 @@ func RedeemCodeFromServiceAdmin(rc *service.RedeemCode) *AdminRedeemCode {
 
 func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
 	out := RedeemCode{
-		ID:           rc.ID,
-		Code:         rc.Code,
-		Type:         rc.Type,
-		Value:        rc.Value,
-		Status:       rc.Status,
-		UsedBy:       rc.UsedBy,
-		UsedAt:       rc.UsedAt,
-		CreatedAt:    rc.CreatedAt,
-		ExpiresAt:    rc.ExpiresAt,
-		GroupID:      rc.GroupID,
-		ValidityDays: rc.ValidityDays,
-		User:         UserFromServiceShallow(rc.User),
-		Group:        GroupFromServiceShallow(rc.Group),
+		ID:                      rc.ID,
+		Code:                    rc.Code,
+		Type:                    rc.Type,
+		Value:                   rc.Value,
+		Status:                  rc.Status,
+		UsedBy:                  rc.UsedBy,
+		UsedAt:                  rc.UsedAt,
+		CreatedAt:               rc.CreatedAt,
+		ExpiresAt:               rc.ExpiresAt,
+		GroupID:                 rc.GroupID,
+		SubscriptionPlanID:      rc.SubscriptionPlanID,
+		PlanNameSnapshot:        rc.PlanNameSnapshot,
+		DailyLimitUSDSnapshot:   rc.DailyLimitUSDSnapshot,
+		WeeklyLimitUSDSnapshot:  rc.WeeklyLimitUSDSnapshot,
+		MonthlyLimitUSDSnapshot: rc.MonthlyLimitUSDSnapshot,
+		RateMultiplierSnapshot:  rc.RateMultiplierSnapshot,
+		ValidityDays:            rc.ValidityDays,
+		User:                    UserFromServiceShallow(rc.User),
+		Group:                   GroupFromServiceShallow(rc.Group),
 	}
 	if rc.IsExpired() {
 		out.Status = service.StatusExpired
@@ -795,23 +827,29 @@ func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserS
 
 func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscription {
 	return UserSubscription{
-		ID:                 sub.ID,
-		UserID:             sub.UserID,
-		GroupID:            sub.GroupID,
-		StartsAt:           sub.StartsAt,
-		ExpiresAt:          sub.ExpiresAt,
-		Status:             sub.Status,
-		DailyWindowStart:   sub.DailyWindowStart,
-		WeeklyWindowStart:  sub.WeeklyWindowStart,
-		MonthlyWindowStart: sub.MonthlyWindowStart,
-		DailyUsageUSD:      sub.DailyUsageUSD,
-		WeeklyUsageUSD:     sub.WeeklyUsageUSD,
-		MonthlyUsageUSD:    sub.MonthlyUsageUSD,
-		CreatedAt:          sub.CreatedAt,
-		UpdatedAt:          sub.UpdatedAt,
-		RevokedAt:          sub.DeletedAt,
-		User:               UserFromServiceShallow(sub.User),
-		Group:              GroupFromServiceShallow(sub.Group),
+		ID:                      sub.ID,
+		UserID:                  sub.UserID,
+		GroupID:                 sub.GroupID,
+		SubscriptionPlanID:      sub.SubscriptionPlanID,
+		PlanNameSnapshot:        sub.PlanNameSnapshot,
+		DailyLimitUSDSnapshot:   sub.DailyLimitUSDSnapshot,
+		WeeklyLimitUSDSnapshot:  sub.WeeklyLimitUSDSnapshot,
+		MonthlyLimitUSDSnapshot: sub.MonthlyLimitUSDSnapshot,
+		RateMultiplierSnapshot:  sub.RateMultiplierSnapshot,
+		StartsAt:                sub.StartsAt,
+		ExpiresAt:               sub.ExpiresAt,
+		Status:                  sub.Status,
+		DailyWindowStart:        sub.DailyWindowStart,
+		WeeklyWindowStart:       sub.WeeklyWindowStart,
+		MonthlyWindowStart:      sub.MonthlyWindowStart,
+		DailyUsageUSD:           sub.DailyUsageUSD,
+		WeeklyUsageUSD:          sub.WeeklyUsageUSD,
+		MonthlyUsageUSD:         sub.MonthlyUsageUSD,
+		CreatedAt:               sub.CreatedAt,
+		UpdatedAt:               sub.UpdatedAt,
+		RevokedAt:               sub.DeletedAt,
+		User:                    UserFromServiceShallow(sub.User),
+		Group:                   GroupFromServiceShallow(sub.Group),
 	}
 }
 

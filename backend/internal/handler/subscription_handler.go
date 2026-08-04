@@ -139,34 +139,7 @@ func (h *SubscriptionHandler) GetSummary(c *gin.Context) {
 	items := make([]SubscriptionSummaryItem, 0, len(subscriptions))
 
 	for _, sub := range subscriptions {
-		item := SubscriptionSummaryItem{
-			ID:             sub.ID,
-			GroupID:        sub.GroupID,
-			Status:         sub.Status,
-			DailyUsedUSD:   sub.DailyUsageUSD,
-			WeeklyUsedUSD:  sub.WeeklyUsageUSD,
-			MonthlyUsedUSD: sub.MonthlyUsageUSD,
-		}
-
-		// Add group info if preloaded
-		if sub.Group != nil {
-			item.GroupName = sub.Group.Name
-			if sub.Group.DailyLimitUSD != nil {
-				item.DailyLimitUSD = *sub.Group.DailyLimitUSD
-			}
-			if sub.Group.WeeklyLimitUSD != nil {
-				item.WeeklyLimitUSD = *sub.Group.WeeklyLimitUSD
-			}
-			if sub.Group.MonthlyLimitUSD != nil {
-				item.MonthlyLimitUSD = *sub.Group.MonthlyLimitUSD
-			}
-		}
-
-		// Format expiration time
-		if !sub.ExpiresAt.IsZero() {
-			formatted := sub.ExpiresAt.Format("2006-01-02T15:04:05Z07:00")
-			item.ExpiresAt = &formatted
-		}
+		item := subscriptionSummaryItemFromService(sub)
 
 		// Track total usage (use monthly as the most comprehensive)
 		totalUsed += sub.MonthlyUsageUSD
@@ -185,4 +158,32 @@ func (h *SubscriptionHandler) GetSummary(c *gin.Context) {
 	}
 
 	response.Success(c, summary)
+}
+
+func subscriptionSummaryItemFromService(sub service.UserSubscription) SubscriptionSummaryItem {
+	item := SubscriptionSummaryItem{
+		ID:             sub.ID,
+		GroupID:        sub.GroupID,
+		Status:         sub.Status,
+		DailyUsedUSD:   sub.DailyUsageUSD,
+		WeeklyUsedUSD:  sub.WeeklyUsageUSD,
+		MonthlyUsedUSD: sub.MonthlyUsageUSD,
+	}
+	if sub.Group != nil {
+		item.GroupName = sub.Group.Name
+	}
+	if limit := sub.DailyLimitUSD(sub.Group); limit != nil {
+		item.DailyLimitUSD = *limit
+	}
+	if limit := sub.WeeklyLimitUSD(sub.Group); limit != nil {
+		item.WeeklyLimitUSD = *limit
+	}
+	if limit := sub.MonthlyLimitUSD(sub.Group); limit != nil {
+		item.MonthlyLimitUSD = *limit
+	}
+	if !sub.ExpiresAt.IsZero() {
+		formatted := sub.ExpiresAt.Format("2006-01-02T15:04:05Z07:00")
+		item.ExpiresAt = &formatted
+	}
+	return item
 }

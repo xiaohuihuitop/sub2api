@@ -211,6 +211,52 @@ type UpdateGroupRequest struct {
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
 }
 
+// BillingProfileRequest replaces balance billing terms for a routing group.
+// Pointer fields distinguish a missing field from an explicit zero or false.
+type BillingProfileRequest struct {
+	BalanceRateMultiplier        *float64 `json:"balance_rate_multiplier" binding:"required"`
+	PeakRateEnabled              *bool    `json:"peak_rate_enabled" binding:"required"`
+	PeakStart                    *string  `json:"peak_start" binding:"required"`
+	PeakEnd                      *string  `json:"peak_end" binding:"required"`
+	PeakRateMultiplier           *float64 `json:"peak_rate_multiplier" binding:"required"`
+	ImageRateIndependent         *bool    `json:"image_rate_independent" binding:"required"`
+	ImageRateMultiplier          *float64 `json:"image_rate_multiplier" binding:"required"`
+	ImagePrice1K                 *float64 `json:"image_price_1k"`
+	ImagePrice2K                 *float64 `json:"image_price_2k"`
+	ImagePrice4K                 *float64 `json:"image_price_4k"`
+	BatchImageDiscountMultiplier *float64 `json:"batch_image_discount_multiplier" binding:"required"`
+	BatchImageHoldMultiplier     *float64 `json:"batch_image_hold_multiplier" binding:"required"`
+	VideoRateIndependent         *bool    `json:"video_rate_independent" binding:"required"`
+	VideoRateMultiplier          *float64 `json:"video_rate_multiplier" binding:"required"`
+	VideoPrice480P               *float64 `json:"video_price_480p"`
+	VideoPrice720P               *float64 `json:"video_price_720p"`
+	VideoPrice1080P              *float64 `json:"video_price_1080p"`
+	WebSearchPricePerCall        *float64 `json:"web_search_price_per_call"`
+}
+
+func (r BillingProfileRequest) ToServiceInput() *service.UpdateBillingProfileInput {
+	return &service.UpdateBillingProfileInput{
+		BalanceRateMultiplier:        *r.BalanceRateMultiplier,
+		PeakRateEnabled:              *r.PeakRateEnabled,
+		PeakStart:                    *r.PeakStart,
+		PeakEnd:                      *r.PeakEnd,
+		PeakRateMultiplier:           *r.PeakRateMultiplier,
+		ImageRateIndependent:         *r.ImageRateIndependent,
+		ImageRateMultiplier:          *r.ImageRateMultiplier,
+		ImagePrice1K:                 r.ImagePrice1K,
+		ImagePrice2K:                 r.ImagePrice2K,
+		ImagePrice4K:                 r.ImagePrice4K,
+		BatchImageDiscountMultiplier: *r.BatchImageDiscountMultiplier,
+		BatchImageHoldMultiplier:     *r.BatchImageHoldMultiplier,
+		VideoRateIndependent:         *r.VideoRateIndependent,
+		VideoRateMultiplier:          *r.VideoRateMultiplier,
+		VideoPrice480P:               r.VideoPrice480P,
+		VideoPrice720P:               r.VideoPrice720P,
+		VideoPrice1080P:              r.VideoPrice1080P,
+		WebSearchPricePerCall:        r.WebSearchPricePerCall,
+	}
+}
+
 type CompositeRouteRequest struct {
 	PublicModel    string `json:"public_model" binding:"required"`
 	MatchType      string `json:"match_type" binding:"omitempty,oneof=exact prefix"`
@@ -437,6 +483,41 @@ func (h *GroupHandler) GetByID(c *gin.Context) {
 	}
 
 	response.Success(c, dto.GroupFromServiceAdmin(group))
+}
+
+// GetBillingProfile returns the independent balance pricing for a group.
+// GET /api/v1/admin/groups/:id/billing-profile
+func (h *GroupHandler) GetBillingProfile(c *gin.Context) {
+	groupID, ok := parsePositiveIDParam(c, "id")
+	if !ok {
+		return
+	}
+	profile, err := h.adminService.GetGroupBillingProfile(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, dto.BillingProfileFromService(profile))
+}
+
+// UpdateBillingProfile replaces the independent balance pricing for a group.
+// PUT /api/v1/admin/groups/:id/billing-profile
+func (h *GroupHandler) UpdateBillingProfile(c *gin.Context) {
+	groupID, ok := parsePositiveIDParam(c, "id")
+	if !ok {
+		return
+	}
+	var req BillingProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	profile, err := h.adminService.UpdateGroupBillingProfile(c.Request.Context(), groupID, req.ToServiceInput())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, dto.BillingProfileFromService(profile))
 }
 
 // GetModelsListCandidates handles getting candidate model IDs for custom /v1/models list.
@@ -738,9 +819,18 @@ func (h *GroupHandler) GetGroupAPIKeys(c *gin.Context) {
 	response.Paginated(c, outKeys, total, page, pageSize)
 }
 
-// GetGroupRateMultipliers handles getting rate multipliers for users in a group
-// GET /api/v1/admin/groups/:id/rate-multipliers
-func (h *GroupHandler) GetGroupRateMultipliers(c *gin.Context) {
+type groupRPMOverrideResponse struct {
+	UserID      int64  `json:"user_id"`
+	UserName    string `json:"user_name"`
+	UserEmail   string `json:"user_email"`
+	UserNotes   string `json:"user_notes"`
+	UserStatus  string `json:"user_status"`
+	RPMOverride *int   `json:"rpm_override"`
+}
+
+// GetGroupRPMOverrides returns per-user RPM overrides without exposing legacy billing multipliers.
+// GET /api/v1/admin/groups/:id/rpm-overrides
+func (h *GroupHandler) GetGroupRPMOverrides(c *gin.Context) {
 	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "Invalid group ID")
@@ -753,55 +843,21 @@ func (h *GroupHandler) GetGroupRateMultipliers(c *gin.Context) {
 		return
 	}
 
-	if entries == nil {
-		entries = []service.UserGroupRateEntry{}
+	result := make([]groupRPMOverrideResponse, 0, len(entries))
+	for _, entry := range entries {
+		if entry.RPMOverride == nil {
+			continue
+		}
+		result = append(result, groupRPMOverrideResponse{
+			UserID:      entry.UserID,
+			UserName:    entry.UserName,
+			UserEmail:   entry.UserEmail,
+			UserNotes:   entry.UserNotes,
+			UserStatus:  entry.UserStatus,
+			RPMOverride: entry.RPMOverride,
+		})
 	}
-	response.Success(c, entries)
-}
-
-// ClearGroupRateMultipliers handles clearing all rate multipliers for a group
-// DELETE /api/v1/admin/groups/:id/rate-multipliers
-func (h *GroupHandler) ClearGroupRateMultipliers(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	if err := h.adminService.ClearGroupRateMultipliers(c.Request.Context(), groupID); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"message": "Rate multipliers cleared successfully"})
-}
-
-// BatchSetGroupRateMultipliersRequest represents batch set rate multipliers request
-type BatchSetGroupRateMultipliersRequest struct {
-	Entries []service.GroupRateMultiplierInput `json:"entries" binding:"required"`
-}
-
-// BatchSetGroupRateMultipliers handles batch setting rate multipliers for a group
-// PUT /api/v1/admin/groups/:id/rate-multipliers
-func (h *GroupHandler) BatchSetGroupRateMultipliers(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	var req BatchSetGroupRateMultipliersRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if err := h.adminService.BatchSetGroupRateMultipliers(c.Request.Context(), groupID, req.Entries); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"message": "Rate multipliers updated successfully"})
+	response.Success(c, result)
 }
 
 // BatchSetGroupRPMOverridesRequest represents batch set rpm_override request

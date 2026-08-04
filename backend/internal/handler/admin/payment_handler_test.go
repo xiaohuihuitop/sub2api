@@ -49,33 +49,33 @@ func TestSanitizeAdminPaymentOrderForResponseAddsCurrency(t *testing.T) {
 }
 
 func TestAdminSubscriptionPlansForResponseIncludesCompositeGroupInfo(t *testing.T) {
-	weekly := 25.0
+	planWeekly := 88.0
 	now := time.Now()
 	plans := []*dbent.SubscriptionPlan{
 		{
-			ID:           11,
-			GroupID:      7,
-			Name:         "All models",
-			Description:  "Composite access",
-			Price:        19.99,
-			Currency:     "CNY",
-			ValidityDays: 30,
-			ValidityUnit: "days",
-			Features:     "OpenAI\nClaude\nGemini\nGrok",
-			ProductName:  "Sub2API",
-			ForSale:      true,
-			SortOrder:    1,
-			CreatedAt:    now,
-			UpdatedAt:    now,
+			ID:             11,
+			GroupID:        7,
+			Name:           "All models",
+			Description:    "Composite access",
+			Price:          19.99,
+			Currency:       "CNY",
+			ValidityDays:   30,
+			ValidityUnit:   "days",
+			Features:       "OpenAI\nClaude\nGemini\nGrok",
+			ProductName:    "Sub2API",
+			ForSale:        true,
+			SortOrder:      1,
+			RateMultiplier: 0.75,
+			WeeklyLimitUsd: &planWeekly,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		},
 	}
 	groupInfo := map[int64]service.PlanGroupInfo{
 		7: {
-			Platform:       service.PlatformComposite,
-			Name:           "Bucket 2 composite",
-			RateMultiplier: 1.5,
-			WeeklyLimitUSD: &weekly,
-			ModelScopes:    []string{"openai", "claude", "gemini", "grok"},
+			Platform:    service.PlatformComposite,
+			Name:        "Bucket 2 composite",
+			ModelScopes: []string{"openai", "claude", "gemini", "grok"},
 		},
 	}
 
@@ -90,7 +90,10 @@ func TestAdminSubscriptionPlansForResponseIncludesCompositeGroupInfo(t *testing.
 	if got[0].GroupName != "Bucket 2 composite" {
 		t.Fatalf("expected group name to be included, got %q", got[0].GroupName)
 	}
-	if got[0].WeeklyLimitUSD == nil || *got[0].WeeklyLimitUSD != weekly {
+	if got[0].RateMultiplier != 0.75 {
+		t.Fatalf("expected plan rate multiplier to be included, got %v", got[0].RateMultiplier)
+	}
+	if got[0].WeeklyLimitUSD == nil || *got[0].WeeklyLimitUSD != planWeekly {
 		t.Fatalf("expected weekly limit to be included, got %#v", got[0].WeeklyLimitUSD)
 	}
 	if strings.Join(got[0].ModelScopes, ",") != "openai,claude,gemini,grok" {
@@ -103,5 +106,26 @@ func TestAdminSubscriptionPlansForResponseIncludesCompositeGroupInfo(t *testing.
 	}
 	if !got[0].CreatedAt.Equal(now) || !got[0].UpdatedAt.Equal(now) {
 		t.Fatalf("expected created_at/updated_at to be preserved, got %v / %v", got[0].CreatedAt, got[0].UpdatedAt)
+	}
+}
+
+func TestAdminSubscriptionPlanResponsePreservesZeroRateMultiplier(t *testing.T) {
+	result := AdminSubscriptionPlanResult{
+		ID:             1,
+		GroupID:        2,
+		Name:           "Free trial",
+		Description:    "zero multiplier is valid",
+		Price:          0.01,
+		ValidityDays:   1,
+		ValidityUnit:   "days",
+		RateMultiplier: 0,
+	}
+
+	body, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal subscription plan result: %v", err)
+	}
+	if !strings.Contains(string(body), `"rate_multiplier":0`) {
+		t.Fatalf("expected zero rate multiplier to be serialized, got %s", body)
 	}
 }

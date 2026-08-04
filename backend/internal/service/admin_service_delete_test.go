@@ -616,19 +616,23 @@ func TestAdminService_DeleteUser_DeleteError(t *testing.T) {
 	require.Equal(t, []int64{9}, repo.deletedIDs)
 }
 
-func TestAdminService_DeleteGroup_Success_WithCacheInvalidation(t *testing.T) {
-	cache := newBillingCacheStub(2)
+func TestAdminService_DeleteGroup_InvalidatesSubscriptionCandidateCache(t *testing.T) {
+	invalidations := make(chan subscriptionInvalidateCall, 2)
+	billingCache := &BillingCacheService{}
+	billingCache.RegisterSubscriptionAuthCacheInvalidator(func(_ context.Context, userID, groupID int64) {
+		invalidations <- subscriptionInvalidateCall{userID: userID, groupID: groupID}
+	})
 	repo := &groupRepoStub{affectedUserIDs: []int64{11, 12}}
 	svc := &adminServiceImpl{
 		groupRepo:           repo,
-		billingCacheService: &BillingCacheService{cache: cache},
+		billingCacheService: billingCache,
 	}
 
 	err := svc.DeleteGroup(context.Background(), 5)
 	require.NoError(t, err)
 	require.Equal(t, []int64{5}, repo.deleteCalls)
 
-	calls := waitForInvalidations(t, cache.invalidations, 2)
+	calls := waitForInvalidations(t, invalidations, 2)
 	require.ElementsMatch(t, []subscriptionInvalidateCall{
 		{userID: 11, groupID: 5},
 		{userID: 12, groupID: 5},

@@ -11,7 +11,6 @@ export interface ApiKeyGroupFilterLabels {
   all: string
   exclusive: string
   public: string
-  subscription: string
   disabled: string
 }
 
@@ -20,7 +19,6 @@ export interface ApiKeyGroupFilterLabels {
 // numbers avoids the duplicate "object:" keys that null-valued headers would produce.
 const HEADER_EXCLUSIVE = -1
 const HEADER_PUBLIC = -2
-const HEADER_SUBSCRIPTION = -3
 const HEADER_DISABLED = -4
 
 /**
@@ -42,15 +40,12 @@ export function buildApiKeyGroupFilterOptions(
 ): ApiKeyGroupFilterOption[] {
   const exclusive: ApiKeyGroupFilterOption[] = []
   const publicGroups: ApiKeyGroupFilterOption[] = []
-  const subscription: ApiKeyGroupFilterOption[] = []
   const disabledGroups: ApiKeyGroupFilterOption[] = []
 
   for (const grp of groups) {
     const item: ApiKeyGroupFilterOption = { value: grp.id, label: grp.name }
     if (grp.status !== 'active') {
       disabledGroups.push(item)
-    } else if (grp.subscription_type === 'subscription') {
-      subscription.push(item)
     } else if (grp.is_exclusive) {
       exclusive.push(item)
     } else {
@@ -63,7 +58,6 @@ export function buildApiKeyGroupFilterOptions(
   const sections: Array<[string, number, ApiKeyGroupFilterOption[]]> = [
     [labels.exclusive,    HEADER_EXCLUSIVE,    exclusive],
     [labels.public,       HEADER_PUBLIC,       publicGroups],
-    [labels.subscription, HEADER_SUBSCRIPTION, subscription],
     [labels.disabled,     HEADER_DISABLED,     disabledGroups],
   ]
   for (const [label, headerValue, items] of sections) {

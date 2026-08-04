@@ -132,11 +132,11 @@ func TestValidatePeakRateConfig(t *testing.T) {
 	}
 }
 
-func TestPeakMultiplierAt_StandardTypeDegradesToOne(t *testing.T) {
+func TestPeakMultiplierAt_AppliesToAnyRoutingGroup(t *testing.T) {
 	g := newPeakGroup(true, "14:00", "18:00", 3.0)
 	g.SubscriptionType = "standard"
-	if got := g.PeakMultiplierAt(at(15, 30)); got != 1.0 {
-		t.Fatalf("standard group must degrade to 1.0, got %v", got)
+	if got := g.PeakMultiplierAt(at(15, 30)); got != 3.0 {
+		t.Fatalf("standard group peak multiplier: got %v, want 3.0", got)
 	}
 
 	sub := newPeakGroup(true, "14:00", "18:00", 3.0)

@@ -2,8 +2,8 @@ package service
 
 import "context"
 
-// UserGroupRateEntry 分组下用户专属倍率/RPM 条目。
-// RateMultiplier 与 RPMOverride 均为指针以支持"未设置"语义（NULL）。
+// UserGroupRateEntry 保存旧用户倍率字段与当前 RPM override 条目。
+// RateMultiplier 仅用于数据兼容，不参与余额或订阅计费；两个字段都用指针表达 NULL。
 type UserGroupRateEntry struct {
 	UserID         int64    `json:"user_id"`
 	UserName       string   `json:"user_name"`
@@ -27,25 +27,25 @@ type GroupRPMOverrideInput struct {
 	RPMOverride *int  `json:"rpm_override"`
 }
 
-// UserGroupRateRepository 用户专属分组倍率/RPM 仓储接口。
-// 允许管理员为特定用户设置分组的专属计费倍率与 RPM 上限，覆盖分组默认值。
+// UserGroupRateRepository 保存旧用户倍率字段和当前 RPM override。
+// 用户专属倍率读写只保留迁移兼容，余额和订阅计费不会调用；RPM override 仍有效。
 type UserGroupRateRepository interface {
-	// GetByUserID 获取用户所有专属分组 rate_multiplier（仅返回非 NULL 的条目）
+	// GetByUserID 获取用户的旧专属 rate_multiplier（仅兼容读取）。
 	GetByUserID(ctx context.Context, userID int64) (map[int64]float64, error)
 
-	// GetByUserAndGroup 获取用户在特定分组的专属 rate_multiplier（NULL 返回 nil）
+	// GetByUserAndGroup 获取旧专属 rate_multiplier（仅兼容读取，NULL 返回 nil）。
 	GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error)
 
 	// GetRPMOverrideByUserAndGroup 获取用户在特定分组的 rpm_override（NULL 返回 nil）
 	GetRPMOverrideByUserAndGroup(ctx context.Context, userID, groupID int64) (*int, error)
 
-	// GetByGroupID 获取指定分组下所有用户的专属配置（rate 与 rpm_override 任一非 NULL 即返回）
+	// GetByGroupID 获取指定分组下所有旧 rate 与当前 RPM 配置（任一非 NULL 即返回）。
 	GetByGroupID(ctx context.Context, groupID int64) ([]UserGroupRateEntry, error)
 
-	// SyncUserGroupRates 同步用户的分组专属倍率；nil 表示清空该分组的 rate_multiplier
+	// SyncUserGroupRates 同步旧分组专属倍率；nil 表示清空该分组的 rate_multiplier。
 	SyncUserGroupRates(ctx context.Context, userID int64, rates map[int64]*float64) error
 
-	// SyncGroupRateMultipliers 批量同步分组的用户专属倍率（替换整组 rate 部分）
+	// SyncGroupRateMultipliers 批量同步旧分组专属倍率（替换整组 rate 部分）。
 	SyncGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error
 
 	// SyncGroupRPMOverrides 批量同步分组的用户专属 RPM（替换整组 rpm_override 部分）。
@@ -55,9 +55,9 @@ type UserGroupRateRepository interface {
 	// ClearGroupRPMOverrides 清空指定分组的所有 rpm_override（整组 rpm 部分归 NULL）
 	ClearGroupRPMOverrides(ctx context.Context, groupID int64) error
 
-	// DeleteByGroupID 删除指定分组的所有用户专属条目（分组删除时调用）
+	// DeleteByGroupID 删除指定分组的所有旧 rate 与 RPM 条目（分组删除时调用）。
 	DeleteByGroupID(ctx context.Context, groupID int64) error
 
-	// DeleteByUserID 删除指定用户的所有专属条目（用户删除时调用）
+	// DeleteByUserID 删除指定用户的所有旧 rate 与 RPM 条目（用户删除时调用）。
 	DeleteByUserID(ctx context.Context, userID int64) error
 }

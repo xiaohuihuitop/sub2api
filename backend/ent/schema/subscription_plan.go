@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
@@ -61,6 +62,21 @@ func (SubscriptionPlan) Fields() []ent.Field {
 			Default(true),
 		field.Int("sort_order").
 			Default(0),
+		field.Float("daily_limit_usd").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("weekly_limit_usd").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("monthly_limit_usd").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Float("rate_multiplier").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			Default(1.0),
 		field.Time("created_at").
 			Immutable().
 			Default(time.Now).
@@ -76,5 +92,12 @@ func (SubscriptionPlan) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("group_id"),
 		index.Fields("for_sale"),
+	}
+}
+
+func (SubscriptionPlan) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("subscriptions", UserSubscription.Type),
+		edge.To("redeem_codes", RedeemCode.Type),
 	}
 }

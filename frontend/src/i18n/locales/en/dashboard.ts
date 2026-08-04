@@ -528,16 +528,16 @@ export default {
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
     title: 'Model Plaza',
-    description: 'Browse available models and pricing by group',
+    description: 'Browse available models and balance pricing by group',
     loading: 'Loading...',
     empty: 'No groups to display',
     loadFailed: 'Failed to load model plaza',
     noSearchResult: 'No matching models',
-    anonymousHint: 'Sign in to see your exclusive groups and personal rates',
+    anonymousHint: 'Sign in to see your exclusive groups',
     filters: {
       platformLabel: 'Platform',
       groupLabel: 'Group',
-      rateLabel: 'Rate',
+      rateLabel: 'Balance Rate',
       modelLabel: 'Model',
       searchPlaceholder: 'Search models',
       all: 'All'
@@ -549,7 +549,7 @@ export default {
     detail: {
       noModels: 'No models configured for this group',
       noPricing: 'Pricing not configured',
-      peakNote: 'Peak hours {window}: billing rate ×{multiplier}'
+      peakNote: 'Balance peak hours {window}: billing rate ×{multiplier}'
     },
     table: {
       model: 'Model',
@@ -558,9 +558,9 @@ export default {
       cache: 'Cache',
       cacheWrite: 'Write',
       cacheRead: 'Read',
-      paidPrice: 'Your Price (Discounted)',
+      balancePrice: 'Balance Price',
       officialPrice: 'Official Price',
-      rate: 'Rate',
+      balanceRate: 'Balance Rate',
       unitPerMillion: '$ / 1M tokens',
       perUnitRequest: '/ request',
       perUnitImage: '/ image',

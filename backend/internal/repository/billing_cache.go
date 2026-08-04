@@ -45,17 +45,22 @@ func billingBalanceKey(userID int64) string {
 }
 
 // billingSubKey generates the Redis key for subscription cache.
-func billingSubKey(userID, groupID int64) string {
-	return fmt.Sprintf("%s%d:%d", billingSubKeyPrefix, userID, groupID)
+func billingSubKey(userID, subscriptionID int64) string {
+	return fmt.Sprintf("%sv2:%d:%d", billingSubKeyPrefix, userID, subscriptionID)
 }
 
 const (
-	subFieldStatus       = "status"
-	subFieldExpiresAt    = "expires_at"
-	subFieldDailyUsage   = "daily_usage"
-	subFieldWeeklyUsage  = "weekly_usage"
-	subFieldMonthlyUsage = "monthly_usage"
-	subFieldVersion      = "version"
+	subFieldSubscriptionID = "subscription_id"
+	subFieldStatus         = "status"
+	subFieldExpiresAt      = "expires_at"
+	subFieldDailyUsage     = "daily_usage"
+	subFieldWeeklyUsage    = "weekly_usage"
+	subFieldMonthlyUsage   = "monthly_usage"
+	subFieldDailyLimit     = "daily_limit"
+	subFieldWeeklyLimit    = "weekly_limit"
+	subFieldMonthlyLimit   = "monthly_limit"
+	subFieldRateMultiplier = "rate_multiplier"
+	subFieldVersion        = "version"
 )
 
 // billingRateLimitKey generates the Redis key for API key rate limit cache.
@@ -173,8 +178,8 @@ func (c *billingCache) InvalidateUserBalance(ctx context.Context, userID int64) 
 	return c.rdb.Del(ctx, key).Err()
 }
 
-func (c *billingCache) GetSubscriptionCache(ctx context.Context, userID, groupID int64) (*service.SubscriptionCacheData, error) {
-	key := billingSubKey(userID, groupID)
+func (c *billingCache) GetSubscriptionCache(ctx context.Context, userID, subscriptionID int64) (*service.SubscriptionCacheData, error) {
+	key := billingSubKey(userID, subscriptionID)
 	result, err := c.rdb.HGetAll(ctx, key).Result()
 	if err != nil {
 		return nil, err
@@ -187,6 +192,9 @@ func (c *billingCache) GetSubscriptionCache(ctx context.Context, userID, groupID
 
 func (c *billingCache) parseSubscriptionCache(data map[string]string) (*service.SubscriptionCacheData, error) {
 	result := &service.SubscriptionCacheData{}
+	if subscriptionID, ok := data[subFieldSubscriptionID]; ok {
+		result.SubscriptionID, _ = strconv.ParseInt(subscriptionID, 10, 64)
+	}
 
 	result.Status = data[subFieldStatus]
 	if result.Status == "" {
@@ -211,6 +219,12 @@ func (c *billingCache) parseSubscriptionCache(data map[string]string) (*service.
 	if monthlyStr, ok := data[subFieldMonthlyUsage]; ok {
 		result.MonthlyUsage, _ = strconv.ParseFloat(monthlyStr, 64)
 	}
+	result.DailyLimitUSD = parseSubscriptionLimit(data[subFieldDailyLimit])
+	result.WeeklyLimitUSD = parseSubscriptionLimit(data[subFieldWeeklyLimit])
+	result.MonthlyLimitUSD = parseSubscriptionLimit(data[subFieldMonthlyLimit])
+	if multiplier, ok := data[subFieldRateMultiplier]; ok {
+		result.RateMultiplier, _ = strconv.ParseFloat(multiplier, 64)
+	}
 
 	if versionStr, ok := data[subFieldVersion]; ok {
 		result.Version, _ = strconv.ParseInt(versionStr, 10, 64)
@@ -219,20 +233,36 @@ func (c *billingCache) parseSubscriptionCache(data map[string]string) (*service.
 	return result, nil
 }
 
-func (c *billingCache) SetSubscriptionCache(ctx context.Context, userID, groupID int64, data *service.SubscriptionCacheData) error {
+func parseSubscriptionLimit(value string) *float64 {
+	if value == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
+func (c *billingCache) SetSubscriptionCache(ctx context.Context, userID, subscriptionID int64, data *service.SubscriptionCacheData) error {
 	if data == nil {
 		return nil
 	}
 
-	key := billingSubKey(userID, groupID)
+	key := billingSubKey(userID, subscriptionID)
 
 	fields := map[string]any{
-		subFieldStatus:       data.Status,
-		subFieldExpiresAt:    data.ExpiresAt.Unix(),
-		subFieldDailyUsage:   data.DailyUsage,
-		subFieldWeeklyUsage:  data.WeeklyUsage,
-		subFieldMonthlyUsage: data.MonthlyUsage,
-		subFieldVersion:      data.Version,
+		subFieldSubscriptionID: data.SubscriptionID,
+		subFieldStatus:         data.Status,
+		subFieldExpiresAt:      data.ExpiresAt.Unix(),
+		subFieldDailyUsage:     data.DailyUsage,
+		subFieldWeeklyUsage:    data.WeeklyUsage,
+		subFieldMonthlyUsage:   data.MonthlyUsage,
+		subFieldDailyLimit:     formatSubscriptionLimit(data.DailyLimitUSD),
+		subFieldWeeklyLimit:    formatSubscriptionLimit(data.WeeklyLimitUSD),
+		subFieldMonthlyLimit:   formatSubscriptionLimit(data.MonthlyLimitUSD),
+		subFieldRateMultiplier: data.RateMultiplier,
+		subFieldVersion:        data.Version,
 	}
 
 	pipe := c.rdb.Pipeline()
@@ -242,18 +272,25 @@ func (c *billingCache) SetSubscriptionCache(ctx context.Context, userID, groupID
 	return err
 }
 
-func (c *billingCache) UpdateSubscriptionUsage(ctx context.Context, userID, groupID int64, cost float64) error {
-	key := billingSubKey(userID, groupID)
+func formatSubscriptionLimit(limit *float64) string {
+	if limit == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*limit, 'f', -1, 64)
+}
+
+func (c *billingCache) UpdateSubscriptionUsage(ctx context.Context, userID, subscriptionID int64, cost float64) error {
+	key := billingSubKey(userID, subscriptionID)
 	_, err := updateSubUsageScript.Run(ctx, c.rdb, []string{key}, cost, int(jitteredTTL().Seconds())).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		log.Printf("Warning: update subscription usage cache failed for user %d group %d: %v", userID, groupID, err)
+		log.Printf("Warning: update subscription usage cache failed for user %d subscription %d: %v", userID, subscriptionID, err)
 		return err
 	}
 	return nil
 }
 
-func (c *billingCache) InvalidateSubscriptionCache(ctx context.Context, userID, groupID int64) error {
-	key := billingSubKey(userID, groupID)
+func (c *billingCache) InvalidateSubscriptionCache(ctx context.Context, userID, subscriptionID int64) error {
+	key := billingSubKey(userID, subscriptionID)
 	return c.rdb.Del(ctx, key).Err()
 }
 

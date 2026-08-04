@@ -11,6 +11,7 @@ const {
   getModelsListCandidates,
   getUsageSummary,
   getCapacitySummary,
+  getLiveCapability,
   showSuccess,
   showError
 } = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const {
   getModelsListCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
+  getLiveCapability: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn()
 }))
@@ -31,6 +33,7 @@ vi.mock('@/api/admin', () => ({
       getModelsListCandidates,
       getUsageSummary,
       getCapacitySummary,
+      getLiveCapability,
       getAll: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -133,6 +136,14 @@ const DataTableStub = defineComponent({
   template: '<div><div v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></div></div>'
 })
 
+const GroupBillingProfileDialogStub = defineComponent({
+  props: {
+    show: { type: Boolean, default: false },
+    group: { type: Object, default: null }
+  },
+  template: '<div data-testid="billing-profile-dialog" :data-open="String(show)" :data-group-id="group?.id ?? null" />'
+})
+
 function mountView() {
   return mount(GroupsView, {
     global: {
@@ -150,6 +161,7 @@ function mountView() {
         GroupCapacityBadge: true,
         GroupRateMultipliersModal: true,
         GroupRPMOverridesModal: true,
+        GroupBillingProfileDialog: GroupBillingProfileDialogStub,
         VueDraggable: true
       }
     }
@@ -166,6 +178,7 @@ describe('GroupsView duplicate action', () => {
       getModelsListCandidates,
       getUsageSummary,
       getCapacitySummary,
+      getLiveCapability,
       showSuccess,
       showError
     ]) {
@@ -188,6 +201,7 @@ describe('GroupsView duplicate action', () => {
     getModelsListCandidates.mockResolvedValue([])
     getUsageSummary.mockResolvedValue([])
     getCapacitySummary.mockResolvedValue([])
+    getLiveCapability.mockResolvedValue({ supported: false })
   })
 
   afterEach(() => {
@@ -205,6 +219,18 @@ describe('GroupsView duplicate action', () => {
     expect(duplicateGroup).toHaveBeenCalledWith(42)
     expect(showSuccess).toHaveBeenCalledWith('admin.groups.duplicateSuccess')
     expect(listGroups).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('opens the separate balance billing profile for the selected routing group', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="group-billing-profile"]').trigger('click')
+
+    const dialog = wrapper.get('[data-testid="billing-profile-dialog"]')
+    expect(dialog.attributes('data-open')).toBe('true')
+    expect(dialog.attributes('data-group-id')).toBe('42')
     wrapper.unmount()
   })
 

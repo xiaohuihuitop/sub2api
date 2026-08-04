@@ -120,6 +120,8 @@ const (
 	FieldMaxReasoningEffort = "max_reasoning_effort"
 	// FieldReasoningEffortMappings holds the string denoting the reasoning_effort_mappings field in the database.
 	FieldReasoningEffortMappings = "reasoning_effort_mappings"
+	// EdgeBillingProfile holds the string denoting the billing_profile edge name in mutations.
+	EdgeBillingProfile = "billing_profile"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -138,6 +140,13 @@ const (
 	EdgeUserAllowedGroups = "user_allowed_groups"
 	// Table holds the table name of the group in the database.
 	Table = "groups"
+	// BillingProfileTable is the table that holds the billing_profile relation/edge.
+	BillingProfileTable = "billing_profiles"
+	// BillingProfileInverseTable is the table name for the BillingProfile entity.
+	// It exists in this package in order to avoid circular dependency with the "billingprofile" package.
+	BillingProfileInverseTable = "billing_profiles"
+	// BillingProfileColumn is the table column denoting the billing_profile relation/edge.
+	BillingProfileColumn = "group_id"
 	// APIKeysTable is the table that holds the api_keys relation/edge.
 	APIKeysTable = "api_keys"
 	// APIKeysInverseTable is the table name for the APIKey entity.
@@ -611,6 +620,13 @@ func ByMaxReasoningEffort(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaxReasoningEffort, opts...).ToFunc()
 }
 
+// ByBillingProfileField orders the results by billing_profile field.
+func ByBillingProfileField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newBillingProfileStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByAPIKeysCount orders the results by api_keys count.
 func ByAPIKeysCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -721,6 +737,13 @@ func ByUserAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newUserAllowedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newBillingProfileStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(BillingProfileInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, BillingProfileTable, BillingProfileColumn),
+	)
 }
 func newAPIKeysStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

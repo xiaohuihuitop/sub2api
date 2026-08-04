@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
@@ -29,6 +30,18 @@ type UserSubscription struct {
 	UserID int64 `json:"user_id,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID int64 `json:"group_id,omitempty"`
+	// SubscriptionPlanID holds the value of the "subscription_plan_id" field.
+	SubscriptionPlanID *int64 `json:"subscription_plan_id,omitempty"`
+	// PlanNameSnapshot holds the value of the "plan_name_snapshot" field.
+	PlanNameSnapshot string `json:"plan_name_snapshot,omitempty"`
+	// DailyLimitUsdSnapshot holds the value of the "daily_limit_usd_snapshot" field.
+	DailyLimitUsdSnapshot *float64 `json:"daily_limit_usd_snapshot,omitempty"`
+	// WeeklyLimitUsdSnapshot holds the value of the "weekly_limit_usd_snapshot" field.
+	WeeklyLimitUsdSnapshot *float64 `json:"weekly_limit_usd_snapshot,omitempty"`
+	// MonthlyLimitUsdSnapshot holds the value of the "monthly_limit_usd_snapshot" field.
+	MonthlyLimitUsdSnapshot *float64 `json:"monthly_limit_usd_snapshot,omitempty"`
+	// RateMultiplierSnapshot holds the value of the "rate_multiplier_snapshot" field.
+	RateMultiplierSnapshot float64 `json:"rate_multiplier_snapshot,omitempty"`
 	// StartsAt holds the value of the "starts_at" field.
 	StartsAt time.Time `json:"starts_at,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
@@ -65,13 +78,15 @@ type UserSubscriptionEdges struct {
 	User *User `json:"user,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
+	// SubscriptionPlan holds the value of the subscription_plan edge.
+	SubscriptionPlan *SubscriptionPlan `json:"subscription_plan,omitempty"`
 	// AssignedByUser holds the value of the assigned_by_user edge.
 	AssignedByUser *User `json:"assigned_by_user,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -96,12 +111,23 @@ func (e UserSubscriptionEdges) GroupOrErr() (*Group, error) {
 	return nil, &NotLoadedError{edge: "group"}
 }
 
+// SubscriptionPlanOrErr returns the SubscriptionPlan value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e UserSubscriptionEdges) SubscriptionPlanOrErr() (*SubscriptionPlan, error) {
+	if e.SubscriptionPlan != nil {
+		return e.SubscriptionPlan, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: subscriptionplan.Label}
+	}
+	return nil, &NotLoadedError{edge: "subscription_plan"}
+}
+
 // AssignedByUserOrErr returns the AssignedByUser value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e UserSubscriptionEdges) AssignedByUserOrErr() (*User, error) {
 	if e.AssignedByUser != nil {
 		return e.AssignedByUser, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: user.Label}
 	}
 	return nil, &NotLoadedError{edge: "assigned_by_user"}
@@ -110,7 +136,7 @@ func (e UserSubscriptionEdges) AssignedByUserOrErr() (*User, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserSubscriptionEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -121,11 +147,11 @@ func (*UserSubscription) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case usersubscription.FieldDailyUsageUsd, usersubscription.FieldWeeklyUsageUsd, usersubscription.FieldMonthlyUsageUsd:
+		case usersubscription.FieldDailyLimitUsdSnapshot, usersubscription.FieldWeeklyLimitUsdSnapshot, usersubscription.FieldMonthlyLimitUsdSnapshot, usersubscription.FieldRateMultiplierSnapshot, usersubscription.FieldDailyUsageUsd, usersubscription.FieldWeeklyUsageUsd, usersubscription.FieldMonthlyUsageUsd:
 			values[i] = new(sql.NullFloat64)
-		case usersubscription.FieldID, usersubscription.FieldUserID, usersubscription.FieldGroupID, usersubscription.FieldAssignedBy:
+		case usersubscription.FieldID, usersubscription.FieldUserID, usersubscription.FieldGroupID, usersubscription.FieldSubscriptionPlanID, usersubscription.FieldAssignedBy:
 			values[i] = new(sql.NullInt64)
-		case usersubscription.FieldStatus, usersubscription.FieldNotes:
+		case usersubscription.FieldPlanNameSnapshot, usersubscription.FieldStatus, usersubscription.FieldNotes:
 			values[i] = new(sql.NullString)
 		case usersubscription.FieldCreatedAt, usersubscription.FieldUpdatedAt, usersubscription.FieldDeletedAt, usersubscription.FieldStartsAt, usersubscription.FieldExpiresAt, usersubscription.FieldDailyWindowStart, usersubscription.FieldWeeklyWindowStart, usersubscription.FieldMonthlyWindowStart, usersubscription.FieldAssignedAt:
 			values[i] = new(sql.NullTime)
@@ -180,6 +206,46 @@ func (_m *UserSubscription) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field group_id", values[i])
 			} else if value.Valid {
 				_m.GroupID = value.Int64
+			}
+		case usersubscription.FieldSubscriptionPlanID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field subscription_plan_id", values[i])
+			} else if value.Valid {
+				_m.SubscriptionPlanID = new(int64)
+				*_m.SubscriptionPlanID = value.Int64
+			}
+		case usersubscription.FieldPlanNameSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field plan_name_snapshot", values[i])
+			} else if value.Valid {
+				_m.PlanNameSnapshot = value.String
+			}
+		case usersubscription.FieldDailyLimitUsdSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field daily_limit_usd_snapshot", values[i])
+			} else if value.Valid {
+				_m.DailyLimitUsdSnapshot = new(float64)
+				*_m.DailyLimitUsdSnapshot = value.Float64
+			}
+		case usersubscription.FieldWeeklyLimitUsdSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_limit_usd_snapshot", values[i])
+			} else if value.Valid {
+				_m.WeeklyLimitUsdSnapshot = new(float64)
+				*_m.WeeklyLimitUsdSnapshot = value.Float64
+			}
+		case usersubscription.FieldMonthlyLimitUsdSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field monthly_limit_usd_snapshot", values[i])
+			} else if value.Valid {
+				_m.MonthlyLimitUsdSnapshot = new(float64)
+				*_m.MonthlyLimitUsdSnapshot = value.Float64
+			}
+		case usersubscription.FieldRateMultiplierSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier_snapshot", values[i])
+			} else if value.Valid {
+				_m.RateMultiplierSnapshot = value.Float64
 			}
 		case usersubscription.FieldStartsAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -281,6 +347,11 @@ func (_m *UserSubscription) QueryGroup() *GroupQuery {
 	return NewUserSubscriptionClient(_m.config).QueryGroup(_m)
 }
 
+// QuerySubscriptionPlan queries the "subscription_plan" edge of the UserSubscription entity.
+func (_m *UserSubscription) QuerySubscriptionPlan() *SubscriptionPlanQuery {
+	return NewUserSubscriptionClient(_m.config).QuerySubscriptionPlan(_m)
+}
+
 // QueryAssignedByUser queries the "assigned_by_user" edge of the UserSubscription entity.
 func (_m *UserSubscription) QueryAssignedByUser() *UserQuery {
 	return NewUserSubscriptionClient(_m.config).QueryAssignedByUser(_m)
@@ -330,6 +401,32 @@ func (_m *UserSubscription) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("group_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.GroupID))
+	builder.WriteString(", ")
+	if v := _m.SubscriptionPlanID; v != nil {
+		builder.WriteString("subscription_plan_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("plan_name_snapshot=")
+	builder.WriteString(_m.PlanNameSnapshot)
+	builder.WriteString(", ")
+	if v := _m.DailyLimitUsdSnapshot; v != nil {
+		builder.WriteString("daily_limit_usd_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.WeeklyLimitUsdSnapshot; v != nil {
+		builder.WriteString("weekly_limit_usd_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MonthlyLimitUsdSnapshot; v != nil {
+		builder.WriteString("monthly_limit_usd_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplierSnapshot))
 	builder.WriteString(", ")
 	builder.WriteString("starts_at=")
 	builder.WriteString(_m.StartsAt.Format(time.ANSIC))

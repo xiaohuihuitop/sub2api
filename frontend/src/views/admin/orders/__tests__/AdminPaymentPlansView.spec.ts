@@ -40,7 +40,10 @@ const DataTableStub = {
   template: `
     <div>
       <div v-for="row in data" :key="row.id">
+        <slot name="cell-group_id" :value="row.group_id" :row="row" />
         <slot name="cell-price" :value="row.price" :row="row" />
+        <slot name="cell-rate_multiplier" :value="row.rate_multiplier" :row="row" />
+        <slot name="cell-limits" :value="row.daily_limit_usd" :row="row" />
       </div>
     </div>
   `,
@@ -61,6 +64,10 @@ describe('AdminPaymentPlansView', () => {
           currency: 'CNY',
           validity_days: 30,
           validity_unit: 'day',
+          rate_multiplier: 0.5,
+          daily_limit_usd: 20,
+          weekly_limit_usd: null,
+          monthly_limit_usd: 200,
           sort_order: 0,
           for_sale: true,
           features: [],
@@ -74,6 +81,10 @@ describe('AdminPaymentPlansView', () => {
           currency: '',
           validity_days: 30,
           validity_unit: 'day',
+          rate_multiplier: 1,
+          daily_limit_usd: null,
+          weekly_limit_usd: null,
+          monthly_limit_usd: null,
           sort_order: 0,
           for_sale: true,
           features: [],
@@ -102,5 +113,27 @@ describe('AdminPaymentPlansView', () => {
     expect(wrapper.text()).toContain('¥499.00CNY')
     expect(wrapper.text()).toContain('¥599.00')
     expect(wrapper.text()).toContain('$10.00')
+  })
+
+  it('renders subscription multiplier and limits from the plan, not the routing group', async () => {
+    const wrapper = mount(AdminPaymentPlansView, {
+      global: {
+        plugins: [createPinia()],
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          DataTable: DataTableStub,
+          ConfirmDialog: true,
+          GroupBadge: true,
+          Icon: true,
+          PlanEditDialog: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('0.50x')
+    expect(wrapper.text()).toContain('$20.00')
+    expect(wrapper.text()).toContain('$200.00')
   })
 })

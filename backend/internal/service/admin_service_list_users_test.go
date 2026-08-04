@@ -4,7 +4,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -121,20 +120,14 @@ func (s *userGroupRateRepoStubForListUsers) DeleteByUserID(_ context.Context, us
 	panic("unexpected DeleteByUserID call")
 }
 
-func TestAdminService_ListUsers_BatchRateFallbackToSingle(t *testing.T) {
+func TestAdminService_ListUsersDoesNotLoadLegacyGroupRates(t *testing.T) {
 	userRepo := &userRepoStubForListUsers{
 		users: []User{
 			{ID: 101, Username: "u1"},
 			{ID: 202, Username: "u2"},
 		},
 	}
-	rateRepo := &userGroupRateRepoStubForListUsers{
-		batchErr: errors.New("batch unavailable"),
-		singleData: map[int64]map[int64]float64{
-			101: {11: 1.1},
-			202: {22: 2.2},
-		},
-	}
+	rateRepo := &userGroupRateRepoStubForListUsers{}
 	svc := &adminServiceImpl{
 		userRepo:          userRepo,
 		userGroupRateRepo: rateRepo,
@@ -144,10 +137,8 @@ func TestAdminService_ListUsers_BatchRateFallbackToSingle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(2), total)
 	require.Len(t, users, 2)
-	require.Equal(t, 1, rateRepo.batchCalls)
-	require.ElementsMatch(t, []int64{101, 202}, rateRepo.singleCall)
-	require.Equal(t, 1.1, users[0].GroupRates[11])
-	require.Equal(t, 2.2, users[1].GroupRates[22])
+	require.Zero(t, rateRepo.batchCalls)
+	require.Empty(t, rateRepo.singleCall)
 }
 
 func TestAdminService_ListUsers_PassesSortParams(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
@@ -193,6 +194,142 @@ func (_u *RedeemCodeUpdate) ClearGroupID() *RedeemCodeUpdate {
 	return _u
 }
 
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (_u *RedeemCodeUpdate) SetSubscriptionPlanID(v int64) *RedeemCodeUpdate {
+	_u.mutation.SetSubscriptionPlanID(v)
+	return _u
+}
+
+// SetNillableSubscriptionPlanID sets the "subscription_plan_id" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableSubscriptionPlanID(v *int64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetSubscriptionPlanID(*v)
+	}
+	return _u
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (_u *RedeemCodeUpdate) ClearSubscriptionPlanID() *RedeemCodeUpdate {
+	_u.mutation.ClearSubscriptionPlanID()
+	return _u
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (_u *RedeemCodeUpdate) SetPlanNameSnapshot(v string) *RedeemCodeUpdate {
+	_u.mutation.SetPlanNameSnapshot(v)
+	return _u
+}
+
+// SetNillablePlanNameSnapshot sets the "plan_name_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillablePlanNameSnapshot(v *string) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetPlanNameSnapshot(*v)
+	}
+	return _u
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) SetDailyLimitUsdSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.ResetDailyLimitUsdSnapshot()
+	_u.mutation.SetDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableDailyLimitUsdSnapshot(v *float64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetDailyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddDailyLimitUsdSnapshot adds value to the "daily_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) AddDailyLimitUsdSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.AddDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) ClearDailyLimitUsdSnapshot() *RedeemCodeUpdate {
+	_u.mutation.ClearDailyLimitUsdSnapshot()
+	return _u
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) SetWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.ResetWeeklyLimitUsdSnapshot()
+	_u.mutation.SetWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableWeeklyLimitUsdSnapshot(v *float64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetWeeklyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddWeeklyLimitUsdSnapshot adds value to the "weekly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) AddWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.AddWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) ClearWeeklyLimitUsdSnapshot() *RedeemCodeUpdate {
+	_u.mutation.ClearWeeklyLimitUsdSnapshot()
+	return _u
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) SetMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.ResetMonthlyLimitUsdSnapshot()
+	_u.mutation.SetMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableMonthlyLimitUsdSnapshot(v *float64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetMonthlyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddMonthlyLimitUsdSnapshot adds value to the "monthly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) AddMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.AddMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdate) ClearMonthlyLimitUsdSnapshot() *RedeemCodeUpdate {
+	_u.mutation.ClearMonthlyLimitUsdSnapshot()
+	return _u
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (_u *RedeemCodeUpdate) SetRateMultiplierSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.ResetRateMultiplierSnapshot()
+	_u.mutation.SetRateMultiplierSnapshot(v)
+	return _u
+}
+
+// SetNillableRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableRateMultiplierSnapshot(v *float64) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetRateMultiplierSnapshot(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplierSnapshot adds value to the "rate_multiplier_snapshot" field.
+func (_u *RedeemCodeUpdate) AddRateMultiplierSnapshot(v float64) *RedeemCodeUpdate {
+	_u.mutation.AddRateMultiplierSnapshot(v)
+	return _u
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (_u *RedeemCodeUpdate) SetValidityDays(v int) *RedeemCodeUpdate {
 	_u.mutation.ResetValidityDays()
@@ -238,6 +375,11 @@ func (_u *RedeemCodeUpdate) SetGroup(v *Group) *RedeemCodeUpdate {
 	return _u.SetGroupID(v.ID)
 }
 
+// SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *RedeemCodeUpdate) SetSubscriptionPlan(v *SubscriptionPlan) *RedeemCodeUpdate {
+	return _u.SetSubscriptionPlanID(v.ID)
+}
+
 // Mutation returns the RedeemCodeMutation object of the builder.
 func (_u *RedeemCodeUpdate) Mutation() *RedeemCodeMutation {
 	return _u.mutation
@@ -252,6 +394,12 @@ func (_u *RedeemCodeUpdate) ClearUser() *RedeemCodeUpdate {
 // ClearGroup clears the "group" edge to the Group entity.
 func (_u *RedeemCodeUpdate) ClearGroup() *RedeemCodeUpdate {
 	_u.mutation.ClearGroup()
+	return _u
+}
+
+// ClearSubscriptionPlan clears the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *RedeemCodeUpdate) ClearSubscriptionPlan() *RedeemCodeUpdate {
+	_u.mutation.ClearSubscriptionPlan()
 	return _u
 }
 
@@ -297,6 +445,11 @@ func (_u *RedeemCodeUpdate) check() error {
 	if v, ok := _u.mutation.Status(); ok {
 		if err := redeemcode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PlanNameSnapshot(); ok {
+		if err := redeemcode.PlanNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "plan_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.plan_name_snapshot": %w`, err)}
 		}
 	}
 	return nil
@@ -346,6 +499,42 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(redeemcode.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.PlanNameSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldPlanNameSnapshot, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyLimitUsdSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.DailyLimitUsdSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.WeeklyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyLimitUsdSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.WeeklyLimitUsdSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.MonthlyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyLimitUsdSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.MonthlyLimitUsdSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplierSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplierSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)
@@ -404,6 +593,35 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SubscriptionPlanCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   redeemcode.SubscriptionPlanTable,
+			Columns: []string{redeemcode.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   redeemcode.SubscriptionPlanTable,
+			Columns: []string{redeemcode.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -594,6 +812,142 @@ func (_u *RedeemCodeUpdateOne) ClearGroupID() *RedeemCodeUpdateOne {
 	return _u
 }
 
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (_u *RedeemCodeUpdateOne) SetSubscriptionPlanID(v int64) *RedeemCodeUpdateOne {
+	_u.mutation.SetSubscriptionPlanID(v)
+	return _u
+}
+
+// SetNillableSubscriptionPlanID sets the "subscription_plan_id" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableSubscriptionPlanID(v *int64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetSubscriptionPlanID(*v)
+	}
+	return _u
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (_u *RedeemCodeUpdateOne) ClearSubscriptionPlanID() *RedeemCodeUpdateOne {
+	_u.mutation.ClearSubscriptionPlanID()
+	return _u
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (_u *RedeemCodeUpdateOne) SetPlanNameSnapshot(v string) *RedeemCodeUpdateOne {
+	_u.mutation.SetPlanNameSnapshot(v)
+	return _u
+}
+
+// SetNillablePlanNameSnapshot sets the "plan_name_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillablePlanNameSnapshot(v *string) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetPlanNameSnapshot(*v)
+	}
+	return _u
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) SetDailyLimitUsdSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetDailyLimitUsdSnapshot()
+	_u.mutation.SetDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableDailyLimitUsdSnapshot(v *float64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetDailyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddDailyLimitUsdSnapshot adds value to the "daily_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) AddDailyLimitUsdSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.AddDailyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) ClearDailyLimitUsdSnapshot() *RedeemCodeUpdateOne {
+	_u.mutation.ClearDailyLimitUsdSnapshot()
+	return _u
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) SetWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetWeeklyLimitUsdSnapshot()
+	_u.mutation.SetWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableWeeklyLimitUsdSnapshot(v *float64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetWeeklyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddWeeklyLimitUsdSnapshot adds value to the "weekly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) AddWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.AddWeeklyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) ClearWeeklyLimitUsdSnapshot() *RedeemCodeUpdateOne {
+	_u.mutation.ClearWeeklyLimitUsdSnapshot()
+	return _u
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) SetMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetMonthlyLimitUsdSnapshot()
+	_u.mutation.SetMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// SetNillableMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableMonthlyLimitUsdSnapshot(v *float64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetMonthlyLimitUsdSnapshot(*v)
+	}
+	return _u
+}
+
+// AddMonthlyLimitUsdSnapshot adds value to the "monthly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) AddMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.AddMonthlyLimitUsdSnapshot(v)
+	return _u
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (_u *RedeemCodeUpdateOne) ClearMonthlyLimitUsdSnapshot() *RedeemCodeUpdateOne {
+	_u.mutation.ClearMonthlyLimitUsdSnapshot()
+	return _u
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (_u *RedeemCodeUpdateOne) SetRateMultiplierSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.ResetRateMultiplierSnapshot()
+	_u.mutation.SetRateMultiplierSnapshot(v)
+	return _u
+}
+
+// SetNillableRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableRateMultiplierSnapshot(v *float64) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetRateMultiplierSnapshot(*v)
+	}
+	return _u
+}
+
+// AddRateMultiplierSnapshot adds value to the "rate_multiplier_snapshot" field.
+func (_u *RedeemCodeUpdateOne) AddRateMultiplierSnapshot(v float64) *RedeemCodeUpdateOne {
+	_u.mutation.AddRateMultiplierSnapshot(v)
+	return _u
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (_u *RedeemCodeUpdateOne) SetValidityDays(v int) *RedeemCodeUpdateOne {
 	_u.mutation.ResetValidityDays()
@@ -639,6 +993,11 @@ func (_u *RedeemCodeUpdateOne) SetGroup(v *Group) *RedeemCodeUpdateOne {
 	return _u.SetGroupID(v.ID)
 }
 
+// SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *RedeemCodeUpdateOne) SetSubscriptionPlan(v *SubscriptionPlan) *RedeemCodeUpdateOne {
+	return _u.SetSubscriptionPlanID(v.ID)
+}
+
 // Mutation returns the RedeemCodeMutation object of the builder.
 func (_u *RedeemCodeUpdateOne) Mutation() *RedeemCodeMutation {
 	return _u.mutation
@@ -653,6 +1012,12 @@ func (_u *RedeemCodeUpdateOne) ClearUser() *RedeemCodeUpdateOne {
 // ClearGroup clears the "group" edge to the Group entity.
 func (_u *RedeemCodeUpdateOne) ClearGroup() *RedeemCodeUpdateOne {
 	_u.mutation.ClearGroup()
+	return _u
+}
+
+// ClearSubscriptionPlan clears the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_u *RedeemCodeUpdateOne) ClearSubscriptionPlan() *RedeemCodeUpdateOne {
+	_u.mutation.ClearSubscriptionPlan()
 	return _u
 }
 
@@ -711,6 +1076,11 @@ func (_u *RedeemCodeUpdateOne) check() error {
 	if v, ok := _u.mutation.Status(); ok {
 		if err := redeemcode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PlanNameSnapshot(); ok {
+		if err := redeemcode.PlanNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "plan_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.plan_name_snapshot": %w`, err)}
 		}
 	}
 	return nil
@@ -778,6 +1148,42 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(redeemcode.FieldExpiresAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.PlanNameSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldPlanNameSnapshot, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.DailyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedDailyLimitUsdSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.DailyLimitUsdSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.WeeklyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedWeeklyLimitUsdSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.WeeklyLimitUsdSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.MonthlyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedMonthlyLimitUsdSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+	}
+	if _u.mutation.MonthlyLimitUsdSnapshotCleared() {
+		_spec.ClearField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.RateMultiplierSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateMultiplierSnapshot(); ok {
+		_spec.AddField(redeemcode.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)
 	}
@@ -835,6 +1241,35 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SubscriptionPlanCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   redeemcode.SubscriptionPlanTable,
+			Columns: []string{redeemcode.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   redeemcode.SubscriptionPlanTable,
+			Columns: []string{redeemcode.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

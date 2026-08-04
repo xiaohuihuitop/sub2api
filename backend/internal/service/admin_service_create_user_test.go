@@ -146,3 +146,29 @@ func TestAdminService_CreateUser_AssignsDefaultSubscriptions(t *testing.T) {
 	require.Equal(t, int64(5), assigner.calls[0].GroupID)
 	require.Equal(t, 30, assigner.calls[0].ValidityDays)
 }
+
+func TestAdminService_CreateUser_AssignsDefaultPlanSubscription(t *testing.T) {
+	repo := &userRepoStub{nextID: 22}
+	assigner := &defaultSubscriptionAssignerStub{}
+	cfg := &config.Config{Default: config.DefaultConfig{UserConcurrency: 1}}
+	settingService := NewSettingService(&settingRepoStub{values: map[string]string{
+		SettingKeyDefaultSubscriptions: `[{"plan_id":52}]`,
+	}}, cfg)
+	svc := &adminServiceImpl{
+		userRepo:           repo,
+		settingService:     settingService,
+		defaultSubAssigner: assigner,
+	}
+
+	_, err := svc.CreateUser(context.Background(), &CreateUserInput{
+		Email:    "new-plan-user@test.com",
+		Password: "password",
+	})
+	require.NoError(t, err)
+	require.Empty(t, assigner.calls)
+	require.Equal(t, []AssignSubscriptionFromPlanInput{{
+		UserID: 22,
+		PlanID: 52,
+		Notes:  "auto assigned by default user subscriptions setting",
+	}}, assigner.planCalls)
+}

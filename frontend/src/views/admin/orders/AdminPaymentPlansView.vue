@@ -23,7 +23,7 @@
             v-else-if="getGroup(value)"
             :name="getGroup(value)!.name"
             :platform="getGroup(value)!.platform"
-            :rate-multiplier="getGroup(value)!.rate_multiplier"
+            :show-rate="false"
           />
           <span v-else class="text-sm text-gray-400">-</span>
         </template>
@@ -32,6 +32,16 @@
             <span class="font-medium text-gray-900 dark:text-white">{{ planCurrencySymbol(row.currency) }}{{ (value ?? 0).toFixed(2) }}</span>
             <span v-if="row.currency" class="ml-1 text-xs text-gray-400">{{ row.currency }}</span>
             <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">{{ planCurrencySymbol(row.currency) }}{{ row.original_price.toFixed(2) }}</span>
+          </div>
+        </template>
+        <template #cell-rate_multiplier="{ value }">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">{{ formatRateMultiplier(value) }}x</span>
+        </template>
+        <template #cell-limits="{ row }">
+          <div class="space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
+            <div>{{ t('payment.admin.daily') }}: {{ formatPlanLimit(row.daily_limit_usd) }}</div>
+            <div>{{ t('payment.admin.weekly') }}: {{ formatPlanLimit(row.weekly_limit_usd) }}</div>
+            <div>{{ t('payment.admin.monthly') }}: {{ formatPlanLimit(row.monthly_limit_usd) }}</div>
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
@@ -101,6 +111,16 @@ function planCurrencySymbol(currency?: string): string {
   return currencySymbol(currency || 'USD')
 }
 
+function formatRateMultiplier(value?: number): string {
+  return Number.isFinite(value) ? Number(value).toFixed(2) : '1.00'
+}
+
+function formatPlanLimit(value?: number | null): string {
+  return typeof value === 'number' && value > 0
+    ? `$${value.toFixed(2)}`
+    : t('payment.admin.unlimited')
+}
+
 // ==================== Groups ====================
 
 const groups = ref<AdminGroup[]>([])
@@ -146,6 +166,8 @@ const planColumns = computed((): Column[] => [
   { key: 'id', label: 'ID' },
   { key: 'name', label: t('payment.admin.planName') },
   { key: 'group_id', label: t('payment.admin.group') },
+  { key: 'rate_multiplier', label: t('payment.admin.rateMultiplier') },
+  { key: 'limits', label: t('payment.planCard.quota') },
   { key: 'price', label: t('payment.admin.price') },
   { key: 'validity_days', label: t('payment.admin.validity') },
   { key: 'for_sale', label: t('payment.admin.forSale') },

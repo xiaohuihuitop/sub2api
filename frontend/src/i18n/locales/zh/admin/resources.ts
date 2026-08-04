@@ -313,6 +313,8 @@ export default {
       failedToCopy: '复制失败',
       selectGroup: '选择分组',
       selectGroupPlaceholder: '选择订阅分组',
+      selectPlan: '选择套餐',
+      selectPlanPlaceholder: '选择订阅套餐',
       validityDays: '有效天数',
       codeExpiry: '兑换码过期',
       neverExpires: '永不过期',
@@ -321,6 +323,7 @@ export default {
       customExpiryDays: '自定义天数',
       expiryDaysRequired: '请输入有效的过期天数',
       groupRequired: '请选择订阅分组',
+      planRequired: '请选择订阅套餐',
       days: '天',
       status: {
         unused: '未使用',

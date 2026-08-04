@@ -39,9 +39,9 @@ function tokenModel(overrides: Partial<PlazaModel> = {}): PlazaModel {
   }
 }
 
-function mountTable(models: PlazaModel[], rateMultiplier: number, userRateMultiplier?: number | null) {
+function mountTable(models: PlazaModel[], balanceRateMultiplier: number) {
   return mount(PlazaModelPricingTable, {
-    props: { models, rateMultiplier, userRateMultiplier: userRateMultiplier ?? null }
+    props: { models, balanceRateMultiplier }
   })
 }
 
@@ -68,19 +68,6 @@ describe('PlazaModelPricingTable', () => {
     expect(text).toContain('$3.00')
     expect(text).toContain('$15.00')
     expect(text).toContain('0.5x')
-  })
-
-  it('用户专属倍率覆盖分组倍率,并划线展示原倍率', () => {
-    const wrapper = mountTable([tokenModel()], 1, 0.8)
-    const text = wrapper.text()
-    // 实付按 0.8:3 × 0.8 = 2.4
-    expect(text).toContain('$2.40')
-    expect(text).toContain('$12.00')
-    // 倍率列:原倍率划线 + 专属倍率
-    const struck = wrapper.find('td .line-through')
-    expect(struck.exists()).toBe(true)
-    expect(struck.text()).toBe('1x')
-    expect(text).toContain('0.8x')
   })
 
   it('模型按官方输出价从高到低排序,无官方价的排最后', () => {
@@ -175,7 +162,8 @@ describe('PlazaModelPricingTable', () => {
   it('两级表头:实付区与官方区各拆输入/输出/缓存列', () => {
     const wrapper = mountTable([tokenModel()], 1)
     const text = wrapper.text()
-    expect(text).toContain('modelPlaza.table.paidPrice')
+    expect(text).toContain('modelPlaza.table.balancePrice')
+    expect(text).toContain('modelPlaza.table.balanceRate')
     expect(text).toContain('modelPlaza.table.officialPrice')
     // token 行:模型 + 实付 3 列 + 官方 3 列 + 倍率
     expect(wrapper.findAll('tbody td')).toHaveLength(8)

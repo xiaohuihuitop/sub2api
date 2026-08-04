@@ -16,10 +16,10 @@ import (
 
 func plazaGroups() []service.PlazaGroup {
 	return []service.PlazaGroup{
-		{ID: 1, Name: "public-standard", Platform: "anthropic", SubscriptionType: "standard", RateMultiplier: 1},
-		{ID: 2, Name: "exclusive-a", Platform: "anthropic", IsExclusive: true, RateMultiplier: 0.5},
-		{ID: 3, Name: "public-subscription", Platform: "openai", SubscriptionType: "subscription", RateMultiplier: 1},
-		{ID: 4, Name: "exclusive-b", Platform: "openai", IsExclusive: true, RateMultiplier: 0.8},
+		{ID: 1, Name: "public-standard", Platform: "anthropic", BalanceRateMultiplier: 1},
+		{ID: 2, Name: "exclusive-a", Platform: "anthropic", IsExclusive: true, BalanceRateMultiplier: 0.5},
+		{ID: 3, Name: "public-subscription", Platform: "openai", BalanceRateMultiplier: 1},
+		{ID: 4, Name: "exclusive-b", Platform: "openai", IsExclusive: true, BalanceRateMultiplier: 0.8},
 	}
 }
 
@@ -62,10 +62,10 @@ func TestModelPlazaHandler_NilSettingServiceFailsClosed404(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
-func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
+func TestToModelPlazaGroupDTO_ExposesBalanceProfileWithoutLegacyGroupBilling(t *testing.T) {
 	g := service.PlazaGroup{
 		ID: 2, Name: "vip", Description: "d", Platform: "anthropic",
-		SubscriptionType: "standard", RateMultiplier: 1, IsExclusive: true,
+		BalanceRateMultiplier: 1, IsExclusive: true,
 		Models: []service.PlazaModel{{
 			Name:     "claude-sonnet",
 			Platform: "anthropic",
@@ -80,22 +80,24 @@ func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
 		}},
 	}
 
-	// 有专属倍率:user_rate_multiplier 序列化输出
-	dto := toModelPlazaGroupDTO(&g, map[int64]float64{2: 0.5})
+	dto := toModelPlazaGroupDTO(&g)
 	raw, err := json.Marshal(dto)
 	require.NoError(t, err)
 	var decoded map[string]any
 	require.NoError(t, json.Unmarshal(raw, &decoded))
 
 	for _, key := range []string{
-		"id", "name", "description", "platform", "subscription_type",
-		"rate_multiplier", "user_rate_multiplier", "is_exclusive", "models",
-		"peak_rate_enabled", "peak_start", "peak_end", "peak_rate_multiplier",
+		"id", "name", "description", "platform", "is_exclusive", "models",
+		"balance_rate_multiplier", "balance_peak_rate_enabled",
+		"balance_peak_start", "balance_peak_end", "balance_peak_rate_multiplier",
 	} {
 		_, exists := decoded[key]
 		require.Truef(t, exists, "plaza group DTO must expose %q", key)
 	}
-	require.InDelta(t, 0.5, decoded["user_rate_multiplier"].(float64), 1e-9)
+	require.NotContains(t, decoded, "user_rate_multiplier")
+	require.NotContains(t, decoded, "subscription_type")
+	require.NotContains(t, decoded, "rate_multiplier")
+	require.NotContains(t, decoded, "peak_rate_enabled")
 
 	// 模型条目:pricing + official_pricing 并存;official 缺失字段输出 null 而非省略
 	models := decoded["models"].([]any)
@@ -109,14 +111,6 @@ func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
 	_, has1h := official["cache_write_1h_price"]
 	require.False(t, has1h, "1h 缓存写价为 nil 时应 omitempty")
 
-	// 无专属倍率:user_rate_multiplier 整个字段省略
-	dtoNoRate := toModelPlazaGroupDTO(&g, nil)
-	rawNoRate, err := json.Marshal(dtoNoRate)
-	require.NoError(t, err)
-	var decodedNoRate map[string]any
-	require.NoError(t, json.Unmarshal(rawNoRate, &decodedNoRate))
-	_, hasRate := decodedNoRate["user_rate_multiplier"]
-	require.False(t, hasRate, "无专属倍率时 user_rate_multiplier 应 omitempty")
 }
 
 func TestToModelPlazaOfficialPricing_NilPassthrough(t *testing.T) {

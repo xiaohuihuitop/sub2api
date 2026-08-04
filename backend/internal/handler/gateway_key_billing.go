@@ -18,7 +18,6 @@ type keyBillingInfoResponse struct {
 	SchemaVersion           int       `json:"schema_version"`
 	BillingScope            string    `json:"billing_scope"`
 	GroupRateMultiplier     float64   `json:"group_rate_multiplier"`
-	UserRateMultiplier      *float64  `json:"user_rate_multiplier,omitempty"`
 	ResolvedRateMultiplier  float64   `json:"resolved_rate_multiplier"`
 	PeakRateEnabled         bool      `json:"peak_rate_enabled"`
 	PeakStart               *string   `json:"peak_start,omitempty"`
@@ -51,38 +50,12 @@ func (h *GatewayHandler) KeyBillingInfo(c *gin.Context) {
 		return
 	}
 
-	resolvedRate, ok := h.resolveKeyBillingRate(c, apiKey)
-	if !ok {
-		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Billing information is unavailable")
-		return
-	}
-
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, buildKeyBillingInfo(apiKey, resolvedRate, timezone.Now()))
-}
-
-func (h *GatewayHandler) resolveKeyBillingRate(c *gin.Context, apiKey *service.APIKey) (float64, bool) {
-	groupRate := apiKey.Group.RateMultiplier
-	switch apiKey.Group.Platform {
-	case service.PlatformOpenAI, service.PlatformGrok:
-		if h.openAIGatewayService == nil {
-			return 0, false
-		}
-		return h.openAIGatewayService.ResolveUserGroupRateMultiplier(c.Request.Context(), apiKey.UserID, *apiKey.GroupID, groupRate), true
-	default:
-		if h.gatewayService == nil {
-			return 0, false
-		}
-		return h.gatewayService.ResolveUserGroupRateMultiplier(c.Request.Context(), apiKey.UserID, *apiKey.GroupID, groupRate), true
-	}
+	c.JSON(http.StatusOK, buildKeyBillingInfo(apiKey, apiKey.Group.RateMultiplier, timezone.Now()))
 }
 
 func buildKeyBillingInfo(apiKey *service.APIKey, resolvedRate float64, now time.Time) keyBillingInfoResponse {
 	groupRate := apiKey.Group.RateMultiplier
-	var userRate *float64
-	if resolvedRate != groupRate {
-		userRate = &resolvedRate
-	}
 	appliedPeak := apiKey.Group.PeakMultiplierAt(now)
 
 	response := keyBillingInfoResponse{
@@ -90,7 +63,6 @@ func buildKeyBillingInfo(apiKey *service.APIKey, resolvedRate float64, now time.
 		SchemaVersion:           keyBillingInfoSchemaVersion,
 		BillingScope:            "token",
 		GroupRateMultiplier:     groupRate,
-		UserRateMultiplier:      userRate,
 		ResolvedRateMultiplier:  resolvedRate,
 		PeakRateEnabled:         apiKey.Group.PeakRateEnabled,
 		EffectiveRateMultiplier: resolvedRate * appliedPeak,

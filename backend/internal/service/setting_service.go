@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"golang.org/x/sync/singleflight"
@@ -22,6 +23,14 @@ var (
 	ErrDefaultSubGroupDuplicate = infraerrors.BadRequest(
 		"DEFAULT_SUBSCRIPTION_GROUP_DUPLICATE",
 		"default subscription group cannot be duplicated",
+	)
+	ErrDefaultSubPlanDuplicate = infraerrors.BadRequest(
+		"DEFAULT_SUBSCRIPTION_PLAN_DUPLICATE",
+		"default subscription plan cannot be duplicated",
+	)
+	ErrDefaultSubPlanInvalid = infraerrors.BadRequest(
+		"DEFAULT_SUBSCRIPTION_PLAN_INVALID",
+		"default subscription plan must exist",
 	)
 )
 
@@ -40,6 +49,11 @@ type DefaultSubscriptionGroupReader interface {
 	GetByID(ctx context.Context, id int64) (*Group, error)
 }
 
+// DefaultSubscriptionPlanReader validates plan references used by default subscriptions.
+type DefaultSubscriptionPlanReader interface {
+	GetPlan(ctx context.Context, id int64) (*dbent.SubscriptionPlan, error)
+}
+
 // WebSearchManagerBuilder creates a websearch.Manager from config (injected by infra layer).
 // proxyURLs maps proxy ID to resolved URL for provider-level proxy support.
 type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[int64]string)
@@ -48,6 +62,7 @@ type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[i
 type SettingService struct {
 	settingRepo                 SettingRepository
 	defaultSubGroupReader       DefaultSubscriptionGroupReader
+	defaultSubPlanReader        DefaultSubscriptionPlanReader
 	proxyRepo                   ProxyRepository // for resolving websearch provider proxy URLs
 	cfg                         *config.Config
 	onUpdate                    func() // Callback when settings are updated (for cache invalidation)
@@ -215,6 +230,11 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 // SetDefaultSubscriptionGroupReader injects an optional group reader for default subscription validation.
 func (s *SettingService) SetDefaultSubscriptionGroupReader(reader DefaultSubscriptionGroupReader) {
 	s.defaultSubGroupReader = reader
+}
+
+// SetDefaultSubscriptionPlanReader injects an optional plan reader for default subscription validation.
+func (s *SettingService) SetDefaultSubscriptionPlanReader(reader DefaultSubscriptionPlanReader) {
+	s.defaultSubPlanReader = reader
 }
 
 // SetProxyRepository injects a proxy repo for resolving websearch provider proxy URLs.

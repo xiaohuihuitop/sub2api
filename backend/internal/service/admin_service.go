@@ -38,6 +38,8 @@ type AdminService interface {
 	// ordered by sort_order then id. Used by the API Key group filter dropdown.
 	GetAllGroupsIncludingInactive(ctx context.Context) ([]Group, error)
 	GetGroup(ctx context.Context, id int64) (*Group, error)
+	GetGroupBillingProfile(ctx context.Context, groupID int64) (*BillingProfile, error)
+	UpdateGroupBillingProfile(ctx context.Context, groupID int64, input *UpdateBillingProfileInput) (*BillingProfile, error)
 	GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error)
 	CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error)
 	// DuplicateGroup creates an inactive independent copy of a group's configuration
@@ -163,9 +165,6 @@ type UpdateUserInput struct {
 	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
-	// GroupRates 用户专属分组倍率配置
-	// map[groupID]*rate，nil 表示删除该分组的专属倍率
-	GroupRates map[int64]*float64
 	// ActorAdminID 执行本次操作的管理员ID(来自JWT)，仅用于权限敏感操作的审计日志。
 	ActorAdminID int64
 }
@@ -482,12 +481,13 @@ type UpdateProxyInput struct {
 }
 
 type GenerateRedeemCodesInput struct {
-	Count        int
-	Type         string
-	Value        float64
-	GroupID      *int64 // 订阅类型专用：关联的分组ID
-	ValidityDays int    // 订阅类型专用：有效天数
-	ExpiresAt    *time.Time
+	Count              int
+	Type               string
+	Value              float64
+	SubscriptionPlanID *int64 // 新订阅码：关联的套餐 ID
+	GroupID            *int64 // 兼容旧订阅码：关联的分组 ID
+	ValidityDays       int    // 兼容旧订阅码：有效天数
+	ExpiresAt          *time.Time
 }
 
 type ProxyBatchDeleteResult struct {

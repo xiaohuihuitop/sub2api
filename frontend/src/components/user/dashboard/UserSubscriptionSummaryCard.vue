@@ -11,7 +11,7 @@
               {{ t('dashboard.subscriptionSummary.title') }}
             </p>
             <h3 class="mt-0.5 truncate text-base font-bold text-gray-900 dark:text-white">
-              {{ subscription.group?.name || 'Group #' + subscription.group_id }}
+              {{ subscriptionName }}
             </h3>
           </div>
           <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
@@ -56,6 +56,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { getRemainingDurationParts, isOneTimeDailyQuota } from '@/utils/subscriptionQuota'
+import { getSubscriptionLimit, getSubscriptionPlanName } from '@/utils/subscriptionTerms'
 import type { UserSubscription } from '@/types'
 
 type UsageMetric = {
@@ -69,16 +70,20 @@ type UsageMetric = {
 const props = defineProps<{ subscription: UserSubscription }>()
 const { t } = useI18n()
 
+const subscriptionName = computed(() => getSubscriptionPlanName(props.subscription))
+
 const metric = computed<UsageMetric | null>(() => {
-  const group = props.subscription.group
-  if (group?.daily_limit_usd) {
-    return makeMetric('daily', props.subscription.daily_usage_usd, group.daily_limit_usd, props.subscription.daily_window_start, 24)
+  const dailyLimit = getSubscriptionLimit(props.subscription, 'daily')
+  const weeklyLimit = getSubscriptionLimit(props.subscription, 'weekly')
+  const monthlyLimit = getSubscriptionLimit(props.subscription, 'monthly')
+  if (dailyLimit) {
+    return makeMetric('daily', props.subscription.daily_usage_usd, dailyLimit, props.subscription.daily_window_start, 24)
   }
-  if (group?.weekly_limit_usd) {
-    return makeMetric('weekly', props.subscription.weekly_usage_usd, group.weekly_limit_usd, props.subscription.weekly_window_start, 168)
+  if (weeklyLimit) {
+    return makeMetric('weekly', props.subscription.weekly_usage_usd, weeklyLimit, props.subscription.weekly_window_start, 168)
   }
-  if (group?.monthly_limit_usd) {
-    return makeMetric('monthly', props.subscription.monthly_usage_usd, group.monthly_limit_usd, props.subscription.monthly_window_start, 720)
+  if (monthlyLimit) {
+    return makeMetric('monthly', props.subscription.monthly_usage_usd, monthlyLimit, props.subscription.monthly_window_start, 720)
   }
   return null
 })

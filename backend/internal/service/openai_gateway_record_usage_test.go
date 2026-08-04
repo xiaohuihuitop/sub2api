@@ -383,7 +383,7 @@ func TestOpenAIGatewayServiceRecordUsage_MissingPricingRecordsZeroCostUsageLog(t
 	require.Zero(t, billingRepo.lastCmd.AccountQuotaCost)
 }
 
-func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T) {
+func TestOpenAIGatewayServiceRecordUsage_IgnoresLegacyUserSpecificGroupRate(t *testing.T) {
 	groupID := int64(11)
 	groupRate := 1.4
 	userRate := 1.8
@@ -415,13 +415,13 @@ func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T)
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, 1, rateRepo.calls)
+	require.Zero(t, rateRepo.calls)
 	require.NotNil(t, usageRepo.lastLog)
-	require.Equal(t, userRate, usageRepo.lastLog.RateMultiplier)
+	require.Equal(t, groupRate, usageRepo.lastLog.RateMultiplier)
 	require.Equal(t, 12, usageRepo.lastLog.InputTokens)
 	require.Equal(t, 3, usageRepo.lastLog.CacheReadTokens)
 
-	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, userRate)
+	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, groupRate)
 	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
 	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
 	require.Equal(t, 1, userRepo.deductCalls)
@@ -528,7 +528,7 @@ func TestOpenAIGatewayServiceRecordUsage_IncludesEndpointMetadata(t *testing.T) 
 	require.Equal(t, "/v1/responses", *usageRepo.lastLog.UpstreamEndpoint)
 }
 
-func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateOnResolverError(t *testing.T) {
+func TestOpenAIGatewayServiceRecordUsage_DoesNotReadLegacyUserRateOnRepositoryError(t *testing.T) {
 	groupID := int64(12)
 	groupRate := 1.6
 	usage := OpenAIUsage{InputTokens: 10, OutputTokens: 5, CacheReadInputTokens: 2}
@@ -559,7 +559,7 @@ func TestOpenAIGatewayServiceRecordUsage_FallsBackToGroupDefaultRateOnResolverEr
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, 1, rateRepo.calls)
+	require.Zero(t, rateRepo.calls)
 	require.NotNil(t, usageRepo.lastLog)
 	require.Equal(t, groupRate, usageRepo.lastLog.RateMultiplier)
 
@@ -1691,7 +1691,7 @@ func TestOpenAIGatewayServiceRecordUsage_SubscriptionBillingSetsSubscriptionFiel
 	userRepo := &openAIRecordUsageUserRepoStub{}
 	subRepo := &openAIRecordUsageSubRepoStub{}
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
-	subscription := &UserSubscription{ID: 99}
+	subscription := &UserSubscription{ID: 99, RateMultiplierSnapshot: 1}
 
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
@@ -1941,17 +1941,18 @@ func TestOpenAIGatewayServiceRecordUsage_ImageSharedMultiplierPreservesExistingB
 	require.Equal(t, string(BillingModeImage), *usageRepo.lastLog.BillingMode)
 }
 
-func TestOpenAIGatewayServiceRecordUsage_ImageSharedMultiplierUsesUserGroupOverride(t *testing.T) {
+func TestOpenAIGatewayServiceRecordUsage_ImageSharedMultiplierIgnoresUserGroupRate(t *testing.T) {
 	imagePrice := 0.5
 	userRate := 0.2
 	groupID := int64(125)
 
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	rateRepo := &openAIUserGroupRateRepoStub{rate: &userRate}
 	svc := newOpenAIRecordUsageServiceForTest(
 		usageRepo,
 		&openAIRecordUsageUserRepoStub{},
 		&openAIRecordUsageSubRepoStub{},
-		&openAIUserGroupRateRepoStub{rate: &userRate},
+		rateRepo,
 	)
 
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
@@ -1978,10 +1979,11 @@ func TestOpenAIGatewayServiceRecordUsage_ImageSharedMultiplierUsesUserGroupOverr
 	})
 
 	require.NoError(t, err)
+	require.Zero(t, rateRepo.calls)
 	require.NotNil(t, usageRepo.lastLog)
 	require.InDelta(t, 0.5, usageRepo.lastLog.TotalCost, 1e-12)
-	require.InDelta(t, 0.1, usageRepo.lastLog.ActualCost, 1e-12)
-	require.InDelta(t, 0.2, usageRepo.lastLog.RateMultiplier, 1e-12)
+	require.InDelta(t, 0.075, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, 0.15, usageRepo.lastLog.RateMultiplier, 1e-12)
 }
 
 func TestOpenAIGatewayServiceRecordUsage_ImageIndependentMultiplierUsesImageRate(t *testing.T) {

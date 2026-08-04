@@ -25,6 +25,18 @@ const (
 	FieldUserID = "user_id"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_id"
+	// FieldSubscriptionPlanID holds the string denoting the subscription_plan_id field in the database.
+	FieldSubscriptionPlanID = "subscription_plan_id"
+	// FieldPlanNameSnapshot holds the string denoting the plan_name_snapshot field in the database.
+	FieldPlanNameSnapshot = "plan_name_snapshot"
+	// FieldDailyLimitUsdSnapshot holds the string denoting the daily_limit_usd_snapshot field in the database.
+	FieldDailyLimitUsdSnapshot = "daily_limit_usd_snapshot"
+	// FieldWeeklyLimitUsdSnapshot holds the string denoting the weekly_limit_usd_snapshot field in the database.
+	FieldWeeklyLimitUsdSnapshot = "weekly_limit_usd_snapshot"
+	// FieldMonthlyLimitUsdSnapshot holds the string denoting the monthly_limit_usd_snapshot field in the database.
+	FieldMonthlyLimitUsdSnapshot = "monthly_limit_usd_snapshot"
+	// FieldRateMultiplierSnapshot holds the string denoting the rate_multiplier_snapshot field in the database.
+	FieldRateMultiplierSnapshot = "rate_multiplier_snapshot"
 	// FieldStartsAt holds the string denoting the starts_at field in the database.
 	FieldStartsAt = "starts_at"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
@@ -53,6 +65,8 @@ const (
 	EdgeUser = "user"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
 	EdgeGroup = "group"
+	// EdgeSubscriptionPlan holds the string denoting the subscription_plan edge name in mutations.
+	EdgeSubscriptionPlan = "subscription_plan"
 	// EdgeAssignedByUser holds the string denoting the assigned_by_user edge name in mutations.
 	EdgeAssignedByUser = "assigned_by_user"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
@@ -73,6 +87,13 @@ const (
 	GroupInverseTable = "groups"
 	// GroupColumn is the table column denoting the group relation/edge.
 	GroupColumn = "group_id"
+	// SubscriptionPlanTable is the table that holds the subscription_plan relation/edge.
+	SubscriptionPlanTable = "user_subscriptions"
+	// SubscriptionPlanInverseTable is the table name for the SubscriptionPlan entity.
+	// It exists in this package in order to avoid circular dependency with the "subscriptionplan" package.
+	SubscriptionPlanInverseTable = "subscription_plans"
+	// SubscriptionPlanColumn is the table column denoting the subscription_plan relation/edge.
+	SubscriptionPlanColumn = "subscription_plan_id"
 	// AssignedByUserTable is the table that holds the assigned_by_user relation/edge.
 	AssignedByUserTable = "user_subscriptions"
 	// AssignedByUserInverseTable is the table name for the User entity.
@@ -97,6 +118,12 @@ var Columns = []string{
 	FieldDeletedAt,
 	FieldUserID,
 	FieldGroupID,
+	FieldSubscriptionPlanID,
+	FieldPlanNameSnapshot,
+	FieldDailyLimitUsdSnapshot,
+	FieldWeeklyLimitUsdSnapshot,
+	FieldMonthlyLimitUsdSnapshot,
+	FieldRateMultiplierSnapshot,
 	FieldStartsAt,
 	FieldExpiresAt,
 	FieldStatus,
@@ -135,6 +162,12 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
+	// DefaultPlanNameSnapshot holds the default value on creation for the "plan_name_snapshot" field.
+	DefaultPlanNameSnapshot string
+	// PlanNameSnapshotValidator is a validator for the "plan_name_snapshot" field. It is called by the builders before save.
+	PlanNameSnapshotValidator func(string) error
+	// DefaultRateMultiplierSnapshot holds the default value on creation for the "rate_multiplier_snapshot" field.
+	DefaultRateMultiplierSnapshot float64
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -180,6 +213,36 @@ func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// BySubscriptionPlanID orders the results by the subscription_plan_id field.
+func BySubscriptionPlanID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubscriptionPlanID, opts...).ToFunc()
+}
+
+// ByPlanNameSnapshot orders the results by the plan_name_snapshot field.
+func ByPlanNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPlanNameSnapshot, opts...).ToFunc()
+}
+
+// ByDailyLimitUsdSnapshot orders the results by the daily_limit_usd_snapshot field.
+func ByDailyLimitUsdSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDailyLimitUsdSnapshot, opts...).ToFunc()
+}
+
+// ByWeeklyLimitUsdSnapshot orders the results by the weekly_limit_usd_snapshot field.
+func ByWeeklyLimitUsdSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeeklyLimitUsdSnapshot, opts...).ToFunc()
+}
+
+// ByMonthlyLimitUsdSnapshot orders the results by the monthly_limit_usd_snapshot field.
+func ByMonthlyLimitUsdSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMonthlyLimitUsdSnapshot, opts...).ToFunc()
+}
+
+// ByRateMultiplierSnapshot orders the results by the rate_multiplier_snapshot field.
+func ByRateMultiplierSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplierSnapshot, opts...).ToFunc()
 }
 
 // ByStartsAt orders the results by the starts_at field.
@@ -256,6 +319,13 @@ func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// BySubscriptionPlanField orders the results by subscription_plan field.
+func BySubscriptionPlanField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSubscriptionPlanStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByAssignedByUserField orders the results by assigned_by_user field.
 func ByAssignedByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -288,6 +358,13 @@ func newGroupStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(GroupInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
+	)
+}
+func newSubscriptionPlanStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SubscriptionPlanInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, SubscriptionPlanTable, SubscriptionPlanColumn),
 	)
 }
 func newAssignedByUserStep() *sqlgraph.Step {

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/billingprofile"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/suite"
@@ -177,6 +178,36 @@ func (s *GroupRepoSuite) TestGetByIDLite_DoesNotUseAccountCount() {
 	s.Require().NoError(err)
 	s.Require().Equal(group.ID, got.ID)
 	s.Require().False(spy.called, "expected no direct sql executor usage")
+}
+
+func (s *GroupRepoSuite) TestGetByIDLite_UsesBillingProfileForBalancePricing() {
+	group := &service.Group{
+		Name:             "profile-lite-group",
+		Platform:         service.PlatformOpenAI,
+		RateMultiplier:   9,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, group))
+	profile, err := s.tx.Client().BillingProfile.Query().
+		Where(billingprofile.GroupIDEQ(group.ID)).
+		Only(s.ctx)
+	s.Require().NoError(err)
+	_, err = s.tx.Client().BillingProfile.UpdateOneID(profile.ID).
+		SetBalanceRateMultiplier(1.25).
+		SetPeakRateEnabled(true).
+		SetPeakStart("08:00").
+		SetPeakEnd("20:00").
+		SetPeakRateMultiplier(1.5).
+		Save(s.ctx)
+	s.Require().NoError(err)
+
+	got, err := s.repo.GetByIDLite(s.ctx, group.ID)
+
+	s.Require().NoError(err)
+	s.Require().Equal(1.25, got.RateMultiplier)
+	s.Require().True(got.PeakRateEnabled)
+	s.Require().Equal(1.5, got.PeakRateMultiplier)
 }
 
 func (s *GroupRepoSuite) TestUpdate() {

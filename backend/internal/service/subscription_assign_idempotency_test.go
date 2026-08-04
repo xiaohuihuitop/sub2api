@@ -39,11 +39,11 @@ func TestMaybeInvalidateAssignmentCaches_DefersForOuterTransactionOwner(t *testi
 	require.True(t, cache.Set(key, &UserSubscription{ID: 42}, 1))
 	cache.Wait()
 
-	svc.maybeInvalidateAssignmentCaches(7, 9, true)
+	svc.maybeInvalidateAssignmentCaches(7, 9, 42, true)
 	_, cachedBeforeCommit := cache.Get(key)
 	require.True(t, cachedBeforeCommit, "outer transaction must retain caches until its owner commits")
 
-	svc.maybeInvalidateAssignmentCaches(7, 9, false)
+	svc.maybeInvalidateAssignmentCaches(7, 9, 42, false)
 	cache.Wait()
 	_, cachedAfterCommit := cache.Get(key)
 	require.False(t, cachedAfterCommit, "post-commit invalidation must remove the cached subscription")

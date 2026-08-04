@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"log/slog"
-
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -54,19 +52,17 @@ type modelPlazaModel struct {
 
 // modelPlazaGroup 广场分组条目（白名单字段）。
 type modelPlazaGroup struct {
-	ID                 int64             `json:"id"`
-	Name               string            `json:"name"`
-	Description        string            `json:"description"`
-	Platform           string            `json:"platform"`
-	SubscriptionType   string            `json:"subscription_type"`
-	RateMultiplier     float64           `json:"rate_multiplier"`
-	UserRateMultiplier *float64          `json:"user_rate_multiplier,omitempty"`
-	PeakRateEnabled    bool              `json:"peak_rate_enabled"`
-	PeakStart          string            `json:"peak_start"`
-	PeakEnd            string            `json:"peak_end"`
-	PeakRateMultiplier float64           `json:"peak_rate_multiplier"`
-	IsExclusive        bool              `json:"is_exclusive"`
-	Models             []modelPlazaModel `json:"models"`
+	ID                        int64             `json:"id"`
+	Name                      string            `json:"name"`
+	Description               string            `json:"description"`
+	Platform                  string            `json:"platform"`
+	BalanceRateMultiplier     float64           `json:"balance_rate_multiplier"`
+	BalancePeakRateEnabled    bool              `json:"balance_peak_rate_enabled"`
+	BalancePeakStart          string            `json:"balance_peak_start"`
+	BalancePeakEnd            string            `json:"balance_peak_end"`
+	BalancePeakRateMultiplier float64           `json:"balance_peak_rate_multiplier"`
+	IsExclusive               bool              `json:"is_exclusive"`
+	Models                    []modelPlazaModel `json:"models"`
 }
 
 // modelPlazaResponse 广场页响应。
@@ -102,7 +98,6 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 
 	// allowedExclusive == nil 表示匿名；登录用户恒为非 nil（可能为空集合）。
 	var allowedExclusive map[int64]struct{}
-	var userRates map[int64]float64
 	if authed {
 		allowedExclusive, err = h.apiKeyService.GetUserAllowedGroupIDSet(c.Request.Context(), subject.UserID)
 		if err != nil {
@@ -110,19 +105,13 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 			response.ErrorFrom(c, err)
 			return
 		}
-		userRates, err = h.apiKeyService.GetUserGroupRates(c.Request.Context(), subject.UserID)
-		if err != nil {
-			// 专属倍率仅是展示增强，失败降级为分组默认倍率。
-			slog.Warn("model_plaza_user_rates_failed", "error", err, "user_id", subject.UserID)
-			userRates = nil
-		}
 	}
 
 	visible := filterPlazaVisibleGroups(groups, allowedExclusive)
 
 	out := make([]modelPlazaGroup, 0, len(visible))
 	for i := range visible {
-		out = append(out, toModelPlazaGroupDTO(&visible[i], userRates))
+		out = append(out, toModelPlazaGroupDTO(&visible[i]))
 	}
 	response.Success(c, modelPlazaResponse{
 		Description: rt.Description,
@@ -151,8 +140,8 @@ func filterPlazaVisibleGroups(
 	return visible
 }
 
-// toModelPlazaGroupDTO 将 service 层广场分组映射为白名单 DTO,并合并用户专属倍率。
-func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) modelPlazaGroup {
+// toModelPlazaGroupDTO 将 service 层广场分组映射为白名单 DTO。
+func toModelPlazaGroupDTO(g *service.PlazaGroup) modelPlazaGroup {
 	models := make([]modelPlazaModel, 0, len(g.Models))
 	for i := range g.Models {
 		m := &g.Models[i]
@@ -164,21 +153,17 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 		})
 	}
 	dto := modelPlazaGroup{
-		ID:                 g.ID,
-		Name:               g.Name,
-		Description:        g.Description,
-		Platform:           g.Platform,
-		SubscriptionType:   g.SubscriptionType,
-		RateMultiplier:     g.RateMultiplier,
-		PeakRateEnabled:    g.PeakRateEnabled,
-		PeakStart:          g.PeakStart,
-		PeakEnd:            g.PeakEnd,
-		PeakRateMultiplier: g.PeakRateMultiplier,
-		IsExclusive:        g.IsExclusive,
-		Models:             models,
-	}
-	if rate, ok := userRates[g.ID]; ok {
-		dto.UserRateMultiplier = &rate
+		ID:                        g.ID,
+		Name:                      g.Name,
+		Description:               g.Description,
+		Platform:                  g.Platform,
+		BalanceRateMultiplier:     g.BalanceRateMultiplier,
+		BalancePeakRateEnabled:    g.BalancePeakRateEnabled,
+		BalancePeakStart:          g.BalancePeakStart,
+		BalancePeakEnd:            g.BalancePeakEnd,
+		BalancePeakRateMultiplier: g.BalancePeakRateMultiplier,
+		IsExclusive:               g.IsExclusive,
+		Models:                    models,
 	}
 	return dto
 }

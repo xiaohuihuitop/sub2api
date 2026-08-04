@@ -107,7 +107,7 @@ func TestBillingCacheServiceQueueHighLoad(t *testing.T) {
 	}
 	require.Less(t, time.Since(start), 2*time.Second)
 
-	svc.QueueUpdateSubscriptionUsage(1, 2, 1.5)
+	svc.QueueUpdateSubscriptionUsage(1, 2, 3, 1.5)
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt64(&cache.balanceUpdates) > 0

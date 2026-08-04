@@ -37,3 +37,16 @@ type UserSubscriptionRepository interface {
 
 	BatchUpdateExpiredStatus(ctx context.Context) (int64, error)
 }
+
+// ActiveUserSubscriptionLister exposes ordered candidates for one routing
+// group. It is separate from the legacy repository contract so existing
+// callers can migrate without losing source compatibility.
+type ActiveUserSubscriptionLister interface {
+	ListActiveByUserIDAndGroupID(ctx context.Context, userID, groupID int64) ([]UserSubscription, error)
+}
+
+// ActiveUserSubscriptionGroupLister exposes ordered candidates across the
+// API key's eligible routing groups.
+type ActiveUserSubscriptionGroupLister interface {
+	ListActiveByUserIDAndGroupIDs(ctx context.Context, userID int64, groupIDs []int64) ([]UserSubscription, error)
+}

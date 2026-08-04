@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
@@ -156,6 +157,90 @@ func (_c *RedeemCodeCreate) SetNillableGroupID(v *int64) *RedeemCodeCreate {
 	return _c
 }
 
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (_c *RedeemCodeCreate) SetSubscriptionPlanID(v int64) *RedeemCodeCreate {
+	_c.mutation.SetSubscriptionPlanID(v)
+	return _c
+}
+
+// SetNillableSubscriptionPlanID sets the "subscription_plan_id" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableSubscriptionPlanID(v *int64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetSubscriptionPlanID(*v)
+	}
+	return _c
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (_c *RedeemCodeCreate) SetPlanNameSnapshot(v string) *RedeemCodeCreate {
+	_c.mutation.SetPlanNameSnapshot(v)
+	return _c
+}
+
+// SetNillablePlanNameSnapshot sets the "plan_name_snapshot" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillablePlanNameSnapshot(v *string) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetPlanNameSnapshot(*v)
+	}
+	return _c
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (_c *RedeemCodeCreate) SetDailyLimitUsdSnapshot(v float64) *RedeemCodeCreate {
+	_c.mutation.SetDailyLimitUsdSnapshot(v)
+	return _c
+}
+
+// SetNillableDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableDailyLimitUsdSnapshot(v *float64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetDailyLimitUsdSnapshot(*v)
+	}
+	return _c
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (_c *RedeemCodeCreate) SetWeeklyLimitUsdSnapshot(v float64) *RedeemCodeCreate {
+	_c.mutation.SetWeeklyLimitUsdSnapshot(v)
+	return _c
+}
+
+// SetNillableWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableWeeklyLimitUsdSnapshot(v *float64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetWeeklyLimitUsdSnapshot(*v)
+	}
+	return _c
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (_c *RedeemCodeCreate) SetMonthlyLimitUsdSnapshot(v float64) *RedeemCodeCreate {
+	_c.mutation.SetMonthlyLimitUsdSnapshot(v)
+	return _c
+}
+
+// SetNillableMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableMonthlyLimitUsdSnapshot(v *float64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetMonthlyLimitUsdSnapshot(*v)
+	}
+	return _c
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (_c *RedeemCodeCreate) SetRateMultiplierSnapshot(v float64) *RedeemCodeCreate {
+	_c.mutation.SetRateMultiplierSnapshot(v)
+	return _c
+}
+
+// SetNillableRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableRateMultiplierSnapshot(v *float64) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetRateMultiplierSnapshot(*v)
+	}
+	return _c
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (_c *RedeemCodeCreate) SetValidityDays(v int) *RedeemCodeCreate {
 	_c.mutation.SetValidityDays(v)
@@ -192,6 +277,11 @@ func (_c *RedeemCodeCreate) SetUser(v *User) *RedeemCodeCreate {
 // SetGroup sets the "group" edge to the Group entity.
 func (_c *RedeemCodeCreate) SetGroup(v *Group) *RedeemCodeCreate {
 	return _c.SetGroupID(v.ID)
+}
+
+// SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_c *RedeemCodeCreate) SetSubscriptionPlan(v *SubscriptionPlan) *RedeemCodeCreate {
+	return _c.SetSubscriptionPlanID(v.ID)
 }
 
 // Mutation returns the RedeemCodeMutation object of the builder.
@@ -245,6 +335,14 @@ func (_c *RedeemCodeCreate) defaults() {
 		v := redeemcode.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
+	if _, ok := _c.mutation.PlanNameSnapshot(); !ok {
+		v := redeemcode.DefaultPlanNameSnapshot
+		_c.mutation.SetPlanNameSnapshot(v)
+	}
+	if _, ok := _c.mutation.RateMultiplierSnapshot(); !ok {
+		v := redeemcode.DefaultRateMultiplierSnapshot
+		_c.mutation.SetRateMultiplierSnapshot(v)
+	}
 	if _, ok := _c.mutation.ValidityDays(); !ok {
 		v := redeemcode.DefaultValidityDays
 		_c.mutation.SetValidityDays(v)
@@ -282,6 +380,17 @@ func (_c *RedeemCodeCreate) check() error {
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "RedeemCode.created_at"`)}
+	}
+	if _, ok := _c.mutation.PlanNameSnapshot(); !ok {
+		return &ValidationError{Name: "plan_name_snapshot", err: errors.New(`ent: missing required field "RedeemCode.plan_name_snapshot"`)}
+	}
+	if v, ok := _c.mutation.PlanNameSnapshot(); ok {
+		if err := redeemcode.PlanNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "plan_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.plan_name_snapshot": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.RateMultiplierSnapshot(); !ok {
+		return &ValidationError{Name: "rate_multiplier_snapshot", err: errors.New(`ent: missing required field "RedeemCode.rate_multiplier_snapshot"`)}
 	}
 	if _, ok := _c.mutation.ValidityDays(); !ok {
 		return &ValidationError{Name: "validity_days", err: errors.New(`ent: missing required field "RedeemCode.validity_days"`)}
@@ -345,6 +454,26 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 		_spec.SetField(redeemcode.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = &value
 	}
+	if value, ok := _c.mutation.PlanNameSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldPlanNameSnapshot, field.TypeString, value)
+		_node.PlanNameSnapshot = value
+	}
+	if value, ok := _c.mutation.DailyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+		_node.DailyLimitUsdSnapshot = &value
+	}
+	if value, ok := _c.mutation.WeeklyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+		_node.WeeklyLimitUsdSnapshot = &value
+	}
+	if value, ok := _c.mutation.MonthlyLimitUsdSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+		_node.MonthlyLimitUsdSnapshot = &value
+	}
+	if value, ok := _c.mutation.RateMultiplierSnapshot(); ok {
+		_spec.SetField(redeemcode.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+		_node.RateMultiplierSnapshot = value
+	}
 	if value, ok := _c.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)
 		_node.ValidityDays = value
@@ -381,6 +510,23 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.GroupID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   redeemcode.SubscriptionPlanTable,
+			Columns: []string{redeemcode.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SubscriptionPlanID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -576,6 +722,126 @@ func (u *RedeemCodeUpsert) UpdateGroupID() *RedeemCodeUpsert {
 // ClearGroupID clears the value of the "group_id" field.
 func (u *RedeemCodeUpsert) ClearGroupID() *RedeemCodeUpsert {
 	u.SetNull(redeemcode.FieldGroupID)
+	return u
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (u *RedeemCodeUpsert) SetSubscriptionPlanID(v int64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldSubscriptionPlanID, v)
+	return u
+}
+
+// UpdateSubscriptionPlanID sets the "subscription_plan_id" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateSubscriptionPlanID() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldSubscriptionPlanID)
+	return u
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (u *RedeemCodeUpsert) ClearSubscriptionPlanID() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldSubscriptionPlanID)
+	return u
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (u *RedeemCodeUpsert) SetPlanNameSnapshot(v string) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldPlanNameSnapshot, v)
+	return u
+}
+
+// UpdatePlanNameSnapshot sets the "plan_name_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdatePlanNameSnapshot() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldPlanNameSnapshot)
+	return u
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) SetDailyLimitUsdSnapshot(v float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldDailyLimitUsdSnapshot, v)
+	return u
+}
+
+// UpdateDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateDailyLimitUsdSnapshot() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldDailyLimitUsdSnapshot)
+	return u
+}
+
+// AddDailyLimitUsdSnapshot adds v to the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) AddDailyLimitUsdSnapshot(v float64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldDailyLimitUsdSnapshot, v)
+	return u
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) ClearDailyLimitUsdSnapshot() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldDailyLimitUsdSnapshot)
+	return u
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) SetWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldWeeklyLimitUsdSnapshot, v)
+	return u
+}
+
+// UpdateWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateWeeklyLimitUsdSnapshot() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldWeeklyLimitUsdSnapshot)
+	return u
+}
+
+// AddWeeklyLimitUsdSnapshot adds v to the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) AddWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldWeeklyLimitUsdSnapshot, v)
+	return u
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) ClearWeeklyLimitUsdSnapshot() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldWeeklyLimitUsdSnapshot)
+	return u
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) SetMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldMonthlyLimitUsdSnapshot, v)
+	return u
+}
+
+// UpdateMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateMonthlyLimitUsdSnapshot() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldMonthlyLimitUsdSnapshot)
+	return u
+}
+
+// AddMonthlyLimitUsdSnapshot adds v to the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) AddMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldMonthlyLimitUsdSnapshot, v)
+	return u
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsert) ClearMonthlyLimitUsdSnapshot() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldMonthlyLimitUsdSnapshot)
+	return u
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (u *RedeemCodeUpsert) SetRateMultiplierSnapshot(v float64) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldRateMultiplierSnapshot, v)
+	return u
+}
+
+// UpdateRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateRateMultiplierSnapshot() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldRateMultiplierSnapshot)
+	return u
+}
+
+// AddRateMultiplierSnapshot adds v to the "rate_multiplier_snapshot" field.
+func (u *RedeemCodeUpsert) AddRateMultiplierSnapshot(v float64) *RedeemCodeUpsert {
+	u.Add(redeemcode.FieldRateMultiplierSnapshot, v)
 	return u
 }
 
@@ -807,6 +1073,146 @@ func (u *RedeemCodeUpsertOne) UpdateGroupID() *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) ClearGroupID() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.ClearGroupID()
+	})
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (u *RedeemCodeUpsertOne) SetSubscriptionPlanID(v int64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionPlanID(v)
+	})
+}
+
+// UpdateSubscriptionPlanID sets the "subscription_plan_id" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateSubscriptionPlanID() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionPlanID()
+	})
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (u *RedeemCodeUpsertOne) ClearSubscriptionPlanID() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionPlanID()
+	})
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (u *RedeemCodeUpsertOne) SetPlanNameSnapshot(v string) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetPlanNameSnapshot(v)
+	})
+}
+
+// UpdatePlanNameSnapshot sets the "plan_name_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdatePlanNameSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdatePlanNameSnapshot()
+	})
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) SetDailyLimitUsdSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetDailyLimitUsdSnapshot(v)
+	})
+}
+
+// AddDailyLimitUsdSnapshot adds v to the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) AddDailyLimitUsdSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddDailyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateDailyLimitUsdSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateDailyLimitUsdSnapshot()
+	})
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) ClearDailyLimitUsdSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearDailyLimitUsdSnapshot()
+	})
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) SetWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// AddWeeklyLimitUsdSnapshot adds v to the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) AddWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateWeeklyLimitUsdSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateWeeklyLimitUsdSnapshot()
+	})
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) ClearWeeklyLimitUsdSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearWeeklyLimitUsdSnapshot()
+	})
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) SetMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// AddMonthlyLimitUsdSnapshot adds v to the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) AddMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateMonthlyLimitUsdSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateMonthlyLimitUsdSnapshot()
+	})
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertOne) ClearMonthlyLimitUsdSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearMonthlyLimitUsdSnapshot()
+	})
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (u *RedeemCodeUpsertOne) SetRateMultiplierSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetRateMultiplierSnapshot(v)
+	})
+}
+
+// AddRateMultiplierSnapshot adds v to the "rate_multiplier_snapshot" field.
+func (u *RedeemCodeUpsertOne) AddRateMultiplierSnapshot(v float64) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddRateMultiplierSnapshot(v)
+	})
+}
+
+// UpdateRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateRateMultiplierSnapshot() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateRateMultiplierSnapshot()
 	})
 }
 
@@ -1207,6 +1613,146 @@ func (u *RedeemCodeUpsertBulk) UpdateGroupID() *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) ClearGroupID() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.ClearGroupID()
+	})
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (u *RedeemCodeUpsertBulk) SetSubscriptionPlanID(v int64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetSubscriptionPlanID(v)
+	})
+}
+
+// UpdateSubscriptionPlanID sets the "subscription_plan_id" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateSubscriptionPlanID() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateSubscriptionPlanID()
+	})
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (u *RedeemCodeUpsertBulk) ClearSubscriptionPlanID() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearSubscriptionPlanID()
+	})
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (u *RedeemCodeUpsertBulk) SetPlanNameSnapshot(v string) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetPlanNameSnapshot(v)
+	})
+}
+
+// UpdatePlanNameSnapshot sets the "plan_name_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdatePlanNameSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdatePlanNameSnapshot()
+	})
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) SetDailyLimitUsdSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetDailyLimitUsdSnapshot(v)
+	})
+}
+
+// AddDailyLimitUsdSnapshot adds v to the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) AddDailyLimitUsdSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddDailyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateDailyLimitUsdSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateDailyLimitUsdSnapshot()
+	})
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) ClearDailyLimitUsdSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearDailyLimitUsdSnapshot()
+	})
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) SetWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// AddWeeklyLimitUsdSnapshot adds v to the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) AddWeeklyLimitUsdSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateWeeklyLimitUsdSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateWeeklyLimitUsdSnapshot()
+	})
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) ClearWeeklyLimitUsdSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearWeeklyLimitUsdSnapshot()
+	})
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) SetMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// AddMonthlyLimitUsdSnapshot adds v to the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) AddMonthlyLimitUsdSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateMonthlyLimitUsdSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateMonthlyLimitUsdSnapshot()
+	})
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (u *RedeemCodeUpsertBulk) ClearMonthlyLimitUsdSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearMonthlyLimitUsdSnapshot()
+	})
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (u *RedeemCodeUpsertBulk) SetRateMultiplierSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetRateMultiplierSnapshot(v)
+	})
+}
+
+// AddRateMultiplierSnapshot adds v to the "rate_multiplier_snapshot" field.
+func (u *RedeemCodeUpsertBulk) AddRateMultiplierSnapshot(v float64) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.AddRateMultiplierSnapshot(v)
+	})
+}
+
+// UpdateRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateRateMultiplierSnapshot() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateRateMultiplierSnapshot()
 	})
 }
 

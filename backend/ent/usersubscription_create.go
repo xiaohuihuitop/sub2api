@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
@@ -76,6 +77,90 @@ func (_c *UserSubscriptionCreate) SetUserID(v int64) *UserSubscriptionCreate {
 // SetGroupID sets the "group_id" field.
 func (_c *UserSubscriptionCreate) SetGroupID(v int64) *UserSubscriptionCreate {
 	_c.mutation.SetGroupID(v)
+	return _c
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (_c *UserSubscriptionCreate) SetSubscriptionPlanID(v int64) *UserSubscriptionCreate {
+	_c.mutation.SetSubscriptionPlanID(v)
+	return _c
+}
+
+// SetNillableSubscriptionPlanID sets the "subscription_plan_id" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableSubscriptionPlanID(v *int64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetSubscriptionPlanID(*v)
+	}
+	return _c
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (_c *UserSubscriptionCreate) SetPlanNameSnapshot(v string) *UserSubscriptionCreate {
+	_c.mutation.SetPlanNameSnapshot(v)
+	return _c
+}
+
+// SetNillablePlanNameSnapshot sets the "plan_name_snapshot" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillablePlanNameSnapshot(v *string) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetPlanNameSnapshot(*v)
+	}
+	return _c
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (_c *UserSubscriptionCreate) SetDailyLimitUsdSnapshot(v float64) *UserSubscriptionCreate {
+	_c.mutation.SetDailyLimitUsdSnapshot(v)
+	return _c
+}
+
+// SetNillableDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableDailyLimitUsdSnapshot(v *float64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetDailyLimitUsdSnapshot(*v)
+	}
+	return _c
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (_c *UserSubscriptionCreate) SetWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionCreate {
+	_c.mutation.SetWeeklyLimitUsdSnapshot(v)
+	return _c
+}
+
+// SetNillableWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableWeeklyLimitUsdSnapshot(v *float64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetWeeklyLimitUsdSnapshot(*v)
+	}
+	return _c
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (_c *UserSubscriptionCreate) SetMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionCreate {
+	_c.mutation.SetMonthlyLimitUsdSnapshot(v)
+	return _c
+}
+
+// SetNillableMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableMonthlyLimitUsdSnapshot(v *float64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetMonthlyLimitUsdSnapshot(*v)
+	}
+	return _c
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (_c *UserSubscriptionCreate) SetRateMultiplierSnapshot(v float64) *UserSubscriptionCreate {
+	_c.mutation.SetRateMultiplierSnapshot(v)
+	return _c
+}
+
+// SetNillableRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableRateMultiplierSnapshot(v *float64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetRateMultiplierSnapshot(*v)
+	}
 	return _c
 }
 
@@ -241,6 +326,11 @@ func (_c *UserSubscriptionCreate) SetGroup(v *Group) *UserSubscriptionCreate {
 	return _c.SetGroupID(v.ID)
 }
 
+// SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
+func (_c *UserSubscriptionCreate) SetSubscriptionPlan(v *SubscriptionPlan) *UserSubscriptionCreate {
+	return _c.SetSubscriptionPlanID(v.ID)
+}
+
 // SetAssignedByUserID sets the "assigned_by_user" edge to the User entity by ID.
 func (_c *UserSubscriptionCreate) SetAssignedByUserID(id int64) *UserSubscriptionCreate {
 	_c.mutation.SetAssignedByUserID(id)
@@ -326,6 +416,14 @@ func (_c *UserSubscriptionCreate) defaults() error {
 		v := usersubscription.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.PlanNameSnapshot(); !ok {
+		v := usersubscription.DefaultPlanNameSnapshot
+		_c.mutation.SetPlanNameSnapshot(v)
+	}
+	if _, ok := _c.mutation.RateMultiplierSnapshot(); !ok {
+		v := usersubscription.DefaultRateMultiplierSnapshot
+		_c.mutation.SetRateMultiplierSnapshot(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := usersubscription.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -365,6 +463,17 @@ func (_c *UserSubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.GroupID(); !ok {
 		return &ValidationError{Name: "group_id", err: errors.New(`ent: missing required field "UserSubscription.group_id"`)}
+	}
+	if _, ok := _c.mutation.PlanNameSnapshot(); !ok {
+		return &ValidationError{Name: "plan_name_snapshot", err: errors.New(`ent: missing required field "UserSubscription.plan_name_snapshot"`)}
+	}
+	if v, ok := _c.mutation.PlanNameSnapshot(); ok {
+		if err := usersubscription.PlanNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "plan_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "UserSubscription.plan_name_snapshot": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.RateMultiplierSnapshot(); !ok {
+		return &ValidationError{Name: "rate_multiplier_snapshot", err: errors.New(`ent: missing required field "UserSubscription.rate_multiplier_snapshot"`)}
 	}
 	if _, ok := _c.mutation.StartsAt(); !ok {
 		return &ValidationError{Name: "starts_at", err: errors.New(`ent: missing required field "UserSubscription.starts_at"`)}
@@ -436,6 +545,26 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 	if value, ok := _c.mutation.DeletedAt(); ok {
 		_spec.SetField(usersubscription.FieldDeletedAt, field.TypeTime, value)
 		_node.DeletedAt = &value
+	}
+	if value, ok := _c.mutation.PlanNameSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldPlanNameSnapshot, field.TypeString, value)
+		_node.PlanNameSnapshot = value
+	}
+	if value, ok := _c.mutation.DailyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldDailyLimitUsdSnapshot, field.TypeFloat64, value)
+		_node.DailyLimitUsdSnapshot = &value
+	}
+	if value, ok := _c.mutation.WeeklyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldWeeklyLimitUsdSnapshot, field.TypeFloat64, value)
+		_node.WeeklyLimitUsdSnapshot = &value
+	}
+	if value, ok := _c.mutation.MonthlyLimitUsdSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldMonthlyLimitUsdSnapshot, field.TypeFloat64, value)
+		_node.MonthlyLimitUsdSnapshot = &value
+	}
+	if value, ok := _c.mutation.RateMultiplierSnapshot(); ok {
+		_spec.SetField(usersubscription.FieldRateMultiplierSnapshot, field.TypeFloat64, value)
+		_node.RateMultiplierSnapshot = value
 	}
 	if value, ok := _c.mutation.StartsAt(); ok {
 		_spec.SetField(usersubscription.FieldStartsAt, field.TypeTime, value)
@@ -513,6 +642,23 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.GroupID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usersubscription.SubscriptionPlanTable,
+			Columns: []string{usersubscription.SubscriptionPlanColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SubscriptionPlanID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.AssignedByUserIDs(); len(nodes) > 0 {
@@ -651,6 +797,126 @@ func (u *UserSubscriptionUpsert) SetGroupID(v int64) *UserSubscriptionUpsert {
 // UpdateGroupID sets the "group_id" field to the value that was provided on create.
 func (u *UserSubscriptionUpsert) UpdateGroupID() *UserSubscriptionUpsert {
 	u.SetExcluded(usersubscription.FieldGroupID)
+	return u
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (u *UserSubscriptionUpsert) SetSubscriptionPlanID(v int64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldSubscriptionPlanID, v)
+	return u
+}
+
+// UpdateSubscriptionPlanID sets the "subscription_plan_id" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateSubscriptionPlanID() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldSubscriptionPlanID)
+	return u
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (u *UserSubscriptionUpsert) ClearSubscriptionPlanID() *UserSubscriptionUpsert {
+	u.SetNull(usersubscription.FieldSubscriptionPlanID)
+	return u
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (u *UserSubscriptionUpsert) SetPlanNameSnapshot(v string) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldPlanNameSnapshot, v)
+	return u
+}
+
+// UpdatePlanNameSnapshot sets the "plan_name_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdatePlanNameSnapshot() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldPlanNameSnapshot)
+	return u
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) SetDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldDailyLimitUsdSnapshot, v)
+	return u
+}
+
+// UpdateDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateDailyLimitUsdSnapshot() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldDailyLimitUsdSnapshot)
+	return u
+}
+
+// AddDailyLimitUsdSnapshot adds v to the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) AddDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldDailyLimitUsdSnapshot, v)
+	return u
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) ClearDailyLimitUsdSnapshot() *UserSubscriptionUpsert {
+	u.SetNull(usersubscription.FieldDailyLimitUsdSnapshot)
+	return u
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) SetWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldWeeklyLimitUsdSnapshot, v)
+	return u
+}
+
+// UpdateWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateWeeklyLimitUsdSnapshot() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldWeeklyLimitUsdSnapshot)
+	return u
+}
+
+// AddWeeklyLimitUsdSnapshot adds v to the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) AddWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldWeeklyLimitUsdSnapshot, v)
+	return u
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) ClearWeeklyLimitUsdSnapshot() *UserSubscriptionUpsert {
+	u.SetNull(usersubscription.FieldWeeklyLimitUsdSnapshot)
+	return u
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) SetMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldMonthlyLimitUsdSnapshot, v)
+	return u
+}
+
+// UpdateMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateMonthlyLimitUsdSnapshot() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldMonthlyLimitUsdSnapshot)
+	return u
+}
+
+// AddMonthlyLimitUsdSnapshot adds v to the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) AddMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldMonthlyLimitUsdSnapshot, v)
+	return u
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsert) ClearMonthlyLimitUsdSnapshot() *UserSubscriptionUpsert {
+	u.SetNull(usersubscription.FieldMonthlyLimitUsdSnapshot)
+	return u
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (u *UserSubscriptionUpsert) SetRateMultiplierSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldRateMultiplierSnapshot, v)
+	return u
+}
+
+// UpdateRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateRateMultiplierSnapshot() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldRateMultiplierSnapshot)
+	return u
+}
+
+// AddRateMultiplierSnapshot adds v to the "rate_multiplier_snapshot" field.
+func (u *UserSubscriptionUpsert) AddRateMultiplierSnapshot(v float64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldRateMultiplierSnapshot, v)
 	return u
 }
 
@@ -951,6 +1217,146 @@ func (u *UserSubscriptionUpsertOne) SetGroupID(v int64) *UserSubscriptionUpsertO
 func (u *UserSubscriptionUpsertOne) UpdateGroupID() *UserSubscriptionUpsertOne {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateGroupID()
+	})
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (u *UserSubscriptionUpsertOne) SetSubscriptionPlanID(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetSubscriptionPlanID(v)
+	})
+}
+
+// UpdateSubscriptionPlanID sets the "subscription_plan_id" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateSubscriptionPlanID() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateSubscriptionPlanID()
+	})
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (u *UserSubscriptionUpsertOne) ClearSubscriptionPlanID() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearSubscriptionPlanID()
+	})
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (u *UserSubscriptionUpsertOne) SetPlanNameSnapshot(v string) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetPlanNameSnapshot(v)
+	})
+}
+
+// UpdatePlanNameSnapshot sets the "plan_name_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdatePlanNameSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdatePlanNameSnapshot()
+	})
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) SetDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetDailyLimitUsdSnapshot(v)
+	})
+}
+
+// AddDailyLimitUsdSnapshot adds v to the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) AddDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddDailyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateDailyLimitUsdSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateDailyLimitUsdSnapshot()
+	})
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) ClearDailyLimitUsdSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearDailyLimitUsdSnapshot()
+	})
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) SetWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// AddWeeklyLimitUsdSnapshot adds v to the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) AddWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateWeeklyLimitUsdSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateWeeklyLimitUsdSnapshot()
+	})
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) ClearWeeklyLimitUsdSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearWeeklyLimitUsdSnapshot()
+	})
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) SetMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// AddMonthlyLimitUsdSnapshot adds v to the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) AddMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateMonthlyLimitUsdSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateMonthlyLimitUsdSnapshot()
+	})
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertOne) ClearMonthlyLimitUsdSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearMonthlyLimitUsdSnapshot()
+	})
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (u *UserSubscriptionUpsertOne) SetRateMultiplierSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetRateMultiplierSnapshot(v)
+	})
+}
+
+// AddRateMultiplierSnapshot adds v to the "rate_multiplier_snapshot" field.
+func (u *UserSubscriptionUpsertOne) AddRateMultiplierSnapshot(v float64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddRateMultiplierSnapshot(v)
+	})
+}
+
+// UpdateRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateRateMultiplierSnapshot() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateRateMultiplierSnapshot()
 	})
 }
 
@@ -1449,6 +1855,146 @@ func (u *UserSubscriptionUpsertBulk) SetGroupID(v int64) *UserSubscriptionUpsert
 func (u *UserSubscriptionUpsertBulk) UpdateGroupID() *UserSubscriptionUpsertBulk {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateGroupID()
+	})
+}
+
+// SetSubscriptionPlanID sets the "subscription_plan_id" field.
+func (u *UserSubscriptionUpsertBulk) SetSubscriptionPlanID(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetSubscriptionPlanID(v)
+	})
+}
+
+// UpdateSubscriptionPlanID sets the "subscription_plan_id" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateSubscriptionPlanID() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateSubscriptionPlanID()
+	})
+}
+
+// ClearSubscriptionPlanID clears the value of the "subscription_plan_id" field.
+func (u *UserSubscriptionUpsertBulk) ClearSubscriptionPlanID() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearSubscriptionPlanID()
+	})
+}
+
+// SetPlanNameSnapshot sets the "plan_name_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) SetPlanNameSnapshot(v string) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetPlanNameSnapshot(v)
+	})
+}
+
+// UpdatePlanNameSnapshot sets the "plan_name_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdatePlanNameSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdatePlanNameSnapshot()
+	})
+}
+
+// SetDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) SetDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetDailyLimitUsdSnapshot(v)
+	})
+}
+
+// AddDailyLimitUsdSnapshot adds v to the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) AddDailyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddDailyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateDailyLimitUsdSnapshot sets the "daily_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateDailyLimitUsdSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateDailyLimitUsdSnapshot()
+	})
+}
+
+// ClearDailyLimitUsdSnapshot clears the value of the "daily_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) ClearDailyLimitUsdSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearDailyLimitUsdSnapshot()
+	})
+}
+
+// SetWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) SetWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// AddWeeklyLimitUsdSnapshot adds v to the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) AddWeeklyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddWeeklyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateWeeklyLimitUsdSnapshot sets the "weekly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateWeeklyLimitUsdSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateWeeklyLimitUsdSnapshot()
+	})
+}
+
+// ClearWeeklyLimitUsdSnapshot clears the value of the "weekly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) ClearWeeklyLimitUsdSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearWeeklyLimitUsdSnapshot()
+	})
+}
+
+// SetMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) SetMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// AddMonthlyLimitUsdSnapshot adds v to the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) AddMonthlyLimitUsdSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddMonthlyLimitUsdSnapshot(v)
+	})
+}
+
+// UpdateMonthlyLimitUsdSnapshot sets the "monthly_limit_usd_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateMonthlyLimitUsdSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateMonthlyLimitUsdSnapshot()
+	})
+}
+
+// ClearMonthlyLimitUsdSnapshot clears the value of the "monthly_limit_usd_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) ClearMonthlyLimitUsdSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearMonthlyLimitUsdSnapshot()
+	})
+}
+
+// SetRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) SetRateMultiplierSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetRateMultiplierSnapshot(v)
+	})
+}
+
+// AddRateMultiplierSnapshot adds v to the "rate_multiplier_snapshot" field.
+func (u *UserSubscriptionUpsertBulk) AddRateMultiplierSnapshot(v float64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddRateMultiplierSnapshot(v)
+	})
+}
+
+// UpdateRateMultiplierSnapshot sets the "rate_multiplier_snapshot" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateRateMultiplierSnapshot() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateRateMultiplierSnapshot()
 	})
 }
 

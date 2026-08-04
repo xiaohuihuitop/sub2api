@@ -9,14 +9,6 @@
         <GroupBadge
           :name="group.name"
           :platform="group.platform as GroupPlatform"
-          :subscription-type="(group.subscription_type || 'standard') as SubscriptionType"
-          :rate-multiplier="group.rate_multiplier"
-          :user-rate-multiplier="group.user_rate_multiplier ?? null"
-          :peak-rate-enabled="group.peak_rate_enabled"
-          :peak-start="group.peak_start"
-          :peak-end="group.peak_end"
-          :peak-rate-multiplier="group.peak_rate_multiplier"
-          always-show-rate
         />
         <span
           v-if="group.is_exclusive"
@@ -24,12 +16,6 @@
         >
           <Icon name="shield" size="xs" class="h-3 w-3" />
           {{ t('modelPlaza.badges.exclusive') }}
-        </span>
-        <span
-          v-if="group.subscription_type === 'subscription'"
-          class="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/20 dark:text-violet-400"
-        >
-          {{ t('modelPlaza.badges.subscription') }}
         </span>
       </div>
       <p v-if="group.description" class="mt-2 text-sm text-gray-500 dark:text-dark-400">
@@ -50,8 +36,7 @@
         v-if="group.models.length > 0"
         :models="group.models"
         :platform="group.platform"
-        :rate-multiplier="group.rate_multiplier"
-        :user-rate-multiplier="group.user_rate_multiplier ?? null"
+        :balance-rate-multiplier="group.balance_rate_multiplier"
       />
       <p v-else class="px-5 py-4 text-center text-sm text-gray-400 dark:text-dark-500">
         {{ t('modelPlaza.detail.noModels') }}
@@ -67,7 +52,7 @@ import Icon from '@/components/icons/Icon.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlazaModelPricingTable from './PlazaModelPricingTable.vue'
 import type { ModelPlazaGroup } from '@/api/modelPlaza'
-import type { GroupPlatform, SubscriptionType } from '@/types'
+import type { GroupPlatform } from '@/types'
 import { platformBorderStrongClass } from '@/utils/platformColors'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { useAppStore } from '@/stores/app'
@@ -79,15 +64,22 @@ const props = defineProps<{
 const { t } = useI18n()
 const appStore = useAppStore()
 
+const balancePeakRateFields = computed(() => ({
+  peak_rate_enabled: props.group.balance_peak_rate_enabled,
+  peak_start: props.group.balance_peak_start,
+  peak_end: props.group.balance_peak_end,
+  peak_rate_multiplier: props.group.balance_peak_rate_multiplier
+}))
+
 const peakNote = computed(() => {
-  if (!hasPeakRate(props.group)) return ''
+  if (!hasPeakRate(balancePeakRateFields.value)) return ''
   const window = formatPeakRateWindow(
-    props.group,
+    balancePeakRateFields.value,
     serverTimezoneLabel(appStore.cachedPublicSettings?.server_utc_offset)
   )
   return t('modelPlaza.detail.peakNote', {
     window,
-    multiplier: props.group.peak_rate_multiplier
+    multiplier: props.group.balance_peak_rate_multiplier
   })
 })
 </script>

@@ -367,6 +367,14 @@
                 <span class="text-xs">{{ t("common.edit") }}</span>
               </button>
               <button
+                data-testid="group-billing-profile"
+                @click="billingProfileGroup = row"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+              >
+                <Icon name="creditCard" size="sm" />
+                <span class="text-xs">{{ t("admin.groups.balanceBilling") }}</span>
+              </button>
+              <button
                 data-testid="group-duplicate"
                 :title="
                   duplicatingGroupIds.has(row.id)
@@ -394,15 +402,6 @@
                 <Icon name="swap" size="sm" />
                 <span class="text-xs">{{
                   t("admin.groups.compositeRoutes.action")
-                }}</span>
-              </button>
-              <button
-                @click="handleRateMultipliers(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
-              >
-                <Icon name="dollar" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rateMultipliers")
                 }}</span>
               </button>
               <button
@@ -582,7 +581,7 @@
           </select>
           <p class="input-hint">{{ t("admin.groups.copyAccounts.hint") }}</p>
         </div>
-        <div>
+        <div v-if="showLegacyBillingFields">
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
@@ -618,7 +617,6 @@
           v-model:mappings="createForm.reasoning_effort_mappings"
         />
         <div
-          v-if="createForm.subscription_type !== 'subscription'"
           data-tour="group-form-exclusive"
         >
           <div class="mb-1.5 flex items-center gap-1">
@@ -693,7 +691,7 @@
         </div>
 
         <!-- Subscription Configuration -->
-        <div class="mt-4 border-t pt-4">
+        <div v-if="showLegacyBillingFields" class="mt-4 border-t pt-4">
           <div>
             <label class="input-label">{{
               t("admin.groups.subscription.type")
@@ -863,7 +861,7 @@
 
         <!-- 图片生成计费配置 -->
         <div
-          v-if="supportsImagePricingPlatform(createForm.platform)"
+          v-if="showLegacyBillingFields && supportsImagePricingPlatform(createForm.platform)"
           class="border-t pt-4"
         >
           <label
@@ -1015,7 +1013,7 @@
 
         <!-- 视频生成计费配置（仅 Grok 平台） -->
         <div
-          v-if="supportsVideoPricingPlatform(createForm.platform)"
+          v-if="showLegacyBillingFields && supportsVideoPricingPlatform(createForm.platform)"
           class="border-t pt-4"
         >
           <label
@@ -1106,7 +1104,7 @@
         </div>
 
         <!-- 高峰时段倍率配置（仅订阅类型分组） -->
-        <div v-if="createForm.subscription_type === 'subscription'" class="border-t pt-4">
+        <div v-if="showLegacyBillingFields && createForm.subscription_type === 'subscription'" class="border-t pt-4">
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -1361,7 +1359,7 @@
 
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
-          v-if="createForm.platform === 'openai'"
+          v-if="showLegacyBillingFields && createForm.platform === 'openai'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -2136,7 +2134,7 @@
             {{ t("admin.groups.copyAccounts.hintEdit") }}
           </p>
         </div>
-        <div>
+        <div v-if="showLegacyBillingFields">
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
@@ -2170,7 +2168,7 @@
           v-model:max-effort="editForm.max_reasoning_effort"
           v-model:mappings="editForm.reasoning_effort_mappings"
         />
-        <div v-if="editForm.subscription_type !== 'subscription'">
+        <div>
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.form.exclusive") }}
@@ -2247,7 +2245,7 @@
         </div>
 
         <!-- Subscription Configuration -->
-        <div class="mt-4 border-t pt-4">
+        <div v-if="showLegacyBillingFields" class="mt-4 border-t pt-4">
           <div>
             <label class="input-label">{{
               t("admin.groups.subscription.type")
@@ -2418,7 +2416,7 @@
 
         <!-- 图片生成计费配置 -->
         <div
-          v-if="supportsImagePricingPlatform(editForm.platform)"
+          v-if="showLegacyBillingFields && supportsImagePricingPlatform(editForm.platform)"
           class="border-t pt-4"
         >
           <label
@@ -2570,7 +2568,7 @@
 
         <!-- 视频生成计费配置（仅 Grok 平台） -->
         <div
-          v-if="supportsVideoPricingPlatform(editForm.platform)"
+          v-if="showLegacyBillingFields && supportsVideoPricingPlatform(editForm.platform)"
           class="border-t pt-4"
         >
           <label
@@ -2661,7 +2659,7 @@
         </div>
 
         <!-- 高峰时段倍率配置（仅订阅类型分组） -->
-        <div v-if="editForm.subscription_type === 'subscription'" class="border-t pt-4">
+        <div v-if="showLegacyBillingFields && editForm.subscription_type === 'subscription'" class="border-t pt-4">
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -2912,7 +2910,7 @@
 
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
-          v-if="editForm.platform === 'openai'"
+          v-if="showLegacyBillingFields && editForm.platform === 'openai'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -4024,20 +4022,18 @@
       </template>
     </BaseDialog>
 
-    <!-- Group Rate Multipliers Modal -->
-    <GroupRateMultipliersModal
-      :show="showRateMultipliersModal"
-      :group="rateMultipliersGroup"
-      @close="showRateMultipliersModal = false"
-      @success="loadGroups"
-    />
-
     <!-- Group RPM Overrides Modal -->
     <GroupRPMOverridesModal
       :show="showRPMOverridesModal"
       :group="rpmOverridesGroup"
       @close="showRPMOverridesModal = false"
       @success="loadGroups"
+    />
+    <GroupBillingProfileDialog
+      :show="billingProfileGroup !== null"
+      :group="billingProfileGroup"
+      @close="billingProfileGroup = null"
+      @saved="loadGroups"
     />
   </AppLayout>
 </template>
@@ -4069,7 +4065,7 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import Select from "@/components/common/Select.vue";
 import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import Icon from "@/components/icons/Icon.vue";
-import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
+import GroupBillingProfileDialog from "@/components/admin/group/GroupBillingProfileDialog.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
@@ -4116,6 +4112,10 @@ const { t } = useI18n();
 const appStore = useAppStore();
 const onboardingStore = useOnboardingStore();
 
+// Old Group pricing fields remain only as a one-release migration fallback.
+// New configuration lives in BillingProfile and SubscriptionPlan instead.
+const showLegacyBillingFields = false;
+
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
 // Default hidden columns (hidden on first load / after schema bumps).
 const DEFAULT_HIDDEN_COLUMNS = ["id"];
@@ -4133,16 +4133,6 @@ const allColumns = computed<Column[]>(() => [
   {
     key: "platform",
     label: t("admin.groups.columns.platform"),
-    sortable: true,
-  },
-  {
-    key: "billing_type",
-    label: t("admin.groups.columns.billingType"),
-    sortable: true,
-  },
-  {
-    key: "rate_multiplier",
-    label: t("admin.groups.columns.rateMultiplier"),
     sortable: true,
   },
   {
@@ -4242,9 +4232,7 @@ const saveColumnsToStorage = () => {
 };
 
 const isColumnVisible = (key: string) => !hiddenColumns.has(key);
-const hasVisibleUsageSummaryConsumer = computed(
-  () => isColumnVisible("usage") || isColumnVisible("billing_type"),
-);
+const hasVisibleUsageSummaryConsumer = computed(() => isColumnVisible("usage"));
 const hasVisibleCapacityColumn = computed(() => isColumnVisible("capacity"));
 
 const toggleColumn = (key: string) => {
@@ -4259,7 +4247,7 @@ const toggleColumn = (key: string) => {
   }
   saveColumnsToStorage();
 
-  if (wasHidden && (key === "usage" || key === "billing_type")) {
+  if (wasHidden && key === "usage") {
     loadUsageSummary();
   }
   if (wasHidden && key === "capacity") {
@@ -4527,9 +4515,8 @@ const submitting = ref(false);
 const sortSubmitting = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
+const billingProfileGroup = ref<AdminGroup | null>(null);
 const duplicatingGroupIds = reactive(new Set<number>());
-const showRateMultipliersModal = ref(false);
-const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
 const sortableGroups = ref<AdminGroup[]>([]);
@@ -5794,11 +5781,6 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
   if (index !== -1) {
     editForm.exact_model_mappings.splice(index, 1);
   }
-};
-
-const handleRateMultipliers = (group: AdminGroup) => {
-  rateMultipliersGroup.value = group;
-  showRateMultipliersModal.value = true;
 };
 
 const handleRPMOverrides = (group: AdminGroup) => {

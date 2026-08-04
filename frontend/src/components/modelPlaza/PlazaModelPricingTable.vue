@@ -23,7 +23,7 @@
           </th>
           <th colspan="3" class="pz-bg pt-2 text-center">
             <div class="pz-title border-b pb-2 font-semibold">
-              {{ t('modelPlaza.table.paidPrice') }}
+              {{ t('modelPlaza.table.balancePrice') }}
               <span class="pz-unit ml-1 normal-case font-normal">{{ t('modelPlaza.table.unitPerMillion') }}</span>
             </div>
           </th>
@@ -40,7 +40,7 @@
             rowspan="2"
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle dark:border-dark-700/60"
           >
-            {{ t('modelPlaza.table.rate') }}
+            {{ t('modelPlaza.table.balanceRate') }}
           </th>
         </tr>
         <tr
@@ -178,15 +178,11 @@
             <span v-else class="text-gray-400 dark:text-dark-500">-</span>
           </td>
 
-          <!-- 折扣倍率(专属倍率划线展示原倍率) -->
+          <!-- 套餐或余额计费倍率 -->
           <td
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle font-mono text-xs dark:border-dark-700/60"
           >
-            <template v-if="hasCustomRate">
-              <span class="mr-1 text-gray-400 line-through dark:text-dark-500">{{ rateMultiplier }}x</span>
-              <span class="font-bold text-primary-600 dark:text-primary-400">{{ effectiveRate }}x</span>
-            </template>
-            <span v-else class="font-bold text-gray-700 dark:text-gray-300">{{ effectiveRate }}x</span>
+            <span class="font-bold text-gray-700 dark:text-gray-300">{{ effectiveBalanceRate }}x</span>
           </td>
         </tr>
       </tbody>
@@ -212,9 +208,7 @@ const props = defineProps<{
   /** 分组平台;实付分区底色随平台着色,未知平台回退品牌青。 */
   platform?: string
   /** 分组默认倍率。 */
-  rateMultiplier: number
-  /** 用户专属倍率;与默认不同,实付价按此计算并划线展示原倍率。 */
-  userRateMultiplier?: number | null
+  balanceRateMultiplier: number
 }>()
 
 const { t } = useI18n()
@@ -244,10 +238,7 @@ const sortedModels = computed(() => {
   })
 })
 
-const effectiveRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
-const hasCustomRate = computed(
-  () => props.userRateMultiplier != null && props.userRateMultiplier !== props.rateMultiplier
-)
+const effectiveBalanceRate = computed(() => props.balanceRateMultiplier)
 
 function billingMode(m: PlazaModel): BillingMode {
   return (m.pricing?.billing_mode || BILLING_MODE_TOKEN) as BillingMode
@@ -265,13 +256,13 @@ const MIN_DECIMALS = 2
 /** 实付价 = 渠道单价 × 生效倍率,按 $/1M token 展示。 */
 function paidPerMillion(value: number | null | undefined): string {
   if (value == null) return '-'
-  return formatScaled(value * effectiveRate.value, PER_MILLION, MIN_DECIMALS)
+  return formatScaled(value * effectiveBalanceRate.value, PER_MILLION, MIN_DECIMALS)
 }
 
 /** 按次 / 按图片单价(乘生效倍率,不换算 1M)。 */
 function paidRequestPrice(value: number | null | undefined): string {
   if (value == null) return '-'
-  return formatScaled(value * effectiveRate.value, 1, MIN_DECIMALS)
+  return formatScaled(value * effectiveBalanceRate.value, 1, MIN_DECIMALS)
 }
 
 /** 官方参考价不乘倍率。 */

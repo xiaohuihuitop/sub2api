@@ -292,7 +292,7 @@ type AdminSubscriptionPlanResult struct {
 	GroupID         int64     `json:"group_id"`
 	GroupPlatform   string    `json:"group_platform,omitempty"`
 	GroupName       string    `json:"group_name,omitempty"`
-	RateMultiplier  float64   `json:"rate_multiplier,omitempty"`
+	RateMultiplier  float64   `json:"rate_multiplier"`
 	DailyLimitUSD   *float64  `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD  *float64  `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD *float64  `json:"monthly_limit_usd,omitempty"`
@@ -324,10 +324,10 @@ func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan, groupInf
 			GroupID:         p.GroupID,
 			GroupPlatform:   gi.Platform,
 			GroupName:       gi.Name,
-			RateMultiplier:  gi.RateMultiplier,
-			DailyLimitUSD:   gi.DailyLimitUSD,
-			WeeklyLimitUSD:  gi.WeeklyLimitUSD,
-			MonthlyLimitUSD: gi.MonthlyLimitUSD,
+			RateMultiplier:  p.RateMultiplier,
+			DailyLimitUSD:   p.DailyLimitUsd,
+			WeeklyLimitUSD:  p.WeeklyLimitUsd,
+			MonthlyLimitUSD: p.MonthlyLimitUsd,
 			ModelScopes:     gi.ModelScopes,
 			Name:            p.Name,
 			Description:     p.Description,

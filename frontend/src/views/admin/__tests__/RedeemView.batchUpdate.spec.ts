@@ -3,11 +3,22 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import RedeemView from '../RedeemView.vue'
 
-const { listRedeemCodes, batchUpdateRedeemCodes, getAllGroups, showSuccess, showError, showInfo } =
+const {
+  listRedeemCodes,
+  generateRedeemCodes,
+  batchUpdateRedeemCodes,
+  getAllGroups,
+  getPlans,
+  showSuccess,
+  showError,
+  showInfo
+} =
   vi.hoisted(() => ({
     listRedeemCodes: vi.fn(),
+    generateRedeemCodes: vi.fn(),
     batchUpdateRedeemCodes: vi.fn(),
     getAllGroups: vi.fn(),
+    getPlans: vi.fn(),
     showSuccess: vi.fn(),
     showError: vi.fn(),
     showInfo: vi.fn()
@@ -17,7 +28,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     redeem: {
       list: listRedeemCodes,
-      generate: vi.fn(),
+      generate: generateRedeemCodes,
       delete: vi.fn(),
       batchDelete: vi.fn(),
       batchUpdate: batchUpdateRedeemCodes,
@@ -27,6 +38,10 @@ vi.mock('@/api/admin', () => ({
       getAll: getAllGroups
     }
   }
+}))
+
+vi.mock('@/api/admin/payment', () => ({
+  adminPaymentAPI: { getPlans }
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -105,8 +120,10 @@ describe('admin RedeemView batch update', () => {
     document.body.innerHTML = ''
 
     listRedeemCodes.mockReset()
+    generateRedeemCodes.mockReset()
     batchUpdateRedeemCodes.mockReset()
     getAllGroups.mockReset()
+    getPlans.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
     showInfo.mockReset()
@@ -142,7 +159,25 @@ describe('admin RedeemView batch update', () => {
       pages: 1
     })
     batchUpdateRedeemCodes.mockResolvedValue({ updated: 1, message: 'ok' })
+    generateRedeemCodes.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
+    getPlans.mockResolvedValue({
+      data: [
+        {
+          id: 9,
+          group_id: 3,
+          name: 'Professional',
+          description: '',
+          rate_multiplier: 1.25,
+          price: 29.9,
+          validity_days: 30,
+          validity_unit: 'days',
+          features: [],
+          for_sale: true,
+          sort_order: 1
+        }
+      ]
+    })
   })
 
   it('submits only checked fields for selected redeem codes', async () => {
@@ -183,5 +218,35 @@ describe('admin RedeemView batch update', () => {
       notes: 'maintenance'
     })
     expect(showSuccess).toHaveBeenCalledWith('admin.redeem.batchUpdateSuccess')
+  })
+
+  it('generates subscription codes from a selected plan', async () => {
+    const wrapper = mount(RedeemView, {
+      attachTo: document.body,
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          Select: SelectStub,
+          Icon: true,
+          Teleport: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-test="generate-codes-open"]').trigger('click')
+    await wrapper.get('[data-test="generate-code-type"]').setValue('subscription')
+    await flushPromises()
+    await wrapper.get('[data-test="subscription-plan-select"]').setValue('9')
+    await wrapper.get('[data-test="generate-codes-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(generateRedeemCodes).toHaveBeenCalledWith(1, 'subscription', 10, 9, undefined)
   })
 })

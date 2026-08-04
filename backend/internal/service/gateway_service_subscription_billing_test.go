@@ -7,9 +7,9 @@ import (
 )
 
 // TestBuildUsageBillingCommand_SubscriptionAppliesRateMultiplier locks in the fix
-// that subscription-mode billing honours the group (and any user-specific) rate
-// multiplier — i.e. cmd.SubscriptionCost tracks ActualCost (= TotalCost *
-// RateMultiplier), not raw TotalCost.
+// that subscription-mode billing honours the plan snapshot multiplier — i.e.
+// cmd.SubscriptionCost tracks ActualCost (= TotalCost * RateMultiplier), not
+// raw TotalCost.
 func TestBuildUsageBillingCommand_SubscriptionAppliesRateMultiplier(t *testing.T) {
 	t.Parallel()
 

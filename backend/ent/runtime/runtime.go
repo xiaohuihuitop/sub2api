@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/batchimageevent"
 	"github.com/Wei-Shaw/sub2api/ent/batchimageitem"
 	"github.com/Wei-Shaw/sub2api/ent/batchimagejob"
+	"github.com/Wei-Shaw/sub2api/ent/billingprofile"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -602,6 +603,69 @@ func init() {
 	batchimagejob.DefaultUpdatedAt = batchimagejobDescUpdatedAt.Default.(func() time.Time)
 	// batchimagejob.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	batchimagejob.UpdateDefaultUpdatedAt = batchimagejobDescUpdatedAt.UpdateDefault.(func() time.Time)
+	billingprofileMixin := schema.BillingProfile{}.Mixin()
+	billingprofileMixinFields0 := billingprofileMixin[0].Fields()
+	_ = billingprofileMixinFields0
+	billingprofileFields := schema.BillingProfile{}.Fields()
+	_ = billingprofileFields
+	// billingprofileDescCreatedAt is the schema descriptor for created_at field.
+	billingprofileDescCreatedAt := billingprofileMixinFields0[0].Descriptor()
+	// billingprofile.DefaultCreatedAt holds the default value on creation for the created_at field.
+	billingprofile.DefaultCreatedAt = billingprofileDescCreatedAt.Default.(func() time.Time)
+	// billingprofileDescUpdatedAt is the schema descriptor for updated_at field.
+	billingprofileDescUpdatedAt := billingprofileMixinFields0[1].Descriptor()
+	// billingprofile.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	billingprofile.DefaultUpdatedAt = billingprofileDescUpdatedAt.Default.(func() time.Time)
+	// billingprofile.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	billingprofile.UpdateDefaultUpdatedAt = billingprofileDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// billingprofileDescBalanceRateMultiplier is the schema descriptor for balance_rate_multiplier field.
+	billingprofileDescBalanceRateMultiplier := billingprofileFields[1].Descriptor()
+	// billingprofile.DefaultBalanceRateMultiplier holds the default value on creation for the balance_rate_multiplier field.
+	billingprofile.DefaultBalanceRateMultiplier = billingprofileDescBalanceRateMultiplier.Default.(float64)
+	// billingprofileDescPeakRateEnabled is the schema descriptor for peak_rate_enabled field.
+	billingprofileDescPeakRateEnabled := billingprofileFields[2].Descriptor()
+	// billingprofile.DefaultPeakRateEnabled holds the default value on creation for the peak_rate_enabled field.
+	billingprofile.DefaultPeakRateEnabled = billingprofileDescPeakRateEnabled.Default.(bool)
+	// billingprofileDescPeakStart is the schema descriptor for peak_start field.
+	billingprofileDescPeakStart := billingprofileFields[3].Descriptor()
+	// billingprofile.DefaultPeakStart holds the default value on creation for the peak_start field.
+	billingprofile.DefaultPeakStart = billingprofileDescPeakStart.Default.(string)
+	// billingprofile.PeakStartValidator is a validator for the "peak_start" field. It is called by the builders before save.
+	billingprofile.PeakStartValidator = billingprofileDescPeakStart.Validators[0].(func(string) error)
+	// billingprofileDescPeakEnd is the schema descriptor for peak_end field.
+	billingprofileDescPeakEnd := billingprofileFields[4].Descriptor()
+	// billingprofile.DefaultPeakEnd holds the default value on creation for the peak_end field.
+	billingprofile.DefaultPeakEnd = billingprofileDescPeakEnd.Default.(string)
+	// billingprofile.PeakEndValidator is a validator for the "peak_end" field. It is called by the builders before save.
+	billingprofile.PeakEndValidator = billingprofileDescPeakEnd.Validators[0].(func(string) error)
+	// billingprofileDescPeakRateMultiplier is the schema descriptor for peak_rate_multiplier field.
+	billingprofileDescPeakRateMultiplier := billingprofileFields[5].Descriptor()
+	// billingprofile.DefaultPeakRateMultiplier holds the default value on creation for the peak_rate_multiplier field.
+	billingprofile.DefaultPeakRateMultiplier = billingprofileDescPeakRateMultiplier.Default.(float64)
+	// billingprofileDescImageRateIndependent is the schema descriptor for image_rate_independent field.
+	billingprofileDescImageRateIndependent := billingprofileFields[6].Descriptor()
+	// billingprofile.DefaultImageRateIndependent holds the default value on creation for the image_rate_independent field.
+	billingprofile.DefaultImageRateIndependent = billingprofileDescImageRateIndependent.Default.(bool)
+	// billingprofileDescImageRateMultiplier is the schema descriptor for image_rate_multiplier field.
+	billingprofileDescImageRateMultiplier := billingprofileFields[7].Descriptor()
+	// billingprofile.DefaultImageRateMultiplier holds the default value on creation for the image_rate_multiplier field.
+	billingprofile.DefaultImageRateMultiplier = billingprofileDescImageRateMultiplier.Default.(float64)
+	// billingprofileDescBatchImageDiscountMultiplier is the schema descriptor for batch_image_discount_multiplier field.
+	billingprofileDescBatchImageDiscountMultiplier := billingprofileFields[11].Descriptor()
+	// billingprofile.DefaultBatchImageDiscountMultiplier holds the default value on creation for the batch_image_discount_multiplier field.
+	billingprofile.DefaultBatchImageDiscountMultiplier = billingprofileDescBatchImageDiscountMultiplier.Default.(float64)
+	// billingprofileDescBatchImageHoldMultiplier is the schema descriptor for batch_image_hold_multiplier field.
+	billingprofileDescBatchImageHoldMultiplier := billingprofileFields[12].Descriptor()
+	// billingprofile.DefaultBatchImageHoldMultiplier holds the default value on creation for the batch_image_hold_multiplier field.
+	billingprofile.DefaultBatchImageHoldMultiplier = billingprofileDescBatchImageHoldMultiplier.Default.(float64)
+	// billingprofileDescVideoRateIndependent is the schema descriptor for video_rate_independent field.
+	billingprofileDescVideoRateIndependent := billingprofileFields[13].Descriptor()
+	// billingprofile.DefaultVideoRateIndependent holds the default value on creation for the video_rate_independent field.
+	billingprofile.DefaultVideoRateIndependent = billingprofileDescVideoRateIndependent.Default.(bool)
+	// billingprofileDescVideoRateMultiplier is the schema descriptor for video_rate_multiplier field.
+	billingprofileDescVideoRateMultiplier := billingprofileFields[14].Descriptor()
+	// billingprofile.DefaultVideoRateMultiplier holds the default value on creation for the video_rate_multiplier field.
+	billingprofile.DefaultVideoRateMultiplier = billingprofileDescVideoRateMultiplier.Default.(float64)
 	channelmonitorMixin := schema.ChannelMonitor{}.Mixin()
 	channelmonitorMixinFields0 := channelmonitorMixin[0].Fields()
 	_ = channelmonitorMixinFields0
@@ -1715,8 +1779,18 @@ func init() {
 	redeemcodeDescCreatedAt := redeemcodeFields[7].Descriptor()
 	// redeemcode.DefaultCreatedAt holds the default value on creation for the created_at field.
 	redeemcode.DefaultCreatedAt = redeemcodeDescCreatedAt.Default.(func() time.Time)
+	// redeemcodeDescPlanNameSnapshot is the schema descriptor for plan_name_snapshot field.
+	redeemcodeDescPlanNameSnapshot := redeemcodeFields[11].Descriptor()
+	// redeemcode.DefaultPlanNameSnapshot holds the default value on creation for the plan_name_snapshot field.
+	redeemcode.DefaultPlanNameSnapshot = redeemcodeDescPlanNameSnapshot.Default.(string)
+	// redeemcode.PlanNameSnapshotValidator is a validator for the "plan_name_snapshot" field. It is called by the builders before save.
+	redeemcode.PlanNameSnapshotValidator = redeemcodeDescPlanNameSnapshot.Validators[0].(func(string) error)
+	// redeemcodeDescRateMultiplierSnapshot is the schema descriptor for rate_multiplier_snapshot field.
+	redeemcodeDescRateMultiplierSnapshot := redeemcodeFields[15].Descriptor()
+	// redeemcode.DefaultRateMultiplierSnapshot holds the default value on creation for the rate_multiplier_snapshot field.
+	redeemcode.DefaultRateMultiplierSnapshot = redeemcodeDescRateMultiplierSnapshot.Default.(float64)
 	// redeemcodeDescValidityDays is the schema descriptor for validity_days field.
-	redeemcodeDescValidityDays := redeemcodeFields[10].Descriptor()
+	redeemcodeDescValidityDays := redeemcodeFields[16].Descriptor()
 	// redeemcode.DefaultValidityDays holds the default value on creation for the validity_days field.
 	redeemcode.DefaultValidityDays = redeemcodeDescValidityDays.Default.(int)
 	securitysecretMixin := schema.SecuritySecret{}.Mixin()
@@ -1840,12 +1914,16 @@ func init() {
 	subscriptionplanDescSortOrder := subscriptionplanFields[11].Descriptor()
 	// subscriptionplan.DefaultSortOrder holds the default value on creation for the sort_order field.
 	subscriptionplan.DefaultSortOrder = subscriptionplanDescSortOrder.Default.(int)
+	// subscriptionplanDescRateMultiplier is the schema descriptor for rate_multiplier field.
+	subscriptionplanDescRateMultiplier := subscriptionplanFields[15].Descriptor()
+	// subscriptionplan.DefaultRateMultiplier holds the default value on creation for the rate_multiplier field.
+	subscriptionplan.DefaultRateMultiplier = subscriptionplanDescRateMultiplier.Default.(float64)
 	// subscriptionplanDescCreatedAt is the schema descriptor for created_at field.
-	subscriptionplanDescCreatedAt := subscriptionplanFields[12].Descriptor()
+	subscriptionplanDescCreatedAt := subscriptionplanFields[16].Descriptor()
 	// subscriptionplan.DefaultCreatedAt holds the default value on creation for the created_at field.
 	subscriptionplan.DefaultCreatedAt = subscriptionplanDescCreatedAt.Default.(func() time.Time)
 	// subscriptionplanDescUpdatedAt is the schema descriptor for updated_at field.
-	subscriptionplanDescUpdatedAt := subscriptionplanFields[13].Descriptor()
+	subscriptionplanDescUpdatedAt := subscriptionplanFields[17].Descriptor()
 	// subscriptionplan.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	subscriptionplan.DefaultUpdatedAt = subscriptionplanDescUpdatedAt.Default.(func() time.Time)
 	// subscriptionplan.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2406,26 +2484,36 @@ func init() {
 	usersubscription.DefaultUpdatedAt = usersubscriptionDescUpdatedAt.Default.(func() time.Time)
 	// usersubscription.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	usersubscription.UpdateDefaultUpdatedAt = usersubscriptionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// usersubscriptionDescPlanNameSnapshot is the schema descriptor for plan_name_snapshot field.
+	usersubscriptionDescPlanNameSnapshot := usersubscriptionFields[3].Descriptor()
+	// usersubscription.DefaultPlanNameSnapshot holds the default value on creation for the plan_name_snapshot field.
+	usersubscription.DefaultPlanNameSnapshot = usersubscriptionDescPlanNameSnapshot.Default.(string)
+	// usersubscription.PlanNameSnapshotValidator is a validator for the "plan_name_snapshot" field. It is called by the builders before save.
+	usersubscription.PlanNameSnapshotValidator = usersubscriptionDescPlanNameSnapshot.Validators[0].(func(string) error)
+	// usersubscriptionDescRateMultiplierSnapshot is the schema descriptor for rate_multiplier_snapshot field.
+	usersubscriptionDescRateMultiplierSnapshot := usersubscriptionFields[7].Descriptor()
+	// usersubscription.DefaultRateMultiplierSnapshot holds the default value on creation for the rate_multiplier_snapshot field.
+	usersubscription.DefaultRateMultiplierSnapshot = usersubscriptionDescRateMultiplierSnapshot.Default.(float64)
 	// usersubscriptionDescStatus is the schema descriptor for status field.
-	usersubscriptionDescStatus := usersubscriptionFields[4].Descriptor()
+	usersubscriptionDescStatus := usersubscriptionFields[10].Descriptor()
 	// usersubscription.DefaultStatus holds the default value on creation for the status field.
 	usersubscription.DefaultStatus = usersubscriptionDescStatus.Default.(string)
 	// usersubscription.StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	usersubscription.StatusValidator = usersubscriptionDescStatus.Validators[0].(func(string) error)
 	// usersubscriptionDescDailyUsageUsd is the schema descriptor for daily_usage_usd field.
-	usersubscriptionDescDailyUsageUsd := usersubscriptionFields[8].Descriptor()
+	usersubscriptionDescDailyUsageUsd := usersubscriptionFields[14].Descriptor()
 	// usersubscription.DefaultDailyUsageUsd holds the default value on creation for the daily_usage_usd field.
 	usersubscription.DefaultDailyUsageUsd = usersubscriptionDescDailyUsageUsd.Default.(float64)
 	// usersubscriptionDescWeeklyUsageUsd is the schema descriptor for weekly_usage_usd field.
-	usersubscriptionDescWeeklyUsageUsd := usersubscriptionFields[9].Descriptor()
+	usersubscriptionDescWeeklyUsageUsd := usersubscriptionFields[15].Descriptor()
 	// usersubscription.DefaultWeeklyUsageUsd holds the default value on creation for the weekly_usage_usd field.
 	usersubscription.DefaultWeeklyUsageUsd = usersubscriptionDescWeeklyUsageUsd.Default.(float64)
 	// usersubscriptionDescMonthlyUsageUsd is the schema descriptor for monthly_usage_usd field.
-	usersubscriptionDescMonthlyUsageUsd := usersubscriptionFields[10].Descriptor()
+	usersubscriptionDescMonthlyUsageUsd := usersubscriptionFields[16].Descriptor()
 	// usersubscription.DefaultMonthlyUsageUsd holds the default value on creation for the monthly_usage_usd field.
 	usersubscription.DefaultMonthlyUsageUsd = usersubscriptionDescMonthlyUsageUsd.Default.(float64)
 	// usersubscriptionDescAssignedAt is the schema descriptor for assigned_at field.
-	usersubscriptionDescAssignedAt := usersubscriptionFields[12].Descriptor()
+	usersubscriptionDescAssignedAt := usersubscriptionFields[18].Descriptor()
 	// usersubscription.DefaultAssignedAt holds the default value on creation for the assigned_at field.
 	usersubscription.DefaultAssignedAt = usersubscriptionDescAssignedAt.Default.(func() time.Time)
 }

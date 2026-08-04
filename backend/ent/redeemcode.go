@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
@@ -39,6 +40,18 @@ type RedeemCode struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID *int64 `json:"group_id,omitempty"`
+	// SubscriptionPlanID holds the value of the "subscription_plan_id" field.
+	SubscriptionPlanID *int64 `json:"subscription_plan_id,omitempty"`
+	// PlanNameSnapshot holds the value of the "plan_name_snapshot" field.
+	PlanNameSnapshot string `json:"plan_name_snapshot,omitempty"`
+	// DailyLimitUsdSnapshot holds the value of the "daily_limit_usd_snapshot" field.
+	DailyLimitUsdSnapshot *float64 `json:"daily_limit_usd_snapshot,omitempty"`
+	// WeeklyLimitUsdSnapshot holds the value of the "weekly_limit_usd_snapshot" field.
+	WeeklyLimitUsdSnapshot *float64 `json:"weekly_limit_usd_snapshot,omitempty"`
+	// MonthlyLimitUsdSnapshot holds the value of the "monthly_limit_usd_snapshot" field.
+	MonthlyLimitUsdSnapshot *float64 `json:"monthly_limit_usd_snapshot,omitempty"`
+	// RateMultiplierSnapshot holds the value of the "rate_multiplier_snapshot" field.
+	RateMultiplierSnapshot float64 `json:"rate_multiplier_snapshot,omitempty"`
 	// ValidityDays holds the value of the "validity_days" field.
 	ValidityDays int `json:"validity_days,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -53,9 +66,11 @@ type RedeemCodeEdges struct {
 	User *User `json:"user,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
+	// SubscriptionPlan holds the value of the subscription_plan edge.
+	SubscriptionPlan *SubscriptionPlan `json:"subscription_plan,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -80,16 +95,27 @@ func (e RedeemCodeEdges) GroupOrErr() (*Group, error) {
 	return nil, &NotLoadedError{edge: "group"}
 }
 
+// SubscriptionPlanOrErr returns the SubscriptionPlan value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e RedeemCodeEdges) SubscriptionPlanOrErr() (*SubscriptionPlan, error) {
+	if e.SubscriptionPlan != nil {
+		return e.SubscriptionPlan, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: subscriptionplan.Label}
+	}
+	return nil, &NotLoadedError{edge: "subscription_plan"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*RedeemCode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case redeemcode.FieldValue:
+		case redeemcode.FieldValue, redeemcode.FieldDailyLimitUsdSnapshot, redeemcode.FieldWeeklyLimitUsdSnapshot, redeemcode.FieldMonthlyLimitUsdSnapshot, redeemcode.FieldRateMultiplierSnapshot:
 			values[i] = new(sql.NullFloat64)
-		case redeemcode.FieldID, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldValidityDays:
+		case redeemcode.FieldID, redeemcode.FieldUsedBy, redeemcode.FieldGroupID, redeemcode.FieldSubscriptionPlanID, redeemcode.FieldValidityDays:
 			values[i] = new(sql.NullInt64)
-		case redeemcode.FieldCode, redeemcode.FieldType, redeemcode.FieldStatus, redeemcode.FieldNotes:
+		case redeemcode.FieldCode, redeemcode.FieldType, redeemcode.FieldStatus, redeemcode.FieldNotes, redeemcode.FieldPlanNameSnapshot:
 			values[i] = new(sql.NullString)
 		case redeemcode.FieldUsedAt, redeemcode.FieldCreatedAt, redeemcode.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -179,6 +205,46 @@ func (_m *RedeemCode) assignValues(columns []string, values []any) error {
 				_m.GroupID = new(int64)
 				*_m.GroupID = value.Int64
 			}
+		case redeemcode.FieldSubscriptionPlanID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field subscription_plan_id", values[i])
+			} else if value.Valid {
+				_m.SubscriptionPlanID = new(int64)
+				*_m.SubscriptionPlanID = value.Int64
+			}
+		case redeemcode.FieldPlanNameSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field plan_name_snapshot", values[i])
+			} else if value.Valid {
+				_m.PlanNameSnapshot = value.String
+			}
+		case redeemcode.FieldDailyLimitUsdSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field daily_limit_usd_snapshot", values[i])
+			} else if value.Valid {
+				_m.DailyLimitUsdSnapshot = new(float64)
+				*_m.DailyLimitUsdSnapshot = value.Float64
+			}
+		case redeemcode.FieldWeeklyLimitUsdSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field weekly_limit_usd_snapshot", values[i])
+			} else if value.Valid {
+				_m.WeeklyLimitUsdSnapshot = new(float64)
+				*_m.WeeklyLimitUsdSnapshot = value.Float64
+			}
+		case redeemcode.FieldMonthlyLimitUsdSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field monthly_limit_usd_snapshot", values[i])
+			} else if value.Valid {
+				_m.MonthlyLimitUsdSnapshot = new(float64)
+				*_m.MonthlyLimitUsdSnapshot = value.Float64
+			}
+		case redeemcode.FieldRateMultiplierSnapshot:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier_snapshot", values[i])
+			} else if value.Valid {
+				_m.RateMultiplierSnapshot = value.Float64
+			}
 		case redeemcode.FieldValidityDays:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field validity_days", values[i])
@@ -206,6 +272,11 @@ func (_m *RedeemCode) QueryUser() *UserQuery {
 // QueryGroup queries the "group" edge of the RedeemCode entity.
 func (_m *RedeemCode) QueryGroup() *GroupQuery {
 	return NewRedeemCodeClient(_m.config).QueryGroup(_m)
+}
+
+// QuerySubscriptionPlan queries the "subscription_plan" edge of the RedeemCode entity.
+func (_m *RedeemCode) QuerySubscriptionPlan() *SubscriptionPlanQuery {
+	return NewRedeemCodeClient(_m.config).QuerySubscriptionPlan(_m)
 }
 
 // Update returns a builder for updating this RedeemCode.
@@ -270,6 +341,32 @@ func (_m *RedeemCode) String() string {
 		builder.WriteString("group_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	if v := _m.SubscriptionPlanID; v != nil {
+		builder.WriteString("subscription_plan_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("plan_name_snapshot=")
+	builder.WriteString(_m.PlanNameSnapshot)
+	builder.WriteString(", ")
+	if v := _m.DailyLimitUsdSnapshot; v != nil {
+		builder.WriteString("daily_limit_usd_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.WeeklyLimitUsdSnapshot; v != nil {
+		builder.WriteString("weekly_limit_usd_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MonthlyLimitUsdSnapshot; v != nil {
+		builder.WriteString("monthly_limit_usd_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplierSnapshot))
 	builder.WriteString(", ")
 	builder.WriteString("validity_days=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ValidityDays))

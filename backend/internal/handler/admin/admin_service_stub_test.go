@@ -778,6 +778,14 @@ func (s *stubAdminService) ReplaceUserGroup(ctx context.Context, userID, oldGrou
 	return &service.ReplaceUserGroupResult{MigratedKeys: 0}, nil
 }
 
+func (s *stubAdminService) GetGroupBillingProfile(_ context.Context, groupID int64) (*service.BillingProfile, error) {
+	return &service.BillingProfile{GroupID: groupID, BalanceRateMultiplier: 1}, nil
+}
+
+func (s *stubAdminService) UpdateGroupBillingProfile(_ context.Context, groupID int64, input *service.UpdateBillingProfileInput) (*service.BillingProfile, error) {
+	return &service.BillingProfile{GroupID: groupID, BalanceRateMultiplier: input.BalanceRateMultiplier}, nil
+}
+
 func (s *stubAdminService) RevertAccountProxyFallback(ctx context.Context, id int64) error {
 	return nil
 }

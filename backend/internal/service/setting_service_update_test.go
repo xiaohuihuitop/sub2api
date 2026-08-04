@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"testing"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -186,6 +187,12 @@ type defaultSubGroupReaderStub struct {
 	calls []int64
 }
 
+type defaultSubPlanReaderStub struct {
+	byID  map[int64]*dbent.SubscriptionPlan
+	errBy map[int64]error
+	calls []int64
+}
+
 func TestSettingService_AffiliateAdminRechargeSetting(t *testing.T) {
 	t.Run("missing value defaults to disabled", func(t *testing.T) {
 		svc := NewSettingService(&settingGetAllRepoStub{values: map[string]string{}}, &config.Config{})
@@ -226,6 +233,17 @@ func (s *defaultSubGroupReaderStub) GetByID(ctx context.Context, id int64) (*Gro
 		return g, nil
 	}
 	return nil, ErrGroupNotFound
+}
+
+func (s *defaultSubPlanReaderStub) GetPlan(ctx context.Context, id int64) (*dbent.SubscriptionPlan, error) {
+	s.calls = append(s.calls, id)
+	if err, ok := s.errBy[id]; ok {
+		return nil, err
+	}
+	if plan, ok := s.byID[id]; ok {
+		return plan, nil
+	}
+	return nil, errors.New("plan not found")
 }
 
 func TestSettingService_UpdateSettings_PersistsCompactHomeEnabled(t *testing.T) {
@@ -345,6 +363,24 @@ func TestSettingService_UpdateSettings_DefaultSubscriptions_RejectsDuplicateGrou
 	require.Nil(t, repo.updates)
 }
 
+func TestSettingService_UpdateSettings_DefaultSubscriptions_RejectsUnknownPlan(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	planReader := &defaultSubPlanReaderStub{
+		errBy: map[int64]error{21: errors.New("plan not found")},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+	svc.SetDefaultSubscriptionPlanReader(planReader)
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		DefaultSubscriptions: []DefaultSubscriptionSetting{{PlanID: 21}},
+	})
+
+	require.Error(t, err)
+	require.Equal(t, "DEFAULT_SUBSCRIPTION_PLAN_INVALID", infraerrors.Reason(err))
+	require.Equal(t, []int64{21}, planReader.calls)
+	require.Nil(t, repo.updates)
+}
+
 func TestSettingService_UpdateSettings_RegistrationEmailSuffixWhitelist_Normalized(t *testing.T) {
 	repo := &settingUpdateRepoStub{}
 	svc := NewSettingService(repo, &config.Config{})
@@ -368,12 +404,28 @@ func TestSettingService_UpdateSettings_RegistrationEmailSuffixWhitelist_Invalid(
 }
 
 func TestParseDefaultSubscriptions_NormalizesValues(t *testing.T) {
-	got := parseDefaultSubscriptions(`[{"group_id":11,"validity_days":30},{"group_id":11,"validity_days":60},{"group_id":0,"validity_days":10},{"group_id":12,"validity_days":99999}]`)
+	got := parseDefaultSubscriptions(`[{"plan_id":21},{"group_id":11,"validity_days":30},{"group_id":11,"validity_days":60},{"group_id":0,"validity_days":10},{"group_id":12,"validity_days":99999}]`)
 	require.Equal(t, []DefaultSubscriptionSetting{
+		{PlanID: 21},
 		{GroupID: 11, ValidityDays: 30},
 		{GroupID: 11, ValidityDays: 60},
 		{GroupID: 12, ValidityDays: MaxValidityDays},
 	}, got)
+}
+
+func TestSettingService_RejectsDuplicateDefaultSubscriptionPlan(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		DefaultSubscriptions: []DefaultSubscriptionSetting{
+			{PlanID: 21},
+			{PlanID: 21},
+		},
+	})
+
+	require.Error(t, err)
+	require.Equal(t, "DEFAULT_SUBSCRIPTION_PLAN_DUPLICATE", infraerrors.Reason(err))
 }
 
 func TestSettingService_UpdateSettings_TablePreferences(t *testing.T) {

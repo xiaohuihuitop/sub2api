@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-import type { AdminUser } from '@/types'
+import type { AdminGroup, AdminUser } from '@/types'
 import UsersView from '../UsersView.vue'
 
 const {
@@ -98,6 +98,7 @@ const DataTableStub = {
       </template>
       <div v-for="row in data" :key="row.id">
         <slot name="cell-last_used_at" :value="row.last_used_at" :row="row" />
+        <slot name="cell-groups" :row="row" />
       </div>
     </div>
   `
@@ -118,6 +119,16 @@ const BulkEditUserModalStub = {
     </div>
   `
 }
+
+const createAdminGroup = (overrides: Partial<AdminGroup> = {}): AdminGroup => ({
+  id: 7,
+  name: 'Legacy subscription routing group',
+  status: 'active',
+  is_exclusive: true,
+  subscription_type: 'subscription',
+  platform: 'openai',
+  ...overrides
+} as AdminGroup)
 
 describe('admin UsersView', () => {
   beforeEach(() => {
@@ -368,5 +379,52 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="row-order"]').text()).toBe('refreshed-page-two@example.com')
     expect(wrapper.find('[data-test="bulk-edit-limits"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="selected-keys"]').text()).toBe('')
+  })
+
+  it('shows an authorized active routing group regardless of its legacy subscription type', async () => {
+    localStorage.setItem('user-column-settings-version', '3')
+    localStorage.setItem('user-hidden-columns', JSON.stringify([]))
+    listUsers.mockResolvedValue({
+      items: [createAdminUser({ allowed_groups: [7] })],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+    getAllGroups.mockResolvedValue([createAdminGroup()])
+
+    const wrapper = mount(UsersView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          EmptyState: true,
+          GroupBadge: true,
+          Select: true,
+          UserAttributesConfigModal: true,
+          UserConcurrencyCell: true,
+          UserCreateModal: true,
+          UserEditModal: true,
+          BulkEditUserModal: BulkEditUserModalStub,
+          UserPlatformQuotaModal: true,
+          UserApiKeysModal: true,
+          UserAllowedGroupsModal: true,
+          UserBalanceModal: true,
+          UserBalanceHistoryModal: true,
+          GroupReplaceModal: true,
+          Icon: true,
+          Teleport: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Legacy subscription routing group')
   })
 })

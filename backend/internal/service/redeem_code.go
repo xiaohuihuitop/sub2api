@@ -18,8 +18,14 @@ type RedeemCode struct {
 	CreatedAt time.Time
 	ExpiresAt *time.Time
 
-	GroupID      *int64
-	ValidityDays int
+	GroupID                 *int64
+	SubscriptionPlanID      *int64
+	PlanNameSnapshot        string
+	DailyLimitUSDSnapshot   *float64
+	WeeklyLimitUSDSnapshot  *float64
+	MonthlyLimitUSDSnapshot *float64
+	RateMultiplierSnapshot  float64
+	ValidityDays            int
 
 	User  *User
 	Group *Group

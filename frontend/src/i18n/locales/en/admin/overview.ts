@@ -937,6 +937,7 @@ export default {
       unsavedChanges: 'Unsaved changes',
       revertChanges: 'Revert',
       userInfo: 'User Info',
+      balanceBilling: 'Balance billing',
       platforms: {
         all: 'All Platforms',
         anthropic: 'Anthropic',

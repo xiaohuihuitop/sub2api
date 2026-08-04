@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -68,24 +69,56 @@ func validatePlanPatch(req UpdatePlanRequest) error {
 	if req.OriginalPrice != nil && *req.OriginalPrice < 0 {
 		return infraerrors.BadRequest("PLAN_ORIGINAL_PRICE_INVALID", "original price must be >= 0")
 	}
+	return validatePlanBillingTerms(req.DailyLimitUSD, req.WeeklyLimitUSD, req.MonthlyLimitUSD, req.RateMultiplier)
+}
+
+func validatePlanBillingTerms(daily, weekly, monthly, rateMultiplier *float64) error {
+	for _, term := range []struct {
+		name  string
+		value *float64
+	}{
+		{"daily limit", daily},
+		{"weekly limit", weekly},
+		{"monthly limit", monthly},
+	} {
+		if err := validateNonNegativePlanValue(term.name, term.value); err != nil {
+			return err
+		}
+	}
+	return validateNonNegativePlanValue("rate multiplier", rateMultiplier)
+}
+
+func validateNonNegativePlanValue(name string, value *float64) error {
+	if value == nil {
+		return nil
+	}
+	if math.IsNaN(*value) || math.IsInf(*value, 0) || *value < 0 {
+		return infraerrors.BadRequest("PLAN_BILLING_TERM_INVALID", name+" must be a finite value >= 0")
+	}
 	return nil
+}
+
+func normalizePlanLimit(value *float64) *float64 {
+	if value == nil || *value == 0 {
+		return nil
+	}
+	return value
+}
+
+func planRateMultiplier(value *float64) float64 {
+	if value == nil {
+		return 1
+	}
+	return *value
 }
 
 // --- Plan CRUD ---
 
 // PlanGroupInfo holds the group details needed for subscription plan display.
 type PlanGroupInfo struct {
-	Platform           string   `json:"platform"`
-	Name               string   `json:"name"`
-	RateMultiplier     float64  `json:"rate_multiplier"`
-	PeakRateEnabled    bool     `json:"peak_rate_enabled"`
-	PeakStart          string   `json:"peak_start"`
-	PeakEnd            string   `json:"peak_end"`
-	PeakRateMultiplier float64  `json:"peak_rate_multiplier"`
-	DailyLimitUSD      *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD     *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD    *float64 `json:"monthly_limit_usd"`
-	ModelScopes        []string `json:"supported_model_scopes"`
+	Platform    string   `json:"platform"`
+	Name        string   `json:"name"`
+	ModelScopes []string `json:"supported_model_scopes"`
 }
 
 // GetGroupInfoMap returns a map of group_id → PlanGroupInfo for the given plans.
@@ -108,17 +141,9 @@ func (s *PaymentConfigService) GetGroupInfoMap(ctx context.Context, plans []*dbe
 	m := make(map[int64]PlanGroupInfo, len(groups))
 	for _, g := range groups {
 		m[int64(g.ID)] = PlanGroupInfo{
-			Platform:           g.Platform,
-			Name:               g.Name,
-			RateMultiplier:     g.RateMultiplier,
-			PeakRateEnabled:    g.PeakRateEnabled,
-			PeakStart:          g.PeakStart,
-			PeakEnd:            g.PeakEnd,
-			PeakRateMultiplier: g.PeakRateMultiplier,
-			DailyLimitUSD:      g.DailyLimitUsd,
-			WeeklyLimitUSD:     g.WeeklyLimitUsd,
-			MonthlyLimitUSD:    g.MonthlyLimitUsd,
-			ModelScopes:        g.SupportedModelScopes,
+			Platform:    g.Platform,
+			Name:        g.Name,
+			ModelScopes: g.SupportedModelScopes,
 		}
 	}
 	return m
@@ -136,6 +161,9 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 	if err := validatePlanRequired(req.Name, req.GroupID, req.Price, req.ValidityDays, req.ValidityUnit, req.OriginalPrice); err != nil {
 		return nil, err
 	}
+	if err := validatePlanBillingTerms(req.DailyLimitUSD, req.WeeklyLimitUSD, req.MonthlyLimitUSD, req.RateMultiplier); err != nil {
+		return nil, err
+	}
 	currency, err := normalizePlanCurrency(req.Currency)
 	if err != nil {
 		return nil, err
@@ -144,9 +172,19 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 		SetGroupID(req.GroupID).SetName(req.Name).SetDescription(req.Description).
 		SetPrice(req.Price).SetCurrency(currency).SetValidityDays(req.ValidityDays).SetValidityUnit(req.ValidityUnit).
 		SetFeatures(req.Features).SetProductName(req.ProductName).
-		SetForSale(req.ForSale).SetSortOrder(req.SortOrder)
+		SetForSale(req.ForSale).SetSortOrder(req.SortOrder).
+		SetRateMultiplier(planRateMultiplier(req.RateMultiplier))
 	if req.OriginalPrice != nil {
 		b.SetOriginalPrice(*req.OriginalPrice)
+	}
+	if limit := normalizePlanLimit(req.DailyLimitUSD); limit != nil {
+		b.SetDailyLimitUsd(*limit)
+	}
+	if limit := normalizePlanLimit(req.WeeklyLimitUSD); limit != nil {
+		b.SetWeeklyLimitUsd(*limit)
+	}
+	if limit := normalizePlanLimit(req.MonthlyLimitUSD); limit != nil {
+		b.SetMonthlyLimitUsd(*limit)
 	}
 	return b.Save(ctx)
 }
@@ -199,7 +237,43 @@ func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req Upd
 	if req.SortOrder != nil {
 		u.SetSortOrder(*req.SortOrder)
 	}
+	if req.RateMultiplier != nil {
+		u.SetRateMultiplier(*req.RateMultiplier)
+	}
+	if req.DailyLimitUSD != nil {
+		setPlanDailyLimit(u, req.DailyLimitUSD)
+	}
+	if req.WeeklyLimitUSD != nil {
+		setPlanWeeklyLimit(u, req.WeeklyLimitUSD)
+	}
+	if req.MonthlyLimitUSD != nil {
+		setPlanMonthlyLimit(u, req.MonthlyLimitUSD)
+	}
 	return u.Save(ctx)
+}
+
+func setPlanDailyLimit(update *dbent.SubscriptionPlanUpdateOne, limit *float64) {
+	if value := normalizePlanLimit(limit); value != nil {
+		update.SetDailyLimitUsd(*value)
+		return
+	}
+	update.ClearDailyLimitUsd()
+}
+
+func setPlanWeeklyLimit(update *dbent.SubscriptionPlanUpdateOne, limit *float64) {
+	if value := normalizePlanLimit(limit); value != nil {
+		update.SetWeeklyLimitUsd(*value)
+		return
+	}
+	update.ClearWeeklyLimitUsd()
+}
+
+func setPlanMonthlyLimit(update *dbent.SubscriptionPlanUpdateOne, limit *float64) {
+	if value := normalizePlanLimit(limit); value != nil {
+		update.SetMonthlyLimitUsd(*value)
+		return
+	}
+	update.ClearMonthlyLimitUsd()
 }
 
 func (s *PaymentConfigService) DeletePlan(ctx context.Context, id int64) error {
