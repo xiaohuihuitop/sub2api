@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -19,19 +20,19 @@ import (
 type platformAssetRequestModelReader func(*gin.Context) (string, error)
 type platformAssetErrorWriter func(*gin.Context, int, string, string)
 
+type PlatformAssetRequestAuthorizer interface {
+	Resolve(context.Context, *service.APIKey, string, string, bool) (*service.PlatformAssetResolution, error)
+}
+
 // NewPlatformAssetAuthorizationMiddleware activates only for API keys with
 // explicit platform permissions. Legacy keys continue through the group-based
 // request path unchanged.
 func NewPlatformAssetAuthorizationMiddleware(
-	apiKeyService *service.APIKeyService,
-	subscriptionService *service.SubscriptionService,
-	resolver service.PlatformModelResolver,
+	authorizer PlatformAssetRequestAuthorizer,
 	cfg *config.Config,
 ) gin.HandlerFunc {
 	return newPlatformAssetAuthorizationMiddleware(
-		apiKeyService,
-		subscriptionService,
-		resolver,
+		authorizer,
 		cfg,
 		platformAssetJSONRequestModel,
 		abortPlatformAssetRequestError,
@@ -42,15 +43,11 @@ func NewPlatformAssetAuthorizationMiddleware(
 // and billing policy to Gemini-native endpoints while preserving Google's error
 // response envelope.
 func NewPlatformAssetAuthorizationGoogleMiddleware(
-	apiKeyService *service.APIKeyService,
-	subscriptionService *service.SubscriptionService,
-	resolver service.PlatformModelResolver,
+	authorizer PlatformAssetRequestAuthorizer,
 	cfg *config.Config,
 ) gin.HandlerFunc {
 	return newPlatformAssetAuthorizationMiddleware(
-		apiKeyService,
-		subscriptionService,
-		resolver,
+		authorizer,
 		cfg,
 		platformAssetGoogleRequestModel,
 		abortPlatformAssetGoogleRequestError,
@@ -58,9 +55,7 @@ func NewPlatformAssetAuthorizationGoogleMiddleware(
 }
 
 func newPlatformAssetAuthorizationMiddleware(
-	apiKeyService *service.APIKeyService,
-	subscriptionService *service.SubscriptionService,
-	resolver service.PlatformModelResolver,
+	authorizer PlatformAssetRequestAuthorizer,
 	cfg *config.Config,
 	readModel platformAssetRequestModelReader,
 	writeError platformAssetErrorWriter,
@@ -81,24 +76,26 @@ func newPlatformAssetAuthorizationMiddleware(
 			return
 		}
 
-		skipBilling := cfg != nil && cfg.RunMode == config.RunModeSimple
-		route, err := apiKeyService.ResolvePlatformAssetRequest(
-			c.Request.Context(),
-			apiKey,
-			resolver,
-			subscriptionService,
-			model,
-			apiKeyBillingRequestEndpoint(c),
-			skipBilling,
+		if authorizer == nil {
+			writeError(c, http.StatusInternalServerError, "PLATFORM_ASSET_RESOLUTION_FAILED", "Failed to resolve platform request")
+			return
+		}
+		resolution, err := authorizer.Resolve(
+			c.Request.Context(), apiKey, model, apiKeyBillingRequestEndpoint(c),
+			cfg != nil && cfg.RunMode == config.RunModeSimple,
 		)
 		if err != nil {
 			abortPlatformAssetResolutionError(c, err, writeError)
 			return
 		}
+		if resolution == nil || resolution.Decision == nil {
+			writeError(c, http.StatusInternalServerError, "PLATFORM_ASSET_RESOLUTION_FAILED", "Failed to resolve platform request")
+			return
+		}
 
-		c.Request = c.Request.WithContext(service.WithGatewayPlatformAssetContext(c.Request.Context(), route))
-		if route.BillingAsset != nil && route.BillingAsset.Subscription != nil {
-			c.Set(string(ContextKeySubscription), route.BillingAsset.Subscription)
+		c.Request = c.Request.WithContext(service.AttachPlatformAssetResolution(c.Request.Context(), resolution))
+		if resolution.Subscription != nil {
+			c.Set(string(ContextKeySubscription), resolution.Subscription)
 		}
 		c.Next()
 	}

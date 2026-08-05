@@ -39,8 +39,9 @@ func RegisterGatewayRoutes(
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
-	platformAssetAuth := middleware.NewPlatformAssetAuthorizationMiddleware(apiKeyService, subscriptionService, platformResolver, cfg)
-	platformAssetGoogleAuth := middleware.NewPlatformAssetAuthorizationGoogleMiddleware(apiKeyService, subscriptionService, platformResolver, cfg)
+	platformAssetAuthorizer := service.NewPlatformAssetProductCoreAdapter(apiKeyService, subscriptionService, platformResolver)
+	platformAssetAuth := middleware.NewPlatformAssetAuthorizationMiddleware(platformAssetAuthorizer, cfg)
+	platformAssetGoogleAuth := middleware.NewPlatformAssetAuthorizationGoogleMiddleware(platformAssetAuthorizer, cfg)
 	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
 

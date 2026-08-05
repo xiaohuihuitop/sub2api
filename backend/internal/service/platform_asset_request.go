@@ -2,10 +2,7 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
@@ -44,62 +41,12 @@ func (s *APIKeyService) ResolvePlatformAssetRequest(
 	if apiKey == nil || !UsesPlatformAssetPermissions(apiKey) {
 		return nil, ErrAPIKeyPlatformForbidden
 	}
-	if resolver == nil {
-		return nil, fmt.Errorf("%w: platform model resolver is required", ErrPlatformInvalid)
-	}
-
-	platform, err := resolver.ResolveModel(ctx, requestedModel)
+	resolution, err := NewPlatformAssetProductCoreAdapter(s, subscriptions, resolver).
+		Resolve(ctx, apiKey, requestedModel, endpoint, skipBilling)
 	if err != nil {
 		return nil, err
 	}
-	if platform == nil || !apiKeyAllowsPlatform(apiKey, platform.PlatformID) {
-		return nil, ErrAPIKeyPlatformForbidden
-	}
-	if !platformSupportsRequestEndpoint(platform, endpoint) {
-		return nil, ErrPlatformEndpointUnsupported
-	}
-
-	asset, err := s.ResolveBillingAssetForRequest(ctx, apiKey, subscriptions, skipBilling)
-	if err != nil {
-		return nil, err
-	}
-	scope := PlatformSchedulingScope{
-		PlatformID:      platform.PlatformID,
-		PlatformCode:    platform.PlatformCode,
-		AccountPlatform: platform.AccountPlatform,
-	}
-	if _, ok := normalizePlatformSchedulingScope(scope); !ok {
-		return nil, fmt.Errorf("%w: resolved platform has no account adapter", ErrPlatformInvalid)
-	}
-
-	return &GatewayPlatformAssetContext{
-		Platform:        cloneResolvedPlatformModel(platform),
-		BillingAsset:    cloneResolvedBillingAsset(asset),
-		SchedulingScope: scope,
-		PricingGroupID:  clonePlatformInt64Pointer(platform.LegacyGroupID),
-	}, nil
-}
-
-func apiKeyAllowsPlatform(apiKey *APIKey, platformID int64) bool {
-	for _, allowedID := range apiKey.AllowedPlatformIDs {
-		if allowedID == platformID {
-			return true
-		}
-	}
-	return false
-}
-
-func platformSupportsRequestEndpoint(platform *ResolvedPlatformModel, endpoint string) bool {
-	capability := billingEndpointCapability(endpoint)
-	if capability == "" || platform == nil || len(platform.EndpointCapabilities) == 0 {
-		return true
-	}
-	for _, configured := range platform.EndpointCapabilities {
-		if strings.EqualFold(strings.TrimSpace(configured), string(capability)) {
-			return true
-		}
-	}
-	return false
+	return gatewayPlatformAssetContextFromDecision(resolution.Decision, resolution.Subscription), nil
 }
 
 func cloneResolvedPlatformModel(value *ResolvedPlatformModel) *ResolvedPlatformModel {
@@ -127,55 +74,6 @@ func cloneResolvedBillingAsset(value *ResolvedBillingAsset) *ResolvedBillingAsse
 	}
 	cloned.Subscription = cloneUserSubscription(value.Subscription)
 	return &cloned
-}
-
-// WithGatewayPlatformAssetContext installs the V2 request route and the
-// related compatibility values. The platform scheduling scope remains the
-// authority for account selection; a pricing group, when present, is only
-// available to legacy model-pricing readers.
-func WithGatewayPlatformAssetContext(ctx context.Context, route *GatewayPlatformAssetContext) context.Context {
-	if ctx == nil || route == nil || route.Platform == nil {
-		return ctx
-	}
-	scope, ok := normalizePlatformSchedulingScope(route.SchedulingScope)
-	if !ok {
-		return ctx
-	}
-	cloned := &GatewayPlatformAssetContext{
-		Platform:        cloneResolvedPlatformModel(route.Platform),
-		BillingAsset:    cloneResolvedBillingAsset(route.BillingAsset),
-		SchedulingScope: scope,
-		PricingGroupID:  clonePlatformInt64Pointer(route.PricingGroupID),
-	}
-	ctx = context.WithValue(ctx, ctxkey.GatewayPlatformAsset, cloned)
-	ctx = WithPlatformSchedulingScope(ctx, scope)
-	ctx = WithResolvedTargetPlatform(ctx, scope.AccountPlatform)
-	if model := strings.TrimSpace(cloned.Platform.UpstreamModel); model != "" {
-		ctx = context.WithValue(ctx, ctxkey.ResolvedUpstreamModel, model)
-	}
-	if model := strings.TrimSpace(cloned.Platform.RequestedModel); model != "" {
-		ctx = context.WithValue(ctx, ctxkey.RequestedPublicModel, model)
-	}
-	return ctx
-}
-
-// GatewayPlatformAssetContextFromContext returns an isolated copy so callers
-// cannot mutate values shared across a request's downstream stages.
-func GatewayPlatformAssetContextFromContext(ctx context.Context) (*GatewayPlatformAssetContext, bool) {
-	if ctx == nil {
-		return nil, false
-	}
-	route, ok := ctx.Value(ctxkey.GatewayPlatformAsset).(*GatewayPlatformAssetContext)
-	if !ok || route == nil || route.Platform == nil {
-		return nil, false
-	}
-	cloned := &GatewayPlatformAssetContext{
-		Platform:        cloneResolvedPlatformModel(route.Platform),
-		BillingAsset:    cloneResolvedBillingAsset(route.BillingAsset),
-		SchedulingScope: route.SchedulingScope,
-		PricingGroupID:  clonePlatformInt64Pointer(route.PricingGroupID),
-	}
-	return cloned, true
 }
 
 // PlatformAssetPricingGroupIDFromContext exposes the optional legacy pricing

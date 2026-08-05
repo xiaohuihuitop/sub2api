@@ -72,7 +72,9 @@ func TestPlatformAssetAuthorizationBuildsExplicitPlatformRouteAndPreservesBody(t
 
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
-	router.Use(NewPlatformAssetAuthorizationMiddleware(apiKeyService, nil, resolver, cfg))
+	router.Use(NewPlatformAssetAuthorizationMiddleware(
+		service.NewPlatformAssetProductCoreAdapter(apiKeyService, nil, resolver), cfg,
+	))
 	router.POST("/v1/chat/completions", func(c *gin.Context) {
 		route, ok := service.GatewayPlatformAssetContextFromContext(c.Request.Context())
 		require.True(t, ok)
@@ -138,7 +140,9 @@ func TestPlatformAssetAuthorizationUsesAuthorizedSubscriptionWithoutLegacyBalanc
 
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
-	router.Use(NewPlatformAssetAuthorizationMiddleware(apiKeyService, subscriptionService, resolver, cfg))
+	router.Use(NewPlatformAssetAuthorizationMiddleware(
+		service.NewPlatformAssetProductCoreAdapter(apiKeyService, subscriptionService, resolver), cfg,
+	))
 	router.POST("/v1/chat/completions", func(c *gin.Context) {
 		subscription, ok := GetSubscriptionFromContext(c)
 		require.True(t, ok)
@@ -186,7 +190,9 @@ func TestGooglePlatformAssetAuthorizationResolvesModelFromPath(t *testing.T) {
 
 	router := gin.New()
 	router.Use(gin.HandlerFunc(APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, cfg)))
-	router.Use(NewPlatformAssetAuthorizationGoogleMiddleware(apiKeyService, nil, resolver, cfg))
+	router.Use(NewPlatformAssetAuthorizationGoogleMiddleware(
+		service.NewPlatformAssetProductCoreAdapter(apiKeyService, nil, resolver), cfg,
+	))
 	router.POST("/v1beta/models/*modelAction", func(c *gin.Context) {
 		route, ok := service.GatewayPlatformAssetContextFromContext(c.Request.Context())
 		require.True(t, ok)
