@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -203,14 +204,74 @@ type UpdatePlanRequest struct {
 // PaymentConfigService manages payment configuration and CRUD for
 // provider instances, channels, and subscription plans.
 type PaymentConfigService struct {
-	entClient     *dbent.Client
-	settingRepo   SettingRepository
-	encryptionKey []byte
+	entClient               *dbent.Client
+	settingRepo             SettingRepository
+	encryptionKey           []byte
+	globalBalanceRateMu     sync.RWMutex
+	globalBalanceRateLoaded bool
+	globalBalanceRateCached float64
 }
 
 // NewPaymentConfigService creates a new PaymentConfigService.
 func NewPaymentConfigService(entClient *dbent.Client, settingRepo SettingRepository, encryptionKey []byte) *PaymentConfigService {
 	return &PaymentConfigService{entClient: entClient, settingRepo: settingRepo, encryptionKey: encryptionKey}
+}
+
+// GetGlobalBalanceRateMultiplier returns the cached global balance multiplier.
+// Missing or invalid persisted values intentionally fall back to the legacy 1x behavior.
+func (s *PaymentConfigService) GetGlobalBalanceRateMultiplier(ctx context.Context) float64 {
+	s.globalBalanceRateMu.RLock()
+	if s.globalBalanceRateLoaded {
+		rate := s.globalBalanceRateCached
+		s.globalBalanceRateMu.RUnlock()
+		return rate
+	}
+	s.globalBalanceRateMu.RUnlock()
+
+	rate := defaultGlobalBalanceRateMultiplier
+	if s.settingRepo != nil {
+		value, err := s.settingRepo.GetValue(ctx, SettingKeyGlobalBalanceRateMultiplier)
+		if err == nil {
+			rate = parseGlobalBalanceRateMultiplier(value)
+		}
+	}
+
+	s.globalBalanceRateMu.Lock()
+	if !s.globalBalanceRateLoaded {
+		s.globalBalanceRateCached = rate
+		s.globalBalanceRateLoaded = true
+	}
+	rate = s.globalBalanceRateCached
+	s.globalBalanceRateMu.Unlock()
+	return rate
+}
+
+// UpdateGlobalBalanceRateMultiplier persists and immediately publishes the
+// multiplier used by balance billing. Subscription snapshots are unaffected.
+func (s *PaymentConfigService) UpdateGlobalBalanceRateMultiplier(ctx context.Context, rate float64) error {
+	if rate < 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
+		return infraerrors.BadRequest("INVALID_GLOBAL_BALANCE_RATE_MULTIPLIER", "global balance rate multiplier must be zero or a positive number")
+	}
+	if s.settingRepo == nil {
+		return fmt.Errorf("global balance rate multiplier: setting repository is not configured")
+	}
+	if err := s.settingRepo.Set(ctx, SettingKeyGlobalBalanceRateMultiplier, strconv.FormatFloat(rate, 'f', -1, 64)); err != nil {
+		return fmt.Errorf("store global balance rate multiplier: %w", err)
+	}
+
+	s.globalBalanceRateMu.Lock()
+	s.globalBalanceRateCached = rate
+	s.globalBalanceRateLoaded = true
+	s.globalBalanceRateMu.Unlock()
+	return nil
+}
+
+func parseGlobalBalanceRateMultiplier(value string) float64 {
+	rate, err := strconv.ParseFloat(value, 64)
+	if err != nil || rate < 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
+		return defaultGlobalBalanceRateMultiplier
+	}
+	return rate
 }
 
 // IsPaymentEnabled returns whether the payment system is enabled.

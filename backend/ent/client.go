@@ -39,6 +39,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
+	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
 	"github.com/Wei-Shaw/sub2api/ent/promocode"
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
@@ -112,6 +114,10 @@ type Client struct {
 	PaymentProviderInstance *PaymentProviderInstanceClient
 	// PendingAuthSession is the client for interacting with the PendingAuthSession builders.
 	PendingAuthSession *PendingAuthSessionClient
+	// Platform is the client for interacting with the Platform builders.
+	Platform *PlatformClient
+	// PlatformModelRule is the client for interacting with the PlatformModelRule builders.
+	PlatformModelRule *PlatformModelRuleClient
 	// PromoCode is the client for interacting with the PromoCode builders.
 	PromoCode *PromoCodeClient
 	// PromoCodeUsage is the client for interacting with the PromoCodeUsage builders.
@@ -179,6 +185,8 @@ func (c *Client) init() {
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
 	c.PendingAuthSession = NewPendingAuthSessionClient(c.config)
+	c.Platform = NewPlatformClient(c.config)
+	c.PlatformModelRule = NewPlatformModelRuleClient(c.config)
 	c.PromoCode = NewPromoCodeClient(c.config)
 	c.PromoCodeUsage = NewPromoCodeUsageClient(c.config)
 	c.Proxy = NewProxyClient(c.config)
@@ -311,6 +319,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
 		PendingAuthSession:            NewPendingAuthSessionClient(cfg),
+		Platform:                      NewPlatformClient(cfg),
+		PlatformModelRule:             NewPlatformModelRuleClient(cfg),
 		PromoCode:                     NewPromoCodeClient(cfg),
 		PromoCodeUsage:                NewPromoCodeUsageClient(cfg),
 		Proxy:                         NewProxyClient(cfg),
@@ -370,6 +380,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
 		PendingAuthSession:            NewPendingAuthSessionClient(cfg),
+		Platform:                      NewPlatformClient(cfg),
+		PlatformModelRule:             NewPlatformModelRuleClient(cfg),
 		PromoCode:                     NewPromoCodeClient(cfg),
 		PromoCodeUsage:                NewPromoCodeUsageClient(cfg),
 		Proxy:                         NewProxyClient(cfg),
@@ -421,11 +433,12 @@ func (c *Client) Use(hooks ...Hook) {
 		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
 		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
 		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
-		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
-		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
-		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.Platform,
+		c.PlatformModelRule, c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode,
+		c.SecuritySecret, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserPlatformQuota,
+		c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -441,11 +454,12 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
 		c.ChannelMonitorRequestTemplate, c.CompositeModelRoute, c.ErrorPassthroughRule,
 		c.Group, c.IdempotencyRecord, c.IdentityAdoptionDecision, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
-		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
-		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
-		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.Platform,
+		c.PlatformModelRule, c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode,
+		c.SecuritySecret, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserPlatformQuota,
+		c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -502,6 +516,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PaymentProviderInstance.mutate(ctx, m)
 	case *PendingAuthSessionMutation:
 		return c.PendingAuthSession.mutate(ctx, m)
+	case *PlatformMutation:
+		return c.Platform.mutate(ctx, m)
+	case *PlatformModelRuleMutation:
+		return c.PlatformModelRule.mutate(ctx, m)
 	case *PromoCodeMutation:
 		return c.PromoCode.mutate(ctx, m)
 	case *PromoCodeUsageMutation:
@@ -679,6 +697,38 @@ func (c *APIKeyClient) QueryGroup(_m *APIKey) *GroupQuery {
 	return query
 }
 
+// QueryPlatforms queries the platforms edge of a APIKey.
+func (c *APIKeyClient) QueryPlatforms(_m *APIKey) *PlatformQuery {
+	query := (&PlatformClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(apikey.Table, apikey.FieldID, id),
+			sqlgraph.To(platform.Table, platform.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, apikey.PlatformsTable, apikey.PlatformsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySubscriptionPlans queries the subscription_plans edge of a APIKey.
+func (c *APIKeyClient) QuerySubscriptionPlans(_m *APIKey) *SubscriptionPlanQuery {
+	query := (&SubscriptionPlanClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(apikey.Table, apikey.FieldID, id),
+			sqlgraph.To(subscriptionplan.Table, subscriptionplan.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, apikey.SubscriptionPlansTable, apikey.SubscriptionPlansPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUsageLogs queries the usage_logs edge of a APIKey.
 func (c *APIKeyClient) QueryUsageLogs(_m *APIKey) *UsageLogQuery {
 	query := (&UsageLogClient{config: c.config}).Query()
@@ -839,6 +889,22 @@ func (c *AccountClient) QueryGroups(_m *Account) *GroupQuery {
 			sqlgraph.From(account.Table, account.FieldID, id),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, false, account.GroupsTable, account.GroupsPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPlatformPool queries the platform_pool edge of a Account.
+func (c *AccountClient) QueryPlatformPool(_m *Account) *PlatformQuery {
+	query := (&PlatformClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(platform.Table, platform.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, account.PlatformPoolTable, account.PlatformPoolColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -4330,6 +4396,368 @@ func (c *PendingAuthSessionClient) mutate(ctx context.Context, m *PendingAuthSes
 	}
 }
 
+// PlatformClient is a client for the Platform schema.
+type PlatformClient struct {
+	config
+}
+
+// NewPlatformClient returns a client for the Platform from the given config.
+func NewPlatformClient(c config) *PlatformClient {
+	return &PlatformClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platform.Hooks(f(g(h())))`.
+func (c *PlatformClient) Use(hooks ...Hook) {
+	c.hooks.Platform = append(c.hooks.Platform, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platform.Intercept(f(g(h())))`.
+func (c *PlatformClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Platform = append(c.inters.Platform, interceptors...)
+}
+
+// Create returns a builder for creating a Platform entity.
+func (c *PlatformClient) Create() *PlatformCreate {
+	mutation := newPlatformMutation(c.config, OpCreate)
+	return &PlatformCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Platform entities.
+func (c *PlatformClient) CreateBulk(builders ...*PlatformCreate) *PlatformCreateBulk {
+	return &PlatformCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformClient) MapCreateBulk(slice any, setFunc func(*PlatformCreate, int)) *PlatformCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformCreateBulk{err: fmt.Errorf("calling to PlatformClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Platform.
+func (c *PlatformClient) Update() *PlatformUpdate {
+	mutation := newPlatformMutation(c.config, OpUpdate)
+	return &PlatformUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformClient) UpdateOne(_m *Platform) *PlatformUpdateOne {
+	mutation := newPlatformMutation(c.config, OpUpdateOne, withPlatform(_m))
+	return &PlatformUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformClient) UpdateOneID(id int64) *PlatformUpdateOne {
+	mutation := newPlatformMutation(c.config, OpUpdateOne, withPlatformID(id))
+	return &PlatformUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Platform.
+func (c *PlatformClient) Delete() *PlatformDelete {
+	mutation := newPlatformMutation(c.config, OpDelete)
+	return &PlatformDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformClient) DeleteOne(_m *Platform) *PlatformDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformClient) DeleteOneID(id int64) *PlatformDeleteOne {
+	builder := c.Delete().Where(platform.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformDeleteOne{builder}
+}
+
+// Query returns a query builder for Platform.
+func (c *PlatformClient) Query() *PlatformQuery {
+	return &PlatformQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatform},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Platform entity by its id.
+func (c *PlatformClient) Get(ctx context.Context, id int64) (*Platform, error) {
+	return c.Query().Where(platform.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformClient) GetX(ctx context.Context, id int64) *Platform {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryLegacyGroup queries the legacy_group edge of a Platform.
+func (c *PlatformClient) QueryLegacyGroup(_m *Platform) *GroupQuery {
+	query := (&GroupClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(platform.Table, platform.FieldID, id),
+			sqlgraph.To(group.Table, group.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, platform.LegacyGroupTable, platform.LegacyGroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryModelRules queries the model_rules edge of a Platform.
+func (c *PlatformClient) QueryModelRules(_m *Platform) *PlatformModelRuleQuery {
+	query := (&PlatformModelRuleClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(platform.Table, platform.FieldID, id),
+			sqlgraph.To(platformmodelrule.Table, platformmodelrule.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, platform.ModelRulesTable, platform.ModelRulesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryAccounts queries the accounts edge of a Platform.
+func (c *PlatformClient) QueryAccounts(_m *Platform) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(platform.Table, platform.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, platform.AccountsTable, platform.AccountsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryAPIKeys queries the api_keys edge of a Platform.
+func (c *PlatformClient) QueryAPIKeys(_m *Platform) *APIKeyQuery {
+	query := (&APIKeyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(platform.Table, platform.FieldID, id),
+			sqlgraph.To(apikey.Table, apikey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, platform.APIKeysTable, platform.APIKeysPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUsageLogs queries the usage_logs edge of a Platform.
+func (c *PlatformClient) QueryUsageLogs(_m *Platform) *UsageLogQuery {
+	query := (&UsageLogClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(platform.Table, platform.FieldID, id),
+			sqlgraph.To(usagelog.Table, usagelog.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, platform.UsageLogsTable, platform.UsageLogsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformClient) Hooks() []Hook {
+	return c.hooks.Platform
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformClient) Interceptors() []Interceptor {
+	return c.inters.Platform
+}
+
+func (c *PlatformClient) mutate(ctx context.Context, m *PlatformMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Platform mutation op: %q", m.Op())
+	}
+}
+
+// PlatformModelRuleClient is a client for the PlatformModelRule schema.
+type PlatformModelRuleClient struct {
+	config
+}
+
+// NewPlatformModelRuleClient returns a client for the PlatformModelRule from the given config.
+func NewPlatformModelRuleClient(c config) *PlatformModelRuleClient {
+	return &PlatformModelRuleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformmodelrule.Hooks(f(g(h())))`.
+func (c *PlatformModelRuleClient) Use(hooks ...Hook) {
+	c.hooks.PlatformModelRule = append(c.hooks.PlatformModelRule, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformmodelrule.Intercept(f(g(h())))`.
+func (c *PlatformModelRuleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformModelRule = append(c.inters.PlatformModelRule, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformModelRule entity.
+func (c *PlatformModelRuleClient) Create() *PlatformModelRuleCreate {
+	mutation := newPlatformModelRuleMutation(c.config, OpCreate)
+	return &PlatformModelRuleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformModelRule entities.
+func (c *PlatformModelRuleClient) CreateBulk(builders ...*PlatformModelRuleCreate) *PlatformModelRuleCreateBulk {
+	return &PlatformModelRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformModelRuleClient) MapCreateBulk(slice any, setFunc func(*PlatformModelRuleCreate, int)) *PlatformModelRuleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformModelRuleCreateBulk{err: fmt.Errorf("calling to PlatformModelRuleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformModelRuleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformModelRuleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformModelRule.
+func (c *PlatformModelRuleClient) Update() *PlatformModelRuleUpdate {
+	mutation := newPlatformModelRuleMutation(c.config, OpUpdate)
+	return &PlatformModelRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformModelRuleClient) UpdateOne(_m *PlatformModelRule) *PlatformModelRuleUpdateOne {
+	mutation := newPlatformModelRuleMutation(c.config, OpUpdateOne, withPlatformModelRule(_m))
+	return &PlatformModelRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformModelRuleClient) UpdateOneID(id int64) *PlatformModelRuleUpdateOne {
+	mutation := newPlatformModelRuleMutation(c.config, OpUpdateOne, withPlatformModelRuleID(id))
+	return &PlatformModelRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformModelRule.
+func (c *PlatformModelRuleClient) Delete() *PlatformModelRuleDelete {
+	mutation := newPlatformModelRuleMutation(c.config, OpDelete)
+	return &PlatformModelRuleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformModelRuleClient) DeleteOne(_m *PlatformModelRule) *PlatformModelRuleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformModelRuleClient) DeleteOneID(id int64) *PlatformModelRuleDeleteOne {
+	builder := c.Delete().Where(platformmodelrule.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformModelRuleDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformModelRule.
+func (c *PlatformModelRuleClient) Query() *PlatformModelRuleQuery {
+	return &PlatformModelRuleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformModelRule},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformModelRule entity by its id.
+func (c *PlatformModelRuleClient) Get(ctx context.Context, id int64) (*PlatformModelRule, error) {
+	return c.Query().Where(platformmodelrule.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformModelRuleClient) GetX(ctx context.Context, id int64) *PlatformModelRule {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPlatform queries the platform edge of a PlatformModelRule.
+func (c *PlatformModelRuleClient) QueryPlatform(_m *PlatformModelRule) *PlatformQuery {
+	query := (&PlatformClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(platformmodelrule.Table, platformmodelrule.FieldID, id),
+			sqlgraph.To(platform.Table, platform.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, platformmodelrule.PlatformTable, platformmodelrule.PlatformColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformModelRuleClient) Hooks() []Hook {
+	return c.hooks.PlatformModelRule
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformModelRuleClient) Interceptors() []Interceptor {
+	return c.inters.PlatformModelRule
+}
+
+func (c *PlatformModelRuleClient) mutate(ctx context.Context, m *PlatformModelRuleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformModelRuleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformModelRuleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformModelRuleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformModelRuleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformModelRule mutation op: %q", m.Op())
+	}
+}
+
 // PromoCodeClient is a client for the PromoCode schema.
 type PromoCodeClient struct {
 	config
@@ -5398,6 +5826,22 @@ func (c *SubscriptionPlanClient) QueryRedeemCodes(_m *SubscriptionPlan) *RedeemC
 	return query
 }
 
+// QueryAPIKeys queries the api_keys edge of a SubscriptionPlan.
+func (c *SubscriptionPlanClient) QueryAPIKeys(_m *SubscriptionPlan) *APIKeyQuery {
+	query := (&APIKeyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(subscriptionplan.Table, subscriptionplan.FieldID, id),
+			sqlgraph.To(apikey.Table, apikey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, subscriptionplan.APIKeysTable, subscriptionplan.APIKeysPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SubscriptionPlanClient) Hooks() []Hook {
 	return c.hooks.SubscriptionPlan
@@ -5870,6 +6314,22 @@ func (c *UsageLogClient) QuerySubscription(_m *UsageLog) *UserSubscriptionQuery 
 			sqlgraph.From(usagelog.Table, usagelog.FieldID, id),
 			sqlgraph.To(usersubscription.Table, usersubscription.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.SubscriptionTable, usagelog.SubscriptionColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPlatform queries the platform edge of a UsageLog.
+func (c *UsageLogClient) QueryPlatform(_m *UsageLog) *PlatformQuery {
+	query := (&PlatformClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(usagelog.Table, usagelog.FieldID, id),
+			sqlgraph.To(platform.Table, platform.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.PlatformTable, usagelog.PlatformColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -7068,10 +7528,10 @@ type (
 		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
 		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
-		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
-		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
-		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
-		UserPlatformQuota, UserSubscription []ent.Hook
+		Platform, PlatformModelRule, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
+		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
+		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
+		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
@@ -7080,10 +7540,10 @@ type (
 		ChannelMonitorHistory, ChannelMonitorRequestTemplate, CompositeModelRoute,
 		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
 		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
-		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
-		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
-		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
-		UserPlatformQuota, UserSubscription []ent.Interceptor
+		Platform, PlatformModelRule, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
+		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
+		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
+		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Interceptor
 	}
 )
 

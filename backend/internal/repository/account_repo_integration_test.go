@@ -803,6 +803,41 @@ func (s *AccountRepoSuite) TestListSchedulableByGroupIDAndPlatform() {
 	s.Require().Equal(a1.ID, accounts[0].ID)
 }
 
+func (s *AccountRepoSuite) TestListSchedulableByPlatformPoolIgnoresLegacyGroups() {
+	poolA := s.client.Platform.Create().
+		SetCode("pool-a").
+		SetName("Pool A").
+		SetAccountPlatform(service.PlatformOpenAI).
+		SetStatus(service.StatusActive).
+		SaveX(s.ctx)
+	poolB := s.client.Platform.Create().
+		SetCode("pool-b").
+		SetName("Pool B").
+		SetAccountPlatform(service.PlatformOpenAI).
+		SetStatus(service.StatusActive).
+		SaveX(s.ctx)
+	legacyGroup := mustCreateGroup(s.T(), s.client, &service.Group{Name: "legacy-link"})
+
+	accountA := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:       "pool-a-account",
+		Platform:   service.PlatformOpenAI,
+		PlatformID: &poolA.ID,
+	})
+	accountB := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:       "pool-b-account",
+		Platform:   service.PlatformOpenAI,
+		PlatformID: &poolB.ID,
+	})
+	mustBindAccountToGroup(s.T(), s.client, accountA.ID, legacyGroup.ID, 1)
+	mustBindAccountToGroup(s.T(), s.client, accountB.ID, legacyGroup.ID, 1)
+
+	accounts, err := s.repo.ListSchedulableByPlatformPool(s.ctx, poolA.ID, service.PlatformOpenAI)
+
+	s.Require().NoError(err)
+	s.Require().Len(accounts, 1)
+	s.Require().Equal(accountA.ID, accounts[0].ID)
+}
+
 func (s *AccountRepoSuite) TestSetSchedulable() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-sched", Schedulable: true})
 	cacheRecorder := &schedulerCacheRecorder{}

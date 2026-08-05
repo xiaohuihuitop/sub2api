@@ -9,11 +9,26 @@ import (
 	"github.com/google/wire"
 )
 
+// ProvideAdminPlatformHandler gives Wire a concrete construction edge while
+// PlatformHandler itself remains testable through its narrow interface.
+func ProvideAdminPlatformHandler(platformService *service.PlatformService) *admin.PlatformHandler {
+	return admin.NewPlatformHandler(platformService)
+}
+
+// ProvideAPIKeyHandler adds the read-only platform selector used by API Key
+// authorization without coupling user routes to administrator handlers.
+func ProvideAPIKeyHandler(apiKeyService *service.APIKeyService, platformService *service.PlatformService) *APIKeyHandler {
+	handler := NewAPIKeyHandler(apiKeyService)
+	handler.platformPools = platformService
+	return handler
+}
+
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
 	dashboardHandler *admin.DashboardHandler,
 	userHandler *admin.UserHandler,
 	groupHandler *admin.GroupHandler,
+	platformHandler *admin.PlatformHandler,
 	accountHandler *admin.AccountHandler,
 	announcementHandler *admin.AnnouncementHandler,
 	dataManagementHandler *admin.DataManagementHandler,
@@ -54,6 +69,7 @@ func ProvideAdminHandlers(
 		Dashboard:              dashboardHandler,
 		User:                   userHandler,
 		Group:                  groupHandler,
+		Platform:               platformHandler,
 		Account:                accountHandler,
 		Announcement:           announcementHandler,
 		DataManagement:         dataManagementHandler,
@@ -218,7 +234,7 @@ var ProviderSet = wire.NewSet(
 	// Top-level handlers
 	NewAuthHandler,
 	NewUserHandler,
-	NewAPIKeyHandler,
+	ProvideAPIKeyHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
 	NewSubscriptionHandler,
@@ -240,6 +256,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewDashboardHandler,
 	admin.NewUserHandler,
 	admin.NewGroupHandler,
+	ProvideAdminPlatformHandler,
 	admin.ProvideAccountHandler,
 	admin.NewAnnouncementHandler,
 	admin.NewDataManagementHandler,

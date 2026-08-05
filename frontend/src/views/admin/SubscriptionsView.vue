@@ -73,22 +73,6 @@
                 @change="applyFilters"
               />
             </div>
-            <div class="w-full sm:w-48">
-              <Select
-                v-model="filters.group_id"
-                :options="groupOptions"
-                :placeholder="t('admin.subscriptions.allGroups')"
-                @change="applyFilters"
-              />
-            </div>
-            <div class="w-full sm:w-40">
-              <Select
-                v-model="filters.platform"
-                :options="platformFilterOptions"
-                :placeholder="t('admin.subscriptions.allPlatforms')"
-                @change="applyFilters"
-              />
-            </div>
           </div>
 
           <!-- Right: Actions -->
@@ -199,16 +183,8 @@
             </div>
           </template>
 
-          <template #cell-group="{ row }">
-            <div class="space-y-1">
-              <div class="text-sm font-medium text-gray-900 dark:text-white">{{ getSubscriptionPlanName(row) }}</div>
-              <GroupBadge
-                v-if="row.group"
-                :name="row.group.name"
-                :platform="row.group.platform"
-                :show-rate="false"
-              />
-            </div>
+          <template #cell-plan="{ row }">
+            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ getSubscriptionPlanName(row) }}</div>
           </template>
 
           <template #cell-usage="{ row }">
@@ -751,7 +727,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import { adminPaymentAPI } from '@/api/admin/payment'
-import type { UserSubscription, Group } from '@/types'
+import type { UserSubscription } from '@/types'
 import type { SubscriptionPlan } from '@/types/payment'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
@@ -765,7 +741,6 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import {
   getRemainingDurationParts,
@@ -824,7 +799,7 @@ const allColumns = computed<Column[]>(() => [
       : t('admin.users.columns.username'),
     sortable: false
   },
-  { key: 'group', label: t('payment.admin.planName'), sortable: false },
+  { key: 'plan', label: t('payment.admin.planName'), sortable: false },
   { key: 'usage', label: t('admin.subscriptions.columns.usage'), sortable: false },
   { key: 'expires_at', label: t('admin.subscriptions.columns.expires'), sortable: true },
   { key: 'status', label: t('admin.subscriptions.columns.status'), sortable: true },
@@ -903,7 +878,6 @@ const statusOptions = computed(() => [
 ])
 
 const subscriptions = ref<UserSubscription[]>([])
-const groups = ref<Group[]>([])
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(false)
 let abortController: AbortController | null = null
@@ -926,8 +900,6 @@ let userSearchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const filters = reactive({
   status: 'active',
-  group_id: '',
-  platform: '',
   user_id: null as number | null
 })
 
@@ -965,24 +937,10 @@ const extendForm = reactive({
   days: 30
 })
 
-// Group options for filter (all groups)
-const groupOptions = computed(() => [
-  { value: '', label: t('admin.subscriptions.allGroups') },
-  ...groups.value.map((g) => ({ value: g.id.toString(), label: g.name }))
-])
-
-const platformFilterOptions = computed(() => [
-  { value: '', label: t('admin.subscriptions.allPlatforms') },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'antigravity', label: 'Antigravity' }
-])
-
 const planOptions = computed(() =>
   plans.value.map((plan) => ({
     value: plan.id,
-    label: plan.group_name ? `${plan.name} — ${plan.group_name}` : plan.name,
+    label: plan.name,
   }))
 )
 
@@ -1006,8 +964,6 @@ const loadSubscriptions = async () => {
       pagination.page_size,
       {
         status: (filters.status as any) || undefined,
-        group_id: filters.group_id ? parseInt(filters.group_id) : undefined,
-        platform: filters.platform || undefined,
         user_id: filters.user_id || undefined,
         sort_by: sortState.sort_by,
         sort_order: sortState.sort_order
@@ -1031,14 +987,6 @@ const loadSubscriptions = async () => {
       loading.value = false
       abortController = null
     }
-  }
-}
-
-const loadGroups = async () => {
-  try {
-    groups.value = await adminAPI.groups.getAll()
-  } catch (error) {
-    console.error('Error loading groups:', error)
   }
 }
 
@@ -1431,7 +1379,6 @@ onMounted(() => {
   loadUserColumnMode()
   loadSavedColumns()
   loadSubscriptions()
-  loadGroups()
   loadPlans()
   document.addEventListener('click', handleClickOutside)
 })

@@ -81,6 +81,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetKey(key.Key).
 		SetName(key.Name).
 		SetStatus(key.Status).
+		SetAllowBalance(key.AllowBalance).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
@@ -95,6 +96,12 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 	}
 	if len(key.IPBlacklist) > 0 {
 		builder.SetIPBlacklist(key.IPBlacklist)
+	}
+	if len(key.AllowedPlatformIDs) > 0 {
+		builder.AddPlatformIDs(key.AllowedPlatformIDs...)
+	}
+	if len(key.AllowedSubscriptionPlanIDs) > 0 {
+		builder.AddSubscriptionPlanIDs(key.AllowedSubscriptionPlanIDs...)
 	}
 
 	created, err := builder.Save(ctx)
@@ -172,24 +179,29 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 	return out, nil
 }
 
+func apiKeyAuthFieldSelection() []string {
+	return []string{
+		apikey.FieldID,
+		apikey.FieldUserID,
+		apikey.FieldGroupID,
+		apikey.FieldAllowBalance,
+		apikey.FieldName,
+		apikey.FieldStatus,
+		apikey.FieldIPWhitelist,
+		apikey.FieldIPBlacklist,
+		apikey.FieldQuota,
+		apikey.FieldQuotaUsed,
+		apikey.FieldExpiresAt,
+		apikey.FieldRateLimit5h,
+		apikey.FieldRateLimit1d,
+		apikey.FieldRateLimit7d,
+	}
+}
+
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
 		Where(apikey.KeyEQ(key)).
-		Select(
-			apikey.FieldID,
-			apikey.FieldUserID,
-			apikey.FieldGroupID,
-			apikey.FieldName,
-			apikey.FieldStatus,
-			apikey.FieldIPWhitelist,
-			apikey.FieldIPBlacklist,
-			apikey.FieldQuota,
-			apikey.FieldQuotaUsed,
-			apikey.FieldExpiresAt,
-			apikey.FieldRateLimit5h,
-			apikey.FieldRateLimit1d,
-			apikey.FieldRateLimit7d,
-		).
+		Select(apiKeyAuthFieldSelection()...).
 		WithUser(func(q *dbent.UserQuery) {
 			q.Select(
 				user.FieldID,
@@ -785,7 +797,69 @@ func (r *apiKeyRepository) loadAllowedGroups(ctx context.Context, keys []*servic
 			key.GroupID = &key.AllowedGroups[0].ID
 		}
 	}
+	return r.loadAssetPermissions(ctx, keys)
+}
+
+func (r *apiKeyRepository) loadAssetPermissions(ctx context.Context, keys []*service.APIKey) error {
+	keyByID := make(map[int64]*service.APIKey, len(keys))
+	keyIDs := make([]int64, 0, len(keys))
+	for _, key := range keys {
+		if key == nil || key.ID <= 0 {
+			continue
+		}
+		key.AllowedPlatformIDs = []int64{}
+		key.AllowedSubscriptionPlanIDs = []int64{}
+		keyByID[key.ID] = key
+		keyIDs = append(keyIDs, key.ID)
+	}
+	if len(keyIDs) == 0 {
+		return nil
+	}
+	if err := r.loadAssetPermissionIDs(ctx, keyByID, keyIDs, "api_key_platforms", "platform_id", func(key *service.APIKey, id int64) {
+		key.AllowedPlatformIDs = append(key.AllowedPlatformIDs, id)
+	}); err != nil {
+		return err
+	}
+	if err := r.loadAssetPermissionIDs(ctx, keyByID, keyIDs, "api_key_subscription_plans", "subscription_plan_id", func(key *service.APIKey, id int64) {
+		key.AllowedSubscriptionPlanIDs = append(key.AllowedSubscriptionPlanIDs, id)
+	}); err != nil {
+		return err
+	}
+	for _, key := range keyByID {
+		permissions := service.NormalizeAPIKeyAssetPermissions(service.APIKeyAssetPermissions{
+			PlatformIDs:         key.AllowedPlatformIDs,
+			SubscriptionPlanIDs: key.AllowedSubscriptionPlanIDs,
+			AllowBalance:        key.AllowBalance,
+		})
+		key.AllowedPlatformIDs = permissions.PlatformIDs
+		key.AllowedSubscriptionPlanIDs = permissions.SubscriptionPlanIDs
+	}
 	return nil
+}
+
+func (r *apiKeyRepository) loadAssetPermissionIDs(
+	ctx context.Context,
+	keyByID map[int64]*service.APIKey,
+	keyIDs []int64,
+	table, column string,
+	assign func(*service.APIKey, int64),
+) error {
+	query := fmt.Sprintf("SELECT api_key_id, %s FROM %s WHERE api_key_id = ANY($1::bigint[])", column, table)
+	rows, err := r.rawExecutor(ctx).QueryContext(ctx, query, pq.Array(keyIDs))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var keyID, valueID int64
+		if err := rows.Scan(&keyID, &valueID); err != nil {
+			return err
+		}
+		if key := keyByID[keyID]; key != nil {
+			assign(key, valueID)
+		}
+	}
+	return rows.Err()
 }
 
 func (r *apiKeyRepository) ListAllowedGroups(ctx context.Context, keyID int64) ([]service.Group, error) {
@@ -1173,6 +1247,46 @@ func (r *apiKeyRepository) ReplaceAllowedGroups(ctx context.Context, keyID int64
 	return err
 }
 
+func (r *apiKeyRepository) ReplaceAssetPermissions(
+	ctx context.Context,
+	keyID int64,
+	permissions service.APIKeyAssetPermissions,
+) error {
+	permissions = service.NormalizeAPIKeyAssetPermissions(permissions)
+	_, err := r.rawExecutor(ctx).ExecContext(ctx, `
+		WITH updated AS (
+			UPDATE api_keys
+			SET allow_balance = $2, updated_at = NOW()
+			WHERE id = $1 AND deleted_at IS NULL
+			RETURNING id
+		), deleted_platforms AS (
+			DELETE FROM api_key_platforms
+			WHERE api_key_id IN (SELECT id FROM updated)
+		), deleted_plans AS (
+			DELETE FROM api_key_subscription_plans
+			WHERE api_key_id IN (SELECT id FROM updated)
+		), normalized_platforms AS (
+			SELECT DISTINCT platform_id
+			FROM unnest($3::bigint[]) AS platform_id
+			WHERE platform_id > 0
+		), normalized_plans AS (
+			SELECT DISTINCT subscription_plan_id
+			FROM unnest($4::bigint[]) AS subscription_plan_id
+			WHERE subscription_plan_id > 0
+		), inserted_platforms AS (
+			INSERT INTO api_key_platforms (api_key_id, platform_id)
+			SELECT updated.id, normalized_platforms.platform_id
+			FROM updated CROSS JOIN normalized_platforms
+			ON CONFLICT (api_key_id, platform_id) DO NOTHING
+		)
+		INSERT INTO api_key_subscription_plans (api_key_id, subscription_plan_id)
+		SELECT updated.id, normalized_plans.subscription_plan_id
+		FROM updated CROSS JOIN normalized_plans
+		ON CONFLICT (api_key_id, subscription_plan_id) DO NOTHING
+	`, keyID, permissions.AllowBalance, pq.Array(permissions.PlatformIDs), pq.Array(permissions.SubscriptionPlanIDs))
+	return err
+}
+
 // ResetRateLimitWindows resets expired rate limit windows atomically.
 func (r *apiKeyRepository) ResetRateLimitWindows(ctx context.Context, id int64) error {
 	_, err := r.sql.ExecContext(ctx, `
@@ -1230,6 +1344,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		GroupID:       m.GroupID,
+		AllowBalance:  m.AllowBalance,
 		Quota:         m.Quota,
 		QuotaUsed:     m.QuotaUsed,
 		ExpiresAt:     m.ExpiresAt,

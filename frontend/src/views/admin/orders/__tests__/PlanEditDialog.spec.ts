@@ -3,7 +3,6 @@ import { defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
 
 import PlanEditDialog from '../PlanEditDialog.vue'
-import type { AdminGroup } from '@/types'
 
 const { createPlan, updatePlan } = vi.hoisted(() => ({
   createPlan: vi.fn(),
@@ -80,56 +79,15 @@ const SelectStub = defineComponent({
   `,
 })
 
-const groupFixture = (overrides: Partial<AdminGroup>): AdminGroup => ({
-  id: 1,
-  name: 'OpenAI',
-  description: null,
-  platform: 'openai',
-  rate_multiplier: 1,
-  rpm_limit: 0,
-  is_exclusive: false,
-  status: 'active',
-  subscription_type: 'subscription',
-  daily_limit_usd: null,
-  weekly_limit_usd: null,
-  monthly_limit_usd: null,
-  allow_image_generation: false,
-  image_rate_independent: false,
-  image_rate_multiplier: 1,
-  image_price_1k: null,
-  image_price_2k: null,
-  image_price_4k: null,
-  peak_rate_enabled: false,
-  peak_start: '',
-  peak_end: '',
-  peak_rate_multiplier: 1,
-  claude_code_only: false,
-  fallback_group_id: null,
-  fallback_group_id_on_invalid_request: null,
-  allow_messages_dispatch: false,
-  require_oauth_only: false,
-  require_privacy_set: false,
-  created_at: '2026-07-01T00:00:00Z',
-  updated_at: '2026-07-01T00:00:00Z',
-  model_routing: null,
-  model_routing_enabled: false,
-  mcp_xml_inject: false,
-  sort_order: 0,
-  ...overrides,
-})
-
 function mountDialog({
-  groups = [],
   paymentConfig = null,
 }: {
-  groups?: AdminGroup[]
   paymentConfig?: Record<string, unknown> | null
 } = {}) {
   return mount(PlanEditDialog, {
     props: {
       show: true,
       plan: null,
-      groups,
       paymentConfig,
     },
     global: {
@@ -137,7 +95,6 @@ function mountDialog({
         BaseDialog: BaseDialogStub,
         Select: SelectStub,
         Icon: true,
-        GroupBadge: true,
       },
     },
   })
@@ -180,39 +137,11 @@ describe('PlanEditDialog', () => {
     expect(wrapper.text()).not.toContain('¥71.43')
   })
 
-  it('uses independent plan terms and accepts every active routing group', async () => {
-    const wrapper = mountDialog({
-      groups: [
-        groupFixture({
-          id: 10,
-          name: 'OpenAI + Claude + Gemini + Grok',
-          platform: 'composite',
-          rate_multiplier: 1.2,
-          subscription_type: 'subscription',
-        }),
-        groupFixture({
-          id: 11,
-          name: 'Standard OpenAI',
-          platform: 'openai',
-          subscription_type: 'standard',
-        }),
-        groupFixture({
-          id: 12,
-          name: 'Disabled route',
-          platform: 'openai',
-          status: 'disabled',
-        }),
-      ],
-    })
-
-    const options = wrapper.findAll('option').map(option => option.text())
-
-    expect(options).toContain('OpenAI + Claude + Gemini + Grok — composite')
-    expect(options).toContain('Standard OpenAI — openai')
-    expect(options).not.toContain('Disabled route — openai')
+  it('uses independent plan terms without a routing group', async () => {
+    const wrapper = mountDialog()
 
     await wrapper.get('[data-testid="plan-name"]').setValue('Independent plan')
-    await wrapper.get('[data-testid="plan-group"]').setValue('11')
+    expect(wrapper.find('[data-testid="plan-group"]').exists()).toBe(false)
     await wrapper.get('[data-testid="plan-description"]').setValue('Owns its terms')
     await wrapper.get('[data-testid="plan-price"]').setValue('9.99')
     await wrapper.get('[data-testid="plan-rate-multiplier"]').setValue('0')
@@ -221,11 +150,17 @@ describe('PlanEditDialog', () => {
     await wrapper.get('form').trigger('submit')
 
     expect(createPlan).toHaveBeenCalledWith(expect.objectContaining({
-      group_id: 11,
       rate_multiplier: 0,
       daily_limit_usd: 12.5,
       weekly_limit_usd: 0,
       monthly_limit_usd: 200,
     }))
+    expect(createPlan.mock.calls[0][0]).not.toHaveProperty('group_id')
+  })
+
+  it('does not require a legacy routing group to create a plan', () => {
+    const wrapper = mountDialog()
+
+    expect(wrapper.find('[data-testid="plan-group"]').exists()).toBe(false)
   })
 })

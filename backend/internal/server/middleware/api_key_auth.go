@@ -157,13 +157,17 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
+		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
+		resolveSkipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || cfg.RunMode == config.RunModeSimple
+		if service.UsesPlatformAssetPermissions(apiKey) {
+			completePlatformAssetAPIKeyAuth(c, apiKey, apiKeyService, cfg, billingInfoRequest)
+			return
+		}
 		if len(apiKey.AllowedGroups) <= 1 {
 			if abortIfAPIKeyGroupUnavailable(c, apiKey) || abortIfAPIKeyGroupNotAllowed(c, apiKey) {
 				return
 			}
 		}
-		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
-		resolveSkipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || cfg.RunMode == config.RunModeSimple
 		targetPlatform, _ := c.Request.Context().Value(ctxkey.ForcePlatform).(string)
 		if targetPlatform == "" && apiKey.Group != nil {
 			targetPlatform = apiKey.Group.Platform
@@ -294,6 +298,55 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		c.Next()
 	}
+}
+
+// completePlatformAssetAPIKeyAuth finishes the common security checks for an
+// explicitly migrated key. Billing and platform authorization are deliberately
+// deferred to NewPlatformAssetAuthorizationMiddleware, because the old group
+// resolver would otherwise reject a valid plan-only V2 key before its model is
+// resolved.
+func completePlatformAssetAPIKeyAuth(
+	c *gin.Context,
+	apiKey *service.APIKey,
+	apiKeyService *service.APIKeyService,
+	cfg *config.Config,
+	billingInfoRequest bool,
+) {
+	skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
+	if cfg != nil && cfg.RunMode == config.RunModeSimple {
+		skipBilling = true
+	}
+	if !skipBilling {
+		switch apiKey.Status {
+		case service.StatusAPIKeyQuotaExhausted:
+			abortWithAPIKeyQuotaError(c)
+			return
+		case service.StatusAPIKeyExpired:
+			AbortWithError(c, http.StatusForbidden, "API_KEY_EXPIRED", "API key 已过期")
+			return
+		}
+		if apiKey.IsExpired() {
+			AbortWithError(c, http.StatusForbidden, "API_KEY_EXPIRED", "API key 已过期")
+			return
+		}
+		if apiKey.IsQuotaExhausted() {
+			abortWithAPIKeyQuotaError(c)
+			return
+		}
+	}
+
+	ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
+	c.Request = c.Request.WithContext(ctx)
+	c.Set(string(ContextKeyAPIKey), apiKey)
+	c.Set(string(ContextKeyUser), AuthSubject{
+		UserID:      apiKey.User.ID,
+		Concurrency: apiKey.User.Concurrency,
+	})
+	c.Set(string(ContextKeyUserRole), apiKey.User.Role)
+	if !billingInfoRequest {
+		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
+	}
+	c.Next()
 }
 
 func apiKeyHeadersTooLarge(c *gin.Context) bool {

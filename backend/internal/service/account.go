@@ -23,6 +23,7 @@ type Account struct {
 	Name                    string
 	Notes                   *string
 	Platform                string
+	PlatformID              *int64
 	Type                    string
 	Credentials             map[string]any
 	Extra                   map[string]any

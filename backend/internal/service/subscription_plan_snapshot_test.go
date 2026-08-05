@@ -32,7 +32,7 @@ func TestSubscriptionFromPlanCopiesImmutableTerms(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, int64(42), sub.UserID)
-	require.Equal(t, int64(9), sub.GroupID)
+	require.Zero(t, sub.GroupID)
 	require.Equal(t, int64(17), *sub.SubscriptionPlanID)
 	require.Equal(t, "Professional", sub.PlanNameSnapshot)
 	require.Equal(t, 25.0, *sub.DailyLimitUSDSnapshot)

@@ -102,8 +102,8 @@ func (s *OpenAIGatewayService) RecordCyberPolicyUsageLog(ctx context.Context, in
 }
 
 // ResolveUserGroupRateMultiplier is a legacy compatibility helper.
-// OpenAI usage billing no longer calls it: balance billing uses BillingProfile
-// and subscription billing uses the instance snapshot multiplier.
+// V2 platform-asset requests use the resolved subscription snapshot or global
+// balance multiplier and do not read this legacy group-rate helper.
 func (s *OpenAIGatewayService) ResolveUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
 	if s == nil {
 		return groupDefaultMultiplier
@@ -153,13 +153,16 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageOutputTokens:   result.Usage.ImageOutputTokens,
 	}
 
-	// 套餐实例倍率优先于余额计费资料；余额请求才读取分组倍率。
+	// 旧 API Key 仍按历史分组资料取倍率；V2 平台资产请求会在下方统一覆盖为
+	// 套餐实例快照或全局余额倍率。
 	fallbackMultiplier := 1.0
 	if s.cfg != nil {
 		fallbackMultiplier = s.cfg.Default.RateMultiplier
 	}
 	baseMultiplier := resolveBillingRateMultiplier(apiKey, subscription, fallbackMultiplier)
 	multiplier, imageMultiplier, videoMultiplier := resolveBillingMultipliers(apiKey, subscription, fallbackMultiplier, timezone.Now())
+	baseMultiplier, multiplier, imageMultiplier = overridePlatformAssetBillingMultipliers(ctx, baseMultiplier, multiplier, imageMultiplier)
+	_, _, videoMultiplier = overridePlatformAssetBillingMultipliers(ctx, multiplier, imageMultiplier, videoMultiplier)
 
 	var cost *CostBreakdown
 	var err error
@@ -341,11 +344,12 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if subscription != nil {
 		usageLog.SubscriptionID = &subscription.ID
 	}
+	applyPlatformAssetUsageAttribution(ctx, usageLog)
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
-	if apiKey.GroupID != nil {
+	if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
-			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
+			account.ID, *pricingGroupID, result.UpstreamModel, result.Model,
 			tokens, cost.TotalCost,
 		)
 	}
@@ -405,8 +409,8 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取
 		// 分组覆盖价（nil 时默认 0.01 = 官方 $10/1000 次），不参与渠道级模型定价。
-		// 倍率与 image/video 按次口径一致：使用不含高峰因子的基础倍率
-		//（套餐实例快照或余额 BillingProfile），与价格预览口径一致。
+		// 倍率与 image/video 按次口径一致：V2 使用套餐实例快照或全局余额倍率；
+		// 旧 API Key 才保留历史分组倍率。
 		return s.billingService.CalculateWebSearchCost(result.WebSearchCalls, webSearchPricePerCallFromAPIKey(apiKey), webSearchMultiplier), nil
 	}
 	if isGrokVideoUsageResult(result, billingModels) {
@@ -487,12 +491,11 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageTokenCost(
 	serviceTier string,
 	longContextBillingEnabled bool,
 ) (*CostBreakdown, error) {
-	if s.resolver != nil && apiKey.Group != nil {
-		gid := apiKey.Group.ID
+	if pricingGroupID := effectivePricingGroupID(ctx, apiKey); s.resolver != nil && pricingGroupID != nil {
 		return s.billingService.CalculateCostUnified(CostInput{
 			Ctx:                       ctx,
 			Model:                     billingModel,
-			GroupID:                   &gid,
+			GroupID:                   pricingGroupID,
 			Tokens:                    tokens,
 			RequestCount:              1,
 			RateMultiplier:            multiplier,
@@ -531,11 +534,11 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	}
 	if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
-		gid := apiKey.Group.ID
+		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        &gid,
+			GroupID:        pricingGroupID,
 			RequestCount:   result.ImageCount,
 			SizeTier:       sizeTier,
 			RateMultiplier: multiplier,
@@ -578,11 +581,11 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 	if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		// 渠道 per_request/image 定价保持"按请求次数"口径（价格由管理员按次配置），不乘视频时长。
-		gid := apiKey.Group.ID
+		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        &gid,
+			GroupID:        pricingGroupID,
 			RequestCount:   videoCount,
 			SizeTier:       resolution,
 			RateMultiplier: multiplier,
@@ -600,20 +603,22 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 }
 
 func (s *OpenAIGatewayService) apiKeyWithFreshGroupMediaPricing(ctx context.Context, apiKey *APIKey) *APIKey {
-	if apiKey == nil || apiKey.GroupID == nil || *apiKey.GroupID <= 0 {
+	pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+	if apiKey == nil || pricingGroupID == nil || *pricingGroupID <= 0 {
 		return apiKey
 	}
-	if !groupMediaPricingLooksIncomplete(apiKey.Group) {
+	if apiKey.Group != nil && apiKey.Group.ID == *pricingGroupID && !groupMediaPricingLooksIncomplete(apiKey.Group) {
 		return apiKey
 	}
 	if s == nil || s.channelService == nil || s.channelService.groupRepo == nil {
 		return apiKey
 	}
-	group, err := s.channelService.groupRepo.GetByIDLite(ctx, *apiKey.GroupID)
+	group, err := s.channelService.groupRepo.GetByIDLite(ctx, *pricingGroupID)
 	if err != nil || group == nil {
 		return apiKey
 	}
 	clone := *apiKey
+	clone.GroupID = clonePlatformInt64Pointer(pricingGroupID)
 	clone.Group = group
 	return &clone
 }
@@ -637,11 +642,11 @@ func groupMediaPricingLooksIncomplete(group *Group) bool {
 }
 
 func (s *OpenAIGatewayService) resolveOpenAIChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
-	if s.resolver == nil || apiKey == nil || apiKey.Group == nil {
+	pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+	if s.resolver == nil || pricingGroupID == nil {
 		return nil
 	}
-	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid})
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: pricingGroupID})
 	if resolved.Source == PricingSourceChannel {
 		return resolved
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -29,6 +30,7 @@ type AccountQuery struct {
 	inters            []Interceptor
 	predicates        []predicate.Account
 	withGroups        *GroupQuery
+	withPlatformPool  *PlatformQuery
 	withProxy         *ProxyQuery
 	withParent        *AccountQuery
 	withChildren      *AccountQuery
@@ -86,6 +88,28 @@ func (_q *AccountQuery) QueryGroups() *GroupQuery {
 			sqlgraph.From(account.Table, account.FieldID, selector),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, false, account.GroupsTable, account.GroupsPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPlatformPool chains the current query on the "platform_pool" edge.
+func (_q *AccountQuery) QueryPlatformPool() *PlatformQuery {
+	query := (&PlatformClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, selector),
+			sqlgraph.To(platform.Table, platform.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, account.PlatformPoolTable, account.PlatformPoolColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -396,6 +420,7 @@ func (_q *AccountQuery) Clone() *AccountQuery {
 		inters:            append([]Interceptor{}, _q.inters...),
 		predicates:        append([]predicate.Account{}, _q.predicates...),
 		withGroups:        _q.withGroups.Clone(),
+		withPlatformPool:  _q.withPlatformPool.Clone(),
 		withProxy:         _q.withProxy.Clone(),
 		withParent:        _q.withParent.Clone(),
 		withChildren:      _q.withChildren.Clone(),
@@ -415,6 +440,17 @@ func (_q *AccountQuery) WithGroups(opts ...func(*GroupQuery)) *AccountQuery {
 		opt(query)
 	}
 	_q.withGroups = query
+	return _q
+}
+
+// WithPlatformPool tells the query-builder to eager-load the nodes that are connected to
+// the "platform_pool" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AccountQuery) WithPlatformPool(opts ...func(*PlatformQuery)) *AccountQuery {
+	query := (&PlatformClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPlatformPool = query
 	return _q
 }
 
@@ -551,8 +587,9 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 	var (
 		nodes       = []*Account{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withGroups != nil,
+			_q.withPlatformPool != nil,
 			_q.withProxy != nil,
 			_q.withParent != nil,
 			_q.withChildren != nil,
@@ -585,6 +622,12 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 		if err := _q.loadGroups(ctx, query, nodes,
 			func(n *Account) { n.Edges.Groups = []*Group{} },
 			func(n *Account, e *Group) { n.Edges.Groups = append(n.Edges.Groups, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPlatformPool; query != nil {
+		if err := _q.loadPlatformPool(ctx, query, nodes, nil,
+			func(n *Account, e *Platform) { n.Edges.PlatformPool = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -681,6 +724,38 @@ func (_q *AccountQuery) loadGroups(ctx context.Context, query *GroupQuery, nodes
 		}
 		for kn := range nodes {
 			assign(kn, n)
+		}
+	}
+	return nil
+}
+func (_q *AccountQuery) loadPlatformPool(ctx context.Context, query *PlatformQuery, nodes []*Account, init func(*Account), assign func(*Account, *Platform)) error {
+	ids := make([]int64, 0, len(nodes))
+	nodeids := make(map[int64][]*Account)
+	for i := range nodes {
+		if nodes[i].PlatformID == nil {
+			continue
+		}
+		fk := *nodes[i].PlatformID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(platform.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "platform_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
 		}
 	}
 	return nil
@@ -870,6 +945,9 @@ func (_q *AccountQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != account.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withPlatformPool != nil {
+			_spec.Node.AddColumnOnce(account.FieldPlatformID)
 		}
 		if _q.withProxy != nil {
 			_spec.Node.AddColumnOnce(account.FieldProxyID)

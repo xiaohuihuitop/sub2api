@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -102,6 +103,26 @@ func (_u *AccountUpdate) SetNillablePlatform(v *string) *AccountUpdate {
 	if v != nil {
 		_u.SetPlatform(*v)
 	}
+	return _u
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (_u *AccountUpdate) SetPlatformID(v int64) *AccountUpdate {
+	_u.mutation.SetPlatformID(v)
+	return _u
+}
+
+// SetNillablePlatformID sets the "platform_id" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillablePlatformID(v *int64) *AccountUpdate {
+	if v != nil {
+		_u.SetPlatformID(*v)
+	}
+	return _u
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (_u *AccountUpdate) ClearPlatformID() *AccountUpdate {
+	_u.mutation.ClearPlatformID()
 	return _u
 }
 
@@ -579,6 +600,25 @@ func (_u *AccountUpdate) AddGroups(v ...*Group) *AccountUpdate {
 	return _u.AddGroupIDs(ids...)
 }
 
+// SetPlatformPoolID sets the "platform_pool" edge to the Platform entity by ID.
+func (_u *AccountUpdate) SetPlatformPoolID(id int64) *AccountUpdate {
+	_u.mutation.SetPlatformPoolID(id)
+	return _u
+}
+
+// SetNillablePlatformPoolID sets the "platform_pool" edge to the Platform entity by ID if the given value is not nil.
+func (_u *AccountUpdate) SetNillablePlatformPoolID(id *int64) *AccountUpdate {
+	if id != nil {
+		_u = _u.SetPlatformPoolID(*id)
+	}
+	return _u
+}
+
+// SetPlatformPool sets the "platform_pool" edge to the Platform entity.
+func (_u *AccountUpdate) SetPlatformPool(v *Platform) *AccountUpdate {
+	return _u.SetPlatformPoolID(v.ID)
+}
+
 // SetProxy sets the "proxy" edge to the Proxy entity.
 func (_u *AccountUpdate) SetProxy(v *Proxy) *AccountUpdate {
 	return _u.SetProxyID(v.ID)
@@ -657,6 +697,12 @@ func (_u *AccountUpdate) RemoveGroups(v ...*Group) *AccountUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveGroupIDs(ids...)
+}
+
+// ClearPlatformPool clears the "platform_pool" edge to the Platform entity.
+func (_u *AccountUpdate) ClearPlatformPool() *AccountUpdate {
+	_u.mutation.ClearPlatformPool()
+	return _u
 }
 
 // ClearProxy clears the "proxy" edge to the Proxy entity.
@@ -1003,6 +1049,35 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.PlatformPoolCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   account.PlatformPoolTable,
+			Columns: []string{account.PlatformPoolColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PlatformPoolIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   account.PlatformPoolTable,
+			Columns: []string{account.PlatformPoolColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.ProxyCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -1242,6 +1317,26 @@ func (_u *AccountUpdateOne) SetNillablePlatform(v *string) *AccountUpdateOne {
 	if v != nil {
 		_u.SetPlatform(*v)
 	}
+	return _u
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (_u *AccountUpdateOne) SetPlatformID(v int64) *AccountUpdateOne {
+	_u.mutation.SetPlatformID(v)
+	return _u
+}
+
+// SetNillablePlatformID sets the "platform_id" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillablePlatformID(v *int64) *AccountUpdateOne {
+	if v != nil {
+		_u.SetPlatformID(*v)
+	}
+	return _u
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (_u *AccountUpdateOne) ClearPlatformID() *AccountUpdateOne {
+	_u.mutation.ClearPlatformID()
 	return _u
 }
 
@@ -1719,6 +1814,25 @@ func (_u *AccountUpdateOne) AddGroups(v ...*Group) *AccountUpdateOne {
 	return _u.AddGroupIDs(ids...)
 }
 
+// SetPlatformPoolID sets the "platform_pool" edge to the Platform entity by ID.
+func (_u *AccountUpdateOne) SetPlatformPoolID(id int64) *AccountUpdateOne {
+	_u.mutation.SetPlatformPoolID(id)
+	return _u
+}
+
+// SetNillablePlatformPoolID sets the "platform_pool" edge to the Platform entity by ID if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillablePlatformPoolID(id *int64) *AccountUpdateOne {
+	if id != nil {
+		_u = _u.SetPlatformPoolID(*id)
+	}
+	return _u
+}
+
+// SetPlatformPool sets the "platform_pool" edge to the Platform entity.
+func (_u *AccountUpdateOne) SetPlatformPool(v *Platform) *AccountUpdateOne {
+	return _u.SetPlatformPoolID(v.ID)
+}
+
 // SetProxy sets the "proxy" edge to the Proxy entity.
 func (_u *AccountUpdateOne) SetProxy(v *Proxy) *AccountUpdateOne {
 	return _u.SetProxyID(v.ID)
@@ -1797,6 +1911,12 @@ func (_u *AccountUpdateOne) RemoveGroups(v ...*Group) *AccountUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveGroupIDs(ids...)
+}
+
+// ClearPlatformPool clears the "platform_pool" edge to the Platform entity.
+func (_u *AccountUpdateOne) ClearPlatformPool() *AccountUpdateOne {
+	_u.mutation.ClearPlatformPool()
+	return _u
 }
 
 // ClearProxy clears the "proxy" edge to the Proxy entity.
@@ -2171,6 +2291,35 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PlatformPoolCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   account.PlatformPoolTable,
+			Columns: []string{account.PlatformPoolColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PlatformPoolIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   account.PlatformPoolTable,
+			Columns: []string{account.PlatformPoolColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.ProxyCleared() {

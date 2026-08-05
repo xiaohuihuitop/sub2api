@@ -85,6 +85,11 @@ func Platform(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldPlatform, v))
 }
 
+// PlatformID applies equality check predicate on the "platform_id" field. It's identical to PlatformIDEQ.
+func PlatformID(v int64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldPlatformID, v))
+}
+
 // Type applies equality check predicate on the "type" field. It's identical to TypeEQ.
 func Type(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldType, v))
@@ -528,6 +533,36 @@ func PlatformEqualFold(v string) predicate.Account {
 // PlatformContainsFold applies the ContainsFold predicate on the "platform" field.
 func PlatformContainsFold(v string) predicate.Account {
 	return predicate.Account(sql.FieldContainsFold(FieldPlatform, v))
+}
+
+// PlatformIDEQ applies the EQ predicate on the "platform_id" field.
+func PlatformIDEQ(v int64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldPlatformID, v))
+}
+
+// PlatformIDNEQ applies the NEQ predicate on the "platform_id" field.
+func PlatformIDNEQ(v int64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldPlatformID, v))
+}
+
+// PlatformIDIn applies the In predicate on the "platform_id" field.
+func PlatformIDIn(vs ...int64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldPlatformID, vs...))
+}
+
+// PlatformIDNotIn applies the NotIn predicate on the "platform_id" field.
+func PlatformIDNotIn(vs ...int64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldPlatformID, vs...))
+}
+
+// PlatformIDIsNil applies the IsNil predicate on the "platform_id" field.
+func PlatformIDIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldPlatformID))
+}
+
+// PlatformIDNotNil applies the NotNil predicate on the "platform_id" field.
+func PlatformIDNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldPlatformID))
 }
 
 // TypeEQ applies the EQ predicate on the "type" field.
@@ -1620,6 +1655,29 @@ func HasGroups() predicate.Account {
 func HasGroupsWith(preds ...predicate.Group) predicate.Account {
 	return predicate.Account(func(s *sql.Selector) {
 		step := newGroupsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPlatformPool applies the HasEdge predicate on the "platform_pool" edge.
+func HasPlatformPool() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, PlatformPoolTable, PlatformPoolColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPlatformPoolWith applies the HasEdge predicate on the "platform_pool" edge with a given conditions (other predicates).
+func HasPlatformPoolWith(preds ...predicate.Platform) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newPlatformPoolStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

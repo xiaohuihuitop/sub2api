@@ -28,7 +28,7 @@ func TestApplySubscriptionPlanToRedeemCodeCapturesImmutableTerms(t *testing.T) {
 
 	require.NoError(t, applySubscriptionPlanToRedeemCode(code, plan))
 	require.Equal(t, int64(15), *code.SubscriptionPlanID)
-	require.Equal(t, int64(6), *code.GroupID)
+	require.Nil(t, code.GroupID)
 	require.Equal(t, 14, code.ValidityDays)
 	require.Equal(t, "Professional", code.PlanNameSnapshot)
 	require.Equal(t, 18.0, *code.DailyLimitUSDSnapshot)
@@ -74,7 +74,6 @@ func TestGenerateRedeemCodesFromPlanCapturesPlanSnapshot(t *testing.T) {
 	client := newPaymentConfigServiceTestClient(t)
 	dailyLimit := 20.0
 	plan, err := client.SubscriptionPlan.Create().
-		SetGroupID(6).
 		SetName("Professional").
 		SetPrice(29.9).
 		SetValidityDays(30).
@@ -96,7 +95,7 @@ func TestGenerateRedeemCodesFromPlanCapturesPlanSnapshot(t *testing.T) {
 	require.Len(t, codes, 1)
 	require.Len(t, repo.created, 1)
 	require.Equal(t, plan.ID, *codes[0].SubscriptionPlanID)
-	require.Equal(t, plan.GroupID, *codes[0].GroupID)
+	require.Nil(t, codes[0].GroupID)
 	require.Equal(t, "Professional", codes[0].PlanNameSnapshot)
 	require.Equal(t, dailyLimit, *codes[0].DailyLimitUSDSnapshot)
 	require.Equal(t, 1.25, codes[0].RateMultiplierSnapshot)
@@ -105,7 +104,6 @@ func TestGenerateRedeemCodesFromPlanCapturesPlanSnapshot(t *testing.T) {
 func TestRedeemSubscriptionCodeCreatesNewSnapshotInstance(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentConfigServiceTestClient(t)
-	groupID := int64(6)
 	planID := int64(15)
 	dailyLimit := 20.0
 	redeemRepo := &snapshotRedeemCodeRepository{redeemCodeRepoStub: &redeemCodeRepoStub{
@@ -115,7 +113,6 @@ func TestRedeemSubscriptionCodeCreatesNewSnapshotInstance(t *testing.T) {
 				Code:                   "PLAN-CODE",
 				Type:                   RedeemTypeSubscription,
 				Status:                 StatusUnused,
-				GroupID:                &groupID,
 				SubscriptionPlanID:     &planID,
 				PlanNameSnapshot:       "Professional",
 				DailyLimitUSDSnapshot:  &dailyLimit,
@@ -143,7 +140,7 @@ func TestRedeemSubscriptionCodeCreatesNewSnapshotInstance(t *testing.T) {
 	require.Equal(t, 1, subscriptionRepo.createCalls)
 	created, err := subscriptionRepo.GetByID(ctx, 1)
 	require.NoError(t, err)
-	require.Equal(t, int64(6), created.GroupID)
+	require.Zero(t, created.GroupID)
 	require.Equal(t, int64(15), *created.SubscriptionPlanID)
 	require.Equal(t, "Professional", created.PlanNameSnapshot)
 	require.Equal(t, dailyLimit, *created.DailyLimitUSDSnapshot)
@@ -151,13 +148,11 @@ func TestRedeemSubscriptionCodeCreatesNewSnapshotInstance(t *testing.T) {
 }
 
 func TestSubscriptionFromRedeemCodeCreatesIndependentSnapshot(t *testing.T) {
-	groupID := int64(6)
 	planID := int64(15)
 	dailyLimit := 18.0
 	now := time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)
 	code := &RedeemCode{
 		Type:                   RedeemTypeSubscription,
-		GroupID:                &groupID,
 		SubscriptionPlanID:     &planID,
 		PlanNameSnapshot:       "Professional",
 		DailyLimitUSDSnapshot:  &dailyLimit,
@@ -169,7 +164,7 @@ func TestSubscriptionFromRedeemCodeCreatesIndependentSnapshot(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, int64(42), subscription.UserID)
-	require.Equal(t, int64(6), subscription.GroupID)
+	require.Zero(t, subscription.GroupID)
 	require.Equal(t, int64(15), *subscription.SubscriptionPlanID)
 	require.Equal(t, "Professional", subscription.PlanNameSnapshot)
 	require.Equal(t, 18.0, *subscription.DailyLimitUSDSnapshot)

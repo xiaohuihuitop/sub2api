@@ -283,20 +283,16 @@ func (h *PaymentHandler) ListPlans(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	groupInfo := h.configService.GetGroupInfoMap(c.Request.Context(), plans)
-	response.Success(c, adminSubscriptionPlansForResponse(plans, groupInfo))
+	response.Success(c, adminSubscriptionPlansForResponse(plans))
 }
 
 type AdminSubscriptionPlanResult struct {
 	ID              int64     `json:"id"`
-	GroupID         int64     `json:"group_id"`
-	GroupPlatform   string    `json:"group_platform,omitempty"`
-	GroupName       string    `json:"group_name,omitempty"`
+	GroupID         *int64    `json:"group_id,omitempty"`
 	RateMultiplier  float64   `json:"rate_multiplier"`
 	DailyLimitUSD   *float64  `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD  *float64  `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD *float64  `json:"monthly_limit_usd,omitempty"`
-	ModelScopes     []string  `json:"supported_model_scopes,omitempty"`
 	Name            string    `json:"name"`
 	Description     string    `json:"description"`
 	Price           float64   `json:"price"`
@@ -312,23 +308,19 @@ type AdminSubscriptionPlanResult struct {
 	UpdatedAt       time.Time `json:"updated_at,omitempty"`
 }
 
-func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan, groupInfo map[int64]service.PlanGroupInfo) []AdminSubscriptionPlanResult {
+func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan) []AdminSubscriptionPlanResult {
 	result := make([]AdminSubscriptionPlanResult, 0, len(plans))
 	for _, p := range plans {
 		if p == nil {
 			continue
 		}
-		gi := groupInfo[p.GroupID]
 		result = append(result, AdminSubscriptionPlanResult{
 			ID:              int64(p.ID),
-			GroupID:         p.GroupID,
-			GroupPlatform:   gi.Platform,
-			GroupName:       gi.Name,
+			GroupID:         legacyPlanGroupID(p.GroupID),
 			RateMultiplier:  p.RateMultiplier,
 			DailyLimitUSD:   p.DailyLimitUsd,
 			WeeklyLimitUSD:  p.WeeklyLimitUsd,
 			MonthlyLimitUSD: p.MonthlyLimitUsd,
-			ModelScopes:     gi.ModelScopes,
 			Name:            p.Name,
 			Description:     p.Description,
 			Price:           p.Price,
@@ -345,6 +337,14 @@ func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan, groupInf
 		})
 	}
 	return result
+}
+
+func legacyPlanGroupID(groupID int64) *int64 {
+	if groupID <= 0 {
+		return nil
+	}
+	value := groupID
+	return &value
 }
 
 // CreatePlan creates a new subscription plan.
@@ -475,6 +475,41 @@ func parseIDParam(c *gin.Context, paramName string) (int64, bool) {
 }
 
 // --- Config ---
+
+type globalBalanceRateMultiplierResponse struct {
+	RateMultiplier float64 `json:"rate_multiplier"`
+}
+
+type updateGlobalBalanceRateMultiplierRequest struct {
+	RateMultiplier *float64 `json:"rate_multiplier"`
+}
+
+// GetGlobalBalanceRateMultiplier returns the multiplier used only for balance billing.
+// GET /api/v1/admin/payment/balance-rate-multiplier
+func (h *PaymentHandler) GetGlobalBalanceRateMultiplier(c *gin.Context) {
+	response.Success(c, globalBalanceRateMultiplierResponse{
+		RateMultiplier: h.configService.GetGlobalBalanceRateMultiplier(c.Request.Context()),
+	})
+}
+
+// UpdateGlobalBalanceRateMultiplier changes the multiplier used only for balance billing.
+// PUT /api/v1/admin/payment/balance-rate-multiplier
+func (h *PaymentHandler) UpdateGlobalBalanceRateMultiplier(c *gin.Context) {
+	var req updateGlobalBalanceRateMultiplierRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.RateMultiplier == nil {
+		response.BadRequest(c, "rate_multiplier is required")
+		return
+	}
+	if err := h.configService.UpdateGlobalBalanceRateMultiplier(c.Request.Context(), *req.RateMultiplier); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, globalBalanceRateMultiplierResponse{RateMultiplier: *req.RateMultiplier})
+}
 
 // GetConfig returns the payment configuration (admin view).
 // GET /api/v1/admin/payment/config

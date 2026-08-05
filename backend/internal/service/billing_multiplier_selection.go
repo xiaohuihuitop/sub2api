@@ -2,8 +2,9 @@ package service
 
 import "time"
 
-// resolveBillingMultipliers keeps customer price selection independent from
-// routing. A subscription snapshot always wins over the balance profile.
+// resolveBillingMultipliers calculates the legacy API key multiplier set.
+// V2 platform-asset requests override its result with the resolved billing
+// asset, so a group never decides a V2 request's charging multiplier.
 func resolveBillingMultipliers(
 	apiKey *APIKey,
 	subscription *UserSubscription,

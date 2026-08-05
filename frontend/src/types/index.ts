@@ -657,6 +657,9 @@ export interface ApiKey {
   name: string
   group_id: number | null
   group_ids?: number[]
+  platform_ids?: number[]
+  subscription_plan_ids?: number[]
+  allow_balance?: boolean
   status: 'active' | 'inactive' | 'quota_exhausted' | 'expired'
   ip_whitelist: string[]
   ip_blacklist: string[]
@@ -688,6 +691,9 @@ export interface CreateApiKeyRequest {
   name: string
   group_id?: number | null
   group_ids?: number[]
+  platform_ids?: number[]
+  subscription_plan_ids?: number[]
+  allow_balance?: boolean
   custom_key?: string // Optional custom API Key
   ip_whitelist?: string[]
   ip_blacklist?: string[]
@@ -702,6 +708,9 @@ export interface UpdateApiKeyRequest {
   name?: string
   group_id?: number | null
   group_ids?: number[]
+  platform_ids?: number[]
+  subscription_plan_ids?: number[]
+  allow_balance?: boolean
   status?: 'active' | 'inactive'
   ip_whitelist?: string[]
   ip_blacklist?: string[]
@@ -820,6 +829,54 @@ export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' 
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
+
+export interface PlatformModelRule {
+  id?: number
+  model_pattern: string
+  upstream_model: string
+  endpoint_capabilities: string[]
+  enabled: boolean
+}
+
+// A platform pool owns a provider-specific account pool and model mapping.
+// It deliberately carries no billing configuration.
+export interface PlatformPool {
+  id: number
+  code: string
+  name: string
+  account_platform: AccountPlatform
+  status: 'active' | 'disabled'
+  legacy_group_id?: number | null
+  model_rules: PlatformModelRule[]
+}
+
+// Safe metadata returned to users when they authorize an API Key. It omits
+// account, model-rule, legacy group, and billing implementation details.
+export interface AvailablePlatformPool {
+  id: number
+  code: string
+  name: string
+  account_platform: AccountPlatform
+}
+
+export interface CreatePlatformPoolRequest {
+  code: string
+  name: string
+  account_platform: AccountPlatform
+  status?: 'active' | 'disabled'
+  legacy_group_id?: number | null
+  model_rules?: PlatformModelRule[]
+}
+
+export interface UpdatePlatformPoolRequest {
+  code?: string
+  name?: string
+  account_platform?: AccountPlatform
+  status?: 'active' | 'disabled'
+  legacy_group_id?: number | null
+  clear_legacy_group?: boolean
+  model_rules?: PlatformModelRule[]
+}
 
 // Claude Model type (returned by /v1/models and account models API)
 export interface ClaudeModel {
@@ -1041,6 +1098,7 @@ export interface Account {
   name: string
   notes?: string | null
   platform: AccountPlatform
+  platform_id?: number | null
   type: AccountType
   // 后端响应里 credentials 已脱敏：access_token / refresh_token / id_token /
   // api_key / session_key / cookie / aws_secret_access_key / aws_session_token /
@@ -1326,6 +1384,7 @@ export interface CreateAccountRequest {
   name: string
   notes?: string | null
   platform: AccountPlatform
+  platform_id: number
   type: AccountType
   credentials: Record<string, unknown>
   extra?: Record<string, unknown>
@@ -1334,11 +1393,9 @@ export interface CreateAccountRequest {
   load_factor?: number | null
   priority?: number
   rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
-  group_ids?: number[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
   upstream_billing_probe_enabled?: boolean
-  confirm_mixed_channel_risk?: boolean
 }
 
 export interface UpdateAccountRequest {
@@ -1352,12 +1409,11 @@ export interface UpdateAccountRequest {
   load_factor?: number | null
   priority?: number
   rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
+  platform_id?: number
   schedulable?: boolean
   status?: 'active' | 'inactive' | 'error'
-  group_ids?: number[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
-  confirm_mixed_channel_risk?: boolean
 }
 
 export interface CheckMixedChannelRequest {
@@ -1464,7 +1520,7 @@ export interface CodexSessionImportRequest {
   contents?: string[]
   name?: string
   notes?: string | null
-  group_ids?: number[]
+  platform_id: number
   proxy_id?: number | null
   concurrency?: number
   priority?: number
@@ -1475,15 +1531,13 @@ export interface CodexSessionImportRequest {
   credential_extras?: Record<string, unknown>
   extra?: Record<string, unknown>
   update_existing?: boolean
-  skip_default_group_bind?: boolean
-  confirm_mixed_channel_risk?: boolean
 }
 
 export interface OpenAICodexPATCreateRequest {
   access_token: string
   name?: string
   notes?: string | null
-  group_ids?: number[]
+  platform_id: number
   proxy_id?: number | null
   concurrency?: number
   priority?: number
@@ -1493,8 +1547,6 @@ export interface OpenAICodexPATCreateRequest {
   auto_pause_on_expired?: boolean
   credential_extras?: Record<string, unknown>
   extra?: Record<string, unknown>
-  skip_default_group_bind?: boolean
-  confirm_mixed_channel_risk?: boolean
 }
 
 export interface CodexSessionImportMessage {
@@ -1543,6 +1595,11 @@ export interface UsageLog {
 
   group_id: number | null
   subscription_id: number | null
+  platform_id?: number | null
+  platform_code?: string
+  platform_name?: string
+  billing_source_type?: 'subscription' | 'balance' | 'legacy_group' | null
+  subscription_name?: string
 
   input_tokens: number
   output_tokens: number
@@ -1888,7 +1945,7 @@ export interface ChangePasswordRequest {
 export interface UserSubscription {
   id: number
   user_id: number
-  group_id: number
+  group_id?: number | null
   subscription_plan_id?: number | null
   plan_name_snapshot?: string
   daily_limit_usd_snapshot?: number | null

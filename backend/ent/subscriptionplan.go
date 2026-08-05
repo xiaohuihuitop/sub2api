@@ -65,9 +65,11 @@ type SubscriptionPlanEdges struct {
 	Subscriptions []*UserSubscription `json:"subscriptions,omitempty"`
 	// RedeemCodes holds the value of the redeem_codes edge.
 	RedeemCodes []*RedeemCode `json:"redeem_codes,omitempty"`
+	// APIKeys holds the value of the api_keys edge.
+	APIKeys []*APIKey `json:"api_keys,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // SubscriptionsOrErr returns the Subscriptions value or an error if the edge
@@ -86,6 +88,15 @@ func (e SubscriptionPlanEdges) RedeemCodesOrErr() ([]*RedeemCode, error) {
 		return e.RedeemCodes, nil
 	}
 	return nil, &NotLoadedError{edge: "redeem_codes"}
+}
+
+// APIKeysOrErr returns the APIKeys value or an error if the edge
+// was not loaded in eager-loading.
+func (e SubscriptionPlanEdges) APIKeysOrErr() ([]*APIKey, error) {
+	if e.loadedTypes[2] {
+		return e.APIKeys, nil
+	}
+	return nil, &NotLoadedError{edge: "api_keys"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -257,6 +268,11 @@ func (_m *SubscriptionPlan) QuerySubscriptions() *UserSubscriptionQuery {
 // QueryRedeemCodes queries the "redeem_codes" edge of the SubscriptionPlan entity.
 func (_m *SubscriptionPlan) QueryRedeemCodes() *RedeemCodeQuery {
 	return NewSubscriptionPlanClient(_m.config).QueryRedeemCodes(_m)
+}
+
+// QueryAPIKeys queries the "api_keys" edge of the SubscriptionPlan entity.
+func (_m *SubscriptionPlan) QueryAPIKeys() *APIKeyQuery {
+	return NewSubscriptionPlanClient(_m.config).QueryAPIKeys(_m)
 }
 
 // Update returns a builder for updating this SubscriptionPlan.

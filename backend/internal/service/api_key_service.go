@@ -124,6 +124,12 @@ type APIKeyAllowedGroupRepository interface {
 	ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error
 }
 
+// APIKeyAssetPermissionRepository is deliberately optional while old API key
+// repositories remain compatible with the legacy group-only read path.
+type APIKeyAssetPermissionRepository interface {
+	ReplaceAssetPermissions(ctx context.Context, keyID int64, permissions APIKeyAssetPermissions) error
+}
+
 type apiKeyAllByUserIDLister interface {
 	ListAllByUserID(ctx context.Context, userID int64, filters APIKeyListFilters) ([]APIKey, error)
 }
@@ -212,12 +218,15 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name        string   `json:"name"`
-	GroupID     *int64   `json:"group_id"`
-	GroupIDs    []int64  `json:"group_ids"`
-	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
+	Name                string   `json:"name"`
+	GroupID             *int64   `json:"group_id"`
+	GroupIDs            []int64  `json:"group_ids"`
+	PlatformIDs         []int64  `json:"platform_ids"`
+	SubscriptionPlanIDs []int64  `json:"subscription_plan_ids"`
+	AllowBalance        *bool    `json:"allow_balance"`
+	CustomKey           *string  `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist         []string `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist         []string `json:"ip_blacklist"` // IP 黑名单
 
 	// Quota fields
 	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
@@ -231,12 +240,15 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name        *string   `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	GroupIDs    *[]int64  `json:"group_ids"`
-	Status      *string   `json:"status"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Name                *string   `json:"name"`
+	GroupID             *int64    `json:"group_id"`
+	GroupIDs            *[]int64  `json:"group_ids"`
+	PlatformIDs         *[]int64  `json:"platform_ids"`
+	SubscriptionPlanIDs *[]int64  `json:"subscription_plan_ids"`
+	AllowBalance        *bool     `json:"allow_balance"`
+	Status              *string   `json:"status"`
+	IPWhitelist         *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist         *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -266,6 +278,7 @@ type APIKeyService struct {
 	cache                     APIKeyCache
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
+	globalBalanceRateProvider GlobalBalanceRateProvider
 	cfg                       *config.Config
 	authCacheL1               *ristretto.Cache
 	authNegativeCacheL1       *ristretto.Cache
@@ -342,6 +355,12 @@ func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidat
 
 func (s *APIKeyService) SetConcurrencyService(concurrencyService *ConcurrencyService) {
 	s.concurrencyService = concurrencyService
+}
+
+// SetGlobalBalanceRateProvider supplies the one global multiplier for balance
+// billing. Subscription instances always keep their own immutable snapshot.
+func (s *APIKeyService) SetGlobalBalanceRateProvider(provider GlobalBalanceRateProvider) {
+	s.globalBalanceRateProvider = provider
 }
 
 func (s *APIKeyService) compileAPIKeyIPRules(apiKey *APIKey) {
@@ -476,6 +495,15 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
+	if createAPIKeyAssetPermissionsProvided(req) {
+		if err := ValidateAPIKeyAssetPermissions(APIKeyAssetPermissions{
+			PlatformIDs:         req.PlatformIDs,
+			SubscriptionPlanIDs: req.SubscriptionPlanIDs,
+			AllowBalance:        req.AllowBalance == nil || *req.AllowBalance,
+		}); err != nil {
+			return nil, err
+		}
+	}
 
 	// 验证 IP 白名单格式
 	if len(req.IPWhitelist) > 0 {
@@ -536,21 +564,13 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 创建API Key记录
-	apiKey := &APIKey{
-		UserID:      userID,
-		Key:         key,
-		Name:        html.EscapeString(req.Name),
-		GroupID:     primaryGroupID,
-		Status:      StatusActive,
-		IPWhitelist: req.IPWhitelist,
-		IPBlacklist: req.IPBlacklist,
-		Quota:       req.Quota,
-		QuotaUsed:   0,
-		RateLimit5h: req.RateLimit5h,
-		RateLimit1d: req.RateLimit1d,
-		RateLimit7d: req.RateLimit7d,
-	}
+	// 创建 API Key 记录。新资产权限与旧分组字段并存，直到 migration mode 启用。
+	apiKey := newAPIKeyFromCreateRequest(req)
+	apiKey.UserID = userID
+	apiKey.Key = key
+	apiKey.Name = html.EscapeString(apiKey.Name)
+	apiKey.GroupID = primaryGroupID
+	apiKey.Status = StatusActive
 
 	// Set expiration time if specified
 	if req.ExpiresInDays != nil && *req.ExpiresInDays > 0 {
@@ -782,6 +802,23 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	if apiKey.UserID != userID {
 		return nil, ErrInsufficientPerms
 	}
+	assetPermissionsChanged := updateAPIKeyAssetPermissionsProvided(req)
+	var assetPermissions APIKeyAssetPermissions
+	var assetPermissionsWriter APIKeyAssetPermissionRepository
+	if assetPermissionsChanged {
+		assetPermissions = updatedAPIKeyAssetPermissions(apiKey, req)
+		if err := ValidateAPIKeyAssetPermissions(assetPermissions); err != nil {
+			return nil, err
+		}
+		writer, ok := s.apiKeyRepo.(APIKeyAssetPermissionRepository)
+		if !ok {
+			return nil, fmt.Errorf("api key repository does not support asset permissions")
+		}
+		assetPermissionsWriter = writer
+		apiKey.AllowedPlatformIDs = assetPermissions.PlatformIDs
+		apiKey.AllowedSubscriptionPlanIDs = assetPermissions.SubscriptionPlanIDs
+		apiKey.AllowBalance = assetPermissions.AllowBalance
+	}
 
 	// 验证 IP 白名单格式
 	if req.IPWhitelist != nil && len(*req.IPWhitelist) > 0 {
@@ -925,6 +962,11 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			if err := writer.ReplaceAllowedGroups(ctx, apiKey.ID, apiKey.AllowedGroupIDs); err != nil {
 				return nil, fmt.Errorf("replace api key allowed groups: %w", err)
 			}
+		}
+	}
+	if assetPermissionsChanged {
+		if err := assetPermissionsWriter.ReplaceAssetPermissions(ctx, apiKey.ID, assetPermissions); err != nil {
+			return nil, fmt.Errorf("replace api key asset permissions: %w", err)
 		}
 	}
 

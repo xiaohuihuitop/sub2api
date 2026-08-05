@@ -15,6 +15,160 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type planRefundUserSubscriptionRepoStub struct {
+	userSubRepoNoop
+	subscriptions []UserSubscription
+}
+
+func (s *planRefundUserSubscriptionRepoStub) ListByUserID(_ context.Context, _ int64) ([]UserSubscription, error) {
+	return append([]UserSubscription(nil), s.subscriptions...), nil
+}
+
+func TestPrepDeductFindsPlanSubscriptionByOrderNote(t *testing.T) {
+	planID := int64(55)
+	days := 30
+	repo := &planRefundUserSubscriptionRepoStub{subscriptions: []UserSubscription{{
+		ID:                 34,
+		UserID:             9,
+		SubscriptionPlanID: &planID,
+		Notes:              paymentSubscriptionOrderNote(88),
+	}}}
+	svc := &PaymentService{subscriptionSvc: &SubscriptionService{userSubRepo: repo}}
+	order := &dbent.PaymentOrder{
+		ID:               88,
+		UserID:           9,
+		OrderType:        payment.OrderTypeSubscription,
+		PlanID:           &planID,
+		SubscriptionDays: &days,
+	}
+
+	refundPlan := &RefundPlan{}
+	result := svc.prepDeduct(context.Background(), order, refundPlan, false)
+
+	require.Nil(t, result)
+	require.Equal(t, payment.DeductionTypeSubscription, refundPlan.DeductionType)
+	require.Equal(t, int64(34), refundPlan.SubscriptionID)
+	require.Equal(t, 30, refundPlan.SubDaysToDeduct)
+}
+
+func TestPrepDeductUsesPlanDaysWhenOrderSnapshotIsMissing(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	plan, err := client.SubscriptionPlan.Create().
+		SetName("Historical plan").
+		SetPrice(9.9).
+		SetValidityDays(14).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	planID := plan.ID
+	repo := &planRefundUserSubscriptionRepoStub{subscriptions: []UserSubscription{{
+		ID:                 35,
+		UserID:             9,
+		SubscriptionPlanID: &planID,
+		Notes:              paymentSubscriptionOrderNote(89),
+	}}}
+	svc := &PaymentService{
+		entClient:       client,
+		subscriptionSvc: &SubscriptionService{userSubRepo: repo},
+	}
+	order := &dbent.PaymentOrder{
+		ID:        89,
+		UserID:    9,
+		OrderType: payment.OrderTypeSubscription,
+		PlanID:    &planID,
+	}
+
+	refundPlan := &RefundPlan{}
+	result := svc.prepDeduct(ctx, order, refundPlan, false)
+
+	require.Nil(t, result)
+	require.Equal(t, int64(35), refundPlan.SubscriptionID)
+	require.Equal(t, 14, refundPlan.SubDaysToDeduct)
+}
+
+func TestPrepDeductFallsBackToLegacyGroupWhenPlanIsMissing(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	planID := int64(99)
+	groupID := int64(7)
+	days := 30
+	repo := &legacyPaymentSubscriptionRepoStub{subscriptionUserSubRepoStub: newSubscriptionUserSubRepoStub()}
+	repo.seed(&UserSubscription{
+		ID:        36,
+		UserID:    9,
+		GroupID:   groupID,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Status:    SubscriptionStatusActive,
+	})
+	groupRepo := &subscriptionGroupRepoStub{group: &Group{ID: groupID, Status: payment.EntityStatusActive}}
+	svc := &PaymentService{
+		entClient:       client,
+		subscriptionSvc: NewSubscriptionService(groupRepo, repo, nil, nil, nil),
+	}
+	order := &dbent.PaymentOrder{
+		ID:                  90,
+		UserID:              9,
+		OrderType:           payment.OrderTypeSubscription,
+		PlanID:              &planID,
+		SubscriptionGroupID: &groupID,
+		SubscriptionDays:    &days,
+	}
+
+	refundPlan := &RefundPlan{}
+	result := svc.prepDeduct(ctx, order, refundPlan, false)
+
+	require.Nil(t, result)
+	require.Equal(t, payment.DeductionTypeSubscription, refundPlan.DeductionType)
+	require.Equal(t, int64(36), refundPlan.SubscriptionID)
+	require.Equal(t, 30, refundPlan.SubDaysToDeduct)
+}
+
+func TestPrepDeductDoesNotFallBackToLegacyGroupWhenPlanStillExists(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	plan, err := client.SubscriptionPlan.Create().
+		SetName("Current plan").
+		SetPrice(9.9).
+		SetValidityDays(30).
+		SetRateMultiplier(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	groupID := int64(7)
+	days := 30
+	repo := &legacyPaymentSubscriptionRepoStub{subscriptionUserSubRepoStub: newSubscriptionUserSubRepoStub()}
+	repo.seed(&UserSubscription{
+		ID:        37,
+		UserID:    9,
+		GroupID:   groupID,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Status:    SubscriptionStatusActive,
+	})
+	groupRepo := &subscriptionGroupRepoStub{group: &Group{ID: groupID, Status: payment.EntityStatusActive}}
+	svc := &PaymentService{
+		entClient:       client,
+		subscriptionSvc: NewSubscriptionService(groupRepo, repo, nil, nil, nil),
+	}
+	order := &dbent.PaymentOrder{
+		ID:                  91,
+		UserID:              9,
+		OrderType:           payment.OrderTypeSubscription,
+		PlanID:              &plan.ID,
+		SubscriptionGroupID: &groupID,
+		SubscriptionDays:    &days,
+	}
+
+	refundPlan := &RefundPlan{}
+	result := svc.prepDeduct(ctx, order, refundPlan, false)
+
+	require.NotNil(t, result)
+	require.True(t, result.RequireForce)
+	require.Contains(t, result.Warning, "cannot find plan subscription")
+	require.Zero(t, refundPlan.SubscriptionID)
+}
+
 func TestValidateRefundRequestRejectsLegacyGuessedProviderInstance(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentConfigServiceTestClient(t)

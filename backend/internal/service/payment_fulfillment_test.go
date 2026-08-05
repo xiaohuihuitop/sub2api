@@ -862,7 +862,6 @@ func TestExecuteSubscriptionFulfillmentCreatesIndependentInstancesFromPlan(t *te
 
 	dailyLimit := 12.0
 	plan, err := client.SubscriptionPlan.Create().
-		SetGroupID(7).
 		SetName("Independent plan").
 		SetPrice(9.9).
 		SetValidityDays(7).
@@ -908,6 +907,129 @@ func TestExecuteSubscriptionFulfillmentCreatesIndependentInstancesFromPlan(t *te
 		require.Equal(t, dailyLimit, *subscription.DailyLimitUSDSnapshot)
 		require.Equal(t, 1.5, subscription.RateMultiplierSnapshot)
 	}
+}
+
+func TestExecuteSubscriptionFulfillmentFallsBackToLegacyGroupWhenPlanIsMissing(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	ensurePaymentAuditOrderActionUniqueIndex(t, ctx, client)
+	order := createPaymentFulfillmentSubscriptionOrder(t, ctx, client, OrderStatusPaid, time.Now())
+
+	subscriptionRepo := newSubscriptionUserSubRepoStub()
+	svc := &PaymentService{
+		entClient: client,
+		groupRepo: &subscriptionGroupRepoStub{
+			group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription},
+		},
+		subscriptionSvc: NewSubscriptionService(
+			&subscriptionGroupRepoStub{group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription}},
+			subscriptionRepo,
+			nil,
+			nil,
+			nil,
+		),
+	}
+
+	require.NoError(t, svc.ExecuteSubscriptionFulfillment(ctx, order.ID))
+	subscription, err := subscriptionRepo.GetByUserIDAndGroupID(ctx, order.UserID, *order.SubscriptionGroupID)
+	require.NoError(t, err)
+	require.Equal(t, int64(7), subscription.GroupID)
+	require.Nil(t, subscription.SubscriptionPlanID)
+	require.Equal(t, 1, subscriptionRepo.createCalls)
+}
+
+type subscriptionPurchaseNotificationVariablesBuilder interface {
+	subscriptionPurchaseNotificationVariables(context.Context, *dbent.PaymentOrder) map[string]string
+}
+
+type legacyPaymentSubscriptionRepoStub struct {
+	*subscriptionUserSubRepoStub
+}
+
+func (s *legacyPaymentSubscriptionRepoStub) GetActiveByUserIDAndGroupID(
+	ctx context.Context,
+	userID, groupID int64,
+) (*UserSubscription, error) {
+	return s.GetByUserIDAndGroupID(ctx, userID, groupID)
+}
+
+func TestSubscriptionPurchaseNotificationVariablesUsePlanWhenNoLegacyGroupExists(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	plan, err := client.SubscriptionPlan.Create().
+		SetName("V2 Premium").
+		SetPrice(9.9).
+		SetValidityDays(7).
+		SetRateMultiplier(1.25).
+		Save(ctx)
+	require.NoError(t, err)
+
+	order := createPaymentFulfillmentSubscriptionOrder(t, ctx, client, OrderStatusCompleted, time.Now())
+	order, err = client.PaymentOrder.UpdateOneID(order.ID).
+		SetPlanID(plan.ID).
+		SetSubscriptionDays(7).
+		ClearSubscriptionGroupID().
+		Save(ctx)
+	require.NoError(t, err)
+
+	expiresAt := time.Date(2026, 8, 12, 9, 30, 0, 0, time.UTC)
+	planID := plan.ID
+	subscriptionRepo := newSubscriptionUserSubRepoStub()
+	subscriptionRepo.seed(&UserSubscription{
+		ID:                 901,
+		UserID:             order.UserID,
+		SubscriptionPlanID: &planID,
+		ExpiresAt:          expiresAt,
+		Status:             SubscriptionStatusActive,
+		Notes:              paymentSubscriptionOrderNote(order.ID),
+	})
+	svc := &PaymentService{
+		entClient: client,
+		subscriptionSvc: NewSubscriptionService(
+			&subscriptionGroupRepoStub{},
+			subscriptionRepo,
+			nil,
+			nil,
+			nil,
+		),
+	}
+
+	builder, ok := any(svc).(subscriptionPurchaseNotificationVariablesBuilder)
+	require.True(t, ok, "payment service must build notification variables for plan orders")
+	variables := builder.subscriptionPurchaseNotificationVariables(ctx, order)
+
+	require.Equal(t, "V2 Premium", variables["subscription_group"])
+	require.Equal(t, "7", variables["subscription_days"])
+	require.Equal(t, "2026-08-12 09:30", variables["expiry_time"])
+}
+
+func TestSubscriptionPurchaseNotificationVariablesFallBackToLegacyGroupWhenPlanIsMissing(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	order := createPaymentFulfillmentSubscriptionOrder(t, ctx, client, OrderStatusCompleted, time.Now())
+	expiresAt := time.Date(2026, 9, 4, 10, 30, 0, 0, time.UTC)
+	subscriptionRepo := &legacyPaymentSubscriptionRepoStub{subscriptionUserSubRepoStub: newSubscriptionUserSubRepoStub()}
+	subscriptionRepo.seed(&UserSubscription{
+		ID:        902,
+		UserID:    order.UserID,
+		GroupID:   *order.SubscriptionGroupID,
+		ExpiresAt: expiresAt,
+		Status:    SubscriptionStatusActive,
+	})
+	groupRepo := &subscriptionGroupRepoStub{
+		group: &Group{ID: 7, Name: "Legacy package", Status: payment.EntityStatusActive},
+	}
+	svc := &PaymentService{
+		entClient:       client,
+		groupRepo:       groupRepo,
+		subscriptionSvc: NewSubscriptionService(groupRepo, subscriptionRepo, nil, nil, nil),
+	}
+
+	variables := svc.subscriptionPurchaseNotificationVariables(ctx, order)
+
+	require.Equal(t, "Legacy package", variables["subscription_group"])
+	require.Equal(t, "30", variables["subscription_days"])
+	require.Equal(t, "2026-09-04 10:30", variables["expiry_time"])
 }
 
 func TestHasPaymentSubscriptionOrderNoteRequiresIndependentExactLine(t *testing.T) {

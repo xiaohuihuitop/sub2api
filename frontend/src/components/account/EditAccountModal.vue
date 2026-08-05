@@ -2494,13 +2494,25 @@
       </div>
 
       <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="mb-4">
+          <label class="input-label">{{ t('admin.accounts.platformPool') }}</label>
+          <Select
+            v-model="form.platform_id"
+            :options="platformPoolOptions"
+            :placeholder="t('admin.accounts.platformPoolRequired')"
+            :aria-label="t('admin.accounts.platformPool')"
+          />
+          <p v-if="platformPoolOptions.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
+            {{ t('admin.accounts.noPlatformPool') }}
+          </p>
+        </div>
         <div>
           <label class="input-label">{{ t('common.status') }}</label>
           <Select v-model="form.status" :options="statusOptions" />
         </div>
 
-        <!-- Mixed Scheduling (only for antigravity accounts, read-only in edit mode) -->
-        <div v-if="account?.platform === 'antigravity'" class="flex items-center gap-2">
+        <!-- Legacy cross-platform routing is intentionally unavailable in V2. -->
+        <div v-if="false" class="flex items-center gap-2">
           <label class="flex cursor-not-allowed items-center gap-2 opacity-60">
             <input
               type="checkbox"
@@ -2559,15 +2571,6 @@
       </div>
 
       <!-- Group Selection - 仅标准模式显示 -->
-      <GroupSelector
-        v-if="!authStore.isSimpleMode"
-        v-model="form.group_ids"
-        :groups="groups"
-        :platform="account?.platform"
-        :mixed-scheduling="mixedScheduling"
-        data-tour="account-form-groups"
-      />
-
     </form>
 
     <template #footer>
@@ -2608,44 +2611,29 @@
     </template>
   </BaseDialog>
 
-  <!-- Mixed Channel Warning Dialog -->
-  <ConfirmDialog
-    :show="showMixedChannelWarning"
-    :title="t('admin.accounts.mixedChannelWarningTitle')"
-    :message="mixedChannelWarningMessageText"
-    :confirm-text="t('common.confirm')"
-    :cancel-text="t('common.cancel')"
-    :danger="true"
-    @confirm="handleMixedChannelConfirm"
-    @cancel="handleMixedChannelCancel"
-  />
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
-import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
 import type {
   Account,
   Proxy,
-  AdminGroup,
-  CheckMixedChannelResponse,
   OpenAICompactMode,
   OpenAIResponsesMode,
   OpenAIEndpointCapability,
-  OllamaCloudUsageState
+  OllamaCloudUsageState,
+  PlatformPool
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
-import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
@@ -2691,7 +2679,7 @@ interface Props {
   show: boolean
   account: Account | null
   proxies: Proxy[]
-  groups: AdminGroup[]
+  platformPools: PlatformPool[]
 }
 
 const props = defineProps<Props>()
@@ -2702,7 +2690,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const appStore = useAppStore()
-const authStore = useAuthStore()
 
 // Spark 影子账号(parent_account_id 非空):代理恒继承母账号,不可独立编辑(外审 B/P1),
 // 故隐藏代理选择器。
@@ -2835,14 +2822,6 @@ const getModelMappingKey = createStableObjectKeyResolver<ModelMapping>('edit-mod
 const getOpenAICompactModelMappingKey = createStableObjectKeyResolver<ModelMapping>('edit-openai-compact-model-mapping')
 const getAntigravityModelMappingKey = createStableObjectKeyResolver<ModelMapping>('edit-antigravity-model-mapping')
 const getTempUnschedRuleKey = createStableObjectKeyResolver<TempUnschedRuleForm>('edit-temp-unsched-rule')
-
-const showMixedChannelWarning = ref(false)
-const mixedChannelWarningDetails = ref<{ groupName: string; currentPlatform: string; otherPlatform: string } | null>(
-  null
-)
-const mixedChannelWarningRawMessage = ref('')
-const mixedChannelWarningAction = ref<(() => Promise<void>) | null>(null)
-const antigravityMixedChannelConfirmed = ref(false)
 
 // Quota control state (Anthropic OAuth/SetupToken only)
 const windowCostEnabled = ref(false)
@@ -3171,13 +3150,6 @@ const defaultBaseUrl = computed(() => {
   return 'https://api.anthropic.com'
 })
 
-const mixedChannelWarningMessageText = computed(() => {
-  if (mixedChannelWarningDetails.value) {
-    return t('admin.accounts.mixedChannelWarning', mixedChannelWarningDetails.value)
-  }
-  return mixedChannelWarningRawMessage.value
-})
-
 const form = reactive({
   name: '',
   notes: '',
@@ -3187,9 +3159,34 @@ const form = reactive({
   priority: 1,
   rate_multiplier: 1,
   status: 'active' as 'active' | 'inactive' | 'error',
-  group_ids: [] as number[],
+  platform_id: 0,
   expires_at: null as number | null
 })
+
+const platformPoolOptions = computed(() =>
+  props.platformPools
+    .filter((pool) => pool.account_platform === props.account?.platform)
+    .filter((pool) => pool.status === 'active' || pool.id === form.platform_id)
+    .map((pool) => ({
+      value: pool.id,
+      label: `${pool.name} (${pool.code})`,
+      disabled: pool.status !== 'active'
+    }))
+)
+
+const ensurePlatformPoolSelected = () => {
+  const selected = props.platformPools.find((pool) => pool.id === form.platform_id)
+  const currentPlatformID = props.account?.platform_id ?? null
+  if (
+    selected &&
+    selected.account_platform === props.account?.platform &&
+    (selected.status === 'active' || selected.id === currentPlatformID)
+  ) {
+    return true
+  }
+  appStore.showError(t('admin.accounts.platformPoolRequired'))
+  return false
+}
 
 const statusOptions = computed(() => {
   const options = [
@@ -3263,11 +3260,6 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   if (!newAccount) {
     return
   }
-  antigravityMixedChannelConfirmed.value = false
-  showMixedChannelWarning.value = false
-  mixedChannelWarningDetails.value = null
-  mixedChannelWarningRawMessage.value = ''
-  mixedChannelWarningAction.value = null
   form.name = newAccount.name
   form.notes = newAccount.notes || ''
   form.proxy_id = newAccount.proxy_id
@@ -3278,7 +3270,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.status = (newAccount.status === 'active' || newAccount.status === 'inactive' || newAccount.status === 'error')
     ? newAccount.status
     : 'active'
-  form.group_ids = newAccount.group_ids || []
+  form.platform_id = newAccount.platform_id ?? 0
   form.expires_at = newAccount.expires_at ?? null
 
   // Load intercept warmup requests setting (applies to all account types)
@@ -3949,113 +3941,22 @@ function toPositiveNumber(value: unknown) {
   return Math.trunc(num)
 }
 
-const needsMixedChannelCheck = () => props.account?.platform === 'antigravity' || props.account?.platform === 'anthropic'
-
-const buildMixedChannelDetails = (resp?: CheckMixedChannelResponse) => {
-  const details = resp?.details
-  if (!details) {
-    return null
-  }
-  return {
-    groupName: details.group_name || 'Unknown',
-    currentPlatform: details.current_platform || 'Unknown',
-    otherPlatform: details.other_platform || 'Unknown'
-  }
-}
-
-const clearMixedChannelDialog = () => {
-  showMixedChannelWarning.value = false
-  mixedChannelWarningDetails.value = null
-  mixedChannelWarningRawMessage.value = ''
-  mixedChannelWarningAction.value = null
-}
-
-const openMixedChannelDialog = (opts: {
-  response?: CheckMixedChannelResponse
-  message?: string
-  onConfirm: () => Promise<void>
-}) => {
-  mixedChannelWarningDetails.value = buildMixedChannelDetails(opts.response)
-  mixedChannelWarningRawMessage.value =
-    opts.message || opts.response?.message || t('admin.accounts.failedToUpdate')
-  mixedChannelWarningAction.value = opts.onConfirm
-  showMixedChannelWarning.value = true
-}
-
-const withAntigravityConfirmFlag = (payload: Record<string, unknown>) => {
-  if (needsMixedChannelCheck() && antigravityMixedChannelConfirmed.value) {
-    return {
-      ...payload,
-      confirm_mixed_channel_risk: true
-    }
-  }
-  const cloned = { ...payload }
-  delete cloned.confirm_mixed_channel_risk
-  return cloned
-}
-
-const ensureAntigravityMixedChannelConfirmed = async (onConfirm: () => Promise<void>): Promise<boolean> => {
-  if (!needsMixedChannelCheck()) {
-    return true
-  }
-  if (antigravityMixedChannelConfirmed.value) {
-    return true
-  }
-  if (!props.account) {
-    return false
-  }
-
-  try {
-    const result = await adminAPI.accounts.checkMixedChannelRisk({
-      platform: props.account.platform,
-      group_ids: form.group_ids,
-      account_id: props.account.id
-    })
-    if (!result.has_risk) {
-      return true
-    }
-    openMixedChannelDialog({
-      response: result,
-      onConfirm: async () => {
-        antigravityMixedChannelConfirmed.value = true
-        await onConfirm()
-      }
-    })
-    return false
-  } catch (error: any) {
-    appStore.showError(error.message || t('admin.accounts.failedToUpdate'))
-    return false
-  }
-}
-
 const formatDateTimeLocal = formatDateTimeLocalInput
 const parseDateTimeLocal = parseDateTimeLocalInput
 
 // Methods
 const handleClose = () => {
-  antigravityMixedChannelConfirmed.value = false
-  clearMixedChannelDialog()
   emit('close')
 }
 
 const submitUpdateAccount = async (accountID: number, updatePayload: Record<string, unknown>) => {
   submitting.value = true
   try {
-    const updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
+    const updatedAccount = await adminAPI.accounts.update(accountID, updatePayload)
     appStore.showSuccess(t('admin.accounts.accountUpdated'))
     emit('updated', updatedAccount)
     handleClose()
   } catch (error: any) {
-    if (error.status === 409 && error.error === 'mixed_channel_warning' && needsMixedChannelCheck()) {
-      openMixedChannelDialog({
-        message: error.message,
-        onConfirm: async () => {
-          antigravityMixedChannelConfirmed.value = true
-          await submitUpdateAccount(accountID, updatePayload)
-        }
-      })
-      return
-    }
     appStore.showError(error.message || t('admin.accounts.failedToUpdate'))
   } finally {
     submitting.value = false
@@ -4064,6 +3965,7 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
 
 const handleSubmit = async () => {
   if (!props.account) return
+  if (!ensurePlatformPoolSelected()) return
   const accountID = props.account.id
 
   if (form.status !== 'active' && form.status !== 'inactive' && form.status !== 'error') {
@@ -4417,11 +4319,7 @@ const handleSubmit = async () => {
     if (props.account.platform === 'antigravity') {
       const currentExtra = (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
-      if (mixedScheduling.value) {
-        newExtra.mixed_scheduling = true
-      } else {
-        delete newExtra.mixed_scheduling
-      }
+      delete newExtra.mixed_scheduling
       if (allowOverages.value) {
         newExtra.allow_overages = true
       } else {
@@ -4698,36 +4596,10 @@ const handleSubmit = async () => {
       updatePayload.extra = newExtra
     }
 
-    const canContinue = await ensureAntigravityMixedChannelConfirmed(async () => {
-      await submitUpdateAccount(accountID, updatePayload)
-    })
-    if (!canContinue) {
-      return
-    }
-
     await submitUpdateAccount(accountID, updatePayload)
   } catch (error: any) {
     appStore.showError(error.message || t('admin.accounts.failedToUpdate'))
   }
 }
 
-// Handle mixed channel warning confirmation
-const handleMixedChannelConfirm = async () => {
-  const action = mixedChannelWarningAction.value
-  if (!action) {
-    clearMixedChannelDialog()
-    return
-  }
-  clearMixedChannelDialog()
-  submitting.value = true
-  try {
-    await action()
-  } finally {
-    submitting.value = false
-  }
-}
-
-const handleMixedChannelCancel = () => {
-  clearMixedChannelDialog()
-}
 </script>

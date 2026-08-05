@@ -25,7 +25,7 @@ func TestCreateShadow_ReturnsCreatedShadow(t *testing.T) {
 	router := gin.New()
 	router.POST("/api/v1/admin/accounts/:id/shadow", h.CreateShadow)
 
-	body := `{"name":"p-spark","priority":50,"concurrency":2,"group_ids":[10,20]}`
+	body := `{"name":"p-spark","priority":50,"concurrency":2}`
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/42/shadow", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

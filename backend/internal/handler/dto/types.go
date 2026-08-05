@@ -48,22 +48,25 @@ type AdminUser struct {
 }
 
 type APIKey struct {
-	ID          int64      `json:"id"`
-	UserID      int64      `json:"user_id"`
-	Key         string     `json:"key"`
-	Name        string     `json:"name"`
-	GroupID     *int64     `json:"group_id"`
-	GroupIDs    []int64    `json:"group_ids"`
-	Status      string     `json:"status"`
-	IPWhitelist []string   `json:"ip_whitelist"`
-	IPBlacklist []string   `json:"ip_blacklist"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	LastUsedIP  *string    `json:"last_used_ip"`
-	Quota       float64    `json:"quota"`      // Quota limit in USD (0 = unlimited)
-	QuotaUsed   float64    `json:"quota_used"` // Used quota amount in USD
-	ExpiresAt   *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID                  int64      `json:"id"`
+	UserID              int64      `json:"user_id"`
+	Key                 string     `json:"key"`
+	Name                string     `json:"name"`
+	GroupID             *int64     `json:"group_id"`
+	GroupIDs            []int64    `json:"group_ids"`
+	PlatformIDs         []int64    `json:"platform_ids"`
+	SubscriptionPlanIDs []int64    `json:"subscription_plan_ids"`
+	AllowBalance        bool       `json:"allow_balance"`
+	Status              string     `json:"status"`
+	IPWhitelist         []string   `json:"ip_whitelist"`
+	IPBlacklist         []string   `json:"ip_blacklist"`
+	LastUsedAt          *time.Time `json:"last_used_at"`
+	LastUsedIP          *string    `json:"last_used_ip"`
+	Quota               float64    `json:"quota"`      // Quota limit in USD (0 = unlimited)
+	QuotaUsed           float64    `json:"quota_used"` // Used quota amount in USD
+	ExpiresAt           *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 	// CurrentConcurrency is the real-time active request count for this API key.
 	CurrentConcurrency int `json:"current_concurrency"`
 
@@ -202,11 +205,12 @@ type AdminGroup struct {
 }
 
 type Account struct {
-	ID       int64   `json:"id"`
-	Name     string  `json:"name"`
-	Notes    *string `json:"notes"`
-	Platform string  `json:"platform"`
-	Type     string  `json:"type"`
+	ID         int64   `json:"id"`
+	Name       string  `json:"name"`
+	Notes      *string `json:"notes"`
+	Platform   string  `json:"platform"`
+	PlatformID *int64  `json:"platform_id,omitempty"`
+	Type       string  `json:"type"`
 	// Credentials 经 RedactCredentials 处理后只含非敏感子键；敏感 token / api_key / 私钥
 	// 的存在性通过 CredentialsStatus（has_<key>）暴露，原始值不返回前端。
 	Credentials             map[string]any                 `json:"credentials"`
@@ -510,6 +514,13 @@ type UsageLog struct {
 
 	GroupID        *int64 `json:"group_id"`
 	SubscriptionID *int64 `json:"subscription_id"`
+	PlatformID     *int64 `json:"platform_id,omitempty"`
+	PlatformCode   string `json:"platform_code,omitempty"`
+	PlatformName   string `json:"platform_name,omitempty"`
+	// BillingSourceType is "subscription" or "balance" for V2 records.
+	// Empty preserves the legacy group-only record format.
+	BillingSourceType string `json:"billing_source_type,omitempty"`
+	SubscriptionName  string `json:"subscription_name,omitempty"`
 
 	InputTokens         int `json:"input_tokens"`
 	OutputTokens        int `json:"output_tokens"`
@@ -642,7 +653,7 @@ type Setting struct {
 type UserSubscription struct {
 	ID      int64 `json:"id"`
 	UserID  int64 `json:"user_id"`
-	GroupID int64 `json:"group_id"`
+	GroupID *int64 `json:"group_id,omitempty"`
 
 	SubscriptionPlanID      *int64   `json:"subscription_plan_id,omitempty"`
 	PlanNameSnapshot        string   `json:"plan_name_snapshot,omitempty"`

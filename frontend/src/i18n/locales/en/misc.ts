@@ -585,6 +585,8 @@ export default {
       supportedTypes: 'Supported Payment Types',
       supportedTypesHint: 'Select the payment types this provider supports',
       rateMultiplier: 'Rate Multiplier',
+      globalBalanceRateMultiplier: 'Balance Multiplier',
+      invalidGlobalBalanceRateMultiplier: 'Balance multiplier must be zero or a positive number',
       dashboardTitle: 'Payment Dashboard',
       dashboardDesc: 'Recharge order analytics and insights',
       daySuffix: 'd',

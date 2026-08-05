@@ -192,35 +192,28 @@ func TestCreateShadowInheritsParentEffectiveOpenAILongContextBillingValue(t *tes
 
 // TestCreateShadow_BindGroups は BindGroups の後置呼び出しを検証する。
 // 影子账号が指定グループに属し、ListSchedulableByGroupID で取得可能であること。
-func TestCreateShadow_BindGroups(t *testing.T) {
+func TestCreateShadowInheritsParentPlatformPool(t *testing.T) {
 	ctx := context.Background()
 	repo := newSparkShadowRepoStub()
 	svc := &adminServiceImpl{accountRepo: repo}
+	platformID := int64(42)
 
 	parent := &Account{
-		Name:     "parent",
-		Platform: PlatformOpenAI,
-		Type:     AccountTypeOAuth,
-		Status:   StatusActive,
+		Name:       "parent",
+		Platform:   PlatformOpenAI,
+		PlatformID: &platformID,
+		Type:       AccountTypeOAuth,
+		Status:     StatusActive,
 		Credentials: map[string]any{
 			"chatgpt_account_id": "org-y",
 		},
 	}
 	require.NoError(t, repo.Create(ctx, parent))
 
-	const testGroupID = int64(42)
-	shadow, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{
-		Name:     "p-spark",
-		GroupIDs: []int64{testGroupID},
-	})
+	shadow, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "p-spark"})
 	require.NoError(t, err)
 	require.NotNil(t, shadow)
-	require.Equal(t, []int64{testGroupID}, shadow.GroupIDs, "CreateShadow should backfill GroupIDs into the returned shadow")
-
-	accounts, err := repo.ListSchedulableByGroupID(ctx, testGroupID)
-	require.NoError(t, err)
-	require.Len(t, accounts, 1)
-	require.Equal(t, shadow.ID, accounts[0].ID)
+	require.Equal(t, parent.PlatformID, shadow.PlatformID)
 }
 
 // TestDeleteAccount_CascadeToShadow verifies that deleting a parent account also
@@ -436,9 +429,10 @@ func (s *sparkShadowGroupRepoStub) ListActiveByPlatform(_ context.Context, _ str
 	return s.groups, nil
 }
 
-// TestCreateShadow_DefaultGroupBinding 验证外审 F4:未指定 group_ids 时
-// 影子回落绑定 openai-default 组(否则无组、组内路由选不到)。
-func TestCreateShadow_DefaultGroupBinding(t *testing.T) {
+// TestCreateShadow_DoesNotDefaultBindLegacyGroup verifies that a V2 shadow
+// account never acquires a legacy group binding, even when an old default
+// group still exists.
+func TestCreateShadow_DoesNotDefaultBindLegacyGroup(t *testing.T) {
 	ctx := context.Background()
 	repo := newSparkShadowRepoStub()
 	groupRepo := &sparkShadowGroupRepoStub{
@@ -457,12 +451,13 @@ func TestCreateShadow_DefaultGroupBinding(t *testing.T) {
 
 	shadow, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "grp-shadow"})
 	require.NoError(t, err)
-	require.Equal(t, []int64{99}, repo.groupsOf[shadow.ID], "未指定分组应回落绑定 openai-default(id=99)")
+	require.Empty(t, repo.groupsOf[shadow.ID])
+	require.Empty(t, shadow.GroupIDs)
 }
 
-// TestCreateShadow_InheritsParentGroups 验证外审 G1:未指定 group_ids 时
-// 影子继承母账号当前分组(而非仅 openai-default),以便母在自定义组时影子也可路由。
-func TestCreateShadow_InheritsParentGroups(t *testing.T) {
+// TestCreateShadow_DoesNotInheritParentLegacyGroups verifies that a V2 shadow
+// account does not inherit historical parent group bindings.
+func TestCreateShadow_DoesNotInheritParentLegacyGroups(t *testing.T) {
 	ctx := context.Background()
 	repo := newSparkShadowRepoStub()
 	// groupRepo 故意提供 openai-default,以证明「继承母分组」优先于「回落 openai-default」。
@@ -478,7 +473,8 @@ func TestCreateShadow_InheritsParentGroups(t *testing.T) {
 
 	shadow, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "grp-shadow"})
 	require.NoError(t, err)
-	require.Equal(t, []int64{11, 22}, repo.groupsOf[shadow.ID], "未指定分组应继承母账号分组,而非 openai-default")
+	require.Empty(t, repo.groupsOf[shadow.ID])
+	require.Empty(t, shadow.GroupIDs)
 }
 
 // TestCreateShadow_RejectsShadowAsParent 验证外审 G6:不允许把影子当母创建二级影子。
@@ -807,7 +803,7 @@ func TestCreateShadow_ConcurrentCreateReturns409(t *testing.T) {
 
 // TestCreateShadow_InvalidGroupRejectedNoOrphan 验证外审 C/P1:显式无效分组应在
 // 创建前被拒,不留孤儿影子。
-func TestCreateShadow_InvalidGroupRejectedNoOrphan(t *testing.T) {
+func TestCreateShadowDoesNotRequireLegacyGroup(t *testing.T) {
 	ctx := context.Background()
 	repo := newSparkShadowRepoStub()
 	groupRepo := &sparkShadowValidatingGroupRepoStub{existing: map[int64]bool{7: true}}
@@ -818,17 +814,18 @@ func TestCreateShadow_InvalidGroupRejectedNoOrphan(t *testing.T) {
 	}
 	require.NoError(t, repo.Create(ctx, parent))
 
-	_, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "s", GroupIDs: []int64{999}})
-	require.Error(t, err, "无效分组应在创建前被拒")
+	shadow, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "s"})
+	require.NoError(t, err)
+	require.NotNil(t, shadow)
 
 	shadows, qerr := repo.ListShadowsByParent(ctx, parent.ID)
 	require.NoError(t, qerr)
-	require.Empty(t, shadows, "无效分组应在创建前被拒,不应建出影子")
+	require.Len(t, shadows, 1)
 }
 
 // TestCreateShadow_BindFailureRollsBackShadow 验证外审 C/P1:绑组失败时补偿删除
 // 刚建的影子,不留孤儿(否则一母一影唯一索引会挡住重试)。
-func TestCreateShadow_BindFailureRollsBackShadow(t *testing.T) {
+func TestCreateShadowDoesNotBindLegacyGroups(t *testing.T) {
 	ctx := context.Background()
 	base := newSparkShadowRepoStub()
 	repo := &bindFailRepoStub{sparkShadowRepoStub: base}
@@ -840,12 +837,13 @@ func TestCreateShadow_BindFailureRollsBackShadow(t *testing.T) {
 	}
 	require.NoError(t, base.Create(ctx, parent))
 
-	_, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "s", GroupIDs: []int64{7}})
-	require.Error(t, err, "绑组失败应返回错误")
+	shadow, err := svc.CreateShadow(ctx, parent.ID, ShadowOptions{Name: "s"})
+	require.NoError(t, err)
+	require.NotNil(t, shadow)
 
 	shadows, qerr := base.ListShadowsByParent(ctx, parent.ID)
 	require.NoError(t, qerr)
-	require.Empty(t, shadows, "绑组失败后应补偿删除影子,不留孤儿")
+	require.Len(t, shadows, 1)
 }
 
 // TestUpdateAccount_RejectsParentTypeChangeWithShadow 验证外审 D/P1:母账号有 spark 影子时,
@@ -897,11 +895,10 @@ func TestUpdateAccount_IgnoresProxyChangeOnShadow(t *testing.T) {
 	require.Equal(t, parentProxy, *repo.accounts[shadow.ID].ProxyID, "影子 proxy 不应被独立改动,恒继承母账号")
 }
 
-func TestUpdateAccount_ShadowAllowsModelMappingAndGroupUpdate(t *testing.T) {
+func TestUpdateAccountShadowAllowsModelMappingWithoutLegacyGroupUpdate(t *testing.T) {
 	ctx := context.Background()
 	repo := newSparkShadowRepoStub()
-	groupRepo := &sparkShadowValidatingGroupRepoStub{existing: map[int64]bool{7: true}}
-	svc := &adminServiceImpl{accountRepo: repo, groupRepo: groupRepo}
+	svc := &adminServiceImpl{accountRepo: repo}
 	parentID := int64(1)
 	parent := &Account{
 		ID:       parentID,
@@ -926,18 +923,16 @@ func TestUpdateAccount_ShadowAllowsModelMappingAndGroupUpdate(t *testing.T) {
 	}
 	require.NoError(t, repo.Create(ctx, shadow))
 
-	groupIDs := []int64{7}
 	updated, err := svc.UpdateAccount(ctx, shadow.ID, &UpdateAccountInput{
 		Credentials: map[string]any{
 			"model_mapping": map[string]any{
 				"gpt-5.3-codex-spark": "gpt-5.3-codex-spark",
 			},
 		},
-		GroupIDs: &groupIDs,
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, []int64{7}, repo.groupsOf[shadow.ID])
+	require.Empty(t, repo.groupsOf[shadow.ID])
 	require.Equal(t, map[string]any{"gpt-5.3-codex-spark": "gpt-5.3-codex-spark"}, updated.Credentials["model_mapping"])
 	require.Empty(t, updated.GetOpenAIAccessToken(), "影子账号不可持有母账号 access_token")
 }

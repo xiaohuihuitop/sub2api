@@ -61,6 +61,10 @@ export interface RefundResult {
   subscription_days_deducted?: number
 }
 
+export interface GlobalBalanceRateMultiplier {
+  rate_multiplier: number
+}
+
 export const adminPaymentAPI = {
   // ==================== Config ====================
 
@@ -72,6 +76,18 @@ export const adminPaymentAPI = {
   /** Update payment configuration */
   updateConfig(data: UpdatePaymentConfigRequest) {
     return apiClient.put('/admin/payment/config', data)
+  },
+
+  /** Get the global multiplier applied when requests consume account balance. */
+  getGlobalBalanceRateMultiplier() {
+    return apiClient.get<GlobalBalanceRateMultiplier>('/admin/payment/balance-rate-multiplier')
+  },
+
+  /** Update the global multiplier applied when requests consume account balance. */
+  updateGlobalBalanceRateMultiplier(rateMultiplier: number) {
+    return apiClient.put<GlobalBalanceRateMultiplier>('/admin/payment/balance-rate-multiplier', {
+      rate_multiplier: rateMultiplier,
+    })
   },
 
   // ==================== Dashboard ====================

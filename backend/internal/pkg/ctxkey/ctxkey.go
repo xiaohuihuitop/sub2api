@@ -10,6 +10,9 @@ const (
 
 	// ResolvedTargetPlatform 是 composite 分组按请求模型解析出的真实目标平台。
 	ResolvedTargetPlatform Key = "ctx_resolved_target_platform"
+	// GatewayPlatformAsset 是 my2.0 路径解析出的平台、计费资产和兼容定价上下文。
+	GatewayPlatformAsset    Key = "ctx_gateway_platform_asset"
+	PlatformSchedulingScope Key = "ctx_platform_scheduling_scope"
 
 	// ResolvedUpstreamModel 是 composite 分组将公开模型名解析到的上游模型名。
 	ResolvedUpstreamModel Key = "ctx_resolved_upstream_model"

@@ -802,7 +802,6 @@ func (s *stubAdminService) CreateShadow(ctx context.Context, parentID int64, opt
 		Type:            service.AccountTypeOAuth,
 		Priority:        opts.Priority,
 		Concurrency:     opts.Concurrency,
-		GroupIDs:        opts.GroupIDs,
 		ParentAccountID: &pid,
 		QuotaDimension:  service.QuotaDimensionSpark,
 		Credentials:     map[string]any{},

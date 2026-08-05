@@ -130,7 +130,7 @@ func subscriptionFromPlan(
 	input AssignSubscriptionFromPlanInput,
 	now time.Time,
 ) (*UserSubscription, error) {
-	if plan == nil || plan.ID <= 0 || plan.GroupID <= 0 || plan.ValidityDays <= 0 {
+	if plan == nil || plan.ID <= 0 || plan.ValidityDays <= 0 {
 		return nil, ErrSubscriptionPlanInvalid
 	}
 
@@ -143,7 +143,6 @@ func subscriptionFromPlan(
 	planID := plan.ID
 	sub := &UserSubscription{
 		UserID:                  input.UserID,
-		GroupID:                 plan.GroupID,
 		SubscriptionPlanID:      &planID,
 		PlanNameSnapshot:        plan.Name,
 		DailyLimitUSDSnapshot:   copyFloat64(plan.DailyLimitUsd),

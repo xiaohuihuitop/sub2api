@@ -80,6 +80,8 @@ func RegisterPaymentRoutes(
 		// Config
 		adminGroup.GET("/config", adminPaymentHandler.GetConfig)
 		adminGroup.PUT("/config", adminPaymentHandler.UpdateConfig)
+		adminGroup.GET("/balance-rate-multiplier", adminPaymentHandler.GetGlobalBalanceRateMultiplier)
+		adminGroup.PUT("/balance-rate-multiplier", adminPaymentHandler.UpdateGlobalBalanceRateMultiplier)
 
 		// Orders
 		adminOrders := adminGroup.Group("/orders")

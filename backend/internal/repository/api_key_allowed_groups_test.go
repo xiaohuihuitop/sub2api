@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
@@ -87,6 +88,62 @@ func TestAPIKeyRepositoryReplaceAllowedGroupsClearsWithEmptyArray(t *testing.T) 
 
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAPIKeyRepositoryReplaceAssetPermissionsUsesAtomicStatement(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	repo := newAPIKeyRepositoryWithSQL(nil, db)
+	permissions := service.APIKeyAssetPermissions{
+		PlatformIDs:         []int64{30, 10, 30},
+		SubscriptionPlanIDs: []int64{80, 20, 80},
+		AllowBalance:        false,
+	}
+	mock.ExpectExec(`(?s)WITH updated AS.*UPDATE api_keys.*DELETE FROM api_key_platforms.*DELETE FROM api_key_subscription_plans.*INSERT INTO api_key_subscription_plans`).
+		WithArgs(int64(7), false, pq.Array([]int64{10, 30}), pq.Array([]int64{20, 80})).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+
+	err = repo.ReplaceAssetPermissions(context.Background(), 7, permissions)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAPIKeyRepositoryLoadAssetPermissions(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	repo := newAPIKeyRepositoryWithSQL(nil, db)
+	keys := []*service.APIKey{{ID: 7}, {ID: 8}}
+
+	mock.ExpectQuery(`(?s)SELECT api_key_id, platform_id.*FROM api_key_platforms`).
+		WithArgs(pq.Array([]int64{7, 8})).
+		WillReturnRows(sqlmock.NewRows([]string{"api_key_id", "platform_id"}).
+			AddRow(int64(7), int64(30)).
+			AddRow(int64(7), int64(10)).
+			AddRow(int64(8), int64(20)))
+	mock.ExpectQuery(`(?s)SELECT api_key_id, subscription_plan_id.*FROM api_key_subscription_plans`).
+		WithArgs(pq.Array([]int64{7, 8})).
+		WillReturnRows(sqlmock.NewRows([]string{"api_key_id", "subscription_plan_id"}).
+			AddRow(int64(7), int64(80)).
+			AddRow(int64(8), int64(20)).
+			AddRow(int64(8), int64(60)))
+
+	err = repo.loadAssetPermissions(context.Background(), keys)
+
+	require.NoError(t, err)
+	require.Equal(t, []int64{10, 30}, keys[0].AllowedPlatformIDs)
+	require.Equal(t, []int64{20}, keys[1].AllowedPlatformIDs)
+	require.Equal(t, []int64{80}, keys[0].AllowedSubscriptionPlanIDs)
+	require.Equal(t, []int64{20, 60}, keys[1].AllowedSubscriptionPlanIDs)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAPIKeyAuthFieldSelectionIncludesAssetPermissions(t *testing.T) {
+	fields := apiKeyAuthFieldSelection()
+
+	require.Contains(t, fields, apikey.FieldAllowBalance)
 }
 
 func TestAPIKeyRepositoryClearGroupRemovesAllowedLinkAndReassignsPrimary(t *testing.T) {

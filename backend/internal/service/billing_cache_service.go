@@ -793,6 +793,11 @@ func (s *BillingCacheService) IncrementUserPlatformQuotaUsage(userID int64, plat
 // 订阅模式：检查缓存用量未超过限额（Group限额从参数传入）
 // platform 为请求的目标平台（如 "anthropic"），传空串 "" 时跳过 user × platform quota 检查。
 func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, platform string) error {
+	// Explicit V2 requests may retain a group solely as a model-pricing
+	// compatibility reference. It must not affect RPM or billing eligibility.
+	if _, platformAssetRequest := GatewayPlatformAssetContextFromContext(ctx); platformAssetRequest {
+		group = nil
+	}
 	// 简易模式：跳过所有计费检查
 	if s.cfg.RunMode == config.RunModeSimple {
 		return nil

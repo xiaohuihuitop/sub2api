@@ -31,4 +31,5 @@ func TestUserSubscriptionFromServiceIncludesPlanSnapshot(t *testing.T) {
 	require.Equal(t, &weeklyLimit, got.WeeklyLimitUSDSnapshot)
 	require.Equal(t, &monthlyLimit, got.MonthlyLimitUSDSnapshot)
 	require.Equal(t, 1.25, got.RateMultiplierSnapshot)
+	require.Nil(t, got.GroupID)
 }

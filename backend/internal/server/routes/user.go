@@ -88,6 +88,12 @@ func RegisterUserRoutes(
 			groups.GET("/available", h.APIKey.GetAvailableGroups)
 		}
 
+		// API Key authorization may select only active platform pools.
+		platforms := authenticated.Group("/platforms")
+		{
+			platforms.GET("/available", h.APIKey.GetAvailablePlatforms)
+		}
+
 		// 用户可用渠道（非管理员接口）
 		channels := authenticated.Group("/channels")
 		{

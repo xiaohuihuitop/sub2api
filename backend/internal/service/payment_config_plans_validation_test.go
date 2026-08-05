@@ -28,8 +28,7 @@ func TestValidatePlanRequired_WhitespaceName(t *testing.T) {
 
 func TestValidatePlanRequired_ZeroGroupID(t *testing.T) {
 	err := validatePlanRequired("Pro", 0, 9.99, 30, "days", nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "group")
+	require.NoError(t, err)
 }
 
 func TestValidatePlanRequired_NegativeGroupID(t *testing.T) {
@@ -150,8 +149,7 @@ func TestValidatePlanPatch_ValidName(t *testing.T) {
 
 func TestValidatePlanPatch_ZeroGroupID(t *testing.T) {
 	err := validatePlanPatch(UpdatePlanRequest{GroupID: ptrInt64(0)})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "group")
+	require.NoError(t, err)
 }
 
 func TestValidatePlanPatch_NegativePrice(t *testing.T) {
@@ -249,7 +247,6 @@ func TestPaymentConfigServiceCreatePlanPersistsIndependentBillingTerms(t *testin
 	multiplier := 1.75
 
 	plan, err := svc.CreatePlan(ctx, CreatePlanRequest{
-		GroupID:         7,
 		Name:            "Independent Pro",
 		Price:           9.9,
 		ValidityDays:    30,
@@ -261,6 +258,7 @@ func TestPaymentConfigServiceCreatePlanPersistsIndependentBillingTerms(t *testin
 	})
 
 	require.NoError(t, err)
+	require.Zero(t, plan.GroupID)
 	require.Equal(t, &daily, plan.DailyLimitUsd)
 	require.Equal(t, &weekly, plan.WeeklyLimitUsd)
 	require.Equal(t, &monthly, plan.MonthlyLimitUsd)

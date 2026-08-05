@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -416,7 +417,13 @@ func (s *paymentConfigSettingRepoStub) Get(context.Context, string) (*Setting, e
 func (s *paymentConfigSettingRepoStub) GetValue(_ context.Context, key string) (string, error) {
 	return s.values[key], nil
 }
-func (s *paymentConfigSettingRepoStub) Set(context.Context, string, string) error { return nil }
+func (s *paymentConfigSettingRepoStub) Set(_ context.Context, key, value string) error {
+	if s.values == nil {
+		s.values = map[string]string{}
+	}
+	s.values[key] = value
+	return nil
+}
 func (s *paymentConfigSettingRepoStub) GetMultiple(_ context.Context, keys []string) (map[string]string, error) {
 	out := make(map[string]string, len(keys))
 	for _, key := range keys {
@@ -439,6 +446,75 @@ func (s *paymentConfigSettingRepoStub) GetAll(context.Context) (map[string]strin
 	return s.values, nil
 }
 func (s *paymentConfigSettingRepoStub) Delete(context.Context, string) error { return nil }
+
+type globalBalanceRateConfigurator interface {
+	GlobalBalanceRateProvider
+	UpdateGlobalBalanceRateMultiplier(context.Context, float64) error
+}
+
+func TestPaymentConfigServiceManagesGlobalBalanceRateMultiplier(t *testing.T) {
+	ctx := context.Background()
+	repo := &paymentConfigSettingRepoStub{values: map[string]string{
+		SettingKeyGlobalBalanceRateMultiplier: "1.75",
+	}}
+	svc := &PaymentConfigService{settingRepo: repo}
+
+	configurator, ok := any(svc).(globalBalanceRateConfigurator)
+	if !ok {
+		t.Fatal("expected payment config service to provide the global balance multiplier")
+	}
+	if got := configurator.GetGlobalBalanceRateMultiplier(ctx); got != 1.75 {
+		t.Fatalf("initial global balance multiplier = %v, want 1.75", got)
+	}
+
+	if err := configurator.UpdateGlobalBalanceRateMultiplier(ctx, 0); err != nil {
+		t.Fatalf("update zero global balance multiplier: %v", err)
+	}
+	if got := repo.values[SettingKeyGlobalBalanceRateMultiplier]; got != "0" {
+		t.Fatalf("stored global balance multiplier = %q, want 0", got)
+	}
+	if got := configurator.GetGlobalBalanceRateMultiplier(ctx); got != 0 {
+		t.Fatalf("updated global balance multiplier = %v, want 0", got)
+	}
+}
+
+func TestPaymentConfigServiceRejectsInvalidGlobalBalanceRateMultiplier(t *testing.T) {
+	ctx := context.Background()
+	repo := &paymentConfigSettingRepoStub{values: map[string]string{
+		SettingKeyGlobalBalanceRateMultiplier: "1.25",
+	}}
+	svc := &PaymentConfigService{settingRepo: repo}
+
+	configurator, ok := any(svc).(globalBalanceRateConfigurator)
+	if !ok {
+		t.Fatal("expected payment config service to provide the global balance multiplier")
+	}
+	for _, value := range []float64{-0.01, math.NaN(), math.Inf(1)} {
+		if err := configurator.UpdateGlobalBalanceRateMultiplier(ctx, value); err == nil {
+			t.Fatalf("expected %v to be rejected", value)
+		}
+	}
+	if got := repo.values[SettingKeyGlobalBalanceRateMultiplier]; got != "1.25" {
+		t.Fatalf("invalid update changed stored global balance multiplier to %q", got)
+	}
+}
+
+func TestPaymentConfigServiceDefaultsInvalidGlobalBalanceRateMultiplier(t *testing.T) {
+	for _, stored := range []string{"", "not-a-number", "-1", "NaN", "+Inf"} {
+		t.Run(stored, func(t *testing.T) {
+			svc := &PaymentConfigService{settingRepo: &paymentConfigSettingRepoStub{values: map[string]string{
+				SettingKeyGlobalBalanceRateMultiplier: stored,
+			}}}
+			configurator, ok := any(svc).(globalBalanceRateConfigurator)
+			if !ok {
+				t.Fatal("expected payment config service to provide the global balance multiplier")
+			}
+			if got := configurator.GetGlobalBalanceRateMultiplier(context.Background()); got != defaultGlobalBalanceRateMultiplier {
+				t.Fatalf("global balance multiplier for %q = %v, want default %v", stored, got, defaultGlobalBalanceRateMultiplier)
+			}
+		})
+	}
+}
 
 func TestUpdatePaymentConfig_PersistsVisibleMethodRouting(t *testing.T) {
 	repo := &paymentConfigSettingRepoStub{values: map[string]string{

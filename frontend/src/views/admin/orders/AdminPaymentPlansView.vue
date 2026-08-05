@@ -1,31 +1,48 @@
 <template>
   <AppLayout>
     <div class="space-y-4">
-      <!-- Actions -->
-      <div class="flex items-center justify-end gap-2">
-        <button @click="loadPlans" :disabled="plansLoading" class="btn btn-secondary" :title="t('common.refresh')">
-          <Icon name="refresh" size="md" :class="plansLoading ? 'animate-spin' : ''" />
-        </button>
-        <button @click="openPlanEdit(null)" class="btn btn-primary">{{ t('payment.admin.createPlan') }}</button>
+      <!-- Balance rate and actions -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <label for="global-balance-rate-multiplier" class="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('payment.admin.globalBalanceRateMultiplier') }}
+          </label>
+          <div class="flex items-center">
+            <input
+              id="global-balance-rate-multiplier"
+              v-model.number="globalBalanceRateMultiplier"
+              data-testid="global-balance-rate-multiplier"
+              type="number"
+              min="0"
+              step="0.01"
+              class="input w-24 text-right"
+            />
+            <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">x</span>
+          </div>
+          <button
+            data-testid="save-global-balance-rate-multiplier"
+            type="button"
+            class="btn btn-secondary"
+            :disabled="globalBalanceRateSaving"
+            :title="t('common.save')"
+            @click="saveGlobalBalanceRateMultiplier"
+          >
+            <Icon name="check" size="md" />
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button @click="loadPlans" :disabled="plansLoading" class="btn btn-secondary" :title="t('common.refresh')">
+            <Icon name="refresh" size="md" :class="plansLoading ? 'animate-spin' : ''" />
+          </button>
+          <button @click="openPlanEdit(null)" class="btn btn-primary">{{ t('payment.admin.createPlan') }}</button>
+        </div>
       </div>
 
       <!-- Plans Table -->
       <DataTable :columns="planColumns" :data="plans" :loading="plansLoading">
-        <template #cell-name="{ value, row }">
-          <span class="text-sm font-medium" :class="getPlanNameClass(row.group_id)">{{ value }}</span>
-        </template>
-        <template #cell-group_id="{ value }">
-          <span v-if="isGroupMissing(value)" class="text-sm">
-            <span class="text-gray-400">#{{ value }}</span>
-            <span class="ml-1 badge badge-danger">{{ t('payment.admin.groupMissing') }}</span>
-          </span>
-          <GroupBadge
-            v-else-if="getGroup(value)"
-            :name="getGroup(value)!.name"
-            :platform="getGroup(value)!.platform"
-            :show-rate="false"
-          />
-          <span v-else class="text-sm text-gray-400">-</span>
+        <template #cell-name="{ value }">
+          <span class="text-sm font-medium text-gray-900 dark:text-white">{{ value }}</span>
         </template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
@@ -78,7 +95,7 @@
     </div>
 
     <!-- Plan Edit Dialog -->
-    <PlanEditDialog :show="showPlanDialog" :plan="editingPlan" :groups="groups" :payment-config="paymentConfig" @close="showPlanDialog = false" @saved="loadPlans" />
+    <PlanEditDialog :show="showPlanDialog" :plan="editingPlan" :payment-config="paymentConfig" @close="showPlanDialog = false" @saved="loadPlans" />
 
     <ConfirmDialog :show="showDeletePlanDialog" :title="t('payment.admin.deletePlan')" :message="t('payment.admin.deletePlanConfirm')" :confirm-text="t('common.delete')" danger @confirm="handleDeletePlan" @cancel="showDeletePlanDialog = false" />
   </AppLayout>
@@ -91,18 +108,14 @@ import { useAppStore } from '@/stores/app'
 import { adminPaymentAPI } from '@/api/admin/payment'
 import type { AdminPaymentConfig } from '@/api/admin/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
-import adminAPI from '@/api/admin'
 import type { SubscriptionPlan } from '@/types/payment'
-import type { AdminGroup } from '@/types'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlanEditDialog from './PlanEditDialog.vue'
 import { currencySymbol } from '@/components/payment/currency'
-import { platformTextClass } from '@/utils/platformColors'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -121,16 +134,9 @@ function formatPlanLimit(value?: number | null): string {
     : t('payment.admin.unlimited')
 }
 
-// ==================== Groups ====================
-
-const groups = ref<AdminGroup[]>([])
 const paymentConfig = ref<AdminPaymentConfig | null>(null)
-
-async function loadGroups() {
-  try {
-    groups.value = await adminAPI.groups.getAll()
-  } catch { /* ignore */ }
-}
+const globalBalanceRateMultiplier = ref(1)
+const globalBalanceRateSaving = ref(false)
 
 async function loadPaymentConfig() {
   try {
@@ -139,19 +145,32 @@ async function loadPaymentConfig() {
   } catch { /* preview only */ }
 }
 
-function getGroup(id: number): AdminGroup | undefined {
-  return groups.value.find(g => g.id === id)
+async function loadGlobalBalanceRateMultiplier() {
+  try {
+    const res = await adminPaymentAPI.getGlobalBalanceRateMultiplier()
+    const rate = Number(res.data?.rate_multiplier)
+    if (Number.isFinite(rate) && rate >= 0) globalBalanceRateMultiplier.value = rate
+  } catch { /* retain the compatibility default */ }
 }
 
-function isGroupMissing(id: number): boolean {
-  return id > 0 && !groups.value.find(g => g.id === id)
-}
+async function saveGlobalBalanceRateMultiplier() {
+  const rate = Number(globalBalanceRateMultiplier.value)
+  if (!Number.isFinite(rate) || rate < 0) {
+    appStore.showError(t('payment.admin.invalidGlobalBalanceRateMultiplier'))
+    return
+  }
 
-function getPlanNameClass(groupId: number): string {
-  const group = getGroup(groupId)
-  return group ? platformTextClass(group.platform) : 'text-gray-900 dark:text-white'
+  globalBalanceRateSaving.value = true
+  try {
+    const res = await adminPaymentAPI.updateGlobalBalanceRateMultiplier(rate)
+    globalBalanceRateMultiplier.value = res.data.rate_multiplier
+    appStore.showSuccess(t('common.saved'))
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  } finally {
+    globalBalanceRateSaving.value = false
+  }
 }
-
 
 // ==================== Plans ====================
 
@@ -165,7 +184,6 @@ const deletingPlanId = ref<number | null>(null)
 const planColumns = computed((): Column[] => [
   { key: 'id', label: 'ID' },
   { key: 'name', label: t('payment.admin.planName') },
-  { key: 'group_id', label: t('payment.admin.group') },
   { key: 'rate_multiplier', label: t('payment.admin.rateMultiplier') },
   { key: 'limits', label: t('payment.planCard.quota') },
   { key: 'price', label: t('payment.admin.price') },
@@ -217,8 +235,8 @@ async function handleDeletePlan() {
 // ==================== Lifecycle ====================
 
 onMounted(() => {
-  loadGroups()
   loadPaymentConfig()
+  loadGlobalBalanceRateMultiplier()
   loadPlans()
 })
 </script>

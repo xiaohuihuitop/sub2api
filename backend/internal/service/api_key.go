@@ -37,17 +37,21 @@ type APIKey struct {
 	IPWhitelist []string
 	IPBlacklist []string
 	// 预编译的 IP 规则，用于认证热路径避免重复 ParseIP/ParseCIDR。
-	CompiledIPWhitelist *ip.CompiledIPRules `json:"-"`
-	CompiledIPBlacklist *ip.CompiledIPRules `json:"-"`
-	LastUsedAt          *time.Time
-	LastUsedIP          *string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	User                *User
-	Group               *Group
-	AllowedGroupIDs     []int64
-	AllowedGroups       []Group
-	CurrentConcurrency  int
+	CompiledIPWhitelist        *ip.CompiledIPRules `json:"-"`
+	CompiledIPBlacklist        *ip.CompiledIPRules `json:"-"`
+	LastUsedAt                 *time.Time
+	LastUsedIP                 *string
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	User                       *User
+	Group                      *Group
+	AllowedGroupIDs            []int64
+	AllowedGroups              []Group
+	AllowedPlatformIDs         []int64
+	AllowedPlatforms           []Platform
+	AllowedSubscriptionPlanIDs []int64
+	AllowBalance               bool
+	CurrentConcurrency         int
 
 	// Quota fields
 	Quota     float64    // Quota limit in USD (0 = unlimited)

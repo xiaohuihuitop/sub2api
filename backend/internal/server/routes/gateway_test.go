@@ -52,6 +52,7 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 		nil,
 		nil,
 		nil,
+		nil,
 		cfg,
 	)
 
@@ -74,6 +75,27 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 		router.ServeHTTP(w, req)
 		require.NotEqual(t, http.StatusNotFound, w.Code, "path=%s should hit OpenAI responses handler", path)
 	}
+}
+
+func TestGetGroupPlatformPrefersExplicitPlatformAssetRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	ctx.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{
+		Group: &service.Group{Platform: service.PlatformAnthropic},
+	})
+	ctx.Request = ctx.Request.WithContext(service.WithGatewayPlatformAssetContext(ctx.Request.Context(), &service.GatewayPlatformAssetContext{
+		Platform: &service.ResolvedPlatformModel{
+			PlatformID:      3,
+			AccountPlatform: service.PlatformOpenAI,
+		},
+		SchedulingScope: service.PlatformSchedulingScope{
+			PlatformID:      3,
+			AccountPlatform: service.PlatformOpenAI,
+		},
+	}))
+
+	require.Equal(t, service.PlatformOpenAI, getGroupPlatform(ctx))
 }
 
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {

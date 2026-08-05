@@ -4,7 +4,13 @@
  */
 
 import { apiClient } from './client'
-import type { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest, PaginatedResponse } from '@/types'
+import type {
+  ApiKey,
+  AvailablePlatformPool,
+  CreateApiKeyRequest,
+  UpdateApiKeyRequest,
+  PaginatedResponse,
+} from '@/types'
 
 /**
  * List all API keys for current user
@@ -47,60 +53,20 @@ export async function getById(id: number): Promise<ApiKey> {
 
 /**
  * Create new API key
- * @param name - Key name
- * @param groupId - Optional group ID
- * @param customKey - Optional custom key value
- * @param ipWhitelist - Optional IP whitelist
- * @param ipBlacklist - Optional IP blacklist
- * @param quota - Optional quota limit in USD (0 = unlimited)
- * @param expiresInDays - Optional days until expiry (undefined = never expires)
- * @param rateLimitData - Optional rate limit fields
+ * @param input - Full key configuration, including V2 asset permissions
  * @returns Created API key
  */
-export async function create(
-  name: string,
-  groupId?: number | null,
-  groupIds?: number[],
-  customKey?: string,
-  ipWhitelist?: string[],
-  ipBlacklist?: string[],
-  quota?: number,
-  expiresInDays?: number,
-  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number }
-): Promise<ApiKey> {
-  const payload: CreateApiKeyRequest = { name }
-  if (groupIds !== undefined) {
-    payload.group_ids = groupIds
-  }
-  if (groupId !== undefined) {
-    payload.group_id = groupId
-  }
-  if (customKey) {
-    payload.custom_key = customKey
-  }
-  if (ipWhitelist && ipWhitelist.length > 0) {
-    payload.ip_whitelist = ipWhitelist
-  }
-  if (ipBlacklist && ipBlacklist.length > 0) {
-    payload.ip_blacklist = ipBlacklist
-  }
-  if (quota !== undefined && quota > 0) {
-    payload.quota = quota
-  }
-  if (expiresInDays !== undefined && expiresInDays > 0) {
-    payload.expires_in_days = expiresInDays
-  }
-  if (rateLimitData?.rate_limit_5h && rateLimitData.rate_limit_5h > 0) {
-    payload.rate_limit_5h = rateLimitData.rate_limit_5h
-  }
-  if (rateLimitData?.rate_limit_1d && rateLimitData.rate_limit_1d > 0) {
-    payload.rate_limit_1d = rateLimitData.rate_limit_1d
-  }
-  if (rateLimitData?.rate_limit_7d && rateLimitData.rate_limit_7d > 0) {
-    payload.rate_limit_7d = rateLimitData.rate_limit_7d
-  }
+export async function create(input: CreateApiKeyRequest): Promise<ApiKey> {
+  const { data } = await apiClient.post<ApiKey>('/keys', input)
+  return data
+}
 
-  const { data } = await apiClient.post<ApiKey>('/keys', payload)
+/**
+ * Returns active platform-pool metadata safe for an API Key authorization
+ * selector. The API does not expose accounts, model rules, or billing data.
+ */
+export async function getAvailablePlatforms(): Promise<AvailablePlatformPool[]> {
+  const { data } = await apiClient.get<AvailablePlatformPool[]>('/platforms/available')
   return data
 }
 
@@ -139,6 +105,7 @@ export const keysAPI = {
   list,
   getById,
   create,
+  getAvailablePlatforms,
   update,
   delete: deleteKey,
   toggleStatus

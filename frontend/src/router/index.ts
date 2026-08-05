@@ -462,6 +462,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/platforms',
+    name: 'AdminPlatforms',
+    component: () => import('@/views/admin/PlatformsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Platform Pools',
+      titleKey: 'admin.platforms.title',
+      descriptionKey: 'admin.platforms.description'
+    }
+  },
+  {
     path: '/admin/channels',
     redirect: '/admin/channels/pricing'
   },
@@ -927,6 +939,7 @@ router.beforeEach(async (to, _from, next) => {
   if (authStore.isSimpleMode) {
     const restrictedPaths = [
       '/admin/groups',
+      '/admin/platforms',
       '/admin/subscriptions',
       '/admin/redeem',
       '/subscriptions',

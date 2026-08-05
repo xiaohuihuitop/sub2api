@@ -65,6 +65,11 @@ const BaseDialogStub = defineComponent({
   template: '<div v-if="show"><slot /><slot name="footer" /></div>',
 })
 
+const ConfirmDialogStub = defineComponent({
+  name: 'ConfirmDialog',
+  template: '<div data-testid="legacy-mixed-channel-dialog" />',
+})
+
 const OAuthAuthorizationFlowStub = defineComponent({
   name: 'OAuthAuthorizationFlow',
   props: {
@@ -84,20 +89,27 @@ const OAuthAuthorizationFlowStub = defineComponent({
   `,
 })
 
+const platformPools = [
+  { id: 1, code: 'openai-primary', name: 'OpenAI', account_platform: 'openai', status: 'active', model_rules: [] },
+  { id: 2, code: 'anthropic-primary', name: 'Anthropic', account_platform: 'anthropic', status: 'active', model_rules: [] },
+  { id: 3, code: 'gemini-primary', name: 'Gemini', account_platform: 'gemini', status: 'active', model_rules: [] },
+  { id: 4, code: 'antigravity-primary', name: 'Antigravity', account_platform: 'antigravity', status: 'active', model_rules: [] },
+  { id: 5, code: 'grok-primary', name: 'Grok', account_platform: 'grok', status: 'active', model_rules: [] },
+] as any
+
 function mountModal() {
   return mount(CreateAccountModal, {
-    props: { show: true, proxies: [], groups: [] },
+    props: { show: true, proxies: [], platformPools },
     global: {
       stubs: {
         BaseDialog: BaseDialogStub,
         OAuthAuthorizationFlow: OAuthAuthorizationFlowStub,
-        ConfirmDialog: true,
+        ConfirmDialog: ConfirmDialogStub,
         Select: true,
         Icon: true,
         PlatformIcon: true,
         ProxySelector: true,
         ProxyAdBanner: true,
-        GroupSelector: true,
         ModelWhitelistSelector: true,
         QuotaLimitCard: true,
       },
@@ -118,8 +130,9 @@ async function submitApiKeyAccount(
 ) {
   const wrapper = mountModal()
   await selectButtonByText(wrapper, platform === 'openai' ? 'OpenAI' : 'admin.accounts.claudeConsole')
-  if (platform === 'openai') {
-    await selectButtonByText(wrapper, 'API Key')
+  if (platform === 'openai' || platform === 'anthropic') {
+    const accountTypeButtons = wrapper.get('[data-tour="account-form-type"]').findAll('button')
+    await accountTypeButtons[1]?.trigger('click')
   }
   await wrapper.get('form#create-account-form input[type="text"]').setValue(`${platform} account`)
   await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
@@ -158,6 +171,12 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
       warnings: [],
     })
     createOpenAICodexPATMock.mockReset().mockResolvedValue({})
+  })
+
+  it('does not mount the legacy mixed-channel confirmation dialog', () => {
+    const wrapper = mountModal()
+
+    expect(wrapper.find('[data-testid="legacy-mixed-channel-dialog"]').exists()).toBe(false)
   })
 
   it('sends false explicitly for normal OpenAI account creation by default', async () => {

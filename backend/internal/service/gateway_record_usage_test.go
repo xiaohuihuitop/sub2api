@@ -194,6 +194,47 @@ func TestGatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels(t *testin
 	require.Equal(t, mappedModel, *usageRepo.lastLog.UpstreamModel)
 }
 
+func TestGatewayServiceRecordUsage_PlatformAssetUsesResolvedBalanceMultiplier(t *testing.T) {
+	platformID := int64(72)
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{})
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform:        &ResolvedPlatformModel{PlatformID: platformID, AccountPlatform: PlatformAnthropic},
+		BillingAsset:    &ResolvedBillingAsset{Source: BillingSourceBalance, RateMultiplier: 0.5},
+		SchedulingScope: PlatformSchedulingScope{PlatformID: platformID, AccountPlatform: PlatformAnthropic},
+	})
+
+	err := svc.RecordUsage(ctx, &RecordUsageInput{
+		Result: &ForwardResult{
+			RequestID: "gateway_platform_balance_rate",
+			Usage:     ClaudeUsage{InputTokens: 15, OutputTokens: 4, CacheReadInputTokens: 3},
+			Model:     "claude-sonnet-4",
+			Duration:  time.Second,
+		},
+		APIKey:  &APIKey{ID: 507, Group: &Group{RateMultiplier: 3}},
+		User:    &User{ID: 607},
+		Account: &Account{ID: 707},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 0.5, usageRepo.lastLog.RateMultiplier)
+	require.NotNil(t, usageRepo.lastLog.PlatformID)
+	require.Equal(t, platformID, *usageRepo.lastLog.PlatformID)
+	require.NotNil(t, usageRepo.lastLog.BillingSourceType)
+	require.Equal(t, BillingSourceBalance, *usageRepo.lastLog.BillingSourceType)
+
+	expected, err := svc.billingService.CalculateCost("claude-sonnet-4", UsageTokens{
+		InputTokens:     15,
+		OutputTokens:    4,
+		CacheReadTokens: 3,
+	}, 0.5)
+	require.NoError(t, err)
+	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
+}
+
 func TestGatewayServiceRecordUsage_PreservesChannelMappedUpstreamModel(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})

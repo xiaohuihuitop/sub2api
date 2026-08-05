@@ -20,4 +20,12 @@ describe('SubscriptionsView billing redesign wiring', () => {
     expect(source).toContain("getSubscriptionLimit(row, 'weekly')")
     expect(source).toContain("getSubscriptionLimit(row, 'monthly')")
   })
+
+  it('does not load or expose legacy groups for plan-backed subscriptions', () => {
+    expect(source).not.toContain('v-model="filters.group_id"')
+    expect(source).not.toContain('GroupBadge')
+    expect(source).not.toContain('loadGroups()')
+    expect(source).not.toContain('group_id: filters.group_id')
+    expect(source).toContain("key: 'plan'")
+  })
 })

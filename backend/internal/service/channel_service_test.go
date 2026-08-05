@@ -1130,6 +1130,42 @@ func TestResolveChannelMappingAndRestrict_WithMapping(t *testing.T) {
 	require.Equal(t, "claude-sonnet-4-20250514", mapping.MappedModel)
 }
 
+func TestResolveChannelMappingAndRestrict_PrefersPlatformAssetUpstreamModel(t *testing.T) {
+	ch := Channel{
+		ID:       1,
+		Status:   StatusActive,
+		GroupIDs: []int64{10},
+		ModelMapping: map[string]map[string]string{
+			"openai": {
+				"public-gpt": "legacy-channel-mapping",
+			},
+		},
+	}
+	svc := newTestChannelService(makeStandardRepo(ch, map[int64]string{10: PlatformOpenAI}))
+	legacyGroupID := int64(10)
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID:      3,
+			PlatformCode:    "gpt",
+			AccountPlatform: PlatformOpenAI,
+			RequestedModel:  "public-gpt",
+			UpstreamModel:   "gpt-4o-2024-08-06",
+		},
+		SchedulingScope: PlatformSchedulingScope{
+			PlatformID:      3,
+			PlatformCode:    "gpt",
+			AccountPlatform: PlatformOpenAI,
+		},
+		PricingGroupID: &legacyGroupID,
+	})
+
+	mapping, restricted := svc.ResolveChannelMappingAndRestrict(ctx, &legacyGroupID, "public-gpt")
+
+	require.False(t, restricted)
+	require.True(t, mapping.Mapped)
+	require.Equal(t, "gpt-4o-2024-08-06", mapping.MappedModel)
+}
+
 func TestResolveChannelMappingAndRestrict_NoMapping(t *testing.T) {
 	ch := Channel{
 		ID:             1,

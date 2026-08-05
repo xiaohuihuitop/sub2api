@@ -38,6 +38,7 @@ func RegisterAdminRoutes(
 
 		// 分组管理
 		registerGroupRoutes(admin, h)
+		registerPlatformRoutes(admin, h)
 
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
@@ -340,6 +341,16 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		groups.PUT("/:id/rpm-overrides", h.Admin.Group.BatchSetGroupRPMOverrides)
 		groups.DELETE("/:id/rpm-overrides", h.Admin.Group.ClearGroupRPMOverrides)
 		groups.GET("/:id/api-keys", h.Admin.Group.GetGroupAPIKeys)
+	}
+}
+
+func registerPlatformRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	platforms := admin.Group("/platforms")
+	{
+		platforms.GET("", h.Admin.Platform.List)
+		platforms.GET("/:id", h.Admin.Platform.GetByID)
+		platforms.POST("", h.Admin.Platform.Create)
+		platforms.PUT("/:id", h.Admin.Platform.Update)
 	}
 }
 

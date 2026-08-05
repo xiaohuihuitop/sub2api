@@ -36,9 +36,10 @@ func TestAccountHandler_Create_AnthropicAPIKeyPassthroughExtraForwarded(t *testi
 	router.POST("/api/v1/admin/accounts", handler.Create)
 
 	body := map[string]any{
-		"name":     "anthropic-key-1",
-		"platform": "anthropic",
-		"type":     "apikey",
+		"name":        "anthropic-key-1",
+		"platform":    "anthropic",
+		"platform_id": 1,
+		"type":        "apikey",
 		"credentials": map[string]any{
 			"api_key":  "sk-ant-xxx",
 			"base_url": "https://api.anthropic.com",

@@ -28,7 +28,7 @@ func TestAccountAdminBoundariesRejectMalformedOpenAILongContextBillingValue(t *t
 			name:   "create",
 			method: http.MethodPost,
 			path:   "/accounts",
-			body:   `{"name":"account","platform":"openai","type":"apikey","credentials":{"api_key":"test"},` + malformedExtra + `}`,
+			body:   `{"name":"account","platform":"openai","platform_id":42,"type":"apikey","credentials":{"api_key":"test"},` + malformedExtra + `}`,
 			mount:  func(router *gin.Engine, handler *AccountHandler) { router.POST("/accounts", handler.Create) },
 		},
 		{
@@ -57,14 +57,14 @@ func TestAccountAdminBoundariesRejectMalformedOpenAILongContextBillingValue(t *t
 			name:   "batch create",
 			method: http.MethodPost,
 			path:   "/accounts/batch",
-			body:   `{"accounts":[{"name":"account","platform":"openai","type":"apikey","credentials":{"api_key":"test"},` + malformedExtra + `}]}`,
+			body:   `{"accounts":[{"name":"account","platform":"openai","platform_id":42,"type":"apikey","credentials":{"api_key":"test"},` + malformedExtra + `}]}`,
 			mount:  func(router *gin.Engine, handler *AccountHandler) { router.POST("/accounts/batch", handler.BatchCreate) },
 		},
 		{
 			name:   "Codex session import",
 			method: http.MethodPost,
 			path:   "/accounts/import-codex-session",
-			body:   `{"content":"token",` + malformedExtra + `}`,
+			body:   `{"content":"token","platform_id":42,` + malformedExtra + `}`,
 			mount: func(router *gin.Engine, handler *AccountHandler) {
 				router.POST("/accounts/import-codex-session", handler.ImportCodexSession)
 			},
@@ -104,7 +104,7 @@ func TestAccountCreateBoundaryDoesNotApplyOpenAIValidationToOtherPlatforms(t *te
 	router.POST("/accounts", handler.Create)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/accounts", bytes.NewBufferString(
-		`{"name":"account","platform":"anthropic","type":"apikey","credentials":{"api_key":"test"},"extra":{"openai_long_context_billing_enabled":"provider-owned"}}`,
+		`{"name":"account","platform":"anthropic","platform_id":1,"type":"apikey","credentials":{"api_key":"test"},"extra":{"openai_long_context_billing_enabled":"provider-owned"}}`,
 	))
 	request.Header.Set("Content-Type", "application/json")
 
@@ -150,7 +150,7 @@ func TestOpenAIOAuthCodexPATBoundaryRejectsMalformedOpenAILongContextBillingValu
 	router.POST("/openai/create-from-codex-pat", handler.CreateAccountFromCodexPAT)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/openai/create-from-codex-pat", bytes.NewBufferString(
-		`{"access_token":"token","extra":{"openai_long_context_billing_enabled":1}}`,
+		`{"access_token":"token","platform_id":42,"extra":{"openai_long_context_billing_enabled":1}}`,
 	))
 	request.Header.Set("Content-Type", "application/json")
 
@@ -162,4 +162,21 @@ func TestOpenAIOAuthCodexPATBoundaryRejectsMalformedOpenAILongContextBillingValu
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &responseBody))
 	require.Equal(t, "OPENAI_LONG_CONTEXT_BILLING_INVALID", responseBody.Reason)
+}
+
+func TestOpenAIOAuthCodexPATRequiresPlatformPoolBeforeTokenValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewOpenAIOAuthHandler(nil, newStubAdminService(), nil)
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.POST("/openai/create-from-codex-pat", handler.CreateAccountFromCodexPAT)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/openai/create-from-codex-pat", bytes.NewBufferString(
+		`{"access_token":"token"}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }

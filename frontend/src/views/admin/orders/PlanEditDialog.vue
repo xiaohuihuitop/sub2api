@@ -1,29 +1,9 @@
 <template>
   <BaseDialog :show="show" :title="plan ? t('payment.admin.editPlan') : t('payment.admin.createPlan')" width="wide" @close="emit('close')">
     <form id="plan-form" @submit.prevent="handleSavePlan" class="space-y-4">
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="input-label">{{ t('payment.admin.planName') }} <span class="text-red-500">*</span></label>
-          <input v-model="planForm.name" data-testid="plan-name" type="text" class="input" required />
-        </div>
-        <div>
-          <label class="input-label">{{ t('payment.admin.group') }} <span class="text-red-500">*</span></label>
-          <Select v-model="planForm.group_id" data-testid="plan-group" :options="groupOptions" :placeholder="t('payment.admin.selectGroup')" class="w-full">
-            <template #selected="{ option }">
-              <span v-if="option?.platform" :class="platformTextClass(String(option.platform))">{{ option.label }}</span>
-              <span v-else>{{ option?.label || t('payment.admin.selectGroup') }}</span>
-            </template>
-            <template #option="{ option, selected }">
-              <span class="flex-1 truncate text-left" :class="option.platform ? platformTextClass(String(option.platform)) : ''">{{ option.label }}</span>
-              <Icon v-if="selected" name="check" size="sm" class="text-primary-500" :stroke-width="2" />
-            </template>
-          </Select>
-        </div>
-      </div>
-
-      <!-- Routing group preview: pricing and limits belong to the plan itself. -->
-      <div v-if="selectedGroupInfo" class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-800">
-        <GroupBadge :name="selectedGroupInfo.name" :platform="selectedGroupInfo.platform" :show-rate="false" />
+      <div>
+        <label class="input-label">{{ t('payment.admin.planName') }} <span class="text-red-500">*</span></label>
+        <input v-model="planForm.name" data-testid="plan-name" type="text" class="input" required />
       </div>
 
       <div><label class="input-label">{{ t('payment.admin.planDescription') }} <span class="text-red-500">*</span></label><textarea v-model="planForm.description" data-testid="plan-description" rows="2" class="input" required></textarea></div>
@@ -112,17 +92,12 @@ import type { AdminPaymentConfig } from '@/api/admin/payment'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatPaymentAmount } from '@/components/payment/currency'
 import type { SubscriptionPlan } from '@/types/payment'
-import type { AdminGroup } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
-import Icon from '@/components/icons/Icon.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
-import { platformTextClass } from '@/utils/platformColors'
 
 const props = defineProps<{
   show: boolean
   plan: SubscriptionPlan | null
-  groups: AdminGroup[]
   paymentConfig?: AdminPaymentConfig | null
 }>()
 
@@ -137,7 +112,6 @@ const appStore = useAppStore()
 const saving = ref(false)
 const planForm = reactive({
   name: '',
-  group_id: null as number | null,
   description: '',
   price: 0,
   original_price: 0,
@@ -158,21 +132,6 @@ const validityUnitOptions = computed(() => [
   { value: 'weeks', label: t('payment.admin.weeks') },
   { value: 'months', label: t('payment.admin.months') },
 ])
-
-const groupOptions = computed(() =>
-  props.groups
-    .filter(g => g.status === 'active')
-    .map(g => ({
-      value: g.id,
-      label: `${g.name} — ${g.platform}`,
-      platform: g.platform,
-    })),
-)
-
-const selectedGroupInfo = computed(() => {
-  if (!planForm.group_id) return null
-  return props.groups.find(g => g.id === planForm.group_id) || null
-})
 
 function roundCnyAmount(value: number): number {
   return Math.round(value * 100) / 100
@@ -205,7 +164,6 @@ watch(() => props.show, (visible) => {
   if (props.plan) {
     Object.assign(planForm, {
       name: props.plan.name,
-      group_id: props.plan.group_id,
       description: props.plan.description,
       price: props.plan.price,
       original_price: props.plan.original_price || 0,
@@ -223,7 +181,6 @@ watch(() => props.show, (visible) => {
   } else {
     Object.assign(planForm, {
       name: '',
-      group_id: null,
       description: '',
       price: 0,
       original_price: 0,
@@ -246,7 +203,6 @@ function buildPlanPayload() {
   const features = planFeaturesText.value.split('\n').map(f => f.trim()).filter(Boolean).join('\n')
   return {
     name: planForm.name,
-    group_id: planForm.group_id,
     description: planForm.description,
     price: planForm.price,
     original_price: planForm.original_price || 0,
@@ -268,10 +224,6 @@ function normalizePlanLimit(value: number | null): number {
 }
 
 async function handleSavePlan() {
-  if (!planForm.group_id) {
-    appStore.showError(t('payment.admin.groupRequired'))
-    return
-  }
   if (!planForm.price || planForm.price <= 0) {
     appStore.showError(t('payment.admin.priceRequired'))
     return

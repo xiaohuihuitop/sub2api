@@ -50,3 +50,10 @@ type ActiveUserSubscriptionLister interface {
 type ActiveUserSubscriptionGroupLister interface {
 	ListActiveByUserIDAndGroupIDs(ctx context.Context, userID int64, groupIDs []int64) ([]UserSubscription, error)
 }
+
+// ActiveUserSubscriptionPlanLister exposes ordered candidates for the API
+// key's explicitly authorized subscription plans. It deliberately remains
+// separate from the legacy group contract while the V2 route is feature-gated.
+type ActiveUserSubscriptionPlanLister interface {
+	ListActiveByUserIDAndPlanIDs(ctx context.Context, userID int64, planIDs []int64) ([]UserSubscription, error)
+}

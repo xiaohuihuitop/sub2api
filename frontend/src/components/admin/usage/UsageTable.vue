@@ -91,9 +91,25 @@
           </div>
         </template>
 
+        <template #cell-platform="{ row }">
+          <div v-if="row.platform_code || row.platform_name" class="min-w-[9rem] text-xs">
+            <div class="font-medium text-gray-900 dark:text-white">
+              {{ row.platform_name || row.platform_code }}
+            </div>
+            <div v-if="row.platform_name && row.platform_code" class="font-mono text-gray-500 dark:text-gray-400">
+              {{ row.platform_code }}
+            </div>
+          </div>
+          <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+        </template>
+
         <template #cell-group="{ row }">
-          <span v-if="row.group" class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-            {{ row.group.name }}
+          <span
+            v-if="getBillingSourceLabel(row) !== '-'"
+            class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
+            :class="getBillingSourceBadgeClass(row)"
+          >
+            {{ getBillingSourceLabel(row) }}
           </span>
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
@@ -605,6 +621,24 @@ const getRequestTypeBadgeClass = (row: AdminUsageLog): string => {
   if (requestType === 'stream') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
   if (requestType === 'sync') return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
   return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+}
+
+const getBillingSourceLabel = (row: AdminUsageLog): string => {
+  if (row.billing_source_type === 'subscription') {
+    return row.subscription_name || row.subscription?.plan_name_snapshot || t('usage.subscription')
+  }
+  if (row.billing_source_type === 'balance') return t('usage.balance')
+  return row.group?.name || '-'
+}
+
+const getBillingSourceBadgeClass = (row: AdminUsageLog): string => {
+  if (row.billing_source_type === 'subscription') {
+    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+  }
+  if (row.billing_source_type === 'balance') {
+    return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+  }
+  return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
 }
 
 

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 )
@@ -90,6 +91,20 @@ func (_c *AccountCreate) SetNillableNotes(v *string) *AccountCreate {
 // SetPlatform sets the "platform" field.
 func (_c *AccountCreate) SetPlatform(v string) *AccountCreate {
 	_c.mutation.SetPlatform(v)
+	return _c
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (_c *AccountCreate) SetPlatformID(v int64) *AccountCreate {
+	_c.mutation.SetPlatformID(v)
+	return _c
+}
+
+// SetNillablePlatformID sets the "platform_id" field if the given value is not nil.
+func (_c *AccountCreate) SetNillablePlatformID(v *int64) *AccountCreate {
+	if v != nil {
+		_c.SetPlatformID(*v)
+	}
 	return _c
 }
 
@@ -432,6 +447,25 @@ func (_c *AccountCreate) AddGroups(v ...*Group) *AccountCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddGroupIDs(ids...)
+}
+
+// SetPlatformPoolID sets the "platform_pool" edge to the Platform entity by ID.
+func (_c *AccountCreate) SetPlatformPoolID(id int64) *AccountCreate {
+	_c.mutation.SetPlatformPoolID(id)
+	return _c
+}
+
+// SetNillablePlatformPoolID sets the "platform_pool" edge to the Platform entity by ID if the given value is not nil.
+func (_c *AccountCreate) SetNillablePlatformPoolID(id *int64) *AccountCreate {
+	if id != nil {
+		_c = _c.SetPlatformPoolID(*id)
+	}
+	return _c
+}
+
+// SetPlatformPool sets the "platform_pool" edge to the Platform entity.
+func (_c *AccountCreate) SetPlatformPool(v *Platform) *AccountCreate {
+	return _c.SetPlatformPoolID(v.ID)
 }
 
 // SetProxy sets the "proxy" edge to the Proxy entity.
@@ -821,6 +855,23 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 		edge.Target.Fields = specE.Fields
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.PlatformPoolIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   account.PlatformPoolTable,
+			Columns: []string{account.PlatformPoolColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.PlatformID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	if nodes := _c.mutation.ProxyIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -1008,6 +1059,24 @@ func (u *AccountUpsert) SetPlatform(v string) *AccountUpsert {
 // UpdatePlatform sets the "platform" field to the value that was provided on create.
 func (u *AccountUpsert) UpdatePlatform() *AccountUpsert {
 	u.SetExcluded(account.FieldPlatform)
+	return u
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (u *AccountUpsert) SetPlatformID(v int64) *AccountUpsert {
+	u.Set(account.FieldPlatformID, v)
+	return u
+}
+
+// UpdatePlatformID sets the "platform_id" field to the value that was provided on create.
+func (u *AccountUpsert) UpdatePlatformID() *AccountUpsert {
+	u.SetExcluded(account.FieldPlatformID)
+	return u
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (u *AccountUpsert) ClearPlatformID() *AccountUpsert {
+	u.SetNull(account.FieldPlatformID)
 	return u
 }
 
@@ -1557,6 +1626,27 @@ func (u *AccountUpsertOne) SetPlatform(v string) *AccountUpsertOne {
 func (u *AccountUpsertOne) UpdatePlatform() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdatePlatform()
+	})
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (u *AccountUpsertOne) SetPlatformID(v int64) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetPlatformID(v)
+	})
+}
+
+// UpdatePlatformID sets the "platform_id" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdatePlatformID() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdatePlatformID()
+	})
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (u *AccountUpsertOne) ClearPlatformID() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearPlatformID()
 	})
 }
 
@@ -2342,6 +2432,27 @@ func (u *AccountUpsertBulk) SetPlatform(v string) *AccountUpsertBulk {
 func (u *AccountUpsertBulk) UpdatePlatform() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdatePlatform()
+	})
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (u *AccountUpsertBulk) SetPlatformID(v int64) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetPlatformID(v)
+	})
+}
+
+// UpdatePlatformID sets the "platform_id" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdatePlatformID() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdatePlatformID()
+	})
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (u *AccountUpsertBulk) ClearPlatformID() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearPlatformID()
 	})
 }
 

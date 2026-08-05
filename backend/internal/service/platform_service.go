@@ -1,0 +1,349 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"strings"
+
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+)
+
+var (
+	ErrPlatformNotFound = infraerrors.NotFound("PLATFORM_NOT_FOUND", "platform not found")
+	ErrPlatformExists   = infraerrors.Conflict("PLATFORM_EXISTS", "platform code already exists")
+	ErrPlatformInvalid  = infraerrors.BadRequest("INVALID_PLATFORM", "invalid platform configuration")
+)
+
+// PlatformRepository is deliberately small at the service boundary. The
+// repository owns atomic persistence of a platform and its model rules.
+type PlatformRepository interface {
+	Create(ctx context.Context, platform *Platform) error
+	List(ctx context.Context) ([]Platform, error)
+	ListModelRules(ctx context.Context) ([]PlatformModelRule, error)
+}
+
+// PlatformManagementRepository is required only by administrator CRUD paths.
+// Keeping it separate avoids expanding gateway-facing repository test doubles.
+type PlatformManagementRepository interface {
+	PlatformRepository
+	GetByID(ctx context.Context, id int64) (*Platform, error)
+	Update(ctx context.Context, platform *Platform) error
+}
+
+// CreatePlatformInput contains all fields that must be decided at platform
+// creation time. A platform is an account pool, never a billing asset.
+type CreatePlatformInput struct {
+	Code            string
+	Name            string
+	AccountPlatform string
+	Status          string
+	LegacyGroupID   *int64
+	ModelRules      []PlatformModelRule
+}
+
+// UpdatePlatformInput contains only the editable platform fields. A nil field
+// keeps its current value; ClearLegacyGroup explicitly removes the legacy
+// compatibility reference.
+type UpdatePlatformInput struct {
+	Code             *string
+	Name             *string
+	AccountPlatform  *string
+	Status           *string
+	LegacyGroupID    *int64
+	ClearLegacyGroup bool
+	ModelRules       *[]PlatformModelRule
+}
+
+// PlatformService validates the unique model-to-platform mapping before the
+// repository makes it durable.
+type PlatformService struct {
+	repo PlatformRepository
+}
+
+func NewPlatformService(repo PlatformRepository) *PlatformService {
+	return &PlatformService{repo: repo}
+}
+
+// List returns isolated platform configurations for administrator views. A
+// disabled platform remains visible so it can be safely edited or re-enabled.
+func (s *PlatformService) List(ctx context.Context) ([]Platform, error) {
+	if s == nil || s.repo == nil {
+		return nil, fmt.Errorf("%w: platform repository is required", ErrPlatformInvalid)
+	}
+	platforms, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list platforms: %w", err)
+	}
+	result := make([]Platform, len(platforms))
+	for index := range platforms {
+		result[index] = *clonePlatform(&platforms[index])
+	}
+	return result, nil
+}
+
+// GetByID returns one platform configuration, including disabled model rules,
+// for administration. Request-time resolution only reads active rules.
+func (s *PlatformService) GetByID(ctx context.Context, id int64) (*Platform, error) {
+	if id <= 0 {
+		return nil, ErrPlatformNotFound
+	}
+	repo, err := s.managementRepository()
+	if err != nil {
+		return nil, err
+	}
+	platform, err := repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get platform: %w", err)
+	}
+	return clonePlatform(platform), nil
+}
+
+func (s *PlatformService) Create(ctx context.Context, input CreatePlatformInput) (*Platform, error) {
+	platform, err := platformFromCreateInput(input)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.validateCandidate(ctx, platform, math.MaxInt64); err != nil {
+		return nil, err
+	}
+	if err := s.repo.Create(ctx, platform); err != nil {
+		return nil, fmt.Errorf("create platform: %w", err)
+	}
+	return platform, nil
+}
+
+// ResolveModel resolves against the current durable rule set. This avoids a
+// stale in-process mapping after an administrator changes a platform.
+func (s *PlatformService) ResolveModel(ctx context.Context, requestedModel string) (*ResolvedPlatformModel, error) {
+	rules, err := s.repo.ListModelRules(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list platform model rules: %w", err)
+	}
+	return newPlatformModelResolver(rules).Resolve(requestedModel)
+}
+
+func (s *PlatformService) Update(ctx context.Context, id int64, input UpdatePlatformInput) (*Platform, error) {
+	repo, err := s.managementRepository()
+	if err != nil {
+		return nil, err
+	}
+	current, err := repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get platform: %w", err)
+	}
+	candidate := clonePlatform(current)
+	if err := applyPlatformUpdate(candidate, input); err != nil {
+		return nil, err
+	}
+	candidate.ModelRules = bindPlatformToRules(candidate.ModelRules, candidate.ID, candidate.Code)
+	if err := s.validateCandidate(ctx, candidate, candidate.ID); err != nil {
+		return nil, err
+	}
+	if err := repo.Update(ctx, candidate); err != nil {
+		return nil, fmt.Errorf("update platform: %w", err)
+	}
+	return candidate, nil
+}
+
+func (s *PlatformService) validateCandidate(ctx context.Context, platform *Platform, candidateID int64) error {
+	if s == nil || s.repo == nil {
+		return fmt.Errorf("%w: platform repository is required", ErrPlatformInvalid)
+	}
+
+	existing, err := s.repo.ListModelRules(ctx)
+	if err != nil {
+		return fmt.Errorf("list platform model rules: %w", err)
+	}
+	existing = excludePlatformRules(existing, candidateID)
+	candidateRules := platformRulesForValidation(platform.ModelRules, candidateID, platform.Code, platform.IsActive())
+	rules := make([]PlatformModelRule, 0, len(existing)+len(candidateRules))
+	rules = append(rules, existing...)
+	rules = append(rules, candidateRules...)
+	if err := validatePlatformModelRules(rules); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *PlatformService) managementRepository() (PlatformManagementRepository, error) {
+	if s == nil || s.repo == nil {
+		return nil, fmt.Errorf("%w: platform repository is required", ErrPlatformInvalid)
+	}
+	repo, ok := s.repo.(PlatformManagementRepository)
+	if !ok {
+		return nil, fmt.Errorf("%w: platform repository does not support management", ErrPlatformInvalid)
+	}
+	return repo, nil
+}
+
+func platformFromCreateInput(input CreatePlatformInput) (*Platform, error) {
+	code, err := normalizePlatformCode(input.Code)
+	if err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, fmt.Errorf("%w: platform name is required", ErrPlatformInvalid)
+	}
+	accountPlatform, err := normalizePlatformAccountPlatform(input.AccountPlatform)
+	if err != nil {
+		return nil, err
+	}
+	status, err := normalizePlatformStatus(input.Status)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Platform{
+		Code:            code,
+		Name:            name,
+		AccountPlatform: accountPlatform,
+		Status:          status,
+		LegacyGroupID:   clonePlatformInt64Pointer(input.LegacyGroupID),
+		ModelRules:      clonePlatformModelRules(input.ModelRules),
+	}, nil
+}
+
+func applyPlatformUpdate(platform *Platform, input UpdatePlatformInput) error {
+	if input.Code != nil {
+		code, err := normalizePlatformCode(*input.Code)
+		if err != nil {
+			return err
+		}
+		platform.Code = code
+	}
+	if input.Name != nil {
+		name := strings.TrimSpace(*input.Name)
+		if name == "" {
+			return fmt.Errorf("%w: platform name is required", ErrPlatformInvalid)
+		}
+		platform.Name = name
+	}
+	if input.AccountPlatform != nil {
+		accountPlatform, err := normalizePlatformAccountPlatform(*input.AccountPlatform)
+		if err != nil {
+			return err
+		}
+		platform.AccountPlatform = accountPlatform
+	}
+	if input.Status != nil {
+		status, err := normalizePlatformStatus(*input.Status)
+		if err != nil {
+			return err
+		}
+		platform.Status = status
+	}
+	if input.ClearLegacyGroup {
+		platform.LegacyGroupID = nil
+	} else if input.LegacyGroupID != nil {
+		platform.LegacyGroupID = clonePlatformInt64Pointer(input.LegacyGroupID)
+	}
+	if input.ModelRules != nil {
+		platform.ModelRules = clonePlatformModelRules(*input.ModelRules)
+	}
+	return nil
+}
+
+func normalizePlatformStatus(raw string) (string, error) {
+	status := strings.ToLower(strings.TrimSpace(raw))
+	if status == "" {
+		return PlatformStatusActive, nil
+	}
+	if status != PlatformStatusActive && status != StatusDisabled {
+		return "", fmt.Errorf("%w: unsupported platform status %q", ErrPlatformInvalid, raw)
+	}
+	return status, nil
+}
+
+func normalizePlatformCode(raw string) (string, error) {
+	code := strings.ToLower(strings.TrimSpace(raw))
+	if code == "" || len(code) > 50 {
+		return "", fmt.Errorf("%w: platform code is required and must be at most 50 characters", ErrPlatformInvalid)
+	}
+	for index, char := range code {
+		if char >= 'a' && char <= 'z' || char >= '0' && char <= '9' || char == '-' || char == '_' {
+			continue
+		}
+		return "", fmt.Errorf("%w: platform code contains an invalid character at index %d", ErrPlatformInvalid, index)
+	}
+	return code, nil
+}
+
+func normalizePlatformAccountPlatform(raw string) (string, error) {
+	platform := strings.ToLower(strings.TrimSpace(raw))
+	if platform == "" || len(platform) > 50 {
+		return "", fmt.Errorf("%w: account platform is required and must be at most 50 characters", ErrPlatformInvalid)
+	}
+	return platform, nil
+}
+
+func platformRulesForValidation(rules []PlatformModelRule, platformID int64, platformCode string, enabled bool) []PlatformModelRule {
+	cloned := bindPlatformToRules(rules, platformID, platformCode)
+	for index := range cloned {
+		cloned[index].Enabled = cloned[index].Enabled && enabled
+	}
+	return cloned
+}
+
+func bindPlatformToRules(rules []PlatformModelRule, platformID int64, platformCode string) []PlatformModelRule {
+	cloned := clonePlatformModelRules(rules)
+	for index := range cloned {
+		cloned[index].PlatformID = platformID
+		cloned[index].PlatformCode = platformCode
+	}
+	return cloned
+}
+
+func excludePlatformRules(rules []PlatformModelRule, platformID int64) []PlatformModelRule {
+	if platformID <= 0 {
+		return append([]PlatformModelRule(nil), rules...)
+	}
+	filtered := make([]PlatformModelRule, 0, len(rules))
+	for index := range rules {
+		if rules[index].PlatformID != platformID {
+			filtered = append(filtered, rules[index])
+		}
+	}
+	return filtered
+}
+
+func clonePlatformModelRules(rules []PlatformModelRule) []PlatformModelRule {
+	cloned := make([]PlatformModelRule, len(rules))
+	copy(cloned, rules)
+	for index := range cloned {
+		cloned[index].EndpointCapabilities = append([]string(nil), rules[index].EndpointCapabilities...)
+	}
+	return cloned
+}
+
+func clonePlatform(platform *Platform) *Platform {
+	if platform == nil {
+		return nil
+	}
+	cloned := *platform
+	cloned.LegacyGroupID = clonePlatformInt64Pointer(platform.LegacyGroupID)
+	cloned.ModelRules = clonePlatformModelRules(platform.ModelRules)
+	if platform.EndpointCapabilities != nil {
+		cloned.EndpointCapabilities = make(map[string]bool, len(platform.EndpointCapabilities))
+		for key, value := range platform.EndpointCapabilities {
+			cloned.EndpointCapabilities[key] = value
+		}
+	}
+	if platform.SchedulingConfig != nil {
+		cloned.SchedulingConfig = make(map[string]any, len(platform.SchedulingConfig))
+		for key, value := range platform.SchedulingConfig {
+			cloned.SchedulingConfig[key] = value
+		}
+	}
+	return &cloned
+}
+
+func clonePlatformInt64Pointer(value *int64) *int64 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}

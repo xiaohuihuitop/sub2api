@@ -463,6 +463,7 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Name:        input.Name,
 		Notes:       normalizeAccountNotes(input.Notes),
 		Platform:    input.Platform,
+		PlatformID:  clonePlatformInt64Pointer(input.PlatformID),
 		Type:        input.Type,
 		Credentials: input.Credentials,
 		Extra:       accountExtra,
@@ -514,6 +515,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
+	if input.PlatformID != nil && len(input.GroupIDs) > 0 {
+		return nil, fmt.Errorf("%w: V2 platform accounts cannot be created with legacy group bindings", ErrPlatformInvalid)
+	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
 		return nil, err
@@ -526,7 +530,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	// 绑定分组
 	groupIDs := input.GroupIDs
 	// 如果没有指定分组,自动绑定对应平台的默认分组
-	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
+	if input.PlatformID == nil && len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
 		defaultGroupName := input.Platform + "-default"
 		groups, err := s.groupRepo.ListActiveByPlatform(ctx, input.Platform)
 		if err == nil {
@@ -553,6 +557,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 
 	account, err := buildAccountForCreate(input, accountExtra)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validatePlatformAccountBinding(ctx, account); err != nil {
 		return nil, err
 	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
@@ -594,11 +601,25 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	return account, nil
 }
 
+func (s *adminServiceImpl) validatePlatformAccountBinding(ctx context.Context, account *Account) error {
+	if account == nil || account.PlatformID == nil {
+		return nil
+	}
+	validator, ok := s.accountRepo.(PlatformAccountBindingValidator)
+	if !ok {
+		return fmt.Errorf("%w: account repository cannot validate platform pool binding", ErrPlatformInvalid)
+	}
+	return validator.ValidatePlatformAccountBinding(ctx, *account.PlatformID, account.Platform)
+}
+
 type accountProbeEnabledAtomicUpdater interface {
 	UpdateWithUpstreamBillingProbeEnabled(context.Context, *Account, bool) error
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
+	if input.PlatformID != nil && input.GroupIDs != nil {
+		return nil, fmt.Errorf("%w: V2 platform accounts cannot update legacy group bindings in the same request", ErrPlatformInvalid)
+	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -647,6 +668,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 
 	if input.Name != "" {
 		account.Name = input.Name
+	}
+	if input.PlatformID != nil {
+		account.PlatformID = clonePlatformInt64Pointer(input.PlatformID)
 	}
 	if input.Type != "" {
 		account.Type = input.Type
@@ -804,6 +828,10 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 				return nil, err
 			}
 		}
+	}
+
+	if err := s.validatePlatformAccountBinding(ctx, account); err != nil {
+		return nil, err
 	}
 
 	probeEnabledAppliedAtomically := false
@@ -1274,32 +1302,7 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 			"parent account already has a spark shadow account")
 	}
 
-	// 3. 解析分组。未指定 GroupIDs 时:优先**继承母账号当前分组**(影子与母同路由域,母在自定义
-	// 组时该组的 spark 请求也能选到影子;G1 决策);母无分组再回落 openai-default(F4)。
-	// 显式指定 GroupIDs 时,与 UpdateAccount 对齐先校验存在性(创建前),避免建出影子后再因无效组
-	// 失败而留下孤儿影子(一母一影唯一索引会挡住重试)——外审 C/P1。
-	groupIDs := opts.GroupIDs
-	if len(groupIDs) > 0 {
-		if s.groupRepo != nil {
-			if err := s.validateGroupIDsExist(ctx, groupIDs); err != nil {
-				return nil, err
-			}
-		}
-	} else if len(parent.GroupIDs) > 0 {
-		groupIDs = append([]int64(nil), parent.GroupIDs...)
-	} else if s.groupRepo != nil {
-		defaultGroupName := PlatformOpenAI + "-default"
-		if groups, gerr := s.groupRepo.ListActiveByPlatform(ctx, PlatformOpenAI); gerr == nil {
-			for _, g := range groups {
-				if g.Name == defaultGroupName {
-					groupIDs = []int64{g.ID}
-					break
-				}
-			}
-		}
-	}
-
-	// 4. 构造影子账号（安全不变量：Credentials 恒不含 auth token，仅含 model_mapping）。
+	// 3. 构造影子账号（安全不变量：Credentials 恒不含 auth token，仅含 model_mapping）。
 	// name 为空时默认 "<母账号名> (Spark)"——否则空 name 会在 ent(name NotEmpty)处变成裸 500
 	// (外审 E/P2);并 rune 安全截断到 ent MaxLen(100)。
 	name := strings.TrimSpace(opts.Name)
@@ -1325,6 +1328,7 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 	shadow := &Account{
 		Name:            name,
 		Platform:        PlatformOpenAI,
+		PlatformID:      clonePlatformInt64Pointer(parent.PlatformID),
 		Type:            AccountTypeOAuth,
 		Status:          StatusActive,
 		Credentials:     map[string]any{"model_mapping": defaultSparkShadowModelMapping()},
@@ -1347,21 +1351,6 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 				"parent account already has a spark shadow account")
 		}
 		return nil, fmt.Errorf("create spark shadow: %w", err)
-	}
-
-	// 6. 绑定分组。注意:create+bind 非单一 DB 事务(通用 Create 走 r.client、outbox 走 r.sql,
-	// 无现成共享事务路径),故绑组失败时做 best-effort 补偿删除刚建的影子,避免半成品影子(否则
-	// 一母一影唯一索引会挡住重试)——外审 C/P1。补偿删除用 detached ctx,即便请求 ctx 已取消/超时
-	// 仍能完成清理(外审第4轮);进程崩溃这种极端仍可能残留,属已知权衡。
-	if len(groupIDs) > 0 {
-		if err := s.accountRepo.BindGroups(ctx, shadow.ID, groupIDs); err != nil {
-			if delErr := s.accountRepo.Delete(context.WithoutCancel(ctx), shadow.ID); delErr != nil {
-				slog.Error("spark_shadow_bind_groups_rollback_failed",
-					"shadow_id", shadow.ID, "parent_id", parentID, "delete_err", delErr)
-			}
-			return nil, fmt.Errorf("bind groups for spark shadow: %w", err)
-		}
-		shadow.GroupIDs = groupIDs
 	}
 
 	return shadow, nil

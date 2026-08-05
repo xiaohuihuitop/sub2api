@@ -118,27 +118,17 @@ const SelectStub = defineComponent({
   `
 })
 
-const GroupSelectorStub = defineComponent({
-  name: 'GroupSelector',
-  props: {
-    modelValue: {
-      type: Array,
-      default: () => []
-    }
-  },
-  emits: ['update:modelValue'],
-  template: `
-    <div data-testid="group-selector">
-      <button
-        type="button"
-        data-testid="set-shadow-group"
-        @click="$emit('update:modelValue', [7])"
-      >
-        group
-      </button>
-    </div>
-  `
+const ConfirmDialogStub = defineComponent({
+  name: 'ConfirmDialog',
+  template: '<div data-testid="legacy-mixed-channel-dialog" />'
 })
+
+const platformPools = [
+  { id: 1, code: 'openai-primary', name: 'OpenAI', account_platform: 'openai', status: 'active', model_rules: [] },
+  { id: 2, code: 'gemini-primary', name: 'Gemini', account_platform: 'gemini', status: 'active', model_rules: [] },
+  { id: 3, code: 'antigravity-primary', name: 'Antigravity', account_platform: 'antigravity', status: 'active', model_rules: [] },
+  { id: 4, code: 'grok-primary', name: 'Grok', account_platform: 'grok', status: 'active', model_rules: [] },
+] as any
 
 function buildAccount() {
   return {
@@ -160,6 +150,7 @@ function buildAccount() {
     priority: 1,
     rate_multiplier: 1,
     status: 'active',
+    platform_id: 1,
     group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
@@ -210,6 +201,7 @@ function buildVertexAccount() {
     priority: 1,
     rate_multiplier: 1,
     status: 'active',
+    platform_id: 2,
     group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
@@ -235,6 +227,7 @@ function buildAntigravityAccount(projectId = 'configured-project') {
     priority: 1,
     rate_multiplier: 1,
     status: 'active',
+    platform_id: 3,
     group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
@@ -261,6 +254,7 @@ function buildGrokOAuthAccount() {
     priority: 1,
     rate_multiplier: 1,
     status: 'active',
+    platform_id: 4,
     group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
@@ -273,6 +267,7 @@ function buildGrokAPIKeyAccount() {
     id: 6,
     name: 'Grok API Key',
     platform: 'grok',
+    platform_id: 4,
     credentials: {},
     credentials_status: { has_api_key: true },
     concurrency: 2
@@ -296,20 +291,28 @@ function mountModal(account = buildAccount()) {
       show: true,
       account,
       proxies: [],
-      groups: []
+      platformPools
     },
     global: {
       stubs: {
         BaseDialog: BaseDialogStub,
         Select: SelectStub,
+        ConfirmDialog: ConfirmDialogStub,
         Icon: true,
         ProxySelector: true,
-        GroupSelector: GroupSelectorStub,
         ModelWhitelistSelector: ModelWhitelistSelectorStub
       }
     }
   })
 }
+
+describe('EditAccountModal platform ownership', () => {
+  it('does not mount the legacy mixed-channel confirmation dialog', () => {
+    const wrapper = mountModal()
+
+    expect(wrapper.find('[data-testid="legacy-mixed-channel-dialog"]').exists()).toBe(false)
+  })
+})
 
 describe('EditAccountModal', () => {
   beforeEach(() => {
@@ -602,12 +605,11 @@ describe('EditAccountModal', () => {
 
     const wrapper = mountModal(account)
 
-    await wrapper.get('[data-testid="set-shadow-group"]').trigger('click')
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
     const payload = updateAccountMock.mock.calls[0]?.[1]
-    expect(payload?.group_ids).toEqual([7])
+    expect(payload).not.toHaveProperty('group_ids')
     expect(payload?.credentials).toEqual({
       model_mapping: {
         'gpt-5.3-codex-spark': 'gpt-5.3-codex-spark'

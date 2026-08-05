@@ -49,12 +49,9 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	// Enrich plans with group platform for frontend color coding
-	type planWithPlatform struct {
+	type planResponse struct {
 		ID              int64    `json:"id"`
-		GroupID         int64    `json:"group_id"`
-		GroupPlatform   string   `json:"group_platform"`
-		GroupName       string   `json:"group_name"`
+		GroupID         *int64   `json:"group_id,omitempty"`
 		RateMultiplier  float64  `json:"rate_multiplier"`
 		DailyLimitUSD   *float64 `json:"daily_limit_usd,omitempty"`
 		WeeklyLimitUSD  *float64 `json:"weekly_limit_usd,omitempty"`
@@ -71,13 +68,10 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 		ForSale         bool     `json:"for_sale"`
 		SortOrder       int      `json:"sort_order"`
 	}
-	groupInfo := h.configService.GetGroupInfoMap(c.Request.Context(), plans)
-	result := make([]planWithPlatform, 0, len(plans))
+	result := make([]planResponse, 0, len(plans))
 	for _, p := range plans {
-		gi := groupInfo[p.GroupID]
-		result = append(result, planWithPlatform{
-			ID: int64(p.ID), GroupID: p.GroupID,
-			GroupPlatform: gi.Platform, GroupName: gi.Name,
+		result = append(result, planResponse{
+			ID: int64(p.ID), GroupID: legacyPlanGroupID(p.GroupID),
 			RateMultiplier: p.RateMultiplier,
 			DailyLimitUSD:  p.DailyLimitUsd, WeeklyLimitUSD: p.WeeklyLimitUsd, MonthlyLimitUSD: p.MonthlyLimitUsd,
 			Name: p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
@@ -117,18 +111,14 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		}
 	}
 
-	// Fetch plans with group info
+	// Fetch globally purchasable plans.
 	plans, _ := h.configService.ListPlansForSale(ctx)
-	groupInfo := h.configService.GetGroupInfoMap(ctx, plans)
 	planList := make([]checkoutPlan, 0, len(plans))
 	for _, p := range plans {
-		gi := groupInfo[p.GroupID]
 		planList = append(planList, checkoutPlan{
-			ID: int64(p.ID), GroupID: p.GroupID,
-			GroupPlatform: gi.Platform, GroupName: gi.Name,
+			ID: int64(p.ID), GroupID: legacyPlanGroupID(p.GroupID),
 			RateMultiplier: p.RateMultiplier,
 			DailyLimitUSD:  p.DailyLimitUsd, WeeklyLimitUSD: p.WeeklyLimitUsd, MonthlyLimitUSD: p.MonthlyLimitUsd,
-			ModelScopes: gi.ModelScopes,
 			Name:        p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
 			Currency:     p.Currency,
 			ValidityDays: p.ValidityDays, ValidityUnit: p.ValidityUnit, Features: parseFeatures(p.Features),
@@ -171,14 +161,11 @@ type checkoutInfoResponse struct {
 
 type checkoutPlan struct {
 	ID              int64    `json:"id"`
-	GroupID         int64    `json:"group_id"`
-	GroupPlatform   string   `json:"group_platform"`
-	GroupName       string   `json:"group_name"`
+	GroupID         *int64   `json:"group_id,omitempty"`
 	RateMultiplier  float64  `json:"rate_multiplier"`
 	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
 	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
 	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
-	ModelScopes     []string `json:"supported_model_scopes"`
 	Name            string   `json:"name"`
 	Description     string   `json:"description"`
 	Price           float64  `json:"price"`
@@ -188,6 +175,14 @@ type checkoutPlan struct {
 	ValidityUnit    string   `json:"validity_unit"`
 	Features        []string `json:"features"`
 	ProductName     string   `json:"product_name"`
+}
+
+func legacyPlanGroupID(groupID int64) *int64 {
+	if groupID <= 0 {
+		return nil
+	}
+	value := groupID
+	return &value
 }
 
 // parseFeatures splits a newline-separated features string into a string slice.

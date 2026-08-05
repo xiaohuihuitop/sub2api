@@ -222,15 +222,12 @@ describe('GroupsView duplicate action', () => {
     wrapper.unmount()
   })
 
-  it('opens the separate balance billing profile for the selected routing group', async () => {
+  it('does not expose balance pricing controls from a routing group', async () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="group-billing-profile"]').trigger('click')
-
-    const dialog = wrapper.get('[data-testid="billing-profile-dialog"]')
-    expect(dialog.attributes('data-open')).toBe('true')
-    expect(dialog.attributes('data-group-id')).toBe('42')
+    expect(wrapper.find('[data-testid="group-billing-profile"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="billing-profile-dialog"]').exists()).toBe(false)
     wrapper.unmount()
   })
 

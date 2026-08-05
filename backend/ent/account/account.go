@@ -28,6 +28,8 @@ const (
 	FieldNotes = "notes"
 	// FieldPlatform holds the string denoting the platform field in the database.
 	FieldPlatform = "platform"
+	// FieldPlatformID holds the string denoting the platform_id field in the database.
+	FieldPlatformID = "platform_id"
 	// FieldType holds the string denoting the type field in the database.
 	FieldType = "type"
 	// FieldCredentials holds the string denoting the credentials field in the database.
@@ -80,6 +82,8 @@ const (
 	FieldQuotaDimension = "quota_dimension"
 	// EdgeGroups holds the string denoting the groups edge name in mutations.
 	EdgeGroups = "groups"
+	// EdgePlatformPool holds the string denoting the platform_pool edge name in mutations.
+	EdgePlatformPool = "platform_pool"
 	// EdgeProxy holds the string denoting the proxy edge name in mutations.
 	EdgeProxy = "proxy"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -97,6 +101,13 @@ const (
 	// GroupsInverseTable is the table name for the Group entity.
 	// It exists in this package in order to avoid circular dependency with the "group" package.
 	GroupsInverseTable = "groups"
+	// PlatformPoolTable is the table that holds the platform_pool relation/edge.
+	PlatformPoolTable = "accounts"
+	// PlatformPoolInverseTable is the table name for the Platform entity.
+	// It exists in this package in order to avoid circular dependency with the "platform" package.
+	PlatformPoolInverseTable = "platforms"
+	// PlatformPoolColumn is the table column denoting the platform_pool relation/edge.
+	PlatformPoolColumn = "platform_id"
 	// ProxyTable is the table that holds the proxy relation/edge.
 	ProxyTable = "accounts"
 	// ProxyInverseTable is the table name for the Proxy entity.
@@ -137,6 +148,7 @@ var Columns = []string{
 	FieldName,
 	FieldNotes,
 	FieldPlatform,
+	FieldPlatformID,
 	FieldType,
 	FieldCredentials,
 	FieldExtra,
@@ -286,6 +298,11 @@ func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPlatform, opts...).ToFunc()
 }
 
+// ByPlatformID orders the results by the platform_id field.
+func ByPlatformID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPlatformID, opts...).ToFunc()
+}
+
 // ByType orders the results by the type field.
 func ByType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldType, opts...).ToFunc()
@@ -415,6 +432,13 @@ func ByGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByPlatformPoolField orders the results by platform_pool field.
+func ByPlatformPoolField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPlatformPoolStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByProxyField orders the results by proxy field.
 func ByProxyField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -475,6 +499,13 @@ func newGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(GroupsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, false, GroupsTable, GroupsPrimaryKey...),
+	)
+}
+func newPlatformPoolStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PlatformPoolInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, PlatformPoolTable, PlatformPoolColumn),
 	)
 }
 func newProxyStep() *sqlgraph.Step {

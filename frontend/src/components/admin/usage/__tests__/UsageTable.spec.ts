@@ -69,6 +69,8 @@ const DataTableStub = {
     <div>
       <div v-for="row in data" :key="row.request_id">
         <slot name="cell-model" :row="row" :value="row.model" />
+        <slot name="cell-platform" :row="row" />
+        <slot name="cell-group" :row="row" />
         <slot name="cell-billing_mode" :row="row" />
         <slot name="cell-tokens" :row="row" />
         <slot name="cell-cost" :row="row" />
@@ -118,6 +120,38 @@ describe('admin UsageTable tooltip', () => {
       height: 20,
       toJSON: () => ({}),
     } as DOMRect)
+  })
+
+  it('separates the V2 platform from the subscription billing source', () => {
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [{
+          ...baseImageRow,
+          request_id: 'req-v2-subscription-source',
+          platform_code: 'openai-primary',
+          platform_name: 'OpenAI 主账号池',
+          billing_source_type: 'subscription',
+          subscription_name: '大包',
+        }],
+        loading: false,
+        columns: [
+          { key: 'platform', label: 'Platform' },
+          { key: 'group', label: 'Billing source' },
+        ],
+      },
+      global: {
+        stubs: {
+          DataTable: DataTableStub,
+          EmptyState: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('OpenAI 主账号池')
+    expect(wrapper.text()).toContain('openai-primary')
+    expect(wrapper.text()).toContain('大包')
   })
 
   it('marks only usage rows that actually applied long-context billing', () => {

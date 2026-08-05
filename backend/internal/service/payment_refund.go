@@ -257,6 +257,50 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 func (s *PaymentService) prepDeduct(ctx context.Context, o *dbent.PaymentOrder, p *RefundPlan, force bool) *RefundResult {
 	if o.OrderType == payment.OrderTypeSubscription {
 		p.DeductionType = payment.DeductionTypeSubscription
+		if o.PlanID != nil && *o.PlanID > 0 {
+			if o.SubscriptionDays != nil && *o.SubscriptionDays > 0 {
+				p.SubDaysToDeduct = *o.SubscriptionDays
+			} else if s != nil && s.entClient != nil {
+				days, err := s.subscriptionPlanFulfillmentDays(ctx, *o.PlanID)
+				if err == nil {
+					p.SubDaysToDeduct = days
+				} else if !force {
+					return &RefundResult{Success: false, Warning: "cannot resolve plan duration for deduction, use force", RequireForce: true}
+				}
+			}
+			sub, err := s.findPlanSubscriptionForOrder(ctx, o)
+			if err == nil && sub != nil {
+				p.SubscriptionID = sub.ID
+				return nil
+			}
+			if o.SubscriptionGroupID == nil || o.SubscriptionDays == nil {
+				if !force {
+					return &RefundResult{Success: false, Warning: "cannot find plan subscription for deduction, use force", RequireForce: true}
+				}
+				return nil
+			}
+			if s == nil || s.entClient == nil {
+				if !force {
+					return &RefundResult{Success: false, Warning: "cannot verify plan for legacy deduction, use force", RequireForce: true}
+				}
+				return nil
+			}
+			_, planErr := s.subscriptionPlanFulfillmentDays(ctx, *o.PlanID)
+			switch {
+			case planErr == nil:
+				if !force {
+					return &RefundResult{Success: false, Warning: "cannot find plan subscription for deduction, use force", RequireForce: true}
+				}
+				return nil
+			case !errors.Is(planErr, ErrSubscriptionPlanNotFound):
+				if !force {
+					return &RefundResult{Success: false, Warning: "cannot resolve plan duration for deduction, use force", RequireForce: true}
+				}
+				return nil
+			}
+			// Historical orders can reference a removed plan while preserving the
+			// original legacy group entitlement. Deduct that entitlement instead.
+		}
 		if o.SubscriptionGroupID != nil && o.SubscriptionDays != nil {
 			p.SubDaysToDeduct = *o.SubscriptionDays
 			sub, err := s.subscriptionSvc.GetActiveSubscription(ctx, o.UserID, *o.SubscriptionGroupID)
@@ -278,6 +322,24 @@ func (s *PaymentService) prepDeduct(ctx context.Context, o *dbent.PaymentOrder, 
 	p.DeductionType = payment.DeductionTypeBalance
 	p.BalanceToDeduct = math.Min(p.RefundAmount, u.Balance)
 	return nil
+}
+
+func (s *PaymentService) findPlanSubscriptionForOrder(ctx context.Context, order *dbent.PaymentOrder) (*UserSubscription, error) {
+	if s == nil || s.subscriptionSvc == nil || s.subscriptionSvc.userSubRepo == nil || order == nil || order.PlanID == nil {
+		return nil, ErrSubscriptionNotFound
+	}
+	subscriptions, err := s.subscriptionSvc.userSubRepo.ListByUserID(ctx, order.UserID)
+	if err != nil {
+		return nil, err
+	}
+	note := paymentSubscriptionOrderNote(order.ID)
+	for index := range subscriptions {
+		subscription := subscriptions[index]
+		if subscription.SubscriptionPlanID != nil && *subscription.SubscriptionPlanID == *order.PlanID && hasPaymentSubscriptionOrderNote(subscription.Notes, note) {
+			return &subscription, nil
+		}
+	}
+	return nil, ErrSubscriptionNotFound
 }
 
 func (s *PaymentService) ExecuteRefund(ctx context.Context, p *RefundPlan) (*RefundResult, error) {

@@ -32,7 +32,7 @@ func newSessionIDUsageLog(sessionID *string) *service.UsageLog {
 // arg slice / arg-type table so the five INSERT column lists stay in sync. session_id
 // is the penultimate arg (created_at is always last).
 func TestPrepareUsageLogInsert_SessionIDArgWiring(t *testing.T) {
-	require.Len(t, usageLogInsertArgTypes, 57, "arg-type table must include session_id")
+	require.Len(t, usageLogInsertArgTypes, 59, "arg-type table must include platform attribution and session_id")
 
 	sessionID := "sess-persisted-123"
 	prepared := prepareUsageLogInsert(newSessionIDUsageLog(&sessionID))
@@ -66,11 +66,46 @@ func TestPrepareUsageLogInsert_SessionIDNullWhenAbsent(t *testing.T) {
 	require.False(t, nsEmpty.Valid, "empty session id must also be NULL")
 }
 
+// TestPrepareUsageLogInsert_PlatformAssetAttributionWiring keeps the platform
+// and selected billing source next to the legacy group/subscription columns in
+// every INSERT path. This prevents a V2 request from losing its actual asset
+// attribution when the usage log is persisted.
+func TestPrepareUsageLogInsert_PlatformAssetAttributionWiring(t *testing.T) {
+	platformID := int64(42)
+	billingSourceType := "subscription"
+	log := newSessionIDUsageLog(nil)
+	log.PlatformID = &platformID
+	log.BillingSourceType = &billingSourceType
+
+	prepared := prepareUsageLogInsert(log)
+
+	const (
+		platformIDArgIndex        = 9
+		billingSourceTypeArgIndex = 10
+	)
+	require.Equal(t, "bigint", usageLogInsertArgTypes[platformIDArgIndex])
+	require.Equal(t, "text", usageLogInsertArgTypes[billingSourceTypeArgIndex])
+
+	platformIDArg, ok := prepared.args[platformIDArgIndex].(sql.NullInt64)
+	require.True(t, ok, "platform_id arg should be a sql.NullInt64, got %T", prepared.args[platformIDArgIndex])
+	require.True(t, platformIDArg.Valid)
+	require.Equal(t, platformID, platformIDArg.Int64)
+
+	billingSourceTypeArg, ok := prepared.args[billingSourceTypeArgIndex].(sql.NullString)
+	require.True(t, ok, "billing_source_type arg should be a sql.NullString, got %T", prepared.args[billingSourceTypeArgIndex])
+	require.True(t, billingSourceTypeArg.Valid)
+	require.Equal(t, billingSourceType, billingSourceTypeArg.String)
+}
+
 // TestUsageLogInsertQueries_IncludeSessionID guards that every generated INSERT path
 // and the SELECT column list reference session_id.
 func TestUsageLogInsertQueries_IncludeSessionID(t *testing.T) {
 	require.Contains(t, usageLogSelectColumns, "session_id",
 		"SELECT column list must include session_id")
+	require.Contains(t, usageLogSelectColumns, "platform_id",
+		"SELECT column list must include platform_id")
+	require.Contains(t, usageLogSelectColumns, "billing_source_type",
+		"SELECT column list must include billing_source_type")
 
 	sessionID := "sess-in-query"
 	log := newSessionIDUsageLog(&sessionID)
@@ -80,6 +115,8 @@ func TestUsageLogInsertQueries_IncludeSessionID(t *testing.T) {
 	batchQuery, batchArgs := buildUsageLogBatchInsertQuery([]string{key},
 		map[string]usageLogInsertPrepared{key: prepared})
 	require.Contains(t, batchQuery, "session_id")
+	require.Contains(t, batchQuery, "platform_id")
+	require.Contains(t, batchQuery, "billing_source_type")
 	// Two column references (INSERT column list + SELECT ... FROM input) plus the CTE def.
 	require.GreaterOrEqual(t, strings.Count(batchQuery, "session_id"), 3)
 	require.Len(t, batchArgs, len(prepared.args)+1,
@@ -87,5 +124,7 @@ func TestUsageLogInsertQueries_IncludeSessionID(t *testing.T) {
 
 	bestEffortQuery, bestEffortArgs := buildUsageLogBestEffortInsertQuery([]usageLogInsertPrepared{prepared})
 	require.Contains(t, bestEffortQuery, "session_id")
+	require.Contains(t, bestEffortQuery, "platform_id")
+	require.Contains(t, bestEffortQuery, "billing_source_type")
 	require.Len(t, bestEffortArgs, len(prepared.args))
 }

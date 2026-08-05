@@ -11,6 +11,7 @@ import (
 	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
 	dbapikey "github.com/Wei-Shaw/sub2api/ent/apikey"
 	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
+	dbplatform "github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	dbusersub "github.com/Wei-Shaw/sub2api/ent/usersubscription"
@@ -19,7 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, image_input_tokens, image_input_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, image_input_size, image_output_size, image_size_source, image_size_breakdown, video_count, video_resolution, video_duration_seconds, service_tier, reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, long_context_billing_applied, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, session_id, created_at"
+const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, group_id, subscription_id, platform_id, billing_source_type, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, image_input_tokens, image_input_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, image_input_size, image_output_size, image_size_source, image_size_breakdown, video_count, video_resolution, video_duration_seconds, service_tier, reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, long_context_billing_applied, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, session_id, created_at"
 
 func (r *usageLogRepository) GetByID(ctx context.Context, id int64) (log *service.UsageLog, err error) {
 	query := "SELECT " + usageLogSelectColumns + " FROM usage_logs WHERE id = $1"
@@ -288,6 +289,10 @@ func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, lo
 	if err != nil {
 		return err
 	}
+	platforms, err := r.loadUsageLogPlatforms(ctx, ids.platformIDs)
+	if err != nil {
+		return err
+	}
 
 	for i := range logs {
 		if user, ok := users[logs[i].UserID]; ok {
@@ -309,6 +314,12 @@ func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, lo
 				logs[i].Subscription = sub
 			}
 		}
+		if logs[i].PlatformID != nil {
+			if platform, ok := platforms[*logs[i].PlatformID]; ok {
+				logs[i].PlatformCode = platform.Code
+				logs[i].PlatformName = platform.Name
+			}
+		}
 	}
 	return nil
 }
@@ -319,6 +330,7 @@ type usageLogIDs struct {
 	accountIDs      []int64
 	groupIDs        []int64
 	subscriptionIDs []int64
+	platformIDs     []int64
 }
 
 func collectUsageLogIDs(logs []service.UsageLog) usageLogIDs {
@@ -329,6 +341,7 @@ func collectUsageLogIDs(logs []service.UsageLog) usageLogIDs {
 	accountIDs := idSet()
 	groupIDs := idSet()
 	subscriptionIDs := idSet()
+	platformIDs := idSet()
 
 	for i := range logs {
 		userIDs[logs[i].UserID] = struct{}{}
@@ -340,6 +353,9 @@ func collectUsageLogIDs(logs []service.UsageLog) usageLogIDs {
 		if logs[i].SubscriptionID != nil {
 			subscriptionIDs[*logs[i].SubscriptionID] = struct{}{}
 		}
+		if logs[i].PlatformID != nil {
+			platformIDs[*logs[i].PlatformID] = struct{}{}
+		}
 	}
 
 	return usageLogIDs{
@@ -348,6 +364,7 @@ func collectUsageLogIDs(logs []service.UsageLog) usageLogIDs {
 		accountIDs:      setToSlice(accountIDs),
 		groupIDs:        setToSlice(groupIDs),
 		subscriptionIDs: setToSlice(subscriptionIDs),
+		platformIDs:     setToSlice(platformIDs),
 	}
 }
 
@@ -427,6 +444,26 @@ func (r *usageLogRepository) loadSubscriptions(ctx context.Context, ids []int64)
 	return out, nil
 }
 
+type usageLogPlatformSummary struct {
+	Code string
+	Name string
+}
+
+func (r *usageLogRepository) loadUsageLogPlatforms(ctx context.Context, ids []int64) (map[int64]usageLogPlatformSummary, error) {
+	out := make(map[int64]usageLogPlatformSummary)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	models, err := r.client.Platform.Query().Where(dbplatform.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, model := range models {
+		out[model.ID] = usageLogPlatformSummary{Code: model.Code, Name: model.Name}
+	}
+	return out, nil
+}
+
 func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, error) {
 	var (
 		id                        int64
@@ -439,6 +476,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		upstreamModel             sql.NullString
 		groupID                   sql.NullInt64
 		subscriptionID            sql.NullInt64
+		platformID                sql.NullInt64
+		billingSourceType         sql.NullString
 		inputTokens               int
 		outputTokens              int
 		cacheCreationTokens       int
@@ -500,6 +539,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		&upstreamModel,
 		&groupID,
 		&subscriptionID,
+		&platformID,
+		&billingSourceType,
 		&inputTokens,
 		&outputTokens,
 		&cacheCreationTokens,
@@ -601,6 +642,14 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 	if subscriptionID.Valid {
 		value := subscriptionID.Int64
 		log.SubscriptionID = &value
+	}
+	if platformID.Valid {
+		value := platformID.Int64
+		log.PlatformID = &value
+	}
+	if billingSourceType.Valid {
+		value := billingSourceType.String
+		log.BillingSourceType = &value
 	}
 	if durationMs.Valid {
 		value := int(durationMs.Int64)

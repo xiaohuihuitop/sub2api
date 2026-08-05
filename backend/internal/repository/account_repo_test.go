@@ -44,6 +44,24 @@ func TestAccountsToService_LargeActiveAccountSetDoesNotExceedPostgresParameterLi
 	require.Len(t, got, len(accounts))
 }
 
+func TestAccountEntityToServicePreservesPlatformPool(t *testing.T) {
+	platformID := int64(42)
+	mapped := accountEntityToService(&dbent.Account{
+		ID:          7,
+		Name:        "platform-bound",
+		Platform:    service.PlatformOpenAI,
+		PlatformID:  &platformID,
+		Type:        service.AccountTypeAPIKey,
+		Credentials: map[string]any{},
+		Extra:       map[string]any{},
+		Status:      service.StatusActive,
+		Schedulable: true,
+	})
+
+	require.NotNil(t, mapped)
+	require.Equal(t, &platformID, mapped.PlatformID)
+}
+
 func newParameterLimitAccountRepo(t *testing.T) *accountRepository {
 	t.Helper()
 

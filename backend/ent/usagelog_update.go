@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -266,6 +267,46 @@ func (_u *UsageLogUpdate) SetNillableSubscriptionID(v *int64) *UsageLogUpdate {
 // ClearSubscriptionID clears the value of the "subscription_id" field.
 func (_u *UsageLogUpdate) ClearSubscriptionID() *UsageLogUpdate {
 	_u.mutation.ClearSubscriptionID()
+	return _u
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (_u *UsageLogUpdate) SetPlatformID(v int64) *UsageLogUpdate {
+	_u.mutation.SetPlatformID(v)
+	return _u
+}
+
+// SetNillablePlatformID sets the "platform_id" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillablePlatformID(v *int64) *UsageLogUpdate {
+	if v != nil {
+		_u.SetPlatformID(*v)
+	}
+	return _u
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (_u *UsageLogUpdate) ClearPlatformID() *UsageLogUpdate {
+	_u.mutation.ClearPlatformID()
+	return _u
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (_u *UsageLogUpdate) SetBillingSourceType(v string) *UsageLogUpdate {
+	_u.mutation.SetBillingSourceType(v)
+	return _u
+}
+
+// SetNillableBillingSourceType sets the "billing_source_type" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableBillingSourceType(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetBillingSourceType(*v)
+	}
+	return _u
+}
+
+// ClearBillingSourceType clears the value of the "billing_source_type" field.
+func (_u *UsageLogUpdate) ClearBillingSourceType() *UsageLogUpdate {
+	_u.mutation.ClearBillingSourceType()
 	return _u
 }
 
@@ -932,6 +973,11 @@ func (_u *UsageLogUpdate) SetSubscription(v *UserSubscription) *UsageLogUpdate {
 	return _u.SetSubscriptionID(v.ID)
 }
 
+// SetPlatform sets the "platform" edge to the Platform entity.
+func (_u *UsageLogUpdate) SetPlatform(v *Platform) *UsageLogUpdate {
+	return _u.SetPlatformID(v.ID)
+}
+
 // Mutation returns the UsageLogMutation object of the builder.
 func (_u *UsageLogUpdate) Mutation() *UsageLogMutation {
 	return _u.mutation
@@ -964,6 +1010,12 @@ func (_u *UsageLogUpdate) ClearGroup() *UsageLogUpdate {
 // ClearSubscription clears the "subscription" edge to the UserSubscription entity.
 func (_u *UsageLogUpdate) ClearSubscription() *UsageLogUpdate {
 	_u.mutation.ClearSubscription()
+	return _u
+}
+
+// ClearPlatform clears the "platform" edge to the Platform entity.
+func (_u *UsageLogUpdate) ClearPlatform() *UsageLogUpdate {
+	_u.mutation.ClearPlatform()
 	return _u
 }
 
@@ -1029,6 +1081,11 @@ func (_u *UsageLogUpdate) check() error {
 	if v, ok := _u.mutation.BillingMode(); ok {
 		if err := usagelog.BillingModeValidator(v); err != nil {
 			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BillingSourceType(); ok {
+		if err := usagelog.BillingSourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "billing_source_type", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_source_type": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.UserAgent(); ok {
@@ -1134,6 +1191,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.BillingModeCleared() {
 		_spec.ClearField(usagelog.FieldBillingMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.BillingSourceType(); ok {
+		_spec.SetField(usagelog.FieldBillingSourceType, field.TypeString, value)
+	}
+	if _u.mutation.BillingSourceTypeCleared() {
+		_spec.ClearField(usagelog.FieldBillingSourceType, field.TypeString)
 	}
 	if value, ok := _u.mutation.InputTokens(); ok {
 		_spec.SetField(usagelog.FieldInputTokens, field.TypeInt, value)
@@ -1469,6 +1532,35 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.PlatformCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.PlatformTable,
+			Columns: []string{usagelog.PlatformColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PlatformIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.PlatformTable,
+			Columns: []string{usagelog.PlatformColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{usagelog.Label}
@@ -1723,6 +1815,46 @@ func (_u *UsageLogUpdateOne) SetNillableSubscriptionID(v *int64) *UsageLogUpdate
 // ClearSubscriptionID clears the value of the "subscription_id" field.
 func (_u *UsageLogUpdateOne) ClearSubscriptionID() *UsageLogUpdateOne {
 	_u.mutation.ClearSubscriptionID()
+	return _u
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (_u *UsageLogUpdateOne) SetPlatformID(v int64) *UsageLogUpdateOne {
+	_u.mutation.SetPlatformID(v)
+	return _u
+}
+
+// SetNillablePlatformID sets the "platform_id" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillablePlatformID(v *int64) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetPlatformID(*v)
+	}
+	return _u
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (_u *UsageLogUpdateOne) ClearPlatformID() *UsageLogUpdateOne {
+	_u.mutation.ClearPlatformID()
+	return _u
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (_u *UsageLogUpdateOne) SetBillingSourceType(v string) *UsageLogUpdateOne {
+	_u.mutation.SetBillingSourceType(v)
+	return _u
+}
+
+// SetNillableBillingSourceType sets the "billing_source_type" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableBillingSourceType(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetBillingSourceType(*v)
+	}
+	return _u
+}
+
+// ClearBillingSourceType clears the value of the "billing_source_type" field.
+func (_u *UsageLogUpdateOne) ClearBillingSourceType() *UsageLogUpdateOne {
+	_u.mutation.ClearBillingSourceType()
 	return _u
 }
 
@@ -2389,6 +2521,11 @@ func (_u *UsageLogUpdateOne) SetSubscription(v *UserSubscription) *UsageLogUpdat
 	return _u.SetSubscriptionID(v.ID)
 }
 
+// SetPlatform sets the "platform" edge to the Platform entity.
+func (_u *UsageLogUpdateOne) SetPlatform(v *Platform) *UsageLogUpdateOne {
+	return _u.SetPlatformID(v.ID)
+}
+
 // Mutation returns the UsageLogMutation object of the builder.
 func (_u *UsageLogUpdateOne) Mutation() *UsageLogMutation {
 	return _u.mutation
@@ -2421,6 +2558,12 @@ func (_u *UsageLogUpdateOne) ClearGroup() *UsageLogUpdateOne {
 // ClearSubscription clears the "subscription" edge to the UserSubscription entity.
 func (_u *UsageLogUpdateOne) ClearSubscription() *UsageLogUpdateOne {
 	_u.mutation.ClearSubscription()
+	return _u
+}
+
+// ClearPlatform clears the "platform" edge to the Platform entity.
+func (_u *UsageLogUpdateOne) ClearPlatform() *UsageLogUpdateOne {
+	_u.mutation.ClearPlatform()
 	return _u
 }
 
@@ -2499,6 +2642,11 @@ func (_u *UsageLogUpdateOne) check() error {
 	if v, ok := _u.mutation.BillingMode(); ok {
 		if err := usagelog.BillingModeValidator(v); err != nil {
 			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.BillingSourceType(); ok {
+		if err := usagelog.BillingSourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "billing_source_type", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_source_type": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.UserAgent(); ok {
@@ -2621,6 +2769,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.BillingModeCleared() {
 		_spec.ClearField(usagelog.FieldBillingMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.BillingSourceType(); ok {
+		_spec.SetField(usagelog.FieldBillingSourceType, field.TypeString, value)
+	}
+	if _u.mutation.BillingSourceTypeCleared() {
+		_spec.ClearField(usagelog.FieldBillingSourceType, field.TypeString)
 	}
 	if value, ok := _u.mutation.InputTokens(); ok {
 		_spec.SetField(usagelog.FieldInputTokens, field.TypeInt, value)
@@ -2949,6 +3103,35 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PlatformCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.PlatformTable,
+			Columns: []string{usagelog.PlatformColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PlatformIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.PlatformTable,
+			Columns: []string{usagelog.PlatformColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
@@ -36,6 +37,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
+	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/promocode"
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
@@ -53,7 +56,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 const (
@@ -89,6 +91,8 @@ const (
 	TypePaymentOrder                  = "PaymentOrder"
 	TypePaymentProviderInstance       = "PaymentProviderInstance"
 	TypePendingAuthSession            = "PendingAuthSession"
+	TypePlatform                      = "Platform"
+	TypePlatformModelRule             = "PlatformModelRule"
 	TypePromoCode                     = "PromoCode"
 	TypePromoCodeUsage                = "PromoCodeUsage"
 	TypeProxy                         = "Proxy"
@@ -110,51 +114,58 @@ const (
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
 type APIKeyMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int64
-	created_at         *time.Time
-	updated_at         *time.Time
-	deleted_at         *time.Time
-	key                *string
-	name               *string
-	status             *string
-	last_used_at       *time.Time
-	ip_whitelist       *[]string
-	appendip_whitelist []string
-	ip_blacklist       *[]string
-	appendip_blacklist []string
-	quota              *float64
-	addquota           *float64
-	quota_used         *float64
-	addquota_used      *float64
-	expires_at         *time.Time
-	rate_limit_5h      *float64
-	addrate_limit_5h   *float64
-	rate_limit_1d      *float64
-	addrate_limit_1d   *float64
-	rate_limit_7d      *float64
-	addrate_limit_7d   *float64
-	usage_5h           *float64
-	addusage_5h        *float64
-	usage_1d           *float64
-	addusage_1d        *float64
-	usage_7d           *float64
-	addusage_7d        *float64
-	window_5h_start    *time.Time
-	window_1d_start    *time.Time
-	window_7d_start    *time.Time
-	clearedFields      map[string]struct{}
-	user               *int64
-	cleareduser        bool
-	group              *int64
-	clearedgroup       bool
-	usage_logs         map[int64]struct{}
-	removedusage_logs  map[int64]struct{}
-	clearedusage_logs  bool
-	done               bool
-	oldValue           func(context.Context) (*APIKey, error)
-	predicates         []predicate.APIKey
+	op                        Op
+	typ                       string
+	id                        *int64
+	created_at                *time.Time
+	updated_at                *time.Time
+	deleted_at                *time.Time
+	key                       *string
+	name                      *string
+	allow_balance             *bool
+	status                    *string
+	last_used_at              *time.Time
+	ip_whitelist              *[]string
+	appendip_whitelist        []string
+	ip_blacklist              *[]string
+	appendip_blacklist        []string
+	quota                     *float64
+	addquota                  *float64
+	quota_used                *float64
+	addquota_used             *float64
+	expires_at                *time.Time
+	rate_limit_5h             *float64
+	addrate_limit_5h          *float64
+	rate_limit_1d             *float64
+	addrate_limit_1d          *float64
+	rate_limit_7d             *float64
+	addrate_limit_7d          *float64
+	usage_5h                  *float64
+	addusage_5h               *float64
+	usage_1d                  *float64
+	addusage_1d               *float64
+	usage_7d                  *float64
+	addusage_7d               *float64
+	window_5h_start           *time.Time
+	window_1d_start           *time.Time
+	window_7d_start           *time.Time
+	clearedFields             map[string]struct{}
+	user                      *int64
+	cleareduser               bool
+	group                     *int64
+	clearedgroup              bool
+	platforms                 map[int64]struct{}
+	removedplatforms          map[int64]struct{}
+	clearedplatforms          bool
+	subscription_plans        map[int64]struct{}
+	removedsubscription_plans map[int64]struct{}
+	clearedsubscription_plans bool
+	usage_logs                map[int64]struct{}
+	removedusage_logs         map[int64]struct{}
+	clearedusage_logs         bool
+	done                      bool
+	oldValue                  func(context.Context) (*APIKey, error)
+	predicates                []predicate.APIKey
 }
 
 var _ ent.Mutation = (*APIKeyMutation)(nil)
@@ -531,6 +542,42 @@ func (m *APIKeyMutation) GroupIDCleared() bool {
 func (m *APIKeyMutation) ResetGroupID() {
 	m.group = nil
 	delete(m.clearedFields, apikey.FieldGroupID)
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (m *APIKeyMutation) SetAllowBalance(b bool) {
+	m.allow_balance = &b
+}
+
+// AllowBalance returns the value of the "allow_balance" field in the mutation.
+func (m *APIKeyMutation) AllowBalance() (r bool, exists bool) {
+	v := m.allow_balance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowBalance returns the old "allow_balance" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldAllowBalance(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowBalance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowBalance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowBalance: %w", err)
+	}
+	return oldValue.AllowBalance, nil
+}
+
+// ResetAllowBalance resets all changes to the "allow_balance" field.
+func (m *APIKeyMutation) ResetAllowBalance() {
+	m.allow_balance = nil
 }
 
 // SetStatus sets the "status" field.
@@ -1446,6 +1493,114 @@ func (m *APIKeyMutation) ResetGroup() {
 	m.clearedgroup = false
 }
 
+// AddPlatformIDs adds the "platforms" edge to the Platform entity by ids.
+func (m *APIKeyMutation) AddPlatformIDs(ids ...int64) {
+	if m.platforms == nil {
+		m.platforms = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.platforms[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPlatforms clears the "platforms" edge to the Platform entity.
+func (m *APIKeyMutation) ClearPlatforms() {
+	m.clearedplatforms = true
+}
+
+// PlatformsCleared reports if the "platforms" edge to the Platform entity was cleared.
+func (m *APIKeyMutation) PlatformsCleared() bool {
+	return m.clearedplatforms
+}
+
+// RemovePlatformIDs removes the "platforms" edge to the Platform entity by IDs.
+func (m *APIKeyMutation) RemovePlatformIDs(ids ...int64) {
+	if m.removedplatforms == nil {
+		m.removedplatforms = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.platforms, ids[i])
+		m.removedplatforms[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPlatforms returns the removed IDs of the "platforms" edge to the Platform entity.
+func (m *APIKeyMutation) RemovedPlatformsIDs() (ids []int64) {
+	for id := range m.removedplatforms {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PlatformsIDs returns the "platforms" edge IDs in the mutation.
+func (m *APIKeyMutation) PlatformsIDs() (ids []int64) {
+	for id := range m.platforms {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPlatforms resets all changes to the "platforms" edge.
+func (m *APIKeyMutation) ResetPlatforms() {
+	m.platforms = nil
+	m.clearedplatforms = false
+	m.removedplatforms = nil
+}
+
+// AddSubscriptionPlanIDs adds the "subscription_plans" edge to the SubscriptionPlan entity by ids.
+func (m *APIKeyMutation) AddSubscriptionPlanIDs(ids ...int64) {
+	if m.subscription_plans == nil {
+		m.subscription_plans = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.subscription_plans[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSubscriptionPlans clears the "subscription_plans" edge to the SubscriptionPlan entity.
+func (m *APIKeyMutation) ClearSubscriptionPlans() {
+	m.clearedsubscription_plans = true
+}
+
+// SubscriptionPlansCleared reports if the "subscription_plans" edge to the SubscriptionPlan entity was cleared.
+func (m *APIKeyMutation) SubscriptionPlansCleared() bool {
+	return m.clearedsubscription_plans
+}
+
+// RemoveSubscriptionPlanIDs removes the "subscription_plans" edge to the SubscriptionPlan entity by IDs.
+func (m *APIKeyMutation) RemoveSubscriptionPlanIDs(ids ...int64) {
+	if m.removedsubscription_plans == nil {
+		m.removedsubscription_plans = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.subscription_plans, ids[i])
+		m.removedsubscription_plans[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSubscriptionPlans returns the removed IDs of the "subscription_plans" edge to the SubscriptionPlan entity.
+func (m *APIKeyMutation) RemovedSubscriptionPlansIDs() (ids []int64) {
+	for id := range m.removedsubscription_plans {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SubscriptionPlansIDs returns the "subscription_plans" edge IDs in the mutation.
+func (m *APIKeyMutation) SubscriptionPlansIDs() (ids []int64) {
+	for id := range m.subscription_plans {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSubscriptionPlans resets all changes to the "subscription_plans" edge.
+func (m *APIKeyMutation) ResetSubscriptionPlans() {
+	m.subscription_plans = nil
+	m.clearedsubscription_plans = false
+	m.removedsubscription_plans = nil
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by ids.
 func (m *APIKeyMutation) AddUsageLogIDs(ids ...int64) {
 	if m.usage_logs == nil {
@@ -1534,7 +1689,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1555,6 +1710,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.group != nil {
 		fields = append(fields, apikey.FieldGroupID)
+	}
+	if m.allow_balance != nil {
+		fields = append(fields, apikey.FieldAllowBalance)
 	}
 	if m.status != nil {
 		fields = append(fields, apikey.FieldStatus)
@@ -1626,6 +1784,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case apikey.FieldGroupID:
 		return m.GroupID()
+	case apikey.FieldAllowBalance:
+		return m.AllowBalance()
 	case apikey.FieldStatus:
 		return m.Status()
 	case apikey.FieldLastUsedAt:
@@ -1681,6 +1841,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldName(ctx)
 	case apikey.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case apikey.FieldAllowBalance:
+		return m.OldAllowBalance(ctx)
 	case apikey.FieldStatus:
 		return m.OldStatus(ctx)
 	case apikey.FieldLastUsedAt:
@@ -1770,6 +1932,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupID(v)
+		return nil
+	case apikey.FieldAllowBalance:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowBalance(v)
 		return nil
 	case apikey.FieldStatus:
 		v, ok := value.(string)
@@ -2109,6 +2278,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 	case apikey.FieldGroupID:
 		m.ResetGroupID()
 		return nil
+	case apikey.FieldAllowBalance:
+		m.ResetAllowBalance()
+		return nil
 	case apikey.FieldStatus:
 		m.ResetStatus()
 		return nil
@@ -2163,12 +2335,18 @@ func (m *APIKeyMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *APIKeyMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
 	if m.user != nil {
 		edges = append(edges, apikey.EdgeUser)
 	}
 	if m.group != nil {
 		edges = append(edges, apikey.EdgeGroup)
+	}
+	if m.platforms != nil {
+		edges = append(edges, apikey.EdgePlatforms)
+	}
+	if m.subscription_plans != nil {
+		edges = append(edges, apikey.EdgeSubscriptionPlans)
 	}
 	if m.usage_logs != nil {
 		edges = append(edges, apikey.EdgeUsageLogs)
@@ -2188,6 +2366,18 @@ func (m *APIKeyMutation) AddedIDs(name string) []ent.Value {
 		if id := m.group; id != nil {
 			return []ent.Value{*id}
 		}
+	case apikey.EdgePlatforms:
+		ids := make([]ent.Value, 0, len(m.platforms))
+		for id := range m.platforms {
+			ids = append(ids, id)
+		}
+		return ids
+	case apikey.EdgeSubscriptionPlans:
+		ids := make([]ent.Value, 0, len(m.subscription_plans))
+		for id := range m.subscription_plans {
+			ids = append(ids, id)
+		}
+		return ids
 	case apikey.EdgeUsageLogs:
 		ids := make([]ent.Value, 0, len(m.usage_logs))
 		for id := range m.usage_logs {
@@ -2200,7 +2390,13 @@ func (m *APIKeyMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *APIKeyMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
+	if m.removedplatforms != nil {
+		edges = append(edges, apikey.EdgePlatforms)
+	}
+	if m.removedsubscription_plans != nil {
+		edges = append(edges, apikey.EdgeSubscriptionPlans)
+	}
 	if m.removedusage_logs != nil {
 		edges = append(edges, apikey.EdgeUsageLogs)
 	}
@@ -2211,6 +2407,18 @@ func (m *APIKeyMutation) RemovedEdges() []string {
 // the given name in this mutation.
 func (m *APIKeyMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
+	case apikey.EdgePlatforms:
+		ids := make([]ent.Value, 0, len(m.removedplatforms))
+		for id := range m.removedplatforms {
+			ids = append(ids, id)
+		}
+		return ids
+	case apikey.EdgeSubscriptionPlans:
+		ids := make([]ent.Value, 0, len(m.removedsubscription_plans))
+		for id := range m.removedsubscription_plans {
+			ids = append(ids, id)
+		}
+		return ids
 	case apikey.EdgeUsageLogs:
 		ids := make([]ent.Value, 0, len(m.removedusage_logs))
 		for id := range m.removedusage_logs {
@@ -2223,12 +2431,18 @@ func (m *APIKeyMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *APIKeyMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
 	if m.cleareduser {
 		edges = append(edges, apikey.EdgeUser)
 	}
 	if m.clearedgroup {
 		edges = append(edges, apikey.EdgeGroup)
+	}
+	if m.clearedplatforms {
+		edges = append(edges, apikey.EdgePlatforms)
+	}
+	if m.clearedsubscription_plans {
+		edges = append(edges, apikey.EdgeSubscriptionPlans)
 	}
 	if m.clearedusage_logs {
 		edges = append(edges, apikey.EdgeUsageLogs)
@@ -2244,6 +2458,10 @@ func (m *APIKeyMutation) EdgeCleared(name string) bool {
 		return m.cleareduser
 	case apikey.EdgeGroup:
 		return m.clearedgroup
+	case apikey.EdgePlatforms:
+		return m.clearedplatforms
+	case apikey.EdgeSubscriptionPlans:
+		return m.clearedsubscription_plans
 	case apikey.EdgeUsageLogs:
 		return m.clearedusage_logs
 	}
@@ -2273,6 +2491,12 @@ func (m *APIKeyMutation) ResetEdge(name string) error {
 		return nil
 	case apikey.EdgeGroup:
 		m.ResetGroup()
+		return nil
+	case apikey.EdgePlatforms:
+		m.ResetPlatforms()
+		return nil
+	case apikey.EdgeSubscriptionPlans:
+		m.ResetSubscriptionPlans()
 		return nil
 	case apikey.EdgeUsageLogs:
 		m.ResetUsageLogs()
@@ -2325,6 +2549,8 @@ type AccountMutation struct {
 	groups                      map[int64]struct{}
 	removedgroups               map[int64]struct{}
 	clearedgroups               bool
+	platform_pool               *int64
+	clearedplatform_pool        bool
 	proxy                       *int64
 	clearedproxy                bool
 	parent                      *int64
@@ -2678,6 +2904,55 @@ func (m *AccountMutation) OldPlatform(ctx context.Context) (v string, err error)
 // ResetPlatform resets all changes to the "platform" field.
 func (m *AccountMutation) ResetPlatform() {
 	m.platform = nil
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (m *AccountMutation) SetPlatformID(i int64) {
+	m.platform_pool = &i
+}
+
+// PlatformID returns the value of the "platform_id" field in the mutation.
+func (m *AccountMutation) PlatformID() (r int64, exists bool) {
+	v := m.platform_pool
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlatformID returns the old "platform_id" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldPlatformID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlatformID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlatformID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlatformID: %w", err)
+	}
+	return oldValue.PlatformID, nil
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (m *AccountMutation) ClearPlatformID() {
+	m.platform_pool = nil
+	m.clearedFields[account.FieldPlatformID] = struct{}{}
+}
+
+// PlatformIDCleared returns if the "platform_id" field was cleared in this mutation.
+func (m *AccountMutation) PlatformIDCleared() bool {
+	_, ok := m.clearedFields[account.FieldPlatformID]
+	return ok
+}
+
+// ResetPlatformID resets all changes to the "platform_id" field.
+func (m *AccountMutation) ResetPlatformID() {
+	m.platform_pool = nil
+	delete(m.clearedFields, account.FieldPlatformID)
 }
 
 // SetType sets the "type" field.
@@ -3931,6 +4206,46 @@ func (m *AccountMutation) ResetGroups() {
 	m.removedgroups = nil
 }
 
+// SetPlatformPoolID sets the "platform_pool" edge to the Platform entity by id.
+func (m *AccountMutation) SetPlatformPoolID(id int64) {
+	m.platform_pool = &id
+}
+
+// ClearPlatformPool clears the "platform_pool" edge to the Platform entity.
+func (m *AccountMutation) ClearPlatformPool() {
+	m.clearedplatform_pool = true
+	m.clearedFields[account.FieldPlatformID] = struct{}{}
+}
+
+// PlatformPoolCleared reports if the "platform_pool" edge to the Platform entity was cleared.
+func (m *AccountMutation) PlatformPoolCleared() bool {
+	return m.PlatformIDCleared() || m.clearedplatform_pool
+}
+
+// PlatformPoolID returns the "platform_pool" edge ID in the mutation.
+func (m *AccountMutation) PlatformPoolID() (id int64, exists bool) {
+	if m.platform_pool != nil {
+		return *m.platform_pool, true
+	}
+	return
+}
+
+// PlatformPoolIDs returns the "platform_pool" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PlatformPoolID instead. It exists only for internal usage by the builders.
+func (m *AccountMutation) PlatformPoolIDs() (ids []int64) {
+	if id := m.platform_pool; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPlatformPool resets all changes to the "platform_pool" edge.
+func (m *AccountMutation) ResetPlatformPool() {
+	m.platform_pool = nil
+	m.clearedplatform_pool = false
+}
+
 // ClearProxy clears the "proxy" edge to the Proxy entity.
 func (m *AccountMutation) ClearProxy() {
 	m.clearedproxy = true
@@ -4140,7 +4455,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 32)
 	if m.created_at != nil {
 		fields = append(fields, account.FieldCreatedAt)
 	}
@@ -4158,6 +4473,9 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.platform != nil {
 		fields = append(fields, account.FieldPlatform)
+	}
+	if m.platform_pool != nil {
+		fields = append(fields, account.FieldPlatformID)
 	}
 	if m._type != nil {
 		fields = append(fields, account.FieldType)
@@ -4254,6 +4572,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.Notes()
 	case account.FieldPlatform:
 		return m.Platform()
+	case account.FieldPlatformID:
+		return m.PlatformID()
 	case account.FieldType:
 		return m.GetType()
 	case account.FieldCredentials:
@@ -4325,6 +4645,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldNotes(ctx)
 	case account.FieldPlatform:
 		return m.OldPlatform(ctx)
+	case account.FieldPlatformID:
+		return m.OldPlatformID(ctx)
 	case account.FieldType:
 		return m.OldType(ctx)
 	case account.FieldCredentials:
@@ -4425,6 +4747,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPlatform(v)
+		return nil
+	case account.FieldPlatformID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlatformID(v)
 		return nil
 	case account.FieldType:
 		v, ok := value.(string)
@@ -4700,6 +5029,9 @@ func (m *AccountMutation) ClearedFields() []string {
 	if m.FieldCleared(account.FieldNotes) {
 		fields = append(fields, account.FieldNotes)
 	}
+	if m.FieldCleared(account.FieldPlatformID) {
+		fields = append(fields, account.FieldPlatformID)
+	}
 	if m.FieldCleared(account.FieldProxyID) {
 		fields = append(fields, account.FieldProxyID)
 	}
@@ -4764,6 +5096,9 @@ func (m *AccountMutation) ClearField(name string) error {
 		return nil
 	case account.FieldNotes:
 		m.ClearNotes()
+		return nil
+	case account.FieldPlatformID:
+		m.ClearPlatformID()
 		return nil
 	case account.FieldProxyID:
 		m.ClearProxyID()
@@ -4835,6 +5170,9 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldPlatform:
 		m.ResetPlatform()
+		return nil
+	case account.FieldPlatformID:
+		m.ResetPlatformID()
 		return nil
 	case account.FieldType:
 		m.ResetType()
@@ -4917,9 +5255,12 @@ func (m *AccountMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *AccountMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.groups != nil {
 		edges = append(edges, account.EdgeGroups)
+	}
+	if m.platform_pool != nil {
+		edges = append(edges, account.EdgePlatformPool)
 	}
 	if m.proxy != nil {
 		edges = append(edges, account.EdgeProxy)
@@ -4946,6 +5287,10 @@ func (m *AccountMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case account.EdgePlatformPool:
+		if id := m.platform_pool; id != nil {
+			return []ent.Value{*id}
+		}
 	case account.EdgeProxy:
 		if id := m.proxy; id != nil {
 			return []ent.Value{*id}
@@ -4972,7 +5317,7 @@ func (m *AccountMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *AccountMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.removedgroups != nil {
 		edges = append(edges, account.EdgeGroups)
 	}
@@ -5013,9 +5358,12 @@ func (m *AccountMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *AccountMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.clearedgroups {
 		edges = append(edges, account.EdgeGroups)
+	}
+	if m.clearedplatform_pool {
+		edges = append(edges, account.EdgePlatformPool)
 	}
 	if m.clearedproxy {
 		edges = append(edges, account.EdgeProxy)
@@ -5038,6 +5386,8 @@ func (m *AccountMutation) EdgeCleared(name string) bool {
 	switch name {
 	case account.EdgeGroups:
 		return m.clearedgroups
+	case account.EdgePlatformPool:
+		return m.clearedplatform_pool
 	case account.EdgeProxy:
 		return m.clearedproxy
 	case account.EdgeParent:
@@ -5054,6 +5404,9 @@ func (m *AccountMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *AccountMutation) ClearEdge(name string) error {
 	switch name {
+	case account.EdgePlatformPool:
+		m.ClearPlatformPool()
+		return nil
 	case account.EdgeProxy:
 		m.ClearProxy()
 		return nil
@@ -5070,6 +5423,9 @@ func (m *AccountMutation) ResetEdge(name string) error {
 	switch name {
 	case account.EdgeGroups:
 		m.ResetGroups()
+		return nil
+	case account.EdgePlatformPool:
+		m.ResetPlatformPool()
 		return nil
 	case account.EdgeProxy:
 		m.ResetProxy()
@@ -36518,6 +36874,1792 @@ func (m *PendingAuthSessionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PendingAuthSession edge %s", name)
 }
 
+// PlatformMutation represents an operation that mutates the Platform nodes in the graph.
+type PlatformMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *int64
+	created_at          *time.Time
+	updated_at          *time.Time
+	code                *string
+	name                *string
+	account_platform    *string
+	status              *string
+	clearedFields       map[string]struct{}
+	legacy_group        *int64
+	clearedlegacy_group bool
+	model_rules         map[int64]struct{}
+	removedmodel_rules  map[int64]struct{}
+	clearedmodel_rules  bool
+	accounts            map[int64]struct{}
+	removedaccounts     map[int64]struct{}
+	clearedaccounts     bool
+	api_keys            map[int64]struct{}
+	removedapi_keys     map[int64]struct{}
+	clearedapi_keys     bool
+	usage_logs          map[int64]struct{}
+	removedusage_logs   map[int64]struct{}
+	clearedusage_logs   bool
+	done                bool
+	oldValue            func(context.Context) (*Platform, error)
+	predicates          []predicate.Platform
+}
+
+var _ ent.Mutation = (*PlatformMutation)(nil)
+
+// platformOption allows management of the mutation configuration using functional options.
+type platformOption func(*PlatformMutation)
+
+// newPlatformMutation creates new mutation for the Platform entity.
+func newPlatformMutation(c config, op Op, opts ...platformOption) *PlatformMutation {
+	m := &PlatformMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatform,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformID sets the ID field of the mutation.
+func withPlatformID(id int64) platformOption {
+	return func(m *PlatformMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Platform
+		)
+		m.oldValue = func(ctx context.Context) (*Platform, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Platform.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatform sets the old Platform of the mutation.
+func withPlatform(node *Platform) platformOption {
+	return func(m *PlatformMutation) {
+		m.oldValue = func(context.Context) (*Platform, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Platform.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PlatformMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PlatformMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PlatformMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetCode sets the "code" field.
+func (m *PlatformMutation) SetCode(s string) {
+	m.code = &s
+}
+
+// Code returns the value of the "code" field in the mutation.
+func (m *PlatformMutation) Code() (r string, exists bool) {
+	v := m.code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCode returns the old "code" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCode: %w", err)
+	}
+	return oldValue.Code, nil
+}
+
+// ResetCode resets all changes to the "code" field.
+func (m *PlatformMutation) ResetCode() {
+	m.code = nil
+}
+
+// SetName sets the "name" field.
+func (m *PlatformMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *PlatformMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *PlatformMutation) ResetName() {
+	m.name = nil
+}
+
+// SetAccountPlatform sets the "account_platform" field.
+func (m *PlatformMutation) SetAccountPlatform(s string) {
+	m.account_platform = &s
+}
+
+// AccountPlatform returns the value of the "account_platform" field in the mutation.
+func (m *PlatformMutation) AccountPlatform() (r string, exists bool) {
+	v := m.account_platform
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountPlatform returns the old "account_platform" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldAccountPlatform(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountPlatform is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountPlatform requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountPlatform: %w", err)
+	}
+	return oldValue.AccountPlatform, nil
+}
+
+// ResetAccountPlatform resets all changes to the "account_platform" field.
+func (m *PlatformMutation) ResetAccountPlatform() {
+	m.account_platform = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *PlatformMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *PlatformMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *PlatformMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetLegacyGroupID sets the "legacy_group_id" field.
+func (m *PlatformMutation) SetLegacyGroupID(i int64) {
+	m.legacy_group = &i
+}
+
+// LegacyGroupID returns the value of the "legacy_group_id" field in the mutation.
+func (m *PlatformMutation) LegacyGroupID() (r int64, exists bool) {
+	v := m.legacy_group
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLegacyGroupID returns the old "legacy_group_id" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldLegacyGroupID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLegacyGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLegacyGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLegacyGroupID: %w", err)
+	}
+	return oldValue.LegacyGroupID, nil
+}
+
+// ClearLegacyGroupID clears the value of the "legacy_group_id" field.
+func (m *PlatformMutation) ClearLegacyGroupID() {
+	m.legacy_group = nil
+	m.clearedFields[platform.FieldLegacyGroupID] = struct{}{}
+}
+
+// LegacyGroupIDCleared returns if the "legacy_group_id" field was cleared in this mutation.
+func (m *PlatformMutation) LegacyGroupIDCleared() bool {
+	_, ok := m.clearedFields[platform.FieldLegacyGroupID]
+	return ok
+}
+
+// ResetLegacyGroupID resets all changes to the "legacy_group_id" field.
+func (m *PlatformMutation) ResetLegacyGroupID() {
+	m.legacy_group = nil
+	delete(m.clearedFields, platform.FieldLegacyGroupID)
+}
+
+// ClearLegacyGroup clears the "legacy_group" edge to the Group entity.
+func (m *PlatformMutation) ClearLegacyGroup() {
+	m.clearedlegacy_group = true
+	m.clearedFields[platform.FieldLegacyGroupID] = struct{}{}
+}
+
+// LegacyGroupCleared reports if the "legacy_group" edge to the Group entity was cleared.
+func (m *PlatformMutation) LegacyGroupCleared() bool {
+	return m.LegacyGroupIDCleared() || m.clearedlegacy_group
+}
+
+// LegacyGroupIDs returns the "legacy_group" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// LegacyGroupID instead. It exists only for internal usage by the builders.
+func (m *PlatformMutation) LegacyGroupIDs() (ids []int64) {
+	if id := m.legacy_group; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetLegacyGroup resets all changes to the "legacy_group" edge.
+func (m *PlatformMutation) ResetLegacyGroup() {
+	m.legacy_group = nil
+	m.clearedlegacy_group = false
+}
+
+// AddModelRuleIDs adds the "model_rules" edge to the PlatformModelRule entity by ids.
+func (m *PlatformMutation) AddModelRuleIDs(ids ...int64) {
+	if m.model_rules == nil {
+		m.model_rules = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.model_rules[ids[i]] = struct{}{}
+	}
+}
+
+// ClearModelRules clears the "model_rules" edge to the PlatformModelRule entity.
+func (m *PlatformMutation) ClearModelRules() {
+	m.clearedmodel_rules = true
+}
+
+// ModelRulesCleared reports if the "model_rules" edge to the PlatformModelRule entity was cleared.
+func (m *PlatformMutation) ModelRulesCleared() bool {
+	return m.clearedmodel_rules
+}
+
+// RemoveModelRuleIDs removes the "model_rules" edge to the PlatformModelRule entity by IDs.
+func (m *PlatformMutation) RemoveModelRuleIDs(ids ...int64) {
+	if m.removedmodel_rules == nil {
+		m.removedmodel_rules = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.model_rules, ids[i])
+		m.removedmodel_rules[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedModelRules returns the removed IDs of the "model_rules" edge to the PlatformModelRule entity.
+func (m *PlatformMutation) RemovedModelRulesIDs() (ids []int64) {
+	for id := range m.removedmodel_rules {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ModelRulesIDs returns the "model_rules" edge IDs in the mutation.
+func (m *PlatformMutation) ModelRulesIDs() (ids []int64) {
+	for id := range m.model_rules {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetModelRules resets all changes to the "model_rules" edge.
+func (m *PlatformMutation) ResetModelRules() {
+	m.model_rules = nil
+	m.clearedmodel_rules = false
+	m.removedmodel_rules = nil
+}
+
+// AddAccountIDs adds the "accounts" edge to the Account entity by ids.
+func (m *PlatformMutation) AddAccountIDs(ids ...int64) {
+	if m.accounts == nil {
+		m.accounts = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.accounts[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAccounts clears the "accounts" edge to the Account entity.
+func (m *PlatformMutation) ClearAccounts() {
+	m.clearedaccounts = true
+}
+
+// AccountsCleared reports if the "accounts" edge to the Account entity was cleared.
+func (m *PlatformMutation) AccountsCleared() bool {
+	return m.clearedaccounts
+}
+
+// RemoveAccountIDs removes the "accounts" edge to the Account entity by IDs.
+func (m *PlatformMutation) RemoveAccountIDs(ids ...int64) {
+	if m.removedaccounts == nil {
+		m.removedaccounts = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.accounts, ids[i])
+		m.removedaccounts[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAccounts returns the removed IDs of the "accounts" edge to the Account entity.
+func (m *PlatformMutation) RemovedAccountsIDs() (ids []int64) {
+	for id := range m.removedaccounts {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// AccountsIDs returns the "accounts" edge IDs in the mutation.
+func (m *PlatformMutation) AccountsIDs() (ids []int64) {
+	for id := range m.accounts {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAccounts resets all changes to the "accounts" edge.
+func (m *PlatformMutation) ResetAccounts() {
+	m.accounts = nil
+	m.clearedaccounts = false
+	m.removedaccounts = nil
+}
+
+// AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
+func (m *PlatformMutation) AddAPIKeyIDs(ids ...int64) {
+	if m.api_keys == nil {
+		m.api_keys = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.api_keys[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAPIKeys clears the "api_keys" edge to the APIKey entity.
+func (m *PlatformMutation) ClearAPIKeys() {
+	m.clearedapi_keys = true
+}
+
+// APIKeysCleared reports if the "api_keys" edge to the APIKey entity was cleared.
+func (m *PlatformMutation) APIKeysCleared() bool {
+	return m.clearedapi_keys
+}
+
+// RemoveAPIKeyIDs removes the "api_keys" edge to the APIKey entity by IDs.
+func (m *PlatformMutation) RemoveAPIKeyIDs(ids ...int64) {
+	if m.removedapi_keys == nil {
+		m.removedapi_keys = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.api_keys, ids[i])
+		m.removedapi_keys[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAPIKeys returns the removed IDs of the "api_keys" edge to the APIKey entity.
+func (m *PlatformMutation) RemovedAPIKeysIDs() (ids []int64) {
+	for id := range m.removedapi_keys {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// APIKeysIDs returns the "api_keys" edge IDs in the mutation.
+func (m *PlatformMutation) APIKeysIDs() (ids []int64) {
+	for id := range m.api_keys {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAPIKeys resets all changes to the "api_keys" edge.
+func (m *PlatformMutation) ResetAPIKeys() {
+	m.api_keys = nil
+	m.clearedapi_keys = false
+	m.removedapi_keys = nil
+}
+
+// AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by ids.
+func (m *PlatformMutation) AddUsageLogIDs(ids ...int64) {
+	if m.usage_logs == nil {
+		m.usage_logs = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.usage_logs[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUsageLogs clears the "usage_logs" edge to the UsageLog entity.
+func (m *PlatformMutation) ClearUsageLogs() {
+	m.clearedusage_logs = true
+}
+
+// UsageLogsCleared reports if the "usage_logs" edge to the UsageLog entity was cleared.
+func (m *PlatformMutation) UsageLogsCleared() bool {
+	return m.clearedusage_logs
+}
+
+// RemoveUsageLogIDs removes the "usage_logs" edge to the UsageLog entity by IDs.
+func (m *PlatformMutation) RemoveUsageLogIDs(ids ...int64) {
+	if m.removedusage_logs == nil {
+		m.removedusage_logs = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.usage_logs, ids[i])
+		m.removedusage_logs[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUsageLogs returns the removed IDs of the "usage_logs" edge to the UsageLog entity.
+func (m *PlatformMutation) RemovedUsageLogsIDs() (ids []int64) {
+	for id := range m.removedusage_logs {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UsageLogsIDs returns the "usage_logs" edge IDs in the mutation.
+func (m *PlatformMutation) UsageLogsIDs() (ids []int64) {
+	for id := range m.usage_logs {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUsageLogs resets all changes to the "usage_logs" edge.
+func (m *PlatformMutation) ResetUsageLogs() {
+	m.usage_logs = nil
+	m.clearedusage_logs = false
+	m.removedusage_logs = nil
+}
+
+// Where appends a list predicates to the PlatformMutation builder.
+func (m *PlatformMutation) Where(ps ...predicate.Platform) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Platform, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Platform).
+func (m *PlatformMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, platform.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, platform.FieldUpdatedAt)
+	}
+	if m.code != nil {
+		fields = append(fields, platform.FieldCode)
+	}
+	if m.name != nil {
+		fields = append(fields, platform.FieldName)
+	}
+	if m.account_platform != nil {
+		fields = append(fields, platform.FieldAccountPlatform)
+	}
+	if m.status != nil {
+		fields = append(fields, platform.FieldStatus)
+	}
+	if m.legacy_group != nil {
+		fields = append(fields, platform.FieldLegacyGroupID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platform.FieldCreatedAt:
+		return m.CreatedAt()
+	case platform.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case platform.FieldCode:
+		return m.Code()
+	case platform.FieldName:
+		return m.Name()
+	case platform.FieldAccountPlatform:
+		return m.AccountPlatform()
+	case platform.FieldStatus:
+		return m.Status()
+	case platform.FieldLegacyGroupID:
+		return m.LegacyGroupID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platform.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platform.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case platform.FieldCode:
+		return m.OldCode(ctx)
+	case platform.FieldName:
+		return m.OldName(ctx)
+	case platform.FieldAccountPlatform:
+		return m.OldAccountPlatform(ctx)
+	case platform.FieldStatus:
+		return m.OldStatus(ctx)
+	case platform.FieldLegacyGroupID:
+		return m.OldLegacyGroupID(ctx)
+	}
+	return nil, fmt.Errorf("unknown Platform field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platform.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platform.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case platform.FieldCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCode(v)
+		return nil
+	case platform.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case platform.FieldAccountPlatform:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountPlatform(v)
+		return nil
+	case platform.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case platform.FieldLegacyGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLegacyGroupID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Platform field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Platform numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platform.FieldLegacyGroupID) {
+		fields = append(fields, platform.FieldLegacyGroupID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformMutation) ClearField(name string) error {
+	switch name {
+	case platform.FieldLegacyGroupID:
+		m.ClearLegacyGroupID()
+		return nil
+	}
+	return fmt.Errorf("unknown Platform nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformMutation) ResetField(name string) error {
+	switch name {
+	case platform.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platform.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case platform.FieldCode:
+		m.ResetCode()
+		return nil
+	case platform.FieldName:
+		m.ResetName()
+		return nil
+	case platform.FieldAccountPlatform:
+		m.ResetAccountPlatform()
+		return nil
+	case platform.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case platform.FieldLegacyGroupID:
+		m.ResetLegacyGroupID()
+		return nil
+	}
+	return fmt.Errorf("unknown Platform field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformMutation) AddedEdges() []string {
+	edges := make([]string, 0, 5)
+	if m.legacy_group != nil {
+		edges = append(edges, platform.EdgeLegacyGroup)
+	}
+	if m.model_rules != nil {
+		edges = append(edges, platform.EdgeModelRules)
+	}
+	if m.accounts != nil {
+		edges = append(edges, platform.EdgeAccounts)
+	}
+	if m.api_keys != nil {
+		edges = append(edges, platform.EdgeAPIKeys)
+	}
+	if m.usage_logs != nil {
+		edges = append(edges, platform.EdgeUsageLogs)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case platform.EdgeLegacyGroup:
+		if id := m.legacy_group; id != nil {
+			return []ent.Value{*id}
+		}
+	case platform.EdgeModelRules:
+		ids := make([]ent.Value, 0, len(m.model_rules))
+		for id := range m.model_rules {
+			ids = append(ids, id)
+		}
+		return ids
+	case platform.EdgeAccounts:
+		ids := make([]ent.Value, 0, len(m.accounts))
+		for id := range m.accounts {
+			ids = append(ids, id)
+		}
+		return ids
+	case platform.EdgeAPIKeys:
+		ids := make([]ent.Value, 0, len(m.api_keys))
+		for id := range m.api_keys {
+			ids = append(ids, id)
+		}
+		return ids
+	case platform.EdgeUsageLogs:
+		ids := make([]ent.Value, 0, len(m.usage_logs))
+		for id := range m.usage_logs {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 5)
+	if m.removedmodel_rules != nil {
+		edges = append(edges, platform.EdgeModelRules)
+	}
+	if m.removedaccounts != nil {
+		edges = append(edges, platform.EdgeAccounts)
+	}
+	if m.removedapi_keys != nil {
+		edges = append(edges, platform.EdgeAPIKeys)
+	}
+	if m.removedusage_logs != nil {
+		edges = append(edges, platform.EdgeUsageLogs)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case platform.EdgeModelRules:
+		ids := make([]ent.Value, 0, len(m.removedmodel_rules))
+		for id := range m.removedmodel_rules {
+			ids = append(ids, id)
+		}
+		return ids
+	case platform.EdgeAccounts:
+		ids := make([]ent.Value, 0, len(m.removedaccounts))
+		for id := range m.removedaccounts {
+			ids = append(ids, id)
+		}
+		return ids
+	case platform.EdgeAPIKeys:
+		ids := make([]ent.Value, 0, len(m.removedapi_keys))
+		for id := range m.removedapi_keys {
+			ids = append(ids, id)
+		}
+		return ids
+	case platform.EdgeUsageLogs:
+		ids := make([]ent.Value, 0, len(m.removedusage_logs))
+		for id := range m.removedusage_logs {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 5)
+	if m.clearedlegacy_group {
+		edges = append(edges, platform.EdgeLegacyGroup)
+	}
+	if m.clearedmodel_rules {
+		edges = append(edges, platform.EdgeModelRules)
+	}
+	if m.clearedaccounts {
+		edges = append(edges, platform.EdgeAccounts)
+	}
+	if m.clearedapi_keys {
+		edges = append(edges, platform.EdgeAPIKeys)
+	}
+	if m.clearedusage_logs {
+		edges = append(edges, platform.EdgeUsageLogs)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformMutation) EdgeCleared(name string) bool {
+	switch name {
+	case platform.EdgeLegacyGroup:
+		return m.clearedlegacy_group
+	case platform.EdgeModelRules:
+		return m.clearedmodel_rules
+	case platform.EdgeAccounts:
+		return m.clearedaccounts
+	case platform.EdgeAPIKeys:
+		return m.clearedapi_keys
+	case platform.EdgeUsageLogs:
+		return m.clearedusage_logs
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformMutation) ClearEdge(name string) error {
+	switch name {
+	case platform.EdgeLegacyGroup:
+		m.ClearLegacyGroup()
+		return nil
+	}
+	return fmt.Errorf("unknown Platform unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformMutation) ResetEdge(name string) error {
+	switch name {
+	case platform.EdgeLegacyGroup:
+		m.ResetLegacyGroup()
+		return nil
+	case platform.EdgeModelRules:
+		m.ResetModelRules()
+		return nil
+	case platform.EdgeAccounts:
+		m.ResetAccounts()
+		return nil
+	case platform.EdgeAPIKeys:
+		m.ResetAPIKeys()
+		return nil
+	case platform.EdgeUsageLogs:
+		m.ResetUsageLogs()
+		return nil
+	}
+	return fmt.Errorf("unknown Platform edge %s", name)
+}
+
+// PlatformModelRuleMutation represents an operation that mutates the PlatformModelRule nodes in the graph.
+type PlatformModelRuleMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *int64
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	model_pattern               *string
+	upstream_model              *string
+	endpoint_capabilities       *[]string
+	appendendpoint_capabilities []string
+	status                      *string
+	clearedFields               map[string]struct{}
+	platform                    *int64
+	clearedplatform             bool
+	done                        bool
+	oldValue                    func(context.Context) (*PlatformModelRule, error)
+	predicates                  []predicate.PlatformModelRule
+}
+
+var _ ent.Mutation = (*PlatformModelRuleMutation)(nil)
+
+// platformmodelruleOption allows management of the mutation configuration using functional options.
+type platformmodelruleOption func(*PlatformModelRuleMutation)
+
+// newPlatformModelRuleMutation creates new mutation for the PlatformModelRule entity.
+func newPlatformModelRuleMutation(c config, op Op, opts ...platformmodelruleOption) *PlatformModelRuleMutation {
+	m := &PlatformModelRuleMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformModelRule,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformModelRuleID sets the ID field of the mutation.
+func withPlatformModelRuleID(id int64) platformmodelruleOption {
+	return func(m *PlatformModelRuleMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformModelRule
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformModelRule, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformModelRule.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformModelRule sets the old PlatformModelRule of the mutation.
+func withPlatformModelRule(node *PlatformModelRule) platformmodelruleOption {
+	return func(m *PlatformModelRuleMutation) {
+		m.oldValue = func(context.Context) (*PlatformModelRule, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformModelRuleMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformModelRuleMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformModelRuleMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformModelRuleMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformModelRule.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformModelRuleMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformModelRuleMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformModelRuleMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PlatformModelRuleMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PlatformModelRuleMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PlatformModelRuleMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (m *PlatformModelRuleMutation) SetPlatformID(i int64) {
+	m.platform = &i
+}
+
+// PlatformID returns the value of the "platform_id" field in the mutation.
+func (m *PlatformModelRuleMutation) PlatformID() (r int64, exists bool) {
+	v := m.platform
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlatformID returns the old "platform_id" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldPlatformID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlatformID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlatformID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlatformID: %w", err)
+	}
+	return oldValue.PlatformID, nil
+}
+
+// ResetPlatformID resets all changes to the "platform_id" field.
+func (m *PlatformModelRuleMutation) ResetPlatformID() {
+	m.platform = nil
+}
+
+// SetModelPattern sets the "model_pattern" field.
+func (m *PlatformModelRuleMutation) SetModelPattern(s string) {
+	m.model_pattern = &s
+}
+
+// ModelPattern returns the value of the "model_pattern" field in the mutation.
+func (m *PlatformModelRuleMutation) ModelPattern() (r string, exists bool) {
+	v := m.model_pattern
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldModelPattern returns the old "model_pattern" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldModelPattern(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldModelPattern is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldModelPattern requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldModelPattern: %w", err)
+	}
+	return oldValue.ModelPattern, nil
+}
+
+// ResetModelPattern resets all changes to the "model_pattern" field.
+func (m *PlatformModelRuleMutation) ResetModelPattern() {
+	m.model_pattern = nil
+}
+
+// SetUpstreamModel sets the "upstream_model" field.
+func (m *PlatformModelRuleMutation) SetUpstreamModel(s string) {
+	m.upstream_model = &s
+}
+
+// UpstreamModel returns the value of the "upstream_model" field in the mutation.
+func (m *PlatformModelRuleMutation) UpstreamModel() (r string, exists bool) {
+	v := m.upstream_model
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpstreamModel returns the old "upstream_model" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldUpstreamModel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpstreamModel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpstreamModel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpstreamModel: %w", err)
+	}
+	return oldValue.UpstreamModel, nil
+}
+
+// ResetUpstreamModel resets all changes to the "upstream_model" field.
+func (m *PlatformModelRuleMutation) ResetUpstreamModel() {
+	m.upstream_model = nil
+}
+
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (m *PlatformModelRuleMutation) SetEndpointCapabilities(s []string) {
+	m.endpoint_capabilities = &s
+	m.appendendpoint_capabilities = nil
+}
+
+// EndpointCapabilities returns the value of the "endpoint_capabilities" field in the mutation.
+func (m *PlatformModelRuleMutation) EndpointCapabilities() (r []string, exists bool) {
+	v := m.endpoint_capabilities
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEndpointCapabilities returns the old "endpoint_capabilities" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldEndpointCapabilities(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEndpointCapabilities is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEndpointCapabilities requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEndpointCapabilities: %w", err)
+	}
+	return oldValue.EndpointCapabilities, nil
+}
+
+// AppendEndpointCapabilities adds s to the "endpoint_capabilities" field.
+func (m *PlatformModelRuleMutation) AppendEndpointCapabilities(s []string) {
+	m.appendendpoint_capabilities = append(m.appendendpoint_capabilities, s...)
+}
+
+// AppendedEndpointCapabilities returns the list of values that were appended to the "endpoint_capabilities" field in this mutation.
+func (m *PlatformModelRuleMutation) AppendedEndpointCapabilities() ([]string, bool) {
+	if len(m.appendendpoint_capabilities) == 0 {
+		return nil, false
+	}
+	return m.appendendpoint_capabilities, true
+}
+
+// ResetEndpointCapabilities resets all changes to the "endpoint_capabilities" field.
+func (m *PlatformModelRuleMutation) ResetEndpointCapabilities() {
+	m.endpoint_capabilities = nil
+	m.appendendpoint_capabilities = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *PlatformModelRuleMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *PlatformModelRuleMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the PlatformModelRule entity.
+// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformModelRuleMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *PlatformModelRuleMutation) ResetStatus() {
+	m.status = nil
+}
+
+// ClearPlatform clears the "platform" edge to the Platform entity.
+func (m *PlatformModelRuleMutation) ClearPlatform() {
+	m.clearedplatform = true
+	m.clearedFields[platformmodelrule.FieldPlatformID] = struct{}{}
+}
+
+// PlatformCleared reports if the "platform" edge to the Platform entity was cleared.
+func (m *PlatformModelRuleMutation) PlatformCleared() bool {
+	return m.clearedplatform
+}
+
+// PlatformIDs returns the "platform" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PlatformID instead. It exists only for internal usage by the builders.
+func (m *PlatformModelRuleMutation) PlatformIDs() (ids []int64) {
+	if id := m.platform; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPlatform resets all changes to the "platform" edge.
+func (m *PlatformModelRuleMutation) ResetPlatform() {
+	m.platform = nil
+	m.clearedplatform = false
+}
+
+// Where appends a list predicates to the PlatformModelRuleMutation builder.
+func (m *PlatformModelRuleMutation) Where(ps ...predicate.PlatformModelRule) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformModelRuleMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformModelRuleMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformModelRule, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformModelRuleMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformModelRuleMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformModelRule).
+func (m *PlatformModelRuleMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformModelRuleMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, platformmodelrule.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, platformmodelrule.FieldUpdatedAt)
+	}
+	if m.platform != nil {
+		fields = append(fields, platformmodelrule.FieldPlatformID)
+	}
+	if m.model_pattern != nil {
+		fields = append(fields, platformmodelrule.FieldModelPattern)
+	}
+	if m.upstream_model != nil {
+		fields = append(fields, platformmodelrule.FieldUpstreamModel)
+	}
+	if m.endpoint_capabilities != nil {
+		fields = append(fields, platformmodelrule.FieldEndpointCapabilities)
+	}
+	if m.status != nil {
+		fields = append(fields, platformmodelrule.FieldStatus)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformModelRuleMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformmodelrule.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformmodelrule.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case platformmodelrule.FieldPlatformID:
+		return m.PlatformID()
+	case platformmodelrule.FieldModelPattern:
+		return m.ModelPattern()
+	case platformmodelrule.FieldUpstreamModel:
+		return m.UpstreamModel()
+	case platformmodelrule.FieldEndpointCapabilities:
+		return m.EndpointCapabilities()
+	case platformmodelrule.FieldStatus:
+		return m.Status()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformModelRuleMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformmodelrule.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformmodelrule.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case platformmodelrule.FieldPlatformID:
+		return m.OldPlatformID(ctx)
+	case platformmodelrule.FieldModelPattern:
+		return m.OldModelPattern(ctx)
+	case platformmodelrule.FieldUpstreamModel:
+		return m.OldUpstreamModel(ctx)
+	case platformmodelrule.FieldEndpointCapabilities:
+		return m.OldEndpointCapabilities(ctx)
+	case platformmodelrule.FieldStatus:
+		return m.OldStatus(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformModelRule field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformModelRuleMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformmodelrule.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformmodelrule.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case platformmodelrule.FieldPlatformID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlatformID(v)
+		return nil
+	case platformmodelrule.FieldModelPattern:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetModelPattern(v)
+		return nil
+	case platformmodelrule.FieldUpstreamModel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpstreamModel(v)
+		return nil
+	case platformmodelrule.FieldEndpointCapabilities:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEndpointCapabilities(v)
+		return nil
+	case platformmodelrule.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformModelRule field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformModelRuleMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformModelRuleMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformModelRuleMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformModelRule numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformModelRuleMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformModelRuleMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformModelRuleMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformModelRule nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformModelRuleMutation) ResetField(name string) error {
+	switch name {
+	case platformmodelrule.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformmodelrule.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case platformmodelrule.FieldPlatformID:
+		m.ResetPlatformID()
+		return nil
+	case platformmodelrule.FieldModelPattern:
+		m.ResetModelPattern()
+		return nil
+	case platformmodelrule.FieldUpstreamModel:
+		m.ResetUpstreamModel()
+		return nil
+	case platformmodelrule.FieldEndpointCapabilities:
+		m.ResetEndpointCapabilities()
+		return nil
+	case platformmodelrule.FieldStatus:
+		m.ResetStatus()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformModelRule field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformModelRuleMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.platform != nil {
+		edges = append(edges, platformmodelrule.EdgePlatform)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformModelRuleMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case platformmodelrule.EdgePlatform:
+		if id := m.platform; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformModelRuleMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformModelRuleMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformModelRuleMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedplatform {
+		edges = append(edges, platformmodelrule.EdgePlatform)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformModelRuleMutation) EdgeCleared(name string) bool {
+	switch name {
+	case platformmodelrule.EdgePlatform:
+		return m.clearedplatform
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformModelRuleMutation) ClearEdge(name string) error {
+	switch name {
+	case platformmodelrule.EdgePlatform:
+		m.ClearPlatform()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformModelRule unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformModelRuleMutation) ResetEdge(name string) error {
+	switch name {
+	case platformmodelrule.EdgePlatform:
+		m.ResetPlatform()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformModelRule edge %s", name)
+}
+
 // PromoCodeMutation represents an operation that mutates the PromoCode nodes in the graph.
 type PromoCodeMutation struct {
 	config
@@ -42159,6 +44301,9 @@ type SubscriptionPlanMutation struct {
 	redeem_codes         map[int64]struct{}
 	removedredeem_codes  map[int64]struct{}
 	clearedredeem_codes  bool
+	api_keys             map[int64]struct{}
+	removedapi_keys      map[int64]struct{}
+	clearedapi_keys      bool
 	done                 bool
 	oldValue             func(context.Context) (*SubscriptionPlan, error)
 	predicates           []predicate.SubscriptionPlan
@@ -42312,10 +44457,24 @@ func (m *SubscriptionPlanMutation) AddedGroupID() (r int64, exists bool) {
 	return *v, true
 }
 
+// ClearGroupID clears the value of the "group_id" field.
+func (m *SubscriptionPlanMutation) ClearGroupID() {
+	m.group_id = nil
+	m.addgroup_id = nil
+	m.clearedFields[subscriptionplan.FieldGroupID] = struct{}{}
+}
+
+// GroupIDCleared returns if the "group_id" field was cleared in this mutation.
+func (m *SubscriptionPlanMutation) GroupIDCleared() bool {
+	_, ok := m.clearedFields[subscriptionplan.FieldGroupID]
+	return ok
+}
+
 // ResetGroupID resets all changes to the "group_id" field.
 func (m *SubscriptionPlanMutation) ResetGroupID() {
 	m.group_id = nil
 	m.addgroup_id = nil
+	delete(m.clearedFields, subscriptionplan.FieldGroupID)
 }
 
 // SetName sets the "name" field.
@@ -43254,6 +45413,60 @@ func (m *SubscriptionPlanMutation) ResetRedeemCodes() {
 	m.removedredeem_codes = nil
 }
 
+// AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
+func (m *SubscriptionPlanMutation) AddAPIKeyIDs(ids ...int64) {
+	if m.api_keys == nil {
+		m.api_keys = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.api_keys[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAPIKeys clears the "api_keys" edge to the APIKey entity.
+func (m *SubscriptionPlanMutation) ClearAPIKeys() {
+	m.clearedapi_keys = true
+}
+
+// APIKeysCleared reports if the "api_keys" edge to the APIKey entity was cleared.
+func (m *SubscriptionPlanMutation) APIKeysCleared() bool {
+	return m.clearedapi_keys
+}
+
+// RemoveAPIKeyIDs removes the "api_keys" edge to the APIKey entity by IDs.
+func (m *SubscriptionPlanMutation) RemoveAPIKeyIDs(ids ...int64) {
+	if m.removedapi_keys == nil {
+		m.removedapi_keys = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.api_keys, ids[i])
+		m.removedapi_keys[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAPIKeys returns the removed IDs of the "api_keys" edge to the APIKey entity.
+func (m *SubscriptionPlanMutation) RemovedAPIKeysIDs() (ids []int64) {
+	for id := range m.removedapi_keys {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// APIKeysIDs returns the "api_keys" edge IDs in the mutation.
+func (m *SubscriptionPlanMutation) APIKeysIDs() (ids []int64) {
+	for id := range m.api_keys {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAPIKeys resets all changes to the "api_keys" edge.
+func (m *SubscriptionPlanMutation) ResetAPIKeys() {
+	m.api_keys = nil
+	m.clearedapi_keys = false
+	m.removedapi_keys = nil
+}
+
 // Where appends a list predicates to the SubscriptionPlanMutation builder.
 func (m *SubscriptionPlanMutation) Where(ps ...predicate.SubscriptionPlan) {
 	m.predicates = append(m.predicates, ps...)
@@ -43708,6 +45921,9 @@ func (m *SubscriptionPlanMutation) AddField(name string, value ent.Value) error 
 // mutation.
 func (m *SubscriptionPlanMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(subscriptionplan.FieldGroupID) {
+		fields = append(fields, subscriptionplan.FieldGroupID)
+	}
 	if m.FieldCleared(subscriptionplan.FieldOriginalPrice) {
 		fields = append(fields, subscriptionplan.FieldOriginalPrice)
 	}
@@ -43734,6 +45950,9 @@ func (m *SubscriptionPlanMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *SubscriptionPlanMutation) ClearField(name string) error {
 	switch name {
+	case subscriptionplan.FieldGroupID:
+		m.ClearGroupID()
+		return nil
 	case subscriptionplan.FieldOriginalPrice:
 		m.ClearOriginalPrice()
 		return nil
@@ -43814,12 +46033,15 @@ func (m *SubscriptionPlanMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SubscriptionPlanMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.subscriptions != nil {
 		edges = append(edges, subscriptionplan.EdgeSubscriptions)
 	}
 	if m.redeem_codes != nil {
 		edges = append(edges, subscriptionplan.EdgeRedeemCodes)
+	}
+	if m.api_keys != nil {
+		edges = append(edges, subscriptionplan.EdgeAPIKeys)
 	}
 	return edges
 }
@@ -43840,18 +46062,27 @@ func (m *SubscriptionPlanMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case subscriptionplan.EdgeAPIKeys:
+		ids := make([]ent.Value, 0, len(m.api_keys))
+		for id := range m.api_keys {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SubscriptionPlanMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.removedsubscriptions != nil {
 		edges = append(edges, subscriptionplan.EdgeSubscriptions)
 	}
 	if m.removedredeem_codes != nil {
 		edges = append(edges, subscriptionplan.EdgeRedeemCodes)
+	}
+	if m.removedapi_keys != nil {
+		edges = append(edges, subscriptionplan.EdgeAPIKeys)
 	}
 	return edges
 }
@@ -43872,18 +46103,27 @@ func (m *SubscriptionPlanMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case subscriptionplan.EdgeAPIKeys:
+		ids := make([]ent.Value, 0, len(m.removedapi_keys))
+		for id := range m.removedapi_keys {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SubscriptionPlanMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedsubscriptions {
 		edges = append(edges, subscriptionplan.EdgeSubscriptions)
 	}
 	if m.clearedredeem_codes {
 		edges = append(edges, subscriptionplan.EdgeRedeemCodes)
+	}
+	if m.clearedapi_keys {
+		edges = append(edges, subscriptionplan.EdgeAPIKeys)
 	}
 	return edges
 }
@@ -43896,6 +46136,8 @@ func (m *SubscriptionPlanMutation) EdgeCleared(name string) bool {
 		return m.clearedsubscriptions
 	case subscriptionplan.EdgeRedeemCodes:
 		return m.clearedredeem_codes
+	case subscriptionplan.EdgeAPIKeys:
+		return m.clearedapi_keys
 	}
 	return false
 }
@@ -43917,6 +46159,9 @@ func (m *SubscriptionPlanMutation) ResetEdge(name string) error {
 		return nil
 	case subscriptionplan.EdgeRedeemCodes:
 		m.ResetRedeemCodes()
+		return nil
+	case subscriptionplan.EdgeAPIKeys:
+		m.ResetAPIKeys()
 		return nil
 	}
 	return fmt.Errorf("unknown SubscriptionPlan edge %s", name)
@@ -46394,6 +48639,7 @@ type UsageLogMutation struct {
 	model_mapping_chain          *string
 	billing_tier                 *string
 	billing_mode                 *string
+	billing_source_type          *string
 	input_tokens                 *int
 	addinput_tokens              *int
 	output_tokens                *int
@@ -46457,6 +48703,8 @@ type UsageLogMutation struct {
 	clearedgroup                 bool
 	subscription                 *int64
 	clearedsubscription          bool
+	platform                     *int64
+	clearedplatform              bool
 	done                         bool
 	oldValue                     func(context.Context) (*UsageLog, error)
 	predicates                   []predicate.UsageLog
@@ -47151,6 +49399,104 @@ func (m *UsageLogMutation) SubscriptionIDCleared() bool {
 func (m *UsageLogMutation) ResetSubscriptionID() {
 	m.subscription = nil
 	delete(m.clearedFields, usagelog.FieldSubscriptionID)
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (m *UsageLogMutation) SetPlatformID(i int64) {
+	m.platform = &i
+}
+
+// PlatformID returns the value of the "platform_id" field in the mutation.
+func (m *UsageLogMutation) PlatformID() (r int64, exists bool) {
+	v := m.platform
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlatformID returns the old "platform_id" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldPlatformID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlatformID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlatformID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlatformID: %w", err)
+	}
+	return oldValue.PlatformID, nil
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (m *UsageLogMutation) ClearPlatformID() {
+	m.platform = nil
+	m.clearedFields[usagelog.FieldPlatformID] = struct{}{}
+}
+
+// PlatformIDCleared returns if the "platform_id" field was cleared in this mutation.
+func (m *UsageLogMutation) PlatformIDCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldPlatformID]
+	return ok
+}
+
+// ResetPlatformID resets all changes to the "platform_id" field.
+func (m *UsageLogMutation) ResetPlatformID() {
+	m.platform = nil
+	delete(m.clearedFields, usagelog.FieldPlatformID)
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (m *UsageLogMutation) SetBillingSourceType(s string) {
+	m.billing_source_type = &s
+}
+
+// BillingSourceType returns the value of the "billing_source_type" field in the mutation.
+func (m *UsageLogMutation) BillingSourceType() (r string, exists bool) {
+	v := m.billing_source_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillingSourceType returns the old "billing_source_type" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldBillingSourceType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillingSourceType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillingSourceType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillingSourceType: %w", err)
+	}
+	return oldValue.BillingSourceType, nil
+}
+
+// ClearBillingSourceType clears the value of the "billing_source_type" field.
+func (m *UsageLogMutation) ClearBillingSourceType() {
+	m.billing_source_type = nil
+	m.clearedFields[usagelog.FieldBillingSourceType] = struct{}{}
+}
+
+// BillingSourceTypeCleared returns if the "billing_source_type" field was cleared in this mutation.
+func (m *UsageLogMutation) BillingSourceTypeCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldBillingSourceType]
+	return ok
+}
+
+// ResetBillingSourceType resets all changes to the "billing_source_type" field.
+func (m *UsageLogMutation) ResetBillingSourceType() {
+	m.billing_source_type = nil
+	delete(m.clearedFields, usagelog.FieldBillingSourceType)
 }
 
 // SetInputTokens sets the "input_tokens" field.
@@ -49000,6 +51346,33 @@ func (m *UsageLogMutation) ResetSubscription() {
 	m.clearedsubscription = false
 }
 
+// ClearPlatform clears the "platform" edge to the Platform entity.
+func (m *UsageLogMutation) ClearPlatform() {
+	m.clearedplatform = true
+	m.clearedFields[usagelog.FieldPlatformID] = struct{}{}
+}
+
+// PlatformCleared reports if the "platform" edge to the Platform entity was cleared.
+func (m *UsageLogMutation) PlatformCleared() bool {
+	return m.PlatformIDCleared() || m.clearedplatform
+}
+
+// PlatformIDs returns the "platform" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PlatformID instead. It exists only for internal usage by the builders.
+func (m *UsageLogMutation) PlatformIDs() (ids []int64) {
+	if id := m.platform; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPlatform resets all changes to the "platform" edge.
+func (m *UsageLogMutation) ResetPlatform() {
+	m.platform = nil
+	m.clearedplatform = false
+}
+
 // Where appends a list predicates to the UsageLogMutation builder.
 func (m *UsageLogMutation) Where(ps ...predicate.UsageLog) {
 	m.predicates = append(m.predicates, ps...)
@@ -49034,7 +51407,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 45)
+	fields := make([]string, 0, 47)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -49073,6 +51446,12 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.subscription != nil {
 		fields = append(fields, usagelog.FieldSubscriptionID)
+	}
+	if m.platform != nil {
+		fields = append(fields, usagelog.FieldPlatformID)
+	}
+	if m.billing_source_type != nil {
+		fields = append(fields, usagelog.FieldBillingSourceType)
 	}
 	if m.input_tokens != nil {
 		fields = append(fields, usagelog.FieldInputTokens)
@@ -49204,6 +51583,10 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case usagelog.FieldSubscriptionID:
 		return m.SubscriptionID()
+	case usagelog.FieldPlatformID:
+		return m.PlatformID()
+	case usagelog.FieldBillingSourceType:
+		return m.BillingSourceType()
 	case usagelog.FieldInputTokens:
 		return m.InputTokens()
 	case usagelog.FieldOutputTokens:
@@ -49303,6 +51686,10 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldGroupID(ctx)
 	case usagelog.FieldSubscriptionID:
 		return m.OldSubscriptionID(ctx)
+	case usagelog.FieldPlatformID:
+		return m.OldPlatformID(ctx)
+	case usagelog.FieldBillingSourceType:
+		return m.OldBillingSourceType(ctx)
 	case usagelog.FieldInputTokens:
 		return m.OldInputTokens(ctx)
 	case usagelog.FieldOutputTokens:
@@ -49466,6 +51853,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSubscriptionID(v)
+		return nil
+	case usagelog.FieldPlatformID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlatformID(v)
+		return nil
+	case usagelog.FieldBillingSourceType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillingSourceType(v)
 		return nil
 	case usagelog.FieldInputTokens:
 		v, ok := value.(int)
@@ -50000,6 +52401,12 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldSubscriptionID) {
 		fields = append(fields, usagelog.FieldSubscriptionID)
 	}
+	if m.FieldCleared(usagelog.FieldPlatformID) {
+		fields = append(fields, usagelog.FieldPlatformID)
+	}
+	if m.FieldCleared(usagelog.FieldBillingSourceType) {
+		fields = append(fields, usagelog.FieldBillingSourceType)
+	}
 	if m.FieldCleared(usagelog.FieldAccountRateMultiplier) {
 		fields = append(fields, usagelog.FieldAccountRateMultiplier)
 	}
@@ -50073,6 +52480,12 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldSubscriptionID:
 		m.ClearSubscriptionID()
+		return nil
+	case usagelog.FieldPlatformID:
+		m.ClearPlatformID()
+		return nil
+	case usagelog.FieldBillingSourceType:
+		m.ClearBillingSourceType()
 		return nil
 	case usagelog.FieldAccountRateMultiplier:
 		m.ClearAccountRateMultiplier()
@@ -50156,6 +52569,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldSubscriptionID:
 		m.ResetSubscriptionID()
+		return nil
+	case usagelog.FieldPlatformID:
+		m.ResetPlatformID()
+		return nil
+	case usagelog.FieldBillingSourceType:
+		m.ResetBillingSourceType()
 		return nil
 	case usagelog.FieldInputTokens:
 		m.ResetInputTokens()
@@ -50259,7 +52678,7 @@ func (m *UsageLogMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UsageLogMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.user != nil {
 		edges = append(edges, usagelog.EdgeUser)
 	}
@@ -50274,6 +52693,9 @@ func (m *UsageLogMutation) AddedEdges() []string {
 	}
 	if m.subscription != nil {
 		edges = append(edges, usagelog.EdgeSubscription)
+	}
+	if m.platform != nil {
+		edges = append(edges, usagelog.EdgePlatform)
 	}
 	return edges
 }
@@ -50302,13 +52724,17 @@ func (m *UsageLogMutation) AddedIDs(name string) []ent.Value {
 		if id := m.subscription; id != nil {
 			return []ent.Value{*id}
 		}
+	case usagelog.EdgePlatform:
+		if id := m.platform; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UsageLogMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	return edges
 }
 
@@ -50320,7 +52746,7 @@ func (m *UsageLogMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UsageLogMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.cleareduser {
 		edges = append(edges, usagelog.EdgeUser)
 	}
@@ -50335,6 +52761,9 @@ func (m *UsageLogMutation) ClearedEdges() []string {
 	}
 	if m.clearedsubscription {
 		edges = append(edges, usagelog.EdgeSubscription)
+	}
+	if m.clearedplatform {
+		edges = append(edges, usagelog.EdgePlatform)
 	}
 	return edges
 }
@@ -50353,6 +52782,8 @@ func (m *UsageLogMutation) EdgeCleared(name string) bool {
 		return m.clearedgroup
 	case usagelog.EdgeSubscription:
 		return m.clearedsubscription
+	case usagelog.EdgePlatform:
+		return m.clearedplatform
 	}
 	return false
 }
@@ -50376,6 +52807,9 @@ func (m *UsageLogMutation) ClearEdge(name string) error {
 	case usagelog.EdgeSubscription:
 		m.ClearSubscription()
 		return nil
+	case usagelog.EdgePlatform:
+		m.ClearPlatform()
+		return nil
 	}
 	return fmt.Errorf("unknown UsageLog unique edge %s", name)
 }
@@ -50398,6 +52832,9 @@ func (m *UsageLogMutation) ResetEdge(name string) error {
 		return nil
 	case usagelog.EdgeSubscription:
 		m.ResetSubscription()
+		return nil
+	case usagelog.EdgePlatform:
+		m.ResetPlatform()
 		return nil
 	}
 	return fmt.Errorf("unknown UsageLog edge %s", name)
@@ -57352,9 +59789,22 @@ func (m *UserSubscriptionMutation) OldGroupID(ctx context.Context) (v int64, err
 	return oldValue.GroupID, nil
 }
 
+// ClearGroupID clears the value of the "group_id" field.
+func (m *UserSubscriptionMutation) ClearGroupID() {
+	m.group = nil
+	m.clearedFields[usersubscription.FieldGroupID] = struct{}{}
+}
+
+// GroupIDCleared returns if the "group_id" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) GroupIDCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldGroupID]
+	return ok
+}
+
 // ResetGroupID resets all changes to the "group_id" field.
 func (m *UserSubscriptionMutation) ResetGroupID() {
 	m.group = nil
+	delete(m.clearedFields, usersubscription.FieldGroupID)
 }
 
 // SetSubscriptionPlanID sets the "subscription_plan_id" field.
@@ -58300,7 +60750,7 @@ func (m *UserSubscriptionMutation) ClearGroup() {
 
 // GroupCleared reports if the "group" edge to the Group entity was cleared.
 func (m *UserSubscriptionMutation) GroupCleared() bool {
-	return m.clearedgroup
+	return m.GroupIDCleared() || m.clearedgroup
 }
 
 // GroupIDs returns the "group" edge IDs in the mutation.
@@ -58943,6 +61393,9 @@ func (m *UserSubscriptionMutation) ClearedFields() []string {
 	if m.FieldCleared(usersubscription.FieldDeletedAt) {
 		fields = append(fields, usersubscription.FieldDeletedAt)
 	}
+	if m.FieldCleared(usersubscription.FieldGroupID) {
+		fields = append(fields, usersubscription.FieldGroupID)
+	}
 	if m.FieldCleared(usersubscription.FieldSubscriptionPlanID) {
 		fields = append(fields, usersubscription.FieldSubscriptionPlanID)
 	}
@@ -58986,6 +61439,9 @@ func (m *UserSubscriptionMutation) ClearField(name string) error {
 	switch name {
 	case usersubscription.FieldDeletedAt:
 		m.ClearDeletedAt()
+		return nil
+	case usersubscription.FieldGroupID:
+		m.ClearGroupID()
 		return nil
 	case usersubscription.FieldSubscriptionPlanID:
 		m.ClearSubscriptionPlanID()

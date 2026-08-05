@@ -367,14 +367,6 @@
                 <span class="text-xs">{{ t("common.edit") }}</span>
               </button>
               <button
-                data-testid="group-billing-profile"
-                @click="billingProfileGroup = row"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
-              >
-                <Icon name="creditCard" size="sm" />
-                <span class="text-xs">{{ t("admin.groups.balanceBilling") }}</span>
-              </button>
-              <button
                 data-testid="group-duplicate"
                 :title="
                   duplicatingGroupIds.has(row.id)
@@ -4029,12 +4021,6 @@
       @close="showRPMOverridesModal = false"
       @success="loadGroups"
     />
-    <GroupBillingProfileDialog
-      :show="billingProfileGroup !== null"
-      :group="billingProfileGroup"
-      @close="billingProfileGroup = null"
-      @saved="loadGroups"
-    />
   </AppLayout>
 </template>
 
@@ -4065,7 +4051,6 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import Select from "@/components/common/Select.vue";
 import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import Icon from "@/components/icons/Icon.vue";
-import GroupBillingProfileDialog from "@/components/admin/group/GroupBillingProfileDialog.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
@@ -4515,7 +4500,6 @@ const submitting = ref(false);
 const sortSubmitting = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
-const billingProfileGroup = ref<AdminGroup | null>(null);
 const duplicatingGroupIds = reactive(new Set<number>());
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);

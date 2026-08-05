@@ -125,6 +125,10 @@ const usageLog = {
   created_at: '2026-03-08T00:00:00Z',
   model: 'gpt-5.4',
   reasoning_effort: null,
+  platform_code: 'openai-primary',
+  platform_name: 'OpenAI primary',
+  billing_source_type: 'subscription',
+  subscription_name: 'Pro',
   ip_address: '203.0.113.10',
   api_key: { name: 'demo-key' },
   billing_mode: 'token',
@@ -210,7 +214,7 @@ describe('user UsageView', () => {
       include_group_stats: true,
     }))
     expect(list).toHaveBeenCalledWith(1, 100)
-    expect(getAvailable).toHaveBeenCalled()
+    expect(getAvailable).not.toHaveBeenCalled()
   })
 
   it('shows only the requested default usage columns on first visit', async () => {
@@ -231,6 +235,17 @@ describe('user UsageView', () => {
       'output_speed',
       'created_at',
     ])
+  })
+
+  it('makes the platform column available when the user enables all usage columns', async () => {
+    localStorage.setItem('user-usage-hidden-columns', JSON.stringify([]))
+    localStorage.setItem('user-usage-hidden-columns-platform-v2', '1')
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const columns = wrapper.findComponent({ name: 'UsageTable' }).props('columns') as Array<{ key: string }>
+    expect(columns.map((column) => column.key)).toContain('platform')
   })
 
   it('preserves the user saved usage column preferences', async () => {
@@ -256,7 +271,7 @@ describe('user UsageView', () => {
     ])
   })
 
-  it('restores the saved date range, granularity, and filters', async () => {
+  it('restores compatible filters but drops the legacy group filter', async () => {
     localStorage.setItem('sub2api:user-usage:view-state:v1', JSON.stringify({
       startDate: '2026-07-03',
       endDate: '2026-07-10',
@@ -272,7 +287,6 @@ describe('user UsageView', () => {
         start_date: '2026-07-03',
         end_date: '2026-07-10',
         model: 'glm-4.7',
-        group_id: 6,
       }),
       expect.anything(),
     )
@@ -330,8 +344,8 @@ describe('user UsageView', () => {
     expect(showSuccess).toHaveBeenCalled()
     expect(csvContent.startsWith('\uFEFF')).toBe(true)
     expect(csvContent.slice(1)).toBe([
-      'Time,API Key Name,Model,Reasoning Effort,Inbound Endpoint,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,Rate Multiplier,Billed Cost,Original Cost,First Token (ms),Duration (ms)',
-      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,"\'-",,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
+      'Time,API Key Name,Model,Reasoning Effort,Inbound Endpoint,Platform,Billing Source,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,Rate Multiplier,Billed Cost,Original Cost,First Token (ms),Duration (ms)',
+      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,"\'-",,OpenAI primary,Pro,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
     ].join('\n'))
     expect(csvContent).toContain('IP Address')
     expect(csvContent).toContain('203.0.113.10')

@@ -8,16 +8,15 @@ import (
 )
 
 func applySubscriptionPlanToRedeemCode(code *RedeemCode, plan *dbent.SubscriptionPlan) error {
-	if code == nil || plan == nil || plan.ID <= 0 || plan.GroupID <= 0 || plan.ValidityDays <= 0 {
+	if code == nil || plan == nil || plan.ID <= 0 || plan.ValidityDays <= 0 {
 		return ErrSubscriptionPlanInvalid
 	}
 
 	validityDays := normalizeAssignValidityDays(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit))
 	planID := plan.ID
-	groupID := plan.GroupID
 	code.Type = RedeemTypeSubscription
 	code.SubscriptionPlanID = &planID
-	code.GroupID = &groupID
+	code.GroupID = nil
 	code.ValidityDays = validityDays
 	code.PlanNameSnapshot = plan.Name
 	code.DailyLimitUSDSnapshot = copyFloat64(plan.DailyLimitUsd)
@@ -28,7 +27,7 @@ func applySubscriptionPlanToRedeemCode(code *RedeemCode, plan *dbent.Subscriptio
 }
 
 func (r *RedeemCode) hasSubscriptionPlanSnapshot() bool {
-	return r != nil && r.PlanNameSnapshot != "" && r.GroupID != nil && r.ValidityDays > 0
+	return r != nil && r.SubscriptionPlanID != nil && *r.SubscriptionPlanID > 0 && r.PlanNameSnapshot != "" && r.ValidityDays > 0
 }
 
 func subscriptionFromRedeemCode(
@@ -47,7 +46,6 @@ func subscriptionFromRedeemCode(
 	}
 	return &UserSubscription{
 		UserID:                  userID,
-		GroupID:                 *code.GroupID,
 		SubscriptionPlanID:      copyRedeemCodeInt64(code.SubscriptionPlanID),
 		PlanNameSnapshot:        code.PlanNameSnapshot,
 		DailyLimitUSDSnapshot:   copyFloat64(code.DailyLimitUSDSnapshot),

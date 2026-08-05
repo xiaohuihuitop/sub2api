@@ -332,6 +332,7 @@ type CreateAccountInput struct {
 	Name               string
 	Notes              *string
 	Platform           string
+	PlatformID         *int64
 	Type               string
 	Credentials        map[string]any
 	Extra              map[string]any
@@ -357,13 +358,13 @@ type ShadowOptions struct {
 	Name        string
 	Priority    int
 	Concurrency int
-	GroupIDs    []int64
 }
 
 type UpdateAccountInput struct {
 	Name                  string
 	Notes                 *string
 	Type                  string // Account type: oauth, setup-token, apikey
+	PlatformID            *int64
 	Credentials           map[string]any
 	Extra                 map[string]any
 	ProxyID               *int64

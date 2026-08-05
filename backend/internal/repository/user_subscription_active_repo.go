@@ -28,6 +28,17 @@ func (r *userSubscriptionRepository) ListActiveByUserIDAndGroupIDs(
 	return r.listActiveByUserID(ctx, userID, usersubscription.GroupIDIn(groupIDs...))
 }
 
+func (r *userSubscriptionRepository) ListActiveByUserIDAndPlanIDs(
+	ctx context.Context,
+	userID int64,
+	planIDs []int64,
+) ([]service.UserSubscription, error) {
+	if len(planIDs) == 0 {
+		return []service.UserSubscription{}, nil
+	}
+	return r.listActiveByUserID(ctx, userID, usersubscription.SubscriptionPlanIDIn(planIDs...))
+}
+
 func (r *userSubscriptionRepository) listActiveByUserID(
 	ctx context.Context,
 	userID int64,

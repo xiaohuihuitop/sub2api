@@ -547,14 +547,39 @@ func (s *ChannelService) IsModelRestricted(ctx context.Context, groupID int64, m
 // 返回映射结果。模型限制检查已移至调度阶段（GatewayService.checkChannelPricingRestriction），
 // restricted 始终返回 false，保留签名兼容性。
 func (s *ChannelService) ResolveChannelMappingAndRestrict(ctx context.Context, groupID *int64, model string) (ChannelMappingResult, bool) {
+	platformUpstreamModel, hasPlatformRoute := platformAssetUpstreamModel(ctx, model)
 	if groupID == nil {
-		return ChannelMappingResult{MappedModel: model}, false
+		return applyPlatformAssetModelMapping(ChannelMappingResult{MappedModel: model}, platformUpstreamModel, hasPlatformRoute), false
 	}
 	lk, _ := s.lookupGroupChannel(ctx, *groupID)
 	if lk == nil {
-		return ChannelMappingResult{MappedModel: model}, false
+		return applyPlatformAssetModelMapping(ChannelMappingResult{MappedModel: model}, platformUpstreamModel, hasPlatformRoute), false
 	}
-	return resolveMapping(lk, *groupID, model), false
+	return applyPlatformAssetModelMapping(resolveMapping(lk, *groupID, model), platformUpstreamModel, hasPlatformRoute), false
+}
+
+// platformAssetUpstreamModel gives an explicitly authorized platform rule
+// precedence over legacy channel aliases. The caller keeps channel metadata
+// for pricing-source compatibility, but account routing must use this model.
+func platformAssetUpstreamModel(ctx context.Context, requestedModel string) (string, bool) {
+	route, ok := GatewayPlatformAssetContextFromContext(ctx)
+	if !ok || route.Platform == nil {
+		return "", false
+	}
+	upstreamModel := strings.TrimSpace(route.Platform.UpstreamModel)
+	if upstreamModel == "" {
+		return "", false
+	}
+	return upstreamModel, true
+}
+
+func applyPlatformAssetModelMapping(result ChannelMappingResult, upstreamModel string, hasPlatformRoute bool) ChannelMappingResult {
+	if !hasPlatformRoute {
+		return result
+	}
+	result.Mapped = !strings.EqualFold(strings.TrimSpace(result.MappedModel), upstreamModel)
+	result.MappedModel = upstreamModel
+	return result
 }
 
 // resolveMapping 基于已查找的渠道信息解析模型映射。

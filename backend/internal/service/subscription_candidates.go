@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"time"
 )
 
@@ -70,6 +71,48 @@ func (s *SubscriptionService) ListActiveSubscriptions(
 		return nil, ErrSubscriptionNotFound
 	}
 	return cloneUserSubscriptions(subscriptions), nil
+}
+
+// ListActiveSubscriptionsByPlanIDs returns all active candidates for the
+// explicitly authorized V2 plans. It does not fall back to a legacy group,
+// because that would silently expand an API key's billing permission.
+func (s *SubscriptionService) ListActiveSubscriptionsByPlanIDs(
+	ctx context.Context,
+	userID int64,
+	planIDs []int64,
+) ([]UserSubscription, error) {
+	normalizedPlanIDs := normalizeSubscriptionPlanIDs(planIDs)
+	if len(normalizedPlanIDs) == 0 {
+		return []UserSubscription{}, nil
+	}
+
+	lister, ok := s.userSubRepo.(ActiveUserSubscriptionPlanLister)
+	if !ok {
+		return nil, ErrSubscriptionNotFound
+	}
+	subscriptions, err := lister.ListActiveByUserIDAndPlanIDs(ctx, userID, normalizedPlanIDs)
+	if err != nil {
+		return nil, err
+	}
+	return cloneUserSubscriptions(subscriptions), nil
+}
+
+func normalizeSubscriptionPlanIDs(planIDs []int64) []int64 {
+	seen := make(map[int64]struct{}, len(planIDs))
+	for _, planID := range planIDs {
+		if planID > 0 {
+			seen[planID] = struct{}{}
+		}
+	}
+
+	normalized := make([]int64, 0, len(seen))
+	for planID := range seen {
+		normalized = append(normalized, planID)
+	}
+	sort.Slice(normalized, func(left, right int) bool {
+		return normalized[left] < normalized[right]
+	})
+	return normalized
 }
 
 func cloneUserSubscriptions(subscriptions []UserSubscription) []UserSubscription {

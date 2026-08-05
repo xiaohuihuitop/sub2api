@@ -14,7 +14,9 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
@@ -117,6 +119,20 @@ func (_u *APIKeyUpdate) SetNillableGroupID(v *int64) *APIKeyUpdate {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *APIKeyUpdate) ClearGroupID() *APIKeyUpdate {
 	_u.mutation.ClearGroupID()
+	return _u
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (_u *APIKeyUpdate) SetAllowBalance(v bool) *APIKeyUpdate {
+	_u.mutation.SetAllowBalance(v)
+	return _u
+}
+
+// SetNillableAllowBalance sets the "allow_balance" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableAllowBalance(v *bool) *APIKeyUpdate {
+	if v != nil {
+		_u.SetAllowBalance(*v)
+	}
 	return _u
 }
 
@@ -448,6 +464,36 @@ func (_u *APIKeyUpdate) SetGroup(v *Group) *APIKeyUpdate {
 	return _u.SetGroupID(v.ID)
 }
 
+// AddPlatformIDs adds the "platforms" edge to the Platform entity by IDs.
+func (_u *APIKeyUpdate) AddPlatformIDs(ids ...int64) *APIKeyUpdate {
+	_u.mutation.AddPlatformIDs(ids...)
+	return _u
+}
+
+// AddPlatforms adds the "platforms" edges to the Platform entity.
+func (_u *APIKeyUpdate) AddPlatforms(v ...*Platform) *APIKeyUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPlatformIDs(ids...)
+}
+
+// AddSubscriptionPlanIDs adds the "subscription_plans" edge to the SubscriptionPlan entity by IDs.
+func (_u *APIKeyUpdate) AddSubscriptionPlanIDs(ids ...int64) *APIKeyUpdate {
+	_u.mutation.AddSubscriptionPlanIDs(ids...)
+	return _u
+}
+
+// AddSubscriptionPlans adds the "subscription_plans" edges to the SubscriptionPlan entity.
+func (_u *APIKeyUpdate) AddSubscriptionPlans(v ...*SubscriptionPlan) *APIKeyUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddSubscriptionPlanIDs(ids...)
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_u *APIKeyUpdate) AddUsageLogIDs(ids ...int64) *APIKeyUpdate {
 	_u.mutation.AddUsageLogIDs(ids...)
@@ -478,6 +524,48 @@ func (_u *APIKeyUpdate) ClearUser() *APIKeyUpdate {
 func (_u *APIKeyUpdate) ClearGroup() *APIKeyUpdate {
 	_u.mutation.ClearGroup()
 	return _u
+}
+
+// ClearPlatforms clears all "platforms" edges to the Platform entity.
+func (_u *APIKeyUpdate) ClearPlatforms() *APIKeyUpdate {
+	_u.mutation.ClearPlatforms()
+	return _u
+}
+
+// RemovePlatformIDs removes the "platforms" edge to Platform entities by IDs.
+func (_u *APIKeyUpdate) RemovePlatformIDs(ids ...int64) *APIKeyUpdate {
+	_u.mutation.RemovePlatformIDs(ids...)
+	return _u
+}
+
+// RemovePlatforms removes "platforms" edges to Platform entities.
+func (_u *APIKeyUpdate) RemovePlatforms(v ...*Platform) *APIKeyUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePlatformIDs(ids...)
+}
+
+// ClearSubscriptionPlans clears all "subscription_plans" edges to the SubscriptionPlan entity.
+func (_u *APIKeyUpdate) ClearSubscriptionPlans() *APIKeyUpdate {
+	_u.mutation.ClearSubscriptionPlans()
+	return _u
+}
+
+// RemoveSubscriptionPlanIDs removes the "subscription_plans" edge to SubscriptionPlan entities by IDs.
+func (_u *APIKeyUpdate) RemoveSubscriptionPlanIDs(ids ...int64) *APIKeyUpdate {
+	_u.mutation.RemoveSubscriptionPlanIDs(ids...)
+	return _u
+}
+
+// RemoveSubscriptionPlans removes "subscription_plans" edges to SubscriptionPlan entities.
+func (_u *APIKeyUpdate) RemoveSubscriptionPlans(v ...*SubscriptionPlan) *APIKeyUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveSubscriptionPlanIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -592,6 +680,9 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AllowBalance(); ok {
+		_spec.SetField(apikey.FieldAllowBalance, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -754,6 +845,96 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.PlatformsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPlatformsIDs(); len(nodes) > 0 && !_u.mutation.PlatformsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PlatformsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SubscriptionPlansCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSubscriptionPlansIDs(); len(nodes) > 0 && !_u.mutation.SubscriptionPlansCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionPlansIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.UsageLogsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -904,6 +1085,20 @@ func (_u *APIKeyUpdateOne) SetNillableGroupID(v *int64) *APIKeyUpdateOne {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *APIKeyUpdateOne) ClearGroupID() *APIKeyUpdateOne {
 	_u.mutation.ClearGroupID()
+	return _u
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (_u *APIKeyUpdateOne) SetAllowBalance(v bool) *APIKeyUpdateOne {
+	_u.mutation.SetAllowBalance(v)
+	return _u
+}
+
+// SetNillableAllowBalance sets the "allow_balance" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableAllowBalance(v *bool) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetAllowBalance(*v)
+	}
 	return _u
 }
 
@@ -1235,6 +1430,36 @@ func (_u *APIKeyUpdateOne) SetGroup(v *Group) *APIKeyUpdateOne {
 	return _u.SetGroupID(v.ID)
 }
 
+// AddPlatformIDs adds the "platforms" edge to the Platform entity by IDs.
+func (_u *APIKeyUpdateOne) AddPlatformIDs(ids ...int64) *APIKeyUpdateOne {
+	_u.mutation.AddPlatformIDs(ids...)
+	return _u
+}
+
+// AddPlatforms adds the "platforms" edges to the Platform entity.
+func (_u *APIKeyUpdateOne) AddPlatforms(v ...*Platform) *APIKeyUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPlatformIDs(ids...)
+}
+
+// AddSubscriptionPlanIDs adds the "subscription_plans" edge to the SubscriptionPlan entity by IDs.
+func (_u *APIKeyUpdateOne) AddSubscriptionPlanIDs(ids ...int64) *APIKeyUpdateOne {
+	_u.mutation.AddSubscriptionPlanIDs(ids...)
+	return _u
+}
+
+// AddSubscriptionPlans adds the "subscription_plans" edges to the SubscriptionPlan entity.
+func (_u *APIKeyUpdateOne) AddSubscriptionPlans(v ...*SubscriptionPlan) *APIKeyUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddSubscriptionPlanIDs(ids...)
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_u *APIKeyUpdateOne) AddUsageLogIDs(ids ...int64) *APIKeyUpdateOne {
 	_u.mutation.AddUsageLogIDs(ids...)
@@ -1265,6 +1490,48 @@ func (_u *APIKeyUpdateOne) ClearUser() *APIKeyUpdateOne {
 func (_u *APIKeyUpdateOne) ClearGroup() *APIKeyUpdateOne {
 	_u.mutation.ClearGroup()
 	return _u
+}
+
+// ClearPlatforms clears all "platforms" edges to the Platform entity.
+func (_u *APIKeyUpdateOne) ClearPlatforms() *APIKeyUpdateOne {
+	_u.mutation.ClearPlatforms()
+	return _u
+}
+
+// RemovePlatformIDs removes the "platforms" edge to Platform entities by IDs.
+func (_u *APIKeyUpdateOne) RemovePlatformIDs(ids ...int64) *APIKeyUpdateOne {
+	_u.mutation.RemovePlatformIDs(ids...)
+	return _u
+}
+
+// RemovePlatforms removes "platforms" edges to Platform entities.
+func (_u *APIKeyUpdateOne) RemovePlatforms(v ...*Platform) *APIKeyUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePlatformIDs(ids...)
+}
+
+// ClearSubscriptionPlans clears all "subscription_plans" edges to the SubscriptionPlan entity.
+func (_u *APIKeyUpdateOne) ClearSubscriptionPlans() *APIKeyUpdateOne {
+	_u.mutation.ClearSubscriptionPlans()
+	return _u
+}
+
+// RemoveSubscriptionPlanIDs removes the "subscription_plans" edge to SubscriptionPlan entities by IDs.
+func (_u *APIKeyUpdateOne) RemoveSubscriptionPlanIDs(ids ...int64) *APIKeyUpdateOne {
+	_u.mutation.RemoveSubscriptionPlanIDs(ids...)
+	return _u
+}
+
+// RemoveSubscriptionPlans removes "subscription_plans" edges to SubscriptionPlan entities.
+func (_u *APIKeyUpdateOne) RemoveSubscriptionPlans(v ...*SubscriptionPlan) *APIKeyUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveSubscriptionPlanIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -1409,6 +1676,9 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AllowBalance(); ok {
+		_spec.SetField(apikey.FieldAllowBalance, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -1564,6 +1834,96 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PlatformsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPlatformsIDs(); len(nodes) > 0 && !_u.mutation.PlatformsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PlatformsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SubscriptionPlansCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSubscriptionPlansIDs(); len(nodes) > 0 && !_u.mutation.SubscriptionPlansCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SubscriptionPlansIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

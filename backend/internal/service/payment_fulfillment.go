@@ -432,14 +432,33 @@ func (s *PaymentService) sendBalanceRechargeSuccessNotification(ctx context.Cont
 }
 
 func (s *PaymentService) sendSubscriptionPurchaseSuccessNotification(ctx context.Context, o *dbent.PaymentOrder) error {
+	return s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
+		Event:          NotificationEmailEventSubscriptionPurchaseSuccess,
+		RecipientEmail: o.UserEmail,
+		RecipientName:  firstNonEmpty(o.UserName, o.UserEmail),
+		UserID:         o.UserID,
+		SourceType:     "payment_order",
+		SourceID:       strconv.FormatInt(o.ID, 10),
+		Variables:      s.subscriptionPurchaseNotificationVariables(ctx, o),
+	})
+}
+
+func (s *PaymentService) subscriptionPurchaseNotificationVariables(ctx context.Context, o *dbent.PaymentOrder) map[string]string {
 	variables := map[string]string{
 		"subscription_group": "Subscription",
 		"subscription_days":  "",
 		"expiry_time":        "",
-		"order_id":           strconv.FormatInt(o.ID, 10),
+		"order_id":           "",
 	}
+	if o == nil {
+		return variables
+	}
+	variables["order_id"] = strconv.FormatInt(o.ID, 10)
 	if o.SubscriptionDays != nil {
 		variables["subscription_days"] = strconv.Itoa(*o.SubscriptionDays)
+	}
+	if o.PlanID != nil && *o.PlanID > 0 && s.enrichPlanSubscriptionNotificationVariables(ctx, o, variables) {
+		return variables
 	}
 	if o.SubscriptionGroupID != nil {
 		if s.groupRepo != nil {
@@ -453,15 +472,32 @@ func (s *PaymentService) sendSubscriptionPurchaseSuccessNotification(ctx context
 			}
 		}
 	}
-	return s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-		Event:          NotificationEmailEventSubscriptionPurchaseSuccess,
-		RecipientEmail: o.UserEmail,
-		RecipientName:  firstNonEmpty(o.UserName, o.UserEmail),
-		UserID:         o.UserID,
-		SourceType:     "payment_order",
-		SourceID:       strconv.FormatInt(o.ID, 10),
-		Variables:      variables,
-	})
+	return variables
+}
+
+func (s *PaymentService) enrichPlanSubscriptionNotificationVariables(ctx context.Context, o *dbent.PaymentOrder, variables map[string]string) bool {
+	resolvedPlan := false
+	if sub, err := s.findPlanSubscriptionForOrder(ctx, o); err == nil && sub != nil {
+		if name := strings.TrimSpace(sub.PlanNameSnapshot); name != "" {
+			variables["subscription_group"] = name
+		}
+		variables["expiry_time"] = sub.ExpiresAt.Format("2006-01-02 15:04")
+		resolvedPlan = true
+	}
+	if s == nil || s.entClient == nil || o.PlanID == nil {
+		return resolvedPlan
+	}
+	plan, err := s.entClient.SubscriptionPlan.Get(ctx, *o.PlanID)
+	if err != nil {
+		return resolvedPlan
+	}
+	if variables["subscription_group"] == "Subscription" && strings.TrimSpace(plan.Name) != "" {
+		variables["subscription_group"] = plan.Name
+	}
+	if variables["subscription_days"] == "" && plan.ValidityDays > 0 {
+		variables["subscription_days"] = strconv.Itoa(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit))
+	}
+	return true
 }
 
 func (s *PaymentService) ExecuteSubscriptionFulfillment(ctx context.Context, oid int64) error {
@@ -496,16 +532,37 @@ func (s *PaymentService) ExecuteSubscriptionFulfillment(ctx context.Context, oid
 }
 
 func (s *PaymentService) doSub(ctx context.Context, o *dbent.PaymentOrder, lease *paymentFulfillmentLease) error {
-	gid, days, err := s.subscriptionFulfillmentTerms(ctx, o)
-	if err != nil {
-		return err
+	assignedFromPlan := false
+	if o.PlanID != nil && *o.PlanID > 0 {
+		days, err := s.subscriptionPlanFulfillmentDays(ctx, *o.PlanID)
+		switch {
+		case err == nil:
+			if err := s.ensurePaymentSubscriptionAssigned(ctx, o, 0, days, true); err != nil {
+				return err
+			}
+			assignedFromPlan = true
+		case !errors.Is(err, ErrSubscriptionPlanNotFound):
+			return err
+		}
+		// Orders created before V2 can retain an obsolete plan ID alongside
+		// their original group and duration snapshot. Keep those orders recoverable.
 	}
-	g, err := s.groupRepo.GetByID(ctx, gid)
-	if err != nil || g.Status != payment.EntityStatusActive {
-		return fmt.Errorf("group %d no longer exists or inactive", gid)
-	}
-	if err := s.ensurePaymentSubscriptionAssigned(ctx, o, gid, days); err != nil {
-		return err
+
+	if !assignedFromPlan {
+		gid, days, err := s.subscriptionFulfillmentTerms(ctx, o)
+		if err != nil {
+			return err
+		}
+		if s.groupRepo == nil {
+			return errors.New("group repository is unavailable")
+		}
+		g, err := s.groupRepo.GetByID(ctx, gid)
+		if err != nil || g.Status != payment.EntityStatusActive {
+			return fmt.Errorf("group %d no longer exists or inactive", gid)
+		}
+		if err := s.ensurePaymentSubscriptionAssigned(ctx, o, gid, days, false); err != nil {
+			return err
+		}
 	}
 	if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
 		return err
@@ -517,26 +574,27 @@ func (s *PaymentService) subscriptionFulfillmentTerms(
 	ctx context.Context,
 	order *dbent.PaymentOrder,
 ) (int64, int, error) {
-	if order != nil && order.PlanID != nil && *order.PlanID > 0 {
-		plan, err := s.entClient.SubscriptionPlan.Get(ctx, *order.PlanID)
-		switch {
-		case err == nil:
-			if plan.GroupID <= 0 || plan.ValidityDays <= 0 {
-				return 0, 0, ErrSubscriptionPlanInvalid
-			}
-			validityDays := psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit)
-			return plan.GroupID, normalizeAssignValidityDays(validityDays), nil
-		case !dbent.IsNotFound(err):
-			return 0, 0, fmt.Errorf("get subscription plan: %w", err)
-		}
-	}
 	if order == nil || order.SubscriptionGroupID == nil || order.SubscriptionDays == nil {
 		return 0, 0, infraerrors.BadRequest("INVALID_STATUS", "missing subscription info")
 	}
 	return *order.SubscriptionGroupID, *order.SubscriptionDays, nil
 }
 
-func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, o *dbent.PaymentOrder, groupID int64, days int) error {
+func (s *PaymentService) subscriptionPlanFulfillmentDays(ctx context.Context, planID int64) (int, error) {
+	plan, err := s.entClient.SubscriptionPlan.Get(ctx, planID)
+	if err != nil {
+		if dbent.IsNotFound(err) {
+			return 0, ErrSubscriptionPlanNotFound
+		}
+		return 0, fmt.Errorf("get subscription plan: %w", err)
+	}
+	if plan.ValidityDays <= 0 {
+		return 0, ErrSubscriptionPlanInvalid
+	}
+	return normalizeAssignValidityDays(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit)), nil
+}
+
+func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, o *dbent.PaymentOrder, groupID int64, days int, assignFromPlan bool) error {
 	if s.subscriptionSvc == nil {
 		return errors.New("subscription service is unavailable")
 	}
@@ -559,20 +617,21 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 	if !alreadyAssigned {
 		orderNote := paymentSubscriptionOrderNote(o.ID)
 		assignedFromPlan := false
-		if o.PlanID != nil {
+		if assignFromPlan {
+			if o.PlanID == nil || *o.PlanID <= 0 {
+				return infraerrors.BadRequest("INVALID_STATUS", "missing subscription plan")
+			}
 			assignedSubscription, planErr := s.subscriptionSvc.assignSubscriptionFromPlan(txCtx, &AssignSubscriptionFromPlanInput{
 				UserID:     o.UserID,
 				PlanID:     *o.PlanID,
 				AssignedBy: 0,
 				Notes:      orderNote,
 			}, true)
-			switch {
-			case planErr == nil:
-				assignedFromPlan = true
-				subscriptionID = assignedSubscription.ID
-			case !errors.Is(planErr, ErrSubscriptionPlanNotFound):
+			if planErr != nil {
 				return fmt.Errorf("assign subscription from plan: %w", planErr)
 			}
+			assignedFromPlan = true
+			subscriptionID = assignedSubscription.ID
 		}
 
 		if !assignedFromPlan {
@@ -598,12 +657,17 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 			}
 		}
 
-		detail, _ := json.Marshal(map[string]any{
-			"groupID":           groupID,
+		detailFields := map[string]any{
 			"validityDays":      days,
-			"planID":            o.PlanID,
 			"recoveredFromNote": recoveredFromNote,
-		})
+		}
+		if assignFromPlan {
+			detailFields["planID"] = *o.PlanID
+		}
+		if groupID > 0 {
+			detailFields["groupID"] = groupID
+		}
+		detail, _ := json.Marshal(detailFields)
 		if _, err := txClient.PaymentAuditLog.Create().
 			SetOrderID(strconv.FormatInt(o.ID, 10)).
 			SetAction("SUBSCRIPTION_ASSIGNED").

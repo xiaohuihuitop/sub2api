@@ -110,7 +110,8 @@ export interface PaymentOrder {
 
 export interface SubscriptionPlan {
   id: number
-  group_id: number
+  /** Legacy association retained only for existing records. */
+  group_id?: number | null
   group_platform?: string
   group_name?: string
   rate_multiplier: number

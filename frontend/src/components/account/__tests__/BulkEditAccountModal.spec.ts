@@ -43,7 +43,6 @@ function mountModal(extraProps: Record<string, unknown> = {}) {
       selectedPlatforms: ['antigravity'],
       selectedTypes: ['apikey'],
       proxies: [],
-      groups: [],
       ...extraProps
     } as any,
     global: {
@@ -86,6 +85,12 @@ describe('BulkEditAccountModal', () => {
     vi.mocked(adminAPI.accounts.checkMixedChannelRisk).mockResolvedValue({
       has_risk: false
     } as any)
+  })
+
+  it('不再接收旧分组绑定属性', () => {
+    const wrapper = mountModal({ groups: [{ id: 7, name: 'legacy' }] })
+
+    expect(wrapper.props()).not.toHaveProperty('groups')
   })
 
   it('antigravity 白名单包含 Gemini 图片模型且过滤掉普通 GPT 模型', async () => {

@@ -30,7 +30,6 @@ func (r *userSubscriptionRepository) Create(ctx context.Context, sub *service.Us
 	client := clientFromContext(ctx, r.client)
 	builder := client.UserSubscription.Create().
 		SetUserID(sub.UserID).
-		SetGroupID(sub.GroupID).
 		SetNillableSubscriptionPlanID(sub.SubscriptionPlanID).
 		SetPlanNameSnapshot(sub.PlanNameSnapshot).
 		SetNillableDailyLimitUsdSnapshot(sub.DailyLimitUSDSnapshot).
@@ -45,6 +44,9 @@ func (r *userSubscriptionRepository) Create(ctx context.Context, sub *service.Us
 		SetWeeklyUsageUsd(sub.WeeklyUsageUSD).
 		SetMonthlyUsageUsd(sub.MonthlyUsageUSD).
 		SetNillableAssignedBy(sub.AssignedBy)
+	if sub.GroupID > 0 {
+		builder.SetGroupID(sub.GroupID)
+	}
 
 	if sub.StartsAt.IsZero() {
 		builder.SetStartsAt(time.Now())
@@ -132,7 +134,6 @@ func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.Us
 	client := clientFromContext(ctx, r.client)
 	builder := client.UserSubscription.UpdateOneID(sub.ID).
 		SetUserID(sub.UserID).
-		SetGroupID(sub.GroupID).
 		SetNillableSubscriptionPlanID(sub.SubscriptionPlanID).
 		SetPlanNameSnapshot(sub.PlanNameSnapshot).
 		SetNillableDailyLimitUsdSnapshot(sub.DailyLimitUSDSnapshot).
@@ -151,6 +152,11 @@ func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.Us
 		SetNillableAssignedBy(sub.AssignedBy).
 		SetAssignedAt(sub.AssignedAt).
 		SetNotes(sub.Notes)
+	if sub.GroupID > 0 {
+		builder.SetGroupID(sub.GroupID)
+	} else {
+		builder.ClearGroupID()
+	}
 
 	updated, err := builder.Save(ctx)
 	if err == nil {

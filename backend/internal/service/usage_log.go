@@ -135,6 +135,14 @@ type UsageLog struct {
 
 	GroupID        *int64
 	SubscriptionID *int64
+	PlatformID     *int64
+	// PlatformCode and PlatformName are hydrated for usage-record display.
+	// They remain empty for historical rows without a V2 platform assignment.
+	PlatformCode string
+	PlatformName string
+	// BillingSourceType is set for V2 requests to "subscription" or "balance".
+	// Nil preserves the meaning of historical legacy rows.
+	BillingSourceType *string
 
 	InputTokens         int
 	OutputTokens        int

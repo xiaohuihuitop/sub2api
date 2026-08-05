@@ -28,27 +28,17 @@
         <div
           v-for="subscription in subscriptions"
           :key="subscription.id"
-          class="overflow-hidden rounded-2xl border bg-white dark:bg-dark-800"
-          :class="platformBorderClass(subscription.group?.platform || '')"
+          class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-600 dark:bg-dark-800"
         >
           <!-- Header -->
           <div
             class="flex items-center justify-between border-b border-gray-100 p-4 dark:border-dark-700"
           >
-            <div class="flex items-center gap-3">
-              <div :class="['h-1.5 w-1.5 shrink-0 rounded-full', platformAccentDotClass(subscription.group?.platform || '')]" />
+            <div class="flex min-w-0 items-center gap-3">
               <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-gray-900 dark:text-white">
-                    {{ getSubscriptionPlanName(subscription) }}
-                  </h3>
-                  <span :class="['rounded-md border px-2 py-0.5 text-[11px] font-medium', platformBadgeClass(subscription.group?.platform || '')]">
-                    {{ platformLabel(subscription.group?.platform || '') }}
-                  </span>
-                </div>
-                <p v-if="subscription.group?.description" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
-                  {{ subscription.group.description }}
-                </p>
+                <h3 class="font-semibold text-gray-900 dark:text-white">
+                  {{ getSubscriptionPlanName(subscription) }}
+                </h3>
                 <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 dark:text-gray-500">
                   <span>{{ t('payment.planCard.rate') }}: ×{{ getSubscriptionRateMultiplier(subscription) }}</span>
                 </div>
@@ -69,7 +59,7 @@
               </span>
               <button
                 v-if="subscription.status === 'active'"
-                :class="['rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors', platformButtonClass(subscription.group?.platform || '')]"
+                class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
                 @click="renewSubscription(subscription)"
               >
                 {{ t('payment.renewNow') }}
@@ -254,7 +244,6 @@ import type { UserSubscription } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTimeToMinute } from '@/utils/format'
-import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
 import {
   getSubscriptionLimit,
   getSubscriptionPlanName,
@@ -267,16 +256,6 @@ import {
   isOneTimeDailyQuota,
   type RemainingDurationParts
 } from '@/utils/subscriptionQuota'
-
-function platformAccentDotClass(p: string): string {
-  switch (p) {
-    case 'anthropic': return 'bg-orange-500'
-    case 'openai': return 'bg-emerald-500'
-    case 'antigravity': return 'bg-purple-500'
-    case 'gemini': return 'bg-blue-500'
-    default: return 'bg-gray-400'
-  }
-}
 
 const { t } = useI18n()
 const router = useRouter()
@@ -304,7 +283,9 @@ function formatSubscriptionLimit(subscription: UserSubscription, window: Subscri
 function renewSubscription(subscription: UserSubscription) {
   const query = subscription.subscription_plan_id
     ? { tab: 'subscription', plan: String(subscription.subscription_plan_id) }
-    : { tab: 'subscription', group: String(subscription.group_id) }
+    : subscription.group_id
+      ? { tab: 'subscription', group: String(subscription.group_id) }
+      : { tab: 'subscription' }
   router.push({ path: '/purchase', query })
 }
 

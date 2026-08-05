@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 18 // v18: include allowed groups and current OpenAI group gates
+const apiKeyAuthSnapshotVersion = 19 // v19: include platform, plan, and balance asset permissions
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -336,21 +336,24 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		return nil
 	}
 	snapshot := &APIKeyAuthSnapshot{
-		Version:         apiKeyAuthSnapshotVersion,
-		APIKeyID:        apiKey.ID,
-		UserID:          apiKey.UserID,
-		GroupID:         apiKey.GroupID,
-		AllowedGroupIDs: append([]int64(nil), apiKey.AllowedGroupIDs...),
-		Name:            apiKey.Name,
-		Status:          apiKey.Status,
-		IPWhitelist:     apiKey.IPWhitelist,
-		IPBlacklist:     apiKey.IPBlacklist,
-		Quota:           apiKey.Quota,
-		QuotaUsed:       apiKey.QuotaUsed,
-		ExpiresAt:       apiKey.ExpiresAt,
-		RateLimit5h:     apiKey.RateLimit5h,
-		RateLimit1d:     apiKey.RateLimit1d,
-		RateLimit7d:     apiKey.RateLimit7d,
+		Version:                    apiKeyAuthSnapshotVersion,
+		APIKeyID:                   apiKey.ID,
+		UserID:                     apiKey.UserID,
+		GroupID:                    apiKey.GroupID,
+		AllowedGroupIDs:            append([]int64(nil), apiKey.AllowedGroupIDs...),
+		AllowedPlatformIDs:         append([]int64(nil), apiKey.AllowedPlatformIDs...),
+		AllowedSubscriptionPlanIDs: append([]int64(nil), apiKey.AllowedSubscriptionPlanIDs...),
+		AllowBalance:               apiKey.AllowBalance,
+		Name:                       apiKey.Name,
+		Status:                     apiKey.Status,
+		IPWhitelist:                apiKey.IPWhitelist,
+		IPBlacklist:                apiKey.IPBlacklist,
+		Quota:                      apiKey.Quota,
+		QuotaUsed:                  apiKey.QuotaUsed,
+		ExpiresAt:                  apiKey.ExpiresAt,
+		RateLimit5h:                apiKey.RateLimit5h,
+		RateLimit1d:                apiKey.RateLimit1d,
+		RateLimit7d:                apiKey.RateLimit7d,
 		User: APIKeyAuthUserSnapshot{
 			ID:                         apiKey.User.ID,
 			Status:                     apiKey.User.Status,
@@ -446,21 +449,24 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		return nil
 	}
 	apiKey := &APIKey{
-		ID:              snapshot.APIKeyID,
-		UserID:          snapshot.UserID,
-		GroupID:         snapshot.GroupID,
-		AllowedGroupIDs: append([]int64(nil), snapshot.AllowedGroupIDs...),
-		Key:             key,
-		Name:            snapshot.Name,
-		Status:          snapshot.Status,
-		IPWhitelist:     snapshot.IPWhitelist,
-		IPBlacklist:     snapshot.IPBlacklist,
-		Quota:           snapshot.Quota,
-		QuotaUsed:       snapshot.QuotaUsed,
-		ExpiresAt:       snapshot.ExpiresAt,
-		RateLimit5h:     snapshot.RateLimit5h,
-		RateLimit1d:     snapshot.RateLimit1d,
-		RateLimit7d:     snapshot.RateLimit7d,
+		ID:                         snapshot.APIKeyID,
+		UserID:                     snapshot.UserID,
+		GroupID:                    snapshot.GroupID,
+		AllowedGroupIDs:            append([]int64(nil), snapshot.AllowedGroupIDs...),
+		AllowedPlatformIDs:         append([]int64(nil), snapshot.AllowedPlatformIDs...),
+		AllowedSubscriptionPlanIDs: append([]int64(nil), snapshot.AllowedSubscriptionPlanIDs...),
+		AllowBalance:               snapshot.AllowBalance,
+		Key:                        key,
+		Name:                       snapshot.Name,
+		Status:                     snapshot.Status,
+		IPWhitelist:                snapshot.IPWhitelist,
+		IPBlacklist:                snapshot.IPBlacklist,
+		Quota:                      snapshot.Quota,
+		QuotaUsed:                  snapshot.QuotaUsed,
+		ExpiresAt:                  snapshot.ExpiresAt,
+		RateLimit5h:                snapshot.RateLimit5h,
+		RateLimit1d:                snapshot.RateLimit1d,
+		RateLimit7d:                snapshot.RateLimit7d,
 		User: &User{
 			ID:                         snapshot.User.ID,
 			Status:                     snapshot.User.Status,

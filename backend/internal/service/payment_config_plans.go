@@ -31,8 +31,8 @@ func validatePlanRequired(name string, groupID int64, price float64, validityDay
 	if strings.TrimSpace(name) == "" {
 		return infraerrors.BadRequest("PLAN_NAME_REQUIRED", "plan name is required")
 	}
-	if groupID <= 0 {
-		return infraerrors.BadRequest("PLAN_GROUP_REQUIRED", "group is required")
+	if groupID < 0 {
+		return infraerrors.BadRequest("PLAN_GROUP_INVALID", "group id must be >= 0")
 	}
 	if price <= 0 {
 		return infraerrors.BadRequest("PLAN_PRICE_INVALID", "price must be > 0")
@@ -54,8 +54,8 @@ func validatePlanPatch(req UpdatePlanRequest) error {
 	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
 		return infraerrors.BadRequest("PLAN_NAME_REQUIRED", "plan name is required")
 	}
-	if req.GroupID != nil && *req.GroupID <= 0 {
-		return infraerrors.BadRequest("PLAN_GROUP_REQUIRED", "group is required")
+	if req.GroupID != nil && *req.GroupID < 0 {
+		return infraerrors.BadRequest("PLAN_GROUP_INVALID", "group id must be >= 0")
 	}
 	if req.Price != nil && *req.Price <= 0 {
 		return infraerrors.BadRequest("PLAN_PRICE_INVALID", "price must be > 0")
@@ -169,11 +169,14 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 		return nil, err
 	}
 	b := s.entClient.SubscriptionPlan.Create().
-		SetGroupID(req.GroupID).SetName(req.Name).SetDescription(req.Description).
+		SetName(req.Name).SetDescription(req.Description).
 		SetPrice(req.Price).SetCurrency(currency).SetValidityDays(req.ValidityDays).SetValidityUnit(req.ValidityUnit).
 		SetFeatures(req.Features).SetProductName(req.ProductName).
 		SetForSale(req.ForSale).SetSortOrder(req.SortOrder).
 		SetRateMultiplier(planRateMultiplier(req.RateMultiplier))
+	if req.GroupID > 0 {
+		b.SetGroupID(req.GroupID)
+	}
 	if req.OriginalPrice != nil {
 		b.SetOriginalPrice(*req.OriginalPrice)
 	}
@@ -198,7 +201,11 @@ func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req Upd
 	}
 	u := s.entClient.SubscriptionPlan.UpdateOneID(id)
 	if req.GroupID != nil {
-		u.SetGroupID(*req.GroupID)
+		if *req.GroupID > 0 {
+			u.SetGroupID(*req.GroupID)
+		} else {
+			u.ClearGroupID()
+		}
 	}
 	if req.Name != nil {
 		u.SetName(*req.Name)

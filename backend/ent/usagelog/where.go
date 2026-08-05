@@ -120,6 +120,16 @@ func SubscriptionID(v int64) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldSubscriptionID, v))
 }
 
+// PlatformID applies equality check predicate on the "platform_id" field. It's identical to PlatformIDEQ.
+func PlatformID(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldPlatformID, v))
+}
+
+// BillingSourceType applies equality check predicate on the "billing_source_type" field. It's identical to BillingSourceTypeEQ.
+func BillingSourceType(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillingSourceType, v))
+}
+
 // InputTokens applies equality check predicate on the "input_tokens" field. It's identical to InputTokensEQ.
 func InputTokens(v int) predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldEQ(FieldInputTokens, v))
@@ -948,6 +958,111 @@ func SubscriptionIDIsNil() predicate.UsageLog {
 // SubscriptionIDNotNil applies the NotNil predicate on the "subscription_id" field.
 func SubscriptionIDNotNil() predicate.UsageLog {
 	return predicate.UsageLog(sql.FieldNotNull(FieldSubscriptionID))
+}
+
+// PlatformIDEQ applies the EQ predicate on the "platform_id" field.
+func PlatformIDEQ(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldPlatformID, v))
+}
+
+// PlatformIDNEQ applies the NEQ predicate on the "platform_id" field.
+func PlatformIDNEQ(v int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldPlatformID, v))
+}
+
+// PlatformIDIn applies the In predicate on the "platform_id" field.
+func PlatformIDIn(vs ...int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldPlatformID, vs...))
+}
+
+// PlatformIDNotIn applies the NotIn predicate on the "platform_id" field.
+func PlatformIDNotIn(vs ...int64) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldPlatformID, vs...))
+}
+
+// PlatformIDIsNil applies the IsNil predicate on the "platform_id" field.
+func PlatformIDIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldPlatformID))
+}
+
+// PlatformIDNotNil applies the NotNil predicate on the "platform_id" field.
+func PlatformIDNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldPlatformID))
+}
+
+// BillingSourceTypeEQ applies the EQ predicate on the "billing_source_type" field.
+func BillingSourceTypeEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEQ(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeNEQ applies the NEQ predicate on the "billing_source_type" field.
+func BillingSourceTypeNEQ(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNEQ(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeIn applies the In predicate on the "billing_source_type" field.
+func BillingSourceTypeIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIn(FieldBillingSourceType, vs...))
+}
+
+// BillingSourceTypeNotIn applies the NotIn predicate on the "billing_source_type" field.
+func BillingSourceTypeNotIn(vs ...string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotIn(FieldBillingSourceType, vs...))
+}
+
+// BillingSourceTypeGT applies the GT predicate on the "billing_source_type" field.
+func BillingSourceTypeGT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGT(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeGTE applies the GTE predicate on the "billing_source_type" field.
+func BillingSourceTypeGTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldGTE(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeLT applies the LT predicate on the "billing_source_type" field.
+func BillingSourceTypeLT(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLT(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeLTE applies the LTE predicate on the "billing_source_type" field.
+func BillingSourceTypeLTE(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldLTE(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeContains applies the Contains predicate on the "billing_source_type" field.
+func BillingSourceTypeContains(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContains(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeHasPrefix applies the HasPrefix predicate on the "billing_source_type" field.
+func BillingSourceTypeHasPrefix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasPrefix(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeHasSuffix applies the HasSuffix predicate on the "billing_source_type" field.
+func BillingSourceTypeHasSuffix(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldHasSuffix(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeIsNil applies the IsNil predicate on the "billing_source_type" field.
+func BillingSourceTypeIsNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldIsNull(FieldBillingSourceType))
+}
+
+// BillingSourceTypeNotNil applies the NotNil predicate on the "billing_source_type" field.
+func BillingSourceTypeNotNil() predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldNotNull(FieldBillingSourceType))
+}
+
+// BillingSourceTypeEqualFold applies the EqualFold predicate on the "billing_source_type" field.
+func BillingSourceTypeEqualFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldEqualFold(FieldBillingSourceType, v))
+}
+
+// BillingSourceTypeContainsFold applies the ContainsFold predicate on the "billing_source_type" field.
+func BillingSourceTypeContainsFold(v string) predicate.UsageLog {
+	return predicate.UsageLog(sql.FieldContainsFold(FieldBillingSourceType, v))
 }
 
 // InputTokensEQ applies the EQ predicate on the "input_tokens" field.
@@ -2502,6 +2617,29 @@ func HasSubscription() predicate.UsageLog {
 func HasSubscriptionWith(preds ...predicate.UserSubscription) predicate.UsageLog {
 	return predicate.UsageLog(func(s *sql.Selector) {
 		step := newSubscriptionStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPlatform applies the HasEdge predicate on the "platform" edge.
+func HasPlatform() predicate.UsageLog {
+	return predicate.UsageLog(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, PlatformTable, PlatformColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPlatformWith applies the HasEdge predicate on the "platform" edge with a given conditions (other predicates).
+func HasPlatformWith(preds ...predicate.Platform) predicate.UsageLog {
+	return predicate.UsageLog(func(s *sql.Selector) {
+		step := newPlatformStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

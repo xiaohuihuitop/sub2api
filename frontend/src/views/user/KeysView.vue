@@ -11,12 +11,6 @@
               @search="onFilterChange"
             />
             <Select
-              :model-value="filterGroupId"
-              class="w-40"
-              :options="groupFilterOptions"
-              @update:model-value="onGroupFilterChange"
-            />
-            <Select
               :model-value="filterStatus"
               class="w-40"
               :options="statusFilterOptions"
@@ -133,22 +127,21 @@
             </div>
           </template>
 
-          <template #cell-group="{ row }">
-            <div v-if="displayGroups(row).length" class="flex flex-wrap gap-1">
-              <GroupBadge
-                v-for="group in displayGroups(row)"
-                :key="group.id"
-                :name="group.name"
-                :platform="group.platform"
-                :subscription-type="group.subscription_type"
-                :rate-multiplier="group.rate_multiplier"
-                :peak-rate-enabled="group.peak_rate_enabled"
-                :peak-start="group.peak_start"
-                :peak-end="group.peak_end"
-                :peak-rate-multiplier="group.peak_rate_multiplier"
-              />
+          <template #cell-authorization="{ row }">
+            <div class="space-y-1.5">
+              <div v-if="displayPlatforms(row).length" class="flex flex-wrap gap-1">
+                <span
+                  v-for="platform in displayPlatforms(row)"
+                  :key="platform.id"
+                  class="inline-flex items-center gap-1 rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-xs text-primary-700 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-300"
+                >
+                  <PlatformIcon :platform="platform.account_platform" size="xs" />
+                  {{ platform.name }}
+                </span>
+              </div>
+              <span v-else class="text-sm text-amber-700 dark:text-amber-300">{{ t('keys.noPlatformsAuthorized') }}</span>
+              <div class="text-xs text-gray-500 dark:text-gray-400">{{ billingSourceSummary(row) }}</div>
             </div>
-            <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{ t('keys.noGroup') }}</span>
           </template>
 
           <template #cell-current_concurrency="{ value }">
@@ -441,36 +434,16 @@
           />
         </div>
 
-        <div class="space-y-2">
-          <label class="input-label">{{ t('keys.groupLabel') }}</label>
-          <div class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-dark-600 dark:bg-dark-800" data-tour="key-form-group">
-            <label
-              v-for="option in groupOptions"
-              :key="option.value"
-              data-test="key-group-option"
-              class="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-dark-700"
-            >
-              <input
-                v-model="formData.group_ids"
-                :value="option.value"
-                type="checkbox"
-                class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500 dark:bg-dark-900"
-              />
-              <GroupOptionItem
-                :name="option.label"
-                :platform="option.platform"
-                :subscription-type="option.subscriptionType"
-                :rate-multiplier="option.rate"
-                :peak-rate-enabled="option.peakRateEnabled"
-                :peak-start="option.peakStart"
-                :peak-end="option.peakEnd"
-                :peak-rate-multiplier="option.peakRateMultiplier"
-                :description="option.description"
-                :selected="formData.group_ids.includes(option.value)"
-              />
-            </label>
-          </div>
-        </div>
+        <KeyAssetPermissionsForm
+          :platforms="platformOptions"
+          :subscription-plans="subscriptionPlanOptions"
+          :platform-ids="formData.platform_ids"
+          :subscription-plan-ids="formData.subscription_plan_ids"
+          :allow-balance="formData.allow_balance"
+          @update:platform-ids="formData.platform_ids = $event"
+          @update:subscription-plan-ids="formData.subscription_plan_ids = $event"
+          @update:allow-balance="formData.allow_balance = $event"
+        />
 
         <!-- Custom Key Section (only for create) -->
         <div v-if="!showEditModal" class="space-y-3">
@@ -958,8 +931,8 @@
       :show="showUseKeyModal"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
-      :platform="selectedKey?.group?.platform || null"
-      :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :platform="primaryUsePlatform(selectedKey)"
+      :allow-messages-dispatch="false"
       @close="closeUseKeyModal"
     />
 
@@ -1022,7 +995,8 @@
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
-import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
+import { keysAPI, authAPI, usageAPI } from '@/api'
+import { getActiveSubscriptions } from '@/api/subscriptions'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import DataTable from '@/components/common/DataTable.vue'
@@ -1035,9 +1009,9 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
-	import GroupBadge from '@/components/common/GroupBadge.vue'
-	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-	import type { ApiKey, Group, PublicSettings, UpdateApiKeyRequest } from '@/types'
+	import KeyAssetPermissionsForm, { type SubscriptionPlanPermissionOption } from '@/components/keys/KeyAssetPermissionsForm.vue'
+	import PlatformIcon from '@/components/common/PlatformIcon.vue'
+	import type { ApiKey, AvailablePlatformPool, CreateApiKeyRequest, PublicSettings, UpdateApiKeyRequest, UserSubscription } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1062,7 +1036,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
   { key: 'id', label: t('keys.id'), sortable: true },
   { key: 'key', label: t('keys.apiKey'), sortable: false },
-  { key: 'group', label: t('keys.group'), sortable: false },
+  { key: 'authorization', label: t('keys.authorization'), sortable: false },
   { key: 'current_concurrency', label: t('keys.currentConcurrency'), sortable: true },
   { key: 'usage', label: t('keys.usage'), sortable: false },
   { key: 'rate_limit', label: t('keys.rateLimitColumn'), sortable: false },
@@ -1153,7 +1127,8 @@ const columns = computed<Column[]>(() =>
 )
 
 const apiKeys = ref<ApiKey[]>([])
-const groups = ref<Group[]>([])
+const platforms = ref<AvailablePlatformPool[]>([])
+const activeSubscriptions = ref<UserSubscription[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 const now = ref(new Date())
@@ -1174,7 +1149,6 @@ const sortState = ref({
 // Filter state
 const filterSearch = ref('')
 const filterStatus = ref('')
-const filterGroupId = ref<string | number>('')
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -1191,11 +1165,11 @@ const publicSettings = ref<PublicSettings | null>(null)
 const columnDropdownRef = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
 
-const displayGroups = (key: ApiKey): Group[] => key.groups?.length ? key.groups : key.group ? [key.group] : []
-
 const formData = ref({
   name: '',
-  group_ids: [] as number[],
+  platform_ids: [] as number[],
+  subscription_plan_ids: [] as number[],
+  allow_balance: true,
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
   custom_key: '',
@@ -1243,13 +1217,6 @@ const shouldSubmitEditStatus = (key: ApiKey, status: 'active' | 'inactive') => {
   return true
 }
 
-// Filter dropdown options
-const groupFilterOptions = computed(() => [
-  { value: '', label: t('keys.allGroups') },
-  { value: 0, label: t('keys.noGroup') },
-  ...groups.value.map((g) => ({ value: g.id, label: g.name }))
-])
-
 const statusFilterOptions = computed(() => [
   { value: '', label: t('keys.allStatus') },
   { value: 'active', label: t('keys.status.active') },
@@ -1263,44 +1230,61 @@ const onFilterChange = () => {
   loadApiKeys()
 }
 
-const onGroupFilterChange = (value: string | number | boolean | null) => {
-  filterGroupId.value = value as string | number
-  onFilterChange()
-}
-
 const onStatusFilterChange = (value: string | number | boolean | null) => {
   filterStatus.value = value as string
   onFilterChange()
 }
 
-// Convert groups to Select options format with rate multiplier and subscription type
-const selectableGroups = computed(() => {
-  const byID = new Map(groups.value.map(group => [group.id, group]))
-  if (showEditModal.value) {
-    for (const group of selectedKey.value?.groups || []) {
-      if (!byID.has(group.id)) byID.set(group.id, group)
+const platformOptions = computed<AvailablePlatformPool[]>(() => {
+  const byID = new Map(platforms.value.map(platform => [platform.id, platform]))
+  for (const id of formData.value.platform_ids) {
+    if (!byID.has(id)) {
+      byID.set(id, {
+        id,
+        code: `#${id}`,
+        name: t('keys.unavailablePlatform', { id }),
+        account_platform: 'openai',
+      })
     }
   }
-  return [...byID.values()]
+  return [...byID.values()].sort((left, right) => left.name.localeCompare(right.name) || left.id - right.id)
 })
 
-const groupOptions = computed(() =>
-  [...selectableGroups.value]
-  .sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
-  .map((group) => ({
-    value: group.id,
-    label: group.name,
-    description: group.description,
-    rate: group.rate_multiplier,
-    peakRateEnabled: group.peak_rate_enabled,
-    peakStart: group.peak_start,
-    peakEnd: group.peak_end,
-    peakRateMultiplier: group.peak_rate_multiplier,
-    subscriptionType: group.subscription_type,
-    platform: group.platform,
-    sortOrder: group.sort_order,
-  }))
-)
+const subscriptionPlanOptions = computed<SubscriptionPlanPermissionOption[]>(() => {
+  const byID = new Map<number, string>()
+  for (const subscription of activeSubscriptions.value) {
+    const id = subscription.subscription_plan_id
+    if (!id || id <= 0 || byID.has(id)) continue
+    byID.set(id, subscription.plan_name_snapshot?.trim() || t('keys.subscriptionPlanFallback', { id }))
+  }
+  for (const id of formData.value.subscription_plan_ids) {
+    if (!byID.has(id)) byID.set(id, t('keys.unavailableSubscriptionPlan', { id }))
+  }
+  return [...byID].map(([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name) || left.id - right.id)
+})
+
+const displayPlatforms = (key: ApiKey | null): AvailablePlatformPool[] => {
+  if (!key?.platform_ids?.length) return []
+  return key.platform_ids.map(id => platforms.value.find(platform => platform.id === id) ?? {
+    id,
+    code: `#${id}`,
+    name: t('keys.unavailablePlatform', { id }),
+    account_platform: 'openai',
+  })
+}
+
+const billingSourceSummary = (key: ApiKey): string => {
+  const planNames = (key.subscription_plan_ids ?? []).map(id => {
+    return subscriptionPlanOptions.value.find(plan => plan.id === id)?.name ?? t('keys.subscriptionPlanFallback', { id })
+  })
+  if (key.allow_balance !== false) planNames.push(t('keys.balanceEnabled'))
+  if (planNames.length) return planNames.join(' / ')
+  return key.group_id || key.group_ids?.length ? t('keys.legacyAuthorization') : t('keys.noBillingSource')
+}
+
+const primaryUsePlatform = (key: ApiKey | null) => {
+  return displayPlatforms(key)[0]?.account_platform ?? key?.group?.platform ?? null
+}
 
 const copyToClipboard = async (text: string, keyId: number) => {
   const success = await clipboardCopy(text, t('keys.copied'))
@@ -1329,13 +1313,11 @@ const loadApiKeys = async () => {
     const filters: {
       search?: string
       status?: string
-      group_id?: number | string
       sort_by?: string
       sort_order?: 'asc' | 'desc'
     } = {}
     if (filterSearch.value) filters.search = filterSearch.value
     if (filterStatus.value) filters.status = filterStatus.value
-    if (filterGroupId.value !== '') filters.group_id = filterGroupId.value
     filters.sort_by = sortState.value.sort_by
     filters.sort_order = sortState.value.sort_order
 
@@ -1372,11 +1354,16 @@ const loadApiKeys = async () => {
   }
 }
 
-const loadGroups = async () => {
+const loadAssetOptions = async () => {
   try {
-    groups.value = await userGroupsAPI.getAvailable()
+    const [availablePlatforms, subscriptions] = await Promise.all([
+      keysAPI.getAvailablePlatforms(),
+      getActiveSubscriptions(),
+    ])
+    platforms.value = availablePlatforms
+    activeSubscriptions.value = subscriptions
   } catch (error) {
-    console.error('Failed to load groups:', error)
+    console.error('Failed to load API key asset options:', error)
   }
 }
 
@@ -1422,7 +1409,9 @@ const editKey = (key: ApiKey) => {
   const hasExpiration = !!key.expires_at
   formData.value = {
     name: key.name,
-    group_ids: key.group_ids?.length ? [...key.group_ids] : (key.group_id ? [key.group_id] : []),
+    platform_ids: [...(key.platform_ids ?? [])],
+    subscription_plan_ids: [...(key.subscription_plan_ids ?? [])],
+    allow_balance: key.allow_balance ?? true,
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
     custom_key: '',
@@ -1468,6 +1457,17 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
+  const platformIDs = [...new Set(formData.value.platform_ids)].sort((left, right) => left - right)
+  const subscriptionPlanIDs = [...new Set(formData.value.subscription_plan_ids)].sort((left, right) => left - right)
+  if (platformIDs.length === 0) {
+    appStore.showError(t('keys.platformRequired'))
+    return
+  }
+  if (subscriptionPlanIDs.length === 0 && !formData.value.allow_balance) {
+    appStore.showError(t('keys.billingSourceRequired'))
+    return
+  }
+
   // Validate custom key if enabled
   if (!showEditModal.value && formData.value.use_custom_key) {
     if (!formData.value.custom_key) {
@@ -1514,23 +1514,14 @@ const handleSubmit = async () => {
     rate_limit_1d: formData.value.rate_limit_1d && formData.value.rate_limit_1d > 0 ? formData.value.rate_limit_1d : 0,
     rate_limit_7d: formData.value.rate_limit_7d && formData.value.rate_limit_7d > 0 ? formData.value.rate_limit_7d : 0,
   } : { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }
-  const availableGroupIDs = new Set(selectableGroups.value.map(group => group.id))
-  const selectedGroupIDs = formData.value.group_ids
-    .filter(groupID => availableGroupIDs.has(groupID))
-    .sort((left, right) => {
-      const leftGroup = selectableGroups.value.find(group => group.id === left)
-      const rightGroup = selectableGroups.value.find(group => group.id === right)
-      return (leftGroup?.sort_order ?? 0) - (rightGroup?.sort_order ?? 0) || left - right
-    })
-  const primaryGroupID = selectedGroupIDs[0] ?? null
-
   submitting.value = true
   try {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        group_id: primaryGroupID,
-        group_ids: selectedGroupIDs,
+        platform_ids: platformIDs,
+        subscription_plan_ids: subscriptionPlanIDs,
+        allow_balance: formData.value.allow_balance,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
@@ -1546,17 +1537,21 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
-        formData.value.name,
-        primaryGroupID,
-        selectedGroupIDs,
-        customKey,
-        ipWhitelist,
-        ipBlacklist,
+      const createRequest: CreateApiKeyRequest = {
+        name: formData.value.name,
+        platform_ids: platformIDs,
+        subscription_plan_ids: subscriptionPlanIDs,
+        allow_balance: formData.value.allow_balance,
+        custom_key: customKey,
+        ip_whitelist: ipWhitelist,
+        ip_blacklist: ipBlacklist,
         quota,
-        expiresInDays,
-        rateLimitData
-      )
+        expires_in_days: expiresInDays,
+        rate_limit_5h: rateLimitData.rate_limit_5h,
+        rate_limit_1d: rateLimitData.rate_limit_1d,
+        rate_limit_7d: rateLimitData.rate_limit_7d,
+      }
+      await keysAPI.create(createRequest)
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
@@ -1600,7 +1595,9 @@ const closeModals = () => {
   selectedKey.value = null
   formData.value = {
     name: '',
-    group_ids: [],
+    platform_ids: [],
+    subscription_plan_ids: [],
+    allow_balance: true,
     status: 'active',
     use_custom_key: false,
     custom_key: '',
@@ -1767,7 +1764,7 @@ function formatResetTime(resetAt: string | null): string {
 onMounted(() => {
   loadSavedColumns()
   loadApiKeys()
-  loadGroups()
+  loadAssetOptions()
   loadPublicSettings()
   document.addEventListener('click', closeColumnDropdown)
   resetTimer = setInterval(() => { now.value = new Date() }, 60000)

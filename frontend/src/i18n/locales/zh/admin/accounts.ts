@@ -81,6 +81,9 @@ export default {
       notes: '备注',
       notesPlaceholder: '请输入备注',
       notesHint: '备注可选',
+      platformPool: '平台账号池',
+      platformPoolRequired: '请选择平台账号池',
+      noPlatformPool: '当前上游类型没有可用的平台账号池',
       // Filter options
       allPlatforms: '全部平台',
       allTypes: '全部类型',
@@ -111,6 +114,7 @@ export default {
         status: '状态',
         schedulable: '调度',
         todayStats: '今日统计',
+        platformPool: '平台账号池',
         groups: '分组',
         usageWindows: '用量窗口',
         proxy: '代理',

@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
 	dbaccountgroup "github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
+	dbplatform "github.com/Wei-Shaw/sub2api/ent/platform"
 	dbpredicate "github.com/Wei-Shaw/sub2api/ent/predicate"
 	dbproxy "github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -115,6 +117,9 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 		SetErrorMessage(account.ErrorMessage).
 		SetSchedulable(account.Schedulable).
 		SetAutoPauseOnExpired(account.AutoPauseOnExpired)
+	if account.PlatformID != nil {
+		builder.SetPlatformID(*account.PlatformID)
+	}
 
 	if account.RateMultiplier != nil {
 		builder.SetRateMultiplier(*account.RateMultiplier)
@@ -477,6 +482,11 @@ func (r *accountRepository) updateLockedAccount(ctx context.Context, client *dbe
 		SetErrorMessage(account.ErrorMessage).
 		SetSchedulable(schedulable).
 		SetAutoPauseOnExpired(account.AutoPauseOnExpired)
+	if account.PlatformID != nil {
+		builder.SetPlatformID(*account.PlatformID)
+	} else {
+		builder.ClearPlatformID()
+	}
 
 	if account.RateMultiplier != nil {
 		builder.SetRateMultiplier(*account.RateMultiplier)
@@ -1920,6 +1930,53 @@ func (r *accountRepository) ListSchedulableByPlatform(ctx context.Context, platf
 	return r.accountsToService(ctx, accounts)
 }
 
+// ListSchedulableByPlatformPool is the V2 account-pool query. It deliberately
+// does not inspect account_groups: a platform-owned pool must not inherit old
+// routing membership or accidentally mix with another platform.
+func (r *accountRepository) ListSchedulableByPlatformPool(ctx context.Context, platformID int64, platform string) ([]service.Account, error) {
+	if platformID <= 0 || strings.TrimSpace(platform) == "" {
+		return []service.Account{}, nil
+	}
+	now := time.Now()
+	accounts, err := r.client.Account.Query().
+		Where(
+			dbaccount.PlatformIDEQ(platformID),
+			dbaccount.PlatformEQ(platform),
+			dbaccount.StatusEQ(service.StatusActive),
+			dbaccount.SchedulableEQ(true),
+			tempUnschedulablePredicate(),
+			notExpiredPredicate(now),
+			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
+			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
+		).
+		Order(dbent.Asc(dbaccount.FieldPriority)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return r.accountsToService(ctx, accounts)
+}
+
+func (r *accountRepository) ValidatePlatformAccountBinding(ctx context.Context, platformID int64, accountPlatform string) error {
+	if platformID <= 0 {
+		return fmt.Errorf("%w: platform id is required", service.ErrPlatformInvalid)
+	}
+	platform, err := r.client.Platform.Query().Where(dbplatform.IDEQ(platformID)).Only(ctx)
+	if err != nil {
+		if dbent.IsNotFound(err) {
+			return service.ErrPlatformNotFound
+		}
+		return fmt.Errorf("get platform account pool: %w", err)
+	}
+	if platform.Status != service.StatusActive {
+		return fmt.Errorf("%w: platform %d is not active", service.ErrPlatformInvalid, platformID)
+	}
+	if !strings.EqualFold(strings.TrimSpace(platform.AccountPlatform), strings.TrimSpace(accountPlatform)) {
+		return fmt.Errorf("%w: account protocol %q does not match platform protocol %q", service.ErrPlatformInvalid, accountPlatform, platform.AccountPlatform)
+	}
+	return nil
+}
+
 func (r *accountRepository) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]service.Account, error) {
 	// 单平台查询复用多平台逻辑，保持过滤条件与排序策略一致。
 	return r.queryAccountsByGroup(ctx, groupID, accountGroupQueryOptions{
@@ -3239,6 +3296,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Name:                    m.Name,
 		Notes:                   m.Notes,
 		Platform:                m.Platform,
+		PlatformID:              m.PlatformID,
 		Type:                    m.Type,
 		Credentials:             copyJSONMap(m.Credentials),
 		Extra:                   copyJSONMap(m.Extra),

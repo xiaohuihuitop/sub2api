@@ -82,7 +82,7 @@ func TestGrokSSOBatchImportKeepsCreatedAccountsWhenOneAutomaticProbeFails(t *tes
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/admin/grok/sso-to-oauth",
-		strings.NewReader(`{"sso_tokens":["sso-one","sso-two","sso-three"]}`),
+		strings.NewReader(`{"platform_id":42,"sso_tokens":["sso-one","sso-two","sso-three"]}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(recorder, request)
@@ -95,6 +95,27 @@ func TestGrokSSOBatchImportKeepsCreatedAccountsWhenOneAutomaticProbeFails(t *tes
 	}
 	calls, _, _ := prober.snapshot()
 	require.Equal(t, map[int64]int{501: 1, 502: 1, 503: 1}, calls)
+}
+
+func TestGrokSSOBatchImportRequiresPlatformPool(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adminService := newGrokImportAdminService()
+	oauthService := service.NewGrokOAuthService(nil, grokImportOAuthClientStub{})
+	defer oauthService.Stop()
+	handler := NewGrokOAuthHandler(oauthService, adminService, nil, nil)
+	router := gin.New()
+	router.POST("/api/v1/admin/grok/sso-to-oauth", handler.CreateAccountsFromSSO)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/admin/grok/sso-to-oauth",
+		strings.NewReader(`{"sso_tokens":["sso-one"]}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestAccountCreateWithoutAutomaticGrokProbeServiceStillSucceeds(t *testing.T) {
@@ -110,7 +131,7 @@ func TestAccountCreateWithoutAutomaticGrokProbeServiceStillSucceeds(t *testing.T
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/admin/accounts",
-		strings.NewReader(`{"name":"grok-rt","platform":"grok","type":"oauth","credentials":{"refresh_token":"secret"}}`),
+		strings.NewReader(`{"name":"grok-rt","platform":"grok","platform_id":42,"type":"oauth","credentials":{"refresh_token":"secret"}}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(recorder, request)

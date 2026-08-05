@@ -13,6 +13,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
+	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
@@ -95,6 +97,20 @@ func (_c *APIKeyCreate) SetGroupID(v int64) *APIKeyCreate {
 func (_c *APIKeyCreate) SetNillableGroupID(v *int64) *APIKeyCreate {
 	if v != nil {
 		_c.SetGroupID(*v)
+	}
+	return _c
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (_c *APIKeyCreate) SetAllowBalance(v bool) *APIKeyCreate {
+	_c.mutation.SetAllowBalance(v)
+	return _c
+}
+
+// SetNillableAllowBalance sets the "allow_balance" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableAllowBalance(v *bool) *APIKeyCreate {
+	if v != nil {
+		_c.SetAllowBalance(*v)
 	}
 	return _c
 }
@@ -317,6 +333,36 @@ func (_c *APIKeyCreate) SetGroup(v *Group) *APIKeyCreate {
 	return _c.SetGroupID(v.ID)
 }
 
+// AddPlatformIDs adds the "platforms" edge to the Platform entity by IDs.
+func (_c *APIKeyCreate) AddPlatformIDs(ids ...int64) *APIKeyCreate {
+	_c.mutation.AddPlatformIDs(ids...)
+	return _c
+}
+
+// AddPlatforms adds the "platforms" edges to the Platform entity.
+func (_c *APIKeyCreate) AddPlatforms(v ...*Platform) *APIKeyCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPlatformIDs(ids...)
+}
+
+// AddSubscriptionPlanIDs adds the "subscription_plans" edge to the SubscriptionPlan entity by IDs.
+func (_c *APIKeyCreate) AddSubscriptionPlanIDs(ids ...int64) *APIKeyCreate {
+	_c.mutation.AddSubscriptionPlanIDs(ids...)
+	return _c
+}
+
+// AddSubscriptionPlans adds the "subscription_plans" edges to the SubscriptionPlan entity.
+func (_c *APIKeyCreate) AddSubscriptionPlans(v ...*SubscriptionPlan) *APIKeyCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddSubscriptionPlanIDs(ids...)
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_c *APIKeyCreate) AddUsageLogIDs(ids ...int64) *APIKeyCreate {
 	_c.mutation.AddUsageLogIDs(ids...)
@@ -383,6 +429,10 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.AllowBalance(); !ok {
+		v := apikey.DefaultAllowBalance
+		_c.mutation.SetAllowBalance(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -448,6 +498,9 @@ func (_c *APIKeyCreate) check() error {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.AllowBalance(); !ok {
+		return &ValidationError{Name: "allow_balance", err: errors.New(`ent: missing required field "APIKey.allow_balance"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
@@ -530,6 +583,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 		_node.Name = value
+	}
+	if value, ok := _c.mutation.AllowBalance(); ok {
+		_spec.SetField(apikey.FieldAllowBalance, field.TypeBool, value)
+		_node.AllowBalance = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -627,6 +684,38 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.GroupID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PlatformsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.PlatformsTable,
+			Columns: apikey.PlatformsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.SubscriptionPlansIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   apikey.SubscriptionPlansTable,
+			Columns: apikey.SubscriptionPlansPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(subscriptionplan.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.UsageLogsIDs(); len(nodes) > 0 {
@@ -778,6 +867,18 @@ func (u *APIKeyUpsert) UpdateGroupID() *APIKeyUpsert {
 // ClearGroupID clears the value of the "group_id" field.
 func (u *APIKeyUpsert) ClearGroupID() *APIKeyUpsert {
 	u.SetNull(apikey.FieldGroupID)
+	return u
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (u *APIKeyUpsert) SetAllowBalance(v bool) *APIKeyUpsert {
+	u.Set(apikey.FieldAllowBalance, v)
+	return u
+}
+
+// UpdateAllowBalance sets the "allow_balance" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateAllowBalance() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldAllowBalance)
 	return u
 }
 
@@ -1203,6 +1304,20 @@ func (u *APIKeyUpsertOne) UpdateGroupID() *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) ClearGroupID() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearGroupID()
+	})
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (u *APIKeyUpsertOne) SetAllowBalance(v bool) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetAllowBalance(v)
+	})
+}
+
+// UpdateAllowBalance sets the "allow_balance" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateAllowBalance() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateAllowBalance()
 	})
 }
 
@@ -1841,6 +1956,20 @@ func (u *APIKeyUpsertBulk) UpdateGroupID() *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) ClearGroupID() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearGroupID()
+	})
+}
+
+// SetAllowBalance sets the "allow_balance" field.
+func (u *APIKeyUpsertBulk) SetAllowBalance(v bool) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetAllowBalance(v)
+	})
+}
+
+// UpdateAllowBalance sets the "allow_balance" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateAllowBalance() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateAllowBalance()
 	})
 }
 

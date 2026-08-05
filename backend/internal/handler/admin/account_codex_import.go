@@ -26,7 +26,8 @@ type CodexSessionImportRequest struct {
 	Contents                []string       `json:"contents"`
 	Name                    string         `json:"name"`
 	Notes                   *string        `json:"notes"`
-	GroupIDs                []int64        `json:"group_ids"`
+	PlatformID              *int64         `json:"platform_id"`
+	GroupIDs                []int64        `json:"-"`
 	ProxyID                 *int64         `json:"proxy_id"`
 	Concurrency             *int           `json:"concurrency"`
 	Priority                *int           `json:"priority"`
@@ -37,8 +38,8 @@ type CodexSessionImportRequest struct {
 	CredentialExtras        map[string]any `json:"credential_extras"`
 	Extra                   map[string]any `json:"extra"`
 	UpdateExisting          *bool          `json:"update_existing"`
-	SkipDefaultGroupBind    *bool          `json:"skip_default_group_bind"`
-	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"`
+	SkipDefaultGroupBind    *bool          `json:"-"`
+	ConfirmMixedChannelRisk *bool          `json:"-"`
 }
 
 type CodexSessionImportResult struct {
@@ -121,6 +122,10 @@ func (h *AccountHandler) ImportCodexSession(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if req.PlatformID == nil || *req.PlatformID <= 0 {
+		response.BadRequest(c, "platform_id is required")
+		return
+	}
 	if err := service.ValidateOpenAILongContextBillingExtra(service.PlatformOpenAI, req.Extra); err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -166,6 +171,9 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 	existingAccounts, err := h.listAccountsFiltered(ctx, service.PlatformOpenAI, service.AccountTypeOAuth, "", "", 0, "", "created_at", "desc")
 	if err != nil {
 		return result, err
+	}
+	if req.PlatformID != nil {
+		existingAccounts = filterAccountsByPlatformPool(existingAccounts, *req.PlatformID)
 	}
 	index := buildCodexAccountIndex(existingAccounts)
 
@@ -286,13 +294,11 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 				ExpiresAt:          effectiveExpiresAt,
 				AutoPauseOnExpired: autoPauseOnExpired,
 			}
+			if req.PlatformID != nil {
+				updateInput.PlatformID = req.PlatformID
+			}
 			if req.ProxyID != nil {
 				updateInput.ProxyID = req.ProxyID
-			}
-			if len(req.GroupIDs) > 0 {
-				groupIDs := append([]int64(nil), req.GroupIDs...)
-				updateInput.GroupIDs = &groupIDs
-				updateInput.SkipMixedChannelCheck = skipMixedChannelCheck
 			}
 			updated, updateErr := h.adminService.UpdateAccount(ctx, existing.ID, updateInput)
 			if updateErr != nil {
@@ -340,11 +346,11 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 			Priority:              priority,
 			RateMultiplier:        req.RateMultiplier,
 			LoadFactor:            req.LoadFactor,
-			GroupIDs:              req.GroupIDs,
+			PlatformID:            req.PlatformID,
 			ExpiresAt:             effectiveExpiresAt,
 			AutoPauseOnExpired:    autoPauseOnExpired,
-			SkipDefaultGroupBind:  skipDefaultGroupBind,
-			SkipMixedChannelCheck: skipMixedChannelCheck,
+			SkipDefaultGroupBind:  req.PlatformID != nil || skipDefaultGroupBind,
+			SkipMixedChannelCheck: req.PlatformID == nil && skipMixedChannelCheck,
 		})
 		if createErr != nil {
 			result.Failed++
@@ -941,6 +947,19 @@ func buildCodexAccountIndex(accounts []service.Account) *codexAccountIndex {
 		index.Add(account)
 	}
 	return index
+}
+
+func filterAccountsByPlatformPool(accounts []service.Account, platformID int64) []service.Account {
+	if platformID <= 0 {
+		return nil
+	}
+	filtered := make([]service.Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account.PlatformID != nil && *account.PlatformID == platformID {
+			filtered = append(filtered, account)
+		}
+	}
+	return filtered
 }
 
 func (i *codexAccountIndex) Add(account service.Account) {

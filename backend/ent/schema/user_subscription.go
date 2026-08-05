@@ -36,7 +36,7 @@ func (UserSubscription) Mixin() []ent.Mixin {
 func (UserSubscription) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("user_id"),
-		field.Int64("group_id"),
+		field.Int64("group_id").Optional(),
 		field.Int64("subscription_plan_id").
 			Optional().
 			Nillable(),
@@ -113,8 +113,7 @@ func (UserSubscription) Edges() []ent.Edge {
 		edge.From("group", Group.Type).
 			Ref("subscriptions").
 			Field("group_id").
-			Unique().
-			Required(),
+			Unique(),
 		edge.From("subscription_plan", SubscriptionPlan.Type).
 			Ref("subscriptions").
 			Field("subscription_plan_id").

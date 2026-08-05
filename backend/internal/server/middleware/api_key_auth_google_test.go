@@ -73,6 +73,40 @@ func TestGoogleAPIKeyAuthMarksLookupBulkheadRejection(t *testing.T) {
 	require.Equal(t, IngressRejectAPIKeyAuthOverloaded, reason)
 }
 
+func TestGoogleAPIKeyAuthV2KeyDefersBillingToPlatformRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 0}
+	apiKey := &service.APIKey{
+		ID:                 1,
+		UserID:             user.ID,
+		Key:                "google-platform-key",
+		Status:             service.StatusActive,
+		User:               user,
+		AllowedPlatformIDs: []int64{3},
+		AllowBalance:       false,
+	}
+	svc := newTestAPIKeyService(fakeAPIKeyRepo{getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+		if key != apiKey.Key {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		clone := *apiKey
+		return &clone, nil
+	}})
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	router := gin.New()
+	router.Use(APIKeyAuthWithSubscriptionGoogle(svc, nil, cfg))
+	router.GET("/v1beta/models", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
+	req.Header.Set("x-goog-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNoContent, w.Code)
+}
+
 type fakeAPIKeyRepo struct {
 	getByKey       func(ctx context.Context, key string) (*service.APIKey, error)
 	updateLastUsed func(ctx context.Context, id int64, usedAt time.Time) error

@@ -218,10 +218,15 @@ func (h *GrokOAuthHandler) CreateAccountFromOAuth(c *gin.Context) {
 		Name        string  `json:"name"`
 		Concurrency int     `json:"concurrency"`
 		Priority    int     `json:"priority"`
-		GroupIDs    []int64 `json:"group_ids"`
+		PlatformID  *int64  `json:"platform_id"`
+		GroupIDs    []int64 `json:"-"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.PlatformID == nil || *req.PlatformID <= 0 {
+		response.BadRequest(c, "platform_id is required")
 		return
 	}
 	tokenInfo, err := h.grokOAuthService.ExchangeCode(c.Request.Context(), &service.GrokExchangeCodeInput{
@@ -246,14 +251,15 @@ func (h *GrokOAuthHandler) CreateAccountFromOAuth(c *gin.Context) {
 	}
 
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:        name,
-		Platform:    service.PlatformGrok,
-		Type:        service.AccountTypeOAuth,
-		Credentials: credentials,
-		ProxyID:     req.ProxyID,
-		Concurrency: req.Concurrency,
-		Priority:    req.Priority,
-		GroupIDs:    req.GroupIDs,
+		Name:                 name,
+		Platform:             service.PlatformGrok,
+		Type:                 service.AccountTypeOAuth,
+		Credentials:          credentials,
+		ProxyID:              req.ProxyID,
+		Concurrency:          req.Concurrency,
+		Priority:             req.Priority,
+		PlatformID:           req.PlatformID,
+		SkipDefaultGroupBind: true,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -269,7 +275,8 @@ type GrokSSOToOAuthRequest struct {
 	Name               string         `json:"name"`
 	Notes              *string        `json:"notes"`
 	ProxyID            *int64         `json:"proxy_id"`
-	GroupIDs           []int64        `json:"group_ids"`
+	PlatformID         *int64         `json:"platform_id"`
+	GroupIDs           []int64        `json:"-"`
 	Credentials        map[string]any `json:"credentials"`
 	Extra              map[string]any `json:"extra"`
 	Concurrency        int            `json:"concurrency"`
@@ -307,6 +314,10 @@ func (h *GrokOAuthHandler) CreateAccountsFromSSO(c *gin.Context) {
 	var req GrokSSOToOAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.PlatformID == nil || *req.PlatformID <= 0 {
+		response.BadRequest(c, "platform_id is required")
 		return
 	}
 	tokens := normalizeSSOImportTokens(req.SSOTokens, req.SSOToken)
@@ -377,20 +388,21 @@ func (h *GrokOAuthHandler) createAccountFromSSOToken(ctx context.Context, req Gr
 	name := grokSSOImportAccountName(req.Name, tokenInfo, index, total)
 	expiresAt, autoPauseOnExpired := grokSSOImportExpiry(req.ExpiresAt, req.AutoPauseOnExpired, tokenInfo)
 	account, err := h.adminService.CreateAccount(ctx, &service.CreateAccountInput{
-		Name:               name,
-		Notes:              req.Notes,
-		Platform:           service.PlatformGrok,
-		Type:               service.AccountTypeOAuth,
-		Credentials:        credentials,
-		Extra:              cloneGrokSSOMap(req.Extra),
-		ProxyID:            req.ProxyID,
-		Concurrency:        req.Concurrency,
-		LoadFactor:         req.LoadFactor,
-		Priority:           req.Priority,
-		RateMultiplier:     req.RateMultiplier,
-		GroupIDs:           append([]int64(nil), req.GroupIDs...),
-		ExpiresAt:          expiresAt,
-		AutoPauseOnExpired: autoPauseOnExpired,
+		Name:                 name,
+		Notes:                req.Notes,
+		Platform:             service.PlatformGrok,
+		Type:                 service.AccountTypeOAuth,
+		Credentials:          credentials,
+		Extra:                cloneGrokSSOMap(req.Extra),
+		ProxyID:              req.ProxyID,
+		Concurrency:          req.Concurrency,
+		LoadFactor:           req.LoadFactor,
+		Priority:             req.Priority,
+		RateMultiplier:       req.RateMultiplier,
+		PlatformID:           req.PlatformID,
+		ExpiresAt:            expiresAt,
+		AutoPauseOnExpired:   autoPauseOnExpired,
+		SkipDefaultGroupBind: true,
 	})
 	if err != nil {
 		return grokSSOImportWorkerResult{item: GrokSSOToOAuthItemResult{Index: index, Name: name, Email: tokenInfo.Email, Error: grokSSOImportErrorMessage(err)}}

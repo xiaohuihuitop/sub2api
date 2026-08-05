@@ -12,8 +12,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 )
 
-// getUserGroupRateMultiplier is retained for legacy compatibility. RecordUsage
-// now selects its multiplier from BillingProfile or a subscription snapshot.
+// getUserGroupRateMultiplier is retained for legacy API key compatibility.
+// V2 platform-asset requests override every multiplier with their resolved
+// subscription snapshot or the global balance multiplier before pricing.
 func (s *GatewayService) getUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
 	if s == nil {
 		return groupDefaultMultiplier
@@ -678,12 +679,14 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		cacheTTLOverridden = (result.Usage.CacheCreation5mTokens + result.Usage.CacheCreation1hTokens) > 0
 	}
 
-	// 套餐实例倍率优先于余额计费资料；余额请求才读取分组倍率。
+	// 旧 API Key 仍按历史分组资料取倍率；V2 平台资产请求会在下方统一覆盖为
+	// 套餐实例快照或全局余额倍率。
 	fallbackMultiplier := 1.0
 	if s.cfg != nil {
 		fallbackMultiplier = s.cfg.Default.RateMultiplier
 	}
 	multiplier, imageMultiplier, _ := resolveBillingMultipliers(apiKey, subscription, fallbackMultiplier, timezone.Now())
+	multiplier, imageMultiplier, _ = overridePlatformAssetBillingMultipliers(ctx, multiplier, imageMultiplier, imageMultiplier)
 
 	// 确定计费模型
 	concreteBillingModel := forwardResultBillingModel(result.Model, result.UpstreamModel)
@@ -725,11 +728,12 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	accountRateMultiplier := account.BillingRateMultiplier()
 	usageLog := s.buildRecordUsageLog(ctx, input, result, apiKey, user, account, subscription,
 		requestedModel, multiplier, imageMultiplier, accountRateMultiplier, billingType, cacheTTLOverridden, cost, opts)
+	applyPlatformAssetUsageAttribution(ctx, usageLog)
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
-	if apiKey.GroupID != nil {
+	if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
-			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
+			account.ID, *pricingGroupID, result.UpstreamModel, result.Model,
 			// Anthropic's input_tokens excludes cache_read and cache_creation (billed separately);
 			// OpenAI gateway uses actualInputTokens which also excludes cache_read for the same reason.
 			UsageTokens{
@@ -857,11 +861,11 @@ func (s *GatewayService) hasResolvableTokenPricing(ctx context.Context, model st
 // resolveChannelPricing 检查指定模型是否存在渠道级别定价。
 // 返回非 nil 的 ResolvedPricing 表示有渠道定价，nil 表示走默认定价路径。
 func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
-	if s.resolver == nil || apiKey.Group == nil {
+	pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+	if s.resolver == nil || pricingGroupID == nil {
 		return nil
 	}
-	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid})
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: pricingGroupID})
 	if resolved.Source == PricingSourceChannel {
 		return resolved
 	}
@@ -887,11 +891,11 @@ func (s *GatewayService) calculateImageCost(
 			OutputTokens:      result.Usage.OutputTokens,
 			ImageOutputTokens: result.Usage.ImageOutputTokens,
 		}
-		gid := apiKey.Group.ID
+		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        &gid,
+			GroupID:        pricingGroupID,
 			Tokens:         tokens,
 			RequestCount:   result.ImageCount,
 			SizeTier:       sizeTier,
@@ -933,11 +937,11 @@ func (s *GatewayService) calculateTokenCost(
 
 	// 优先尝试渠道定价 → CalculateCostUnified
 	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
-		gid := apiKey.Group.ID
+		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        &gid,
+			GroupID:        pricingGroupID,
 			Tokens:         tokens,
 			RequestCount:   1,
 			RateMultiplier: multiplier,

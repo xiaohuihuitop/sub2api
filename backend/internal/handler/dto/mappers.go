@@ -79,34 +79,37 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		return nil
 	}
 	out := &APIKey{
-		ID:                 k.ID,
-		UserID:             k.UserID,
-		Key:                k.Key,
-		Name:               k.Name,
-		GroupID:            k.GroupID,
-		GroupIDs:           append([]int64{}, k.AllowedGroupIDs...),
-		Status:             k.Status,
-		IPWhitelist:        k.IPWhitelist,
-		IPBlacklist:        k.IPBlacklist,
-		LastUsedAt:         k.LastUsedAt,
-		LastUsedIP:         k.LastUsedIP,
-		Quota:              k.Quota,
-		QuotaUsed:          k.QuotaUsed,
-		ExpiresAt:          k.ExpiresAt,
-		CreatedAt:          k.CreatedAt,
-		UpdatedAt:          k.UpdatedAt,
-		CurrentConcurrency: k.CurrentConcurrency,
-		RateLimit5h:        k.RateLimit5h,
-		RateLimit1d:        k.RateLimit1d,
-		RateLimit7d:        k.RateLimit7d,
-		Usage5h:            k.EffectiveUsage5h(),
-		Usage1d:            k.EffectiveUsage1d(),
-		Usage7d:            k.EffectiveUsage7d(),
-		Window5hStart:      k.Window5hStart,
-		Window1dStart:      k.Window1dStart,
-		Window7dStart:      k.Window7dStart,
-		User:               UserFromServiceShallow(k.User),
-		Group:              GroupFromServiceShallow(k.Group),
+		ID:                  k.ID,
+		UserID:              k.UserID,
+		Key:                 k.Key,
+		Name:                k.Name,
+		GroupID:             k.GroupID,
+		GroupIDs:            append([]int64{}, k.AllowedGroupIDs...),
+		PlatformIDs:         append([]int64{}, k.AllowedPlatformIDs...),
+		SubscriptionPlanIDs: append([]int64{}, k.AllowedSubscriptionPlanIDs...),
+		AllowBalance:        k.AllowBalance,
+		Status:              k.Status,
+		IPWhitelist:         k.IPWhitelist,
+		IPBlacklist:         k.IPBlacklist,
+		LastUsedAt:          k.LastUsedAt,
+		LastUsedIP:          k.LastUsedIP,
+		Quota:               k.Quota,
+		QuotaUsed:           k.QuotaUsed,
+		ExpiresAt:           k.ExpiresAt,
+		CreatedAt:           k.CreatedAt,
+		UpdatedAt:           k.UpdatedAt,
+		CurrentConcurrency:  k.CurrentConcurrency,
+		RateLimit5h:         k.RateLimit5h,
+		RateLimit1d:         k.RateLimit1d,
+		RateLimit7d:         k.RateLimit7d,
+		Usage5h:             k.EffectiveUsage5h(),
+		Usage1d:             k.EffectiveUsage1d(),
+		Usage7d:             k.EffectiveUsage7d(),
+		Window5hStart:       k.Window5hStart,
+		Window1dStart:       k.Window1dStart,
+		Window7dStart:       k.Window7dStart,
+		User:                UserFromServiceShallow(k.User),
+		Group:               GroupFromServiceShallow(k.Group),
 	}
 	if len(k.AllowedGroups) > 0 {
 		out.Groups = make([]*Group, 0, len(k.AllowedGroups))
@@ -263,6 +266,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		Name:                    a.Name,
 		Notes:                   a.Notes,
 		Platform:                a.Platform,
+		PlatformID:              a.PlatformID,
 		Type:                    a.Type,
 		Credentials:             redactedCreds,
 		CredentialsStatus:       credsStatus,
@@ -664,6 +668,14 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 	if requestedModel == "" {
 		requestedModel = l.Model
 	}
+	subscriptionName := ""
+	if l.Subscription != nil {
+		subscriptionName = l.Subscription.PlanNameSnapshot
+	}
+	billingSourceType := ""
+	if l.BillingSourceType != nil {
+		billingSourceType = *l.BillingSourceType
+	}
 	return UsageLog{
 		ID:                        l.ID,
 		UserID:                    l.UserID,
@@ -676,6 +688,11 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		InboundEndpoint:           l.InboundEndpoint,
 		GroupID:                   l.GroupID,
 		SubscriptionID:            l.SubscriptionID,
+		PlatformID:                l.PlatformID,
+		PlatformCode:              l.PlatformCode,
+		PlatformName:              l.PlatformName,
+		BillingSourceType:         billingSourceType,
+		SubscriptionName:          subscriptionName,
 		InputTokens:               l.InputTokens,
 		OutputTokens:              l.OutputTokens,
 		CacheCreationTokens:       l.CacheCreationTokens,
@@ -829,7 +846,7 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 	return UserSubscription{
 		ID:                      sub.ID,
 		UserID:                  sub.UserID,
-		GroupID:                 sub.GroupID,
+		GroupID:                 optionalLegacySubscriptionGroupID(sub.GroupID),
 		SubscriptionPlanID:      sub.SubscriptionPlanID,
 		PlanNameSnapshot:        sub.PlanNameSnapshot,
 		DailyLimitUSDSnapshot:   sub.DailyLimitUSDSnapshot,
@@ -851,6 +868,14 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 		User:                    UserFromServiceShallow(sub.User),
 		Group:                   GroupFromServiceShallow(sub.Group),
 	}
+}
+
+func optionalLegacySubscriptionGroupID(groupID int64) *int64 {
+	if groupID <= 0 {
+		return nil
+	}
+	value := groupID
+	return &value
 }
 
 func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult {

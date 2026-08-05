@@ -975,6 +975,32 @@ func TestRequireGroupAssignmentMarksUngroupedKeyBusinessLimited(t *testing.T) {
 	require.Equal(t, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnassigned, businessLimitedReason)
 }
 
+func TestRequireGroupAssignmentAllowsExplicitPlatformKeyWithoutLegacyGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	apiKey := &service.APIKey{
+		ID:                 101,
+		Key:                "platform-key",
+		Status:             service.StatusActive,
+		AllowedPlatformIDs: []int64{7},
+	}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyAPIKey), apiKey)
+		c.Next()
+	})
+	// A V2 key must not consult legacy group scheduling settings at all.
+	router.Use(RequireGroupAssignment(nil, AnthropicErrorWriter))
+	router.GET("/t", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/t", nil))
+
+	require.Equal(t, http.StatusNoContent, w.Code)
+}
+
 func TestAPIKeyAuthIPRestrictionUsesTrustedPathWhenSwitchDisabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

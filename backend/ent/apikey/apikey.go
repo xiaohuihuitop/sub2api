@@ -29,6 +29,8 @@ const (
 	FieldName = "name"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_id"
+	// FieldAllowBalance holds the string denoting the allow_balance field in the database.
+	FieldAllowBalance = "allow_balance"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
@@ -65,6 +67,10 @@ const (
 	EdgeUser = "user"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
 	EdgeGroup = "group"
+	// EdgePlatforms holds the string denoting the platforms edge name in mutations.
+	EdgePlatforms = "platforms"
+	// EdgeSubscriptionPlans holds the string denoting the subscription_plans edge name in mutations.
+	EdgeSubscriptionPlans = "subscription_plans"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the apikey in the database.
@@ -83,6 +89,16 @@ const (
 	GroupInverseTable = "groups"
 	// GroupColumn is the table column denoting the group relation/edge.
 	GroupColumn = "group_id"
+	// PlatformsTable is the table that holds the platforms relation/edge. The primary key declared below.
+	PlatformsTable = "api_key_platforms"
+	// PlatformsInverseTable is the table name for the Platform entity.
+	// It exists in this package in order to avoid circular dependency with the "platform" package.
+	PlatformsInverseTable = "platforms"
+	// SubscriptionPlansTable is the table that holds the subscription_plans relation/edge. The primary key declared below.
+	SubscriptionPlansTable = "api_key_subscription_plans"
+	// SubscriptionPlansInverseTable is the table name for the SubscriptionPlan entity.
+	// It exists in this package in order to avoid circular dependency with the "subscriptionplan" package.
+	SubscriptionPlansInverseTable = "subscription_plans"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -102,6 +118,7 @@ var Columns = []string{
 	FieldKey,
 	FieldName,
 	FieldGroupID,
+	FieldAllowBalance,
 	FieldStatus,
 	FieldLastUsedAt,
 	FieldIPWhitelist,
@@ -119,6 +136,15 @@ var Columns = []string{
 	FieldWindow1dStart,
 	FieldWindow7dStart,
 }
+
+var (
+	// PlatformsPrimaryKey and PlatformsColumn2 are the table columns denoting the
+	// primary key for the platforms relation (M2M).
+	PlatformsPrimaryKey = []string{"api_key_id", "platform_id"}
+	// SubscriptionPlansPrimaryKey and SubscriptionPlansColumn2 are the table columns denoting the
+	// primary key for the subscription_plans relation (M2M).
+	SubscriptionPlansPrimaryKey = []string{"api_key_id", "subscription_plan_id"}
+)
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
@@ -148,6 +174,8 @@ var (
 	KeyValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultAllowBalance holds the default value on creation for the "allow_balance" field.
+	DefaultAllowBalance bool
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -211,6 +239,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// ByAllowBalance orders the results by the allow_balance field.
+func ByAllowBalance(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowBalance, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.
@@ -297,6 +330,34 @@ func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByPlatformsCount orders the results by platforms count.
+func ByPlatformsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPlatformsStep(), opts...)
+	}
+}
+
+// ByPlatforms orders the results by platforms terms.
+func ByPlatforms(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPlatformsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// BySubscriptionPlansCount orders the results by subscription_plans count.
+func BySubscriptionPlansCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newSubscriptionPlansStep(), opts...)
+	}
+}
+
+// BySubscriptionPlans orders the results by subscription_plans terms.
+func BySubscriptionPlans(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSubscriptionPlansStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -322,6 +383,20 @@ func newGroupStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(GroupInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
+	)
+}
+func newPlatformsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PlatformsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, false, PlatformsTable, PlatformsPrimaryKey...),
+	)
+}
+func newSubscriptionPlansStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SubscriptionPlansInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, false, SubscriptionPlansTable, SubscriptionPlansPrimaryKey...),
 	)
 }
 func newUsageLogsStep() *sqlgraph.Step {

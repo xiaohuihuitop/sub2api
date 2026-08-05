@@ -4,16 +4,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AdminPaymentPlansView from '../AdminPaymentPlansView.vue'
 
-const { getPlans, getConfig, getGroups } = vi.hoisted(() => ({
+const { getPlans, getConfig, getGroups, getGlobalBalanceRateMultiplier, updateGlobalBalanceRateMultiplier } = vi.hoisted(() => ({
   getPlans: vi.fn(),
   getConfig: vi.fn(),
   getGroups: vi.fn(),
+  getGlobalBalanceRateMultiplier: vi.fn(),
+  updateGlobalBalanceRateMultiplier: vi.fn(),
 }))
 
 vi.mock('@/api/admin/payment', () => ({
   adminPaymentAPI: {
     getPlans,
     getConfig,
+    getGlobalBalanceRateMultiplier,
+    updateGlobalBalanceRateMultiplier,
   },
 }))
 
@@ -51,8 +55,11 @@ const DataTableStub = {
 
 describe('AdminPaymentPlansView', () => {
   beforeEach(() => {
+	vi.clearAllMocks()
     getGroups.mockResolvedValue([])
     getConfig.mockResolvedValue({ data: {} })
+    getGlobalBalanceRateMultiplier.mockResolvedValue({ data: { rate_multiplier: 1.25 } })
+    updateGlobalBalanceRateMultiplier.mockResolvedValue({ data: { rate_multiplier: 0.6 } })
     getPlans.mockResolvedValue({
       data: [
         {
@@ -109,6 +116,7 @@ describe('AdminPaymentPlansView', () => {
     })
 
     await flushPromises()
+    expect(getGroups).not.toHaveBeenCalled()
 
     expect(wrapper.text()).toContain('¥499.00CNY')
     expect(wrapper.text()).toContain('¥599.00')
@@ -135,5 +143,32 @@ describe('AdminPaymentPlansView', () => {
     expect(wrapper.text()).toContain('0.50x')
     expect(wrapper.text()).toContain('$20.00')
     expect(wrapper.text()).toContain('$200.00')
+  })
+
+  it('loads and saves the global balance multiplier separately from subscription plans', async () => {
+    const wrapper = mount(AdminPaymentPlansView, {
+      global: {
+        plugins: [createPinia()],
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          DataTable: DataTableStub,
+          ConfirmDialog: true,
+          Icon: true,
+          PlanEditDialog: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const input = wrapper.get('[data-testid="global-balance-rate-multiplier"]')
+    expect((input.element as HTMLInputElement).value).toBe('1.25')
+
+    await input.setValue('0.6')
+    await wrapper.get('[data-testid="save-global-balance-rate-multiplier"]').trigger('click')
+    await flushPromises()
+
+    expect(getGlobalBalanceRateMultiplier).toHaveBeenCalledTimes(1)
+    expect(updateGlobalBalanceRateMultiplier).toHaveBeenCalledWith(0.6)
   })
 })

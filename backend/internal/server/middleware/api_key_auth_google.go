@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -111,6 +112,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		if !apiKey.User.IsActive() {
 			MarkIngressRejected(c, IngressRejectUserInactive)
 			abortWithGoogleError(c, 401, "User account is not active")
+			return
+		}
+		if service.UsesPlatformAssetPermissions(apiKey) {
+			completePlatformAssetAPIKeyAuthGoogle(c, apiKey, apiKeyService, cfg)
 			return
 		}
 		if len(apiKey.AllowedGroups) <= 1 {
@@ -231,6 +236,45 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 		c.Next()
 	}
+}
+
+// completePlatformAssetAPIKeyAuthGoogle mirrors the V2 branch of the standard
+// API-key middleware while preserving Gemini's native error envelope. Platform
+// authorization and billing are intentionally deferred until the request model
+// is resolved by NewPlatformAssetAuthorizationGoogleMiddleware.
+func completePlatformAssetAPIKeyAuthGoogle(
+	c *gin.Context,
+	apiKey *service.APIKey,
+	apiKeyService *service.APIKeyService,
+	cfg *config.Config,
+) {
+	if cfg == nil || cfg.RunMode != config.RunModeSimple {
+		switch apiKey.Status {
+		case service.StatusAPIKeyQuotaExhausted:
+			abortWithGoogleError(c, http.StatusTooManyRequests, "API key quota exhausted")
+			return
+		case service.StatusAPIKeyExpired:
+			abortWithGoogleError(c, http.StatusForbidden, "API key expired")
+			return
+		}
+		if apiKey.IsExpired() {
+			abortWithGoogleError(c, http.StatusForbidden, "API key expired")
+			return
+		}
+		if apiKey.IsQuotaExhausted() {
+			abortWithGoogleError(c, http.StatusTooManyRequests, "API key quota exhausted")
+			return
+		}
+	}
+
+	c.Set(string(ContextKeyAPIKey), apiKey)
+	c.Set(string(ContextKeyUser), AuthSubject{
+		UserID:      apiKey.User.ID,
+		Concurrency: apiKey.User.Concurrency,
+	})
+	c.Set(string(ContextKeyUserRole), apiKey.User.Role)
+	_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
+	c.Next()
 }
 
 // extractAPIKeyForGoogle extracts API key for Google/Gemini endpoints.

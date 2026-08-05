@@ -199,6 +199,15 @@ func normalizeOpenAICompatiblePlatform(platform string) string {
 	return PlatformOpenAI
 }
 
+func openAICompatiblePlatformFromScope(scope PlatformSchedulingScope) (string, error) {
+	switch scope.AccountPlatform {
+	case PlatformOpenAI, PlatformGrok:
+		return scope.AccountPlatform, nil
+	default:
+		return "", fmt.Errorf("%w: protocol %q is not OpenAI-compatible", ErrPlatformInvalid, scope.AccountPlatform)
+	}
+}
+
 // details carries an optional machine-parseable exclusion summary (e.g.
 // "pool=2, filtered: quota_auto_pause_7d=1 runtime_blocked=1") appended in
 // parentheses. It is for server-side logs / ops diagnostics only: handlers
@@ -631,8 +640,20 @@ func resolveOpenAIAccountUpstreamModelForRequest(account *Account, requestedMode
 }
 
 func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyAccountID int64, requiredCapability OpenAIEndpointCapability, preferLowUpstreamRate bool) (*Account, error) {
+	_, scoped := PlatformSchedulingScopeFromContext(ctx)
+	if scope, ok := PlatformSchedulingScopeFromContext(ctx); ok {
+		resolvedPlatform, err := openAICompatiblePlatformFromScope(scope)
+		if err != nil {
+			return nil, err
+		}
+		groupID = platformSchedulingCacheGroupID(scope)
+		if groupID == nil {
+			return nil, fmt.Errorf("%w: invalid platform scheduling scope", ErrPlatformInvalid)
+		}
+		platform = resolvedPlatform
+	}
 	platform = normalizeOpenAICompatiblePlatform(platform)
-	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
+	if !scoped && s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
 		slog.Warn("channel pricing restriction blocked request",
 			"group_id", derefGroupID(groupID),
 			"model", requestedModel)
@@ -724,11 +745,11 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		return nil
 	}
 	account = s.recheckSelectedOpenAIAccountFromDB(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability)
-	if account == nil || !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
+	if account == nil || !s.openAIAccountMatchesSchedulingScope(ctx, account, groupID) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
-	if groupID != nil && s.needsUpstreamChannelRestrictionCheck(ctx, groupID) &&
+	if _, scoped := PlatformSchedulingScopeFromContext(ctx); !scoped && groupID != nil && s.needsUpstreamChannelRestrictionCheck(ctx, groupID) &&
 		s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
@@ -750,7 +771,8 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *int64, platform string, accounts []Account, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, preferLowUpstreamRate bool) (*Account, bool) {
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	compactBlocked := false
-	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
+	_, scoped := PlatformSchedulingScopeFromContext(ctx)
+	needsUpstreamCheck := !scoped && s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	eligible := make([]*Account, 0, len(accounts))
 	compactTiers := make(map[int64]int, len(accounts))
 
@@ -846,8 +868,20 @@ func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Contex
 }
 
 func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, useUpstreamTokenCost bool) (*AccountSelectionResult, error) {
+	_, scoped := PlatformSchedulingScopeFromContext(ctx)
+	if scope, ok := PlatformSchedulingScopeFromContext(ctx); ok {
+		resolvedPlatform, err := openAICompatiblePlatformFromScope(scope)
+		if err != nil {
+			return nil, err
+		}
+		groupID = platformSchedulingCacheGroupID(scope)
+		if groupID == nil {
+			return nil, fmt.Errorf("%w: invalid platform scheduling scope", ErrPlatformInvalid)
+		}
+		platform = resolvedPlatform
+	}
 	platform = normalizeOpenAICompatiblePlatform(platform)
-	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
+	if !scoped && s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
 		slog.Warn("channel pricing restriction blocked request",
 			"group_id", derefGroupID(groupID),
 			"model", requestedModel)
@@ -856,7 +890,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	cfg := s.schedulingConfig()
 	preferLowUpstreamRate := useUpstreamTokenCost && s.isOpenAILowUpstreamRatePriorityEnabled(ctx)
-	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
+	needsUpstreamCheck := !scoped && s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	var stickyAccountID int64
 	if sessionHash != "" && s.cache != nil {
 		if accountID, err := s.getStickySessionAccountID(ctx, groupID, sessionHash); err == nil {
@@ -921,7 +955,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 					account = s.recheckSelectedOpenAIAccountFromDB(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability)
 					if account == nil {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
-					} else if !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
+					} else if !s.openAIAccountMatchesSchedulingScope(ctx, account, groupID) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if s.isOpenAIAccountRequestRuntimeBlocked(account, requestedModel) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
@@ -1192,6 +1226,20 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 }
 
 func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, groupID *int64, platform string) ([]Account, error) {
+	if scope, scoped := PlatformSchedulingScopeFromContext(ctx); scoped {
+		resolvedPlatform, err := openAICompatiblePlatformFromScope(scope)
+		if err != nil {
+			return nil, err
+		}
+		lister, ok := s.accountRepo.(PlatformPoolAccountLister)
+		if !ok {
+			return nil, fmt.Errorf("%w: account repository cannot list platform pool accounts", ErrPlatformInvalid)
+		}
+		if !strings.EqualFold(strings.TrimSpace(platform), resolvedPlatform) && platform != PlatformOpenAI {
+			return nil, fmt.Errorf("%w: platform scope protocol %q does not match requested protocol %q", ErrPlatformInvalid, resolvedPlatform, platform)
+		}
+		return listPlatformPoolSchedulableAccounts(ctx, lister, scope)
+	}
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	if s.schedulerSnapshot != nil {
 		accounts, _, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, false)
@@ -1233,6 +1281,9 @@ func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccount(ctx context.
 		}
 		fresh = current
 	}
+	if !accountMatchesPlatformSchedulingScope(ctx, fresh) {
+		return nil
+	}
 
 	if !isOpenAICompatibleAccountEligibleForRequest(ctx, fresh, platform, requestedModel, requireCompact, requiredCapability) {
 		return nil
@@ -1267,6 +1318,9 @@ func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Co
 	if account == nil {
 		return nil
 	}
+	if !accountMatchesPlatformSchedulingScope(ctx, account) {
+		return nil
+	}
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	if s.schedulerSnapshot == nil || s.accountRepo == nil {
 		if !isOpenAICompatibleAccountEligibleForRequest(ctx, account, platform, requestedModel, requireCompact, requiredCapability) {
@@ -1285,7 +1339,7 @@ func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Co
 	if err != nil || latest == nil {
 		return nil
 	}
-	if !s.openAIAccountMatchesSchedulingGroup(latest, groupID) {
+	if !s.openAIAccountMatchesSchedulingScope(ctx, latest, groupID) {
 		return nil
 	}
 	if !isOpenAICompatibleAccountEligibleForRequest(ctx, latest, platform, requestedModel, requireCompact, requiredCapability) {
@@ -1310,12 +1364,27 @@ func (s *OpenAIGatewayService) openAIAccountMatchesSchedulingGroup(account *Acco
 	return openAIStickyAccountMatchesGroup(account, groupID)
 }
 
+func (s *OpenAIGatewayService) openAIAccountMatchesSchedulingScope(ctx context.Context, account *Account, groupID *int64) bool {
+	if !accountMatchesPlatformSchedulingScope(ctx, account) {
+		return false
+	}
+	if _, scoped := PlatformSchedulingScopeFromContext(ctx); scoped {
+		return true
+	}
+	return s.openAIAccountMatchesSchedulingGroup(account, groupID)
+}
+
 func (s *OpenAIGatewayService) getSchedulableAccount(ctx context.Context, accountID int64) (*Account, error) {
 	var (
 		account *Account
 		err     error
 	)
-	if s.schedulerSnapshot != nil {
+	if _, scoped := PlatformSchedulingScopeFromContext(ctx); scoped {
+		if s.accountRepo == nil {
+			return nil, fmt.Errorf("%w: account repository is not configured", ErrPlatformInvalid)
+		}
+		account, err = s.accountRepo.GetByID(ctx, accountID)
+	} else if s.schedulerSnapshot != nil {
 		account, err = s.schedulerSnapshot.GetAccount(ctx, accountID)
 	} else {
 		account, err = s.accountRepo.GetByID(ctx, accountID)
@@ -1327,6 +1396,12 @@ func (s *OpenAIGatewayService) getSchedulableAccount(ctx context.Context, accoun
 }
 
 func (s *OpenAIGatewayService) hydrateSelectedAccount(ctx context.Context, account *Account) (*Account, error) {
+	if _, scoped := PlatformSchedulingScopeFromContext(ctx); scoped {
+		if !accountMatchesPlatformSchedulingScope(ctx, account) {
+			return nil, fmt.Errorf("%w: selected account does not belong to platform pool", ErrPlatformInvalid)
+		}
+		return account, nil
+	}
 	if account == nil || s.schedulerSnapshot == nil {
 		return account, nil
 	}

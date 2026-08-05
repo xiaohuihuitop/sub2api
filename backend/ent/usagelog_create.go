@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
@@ -165,6 +166,34 @@ func (_c *UsageLogCreate) SetSubscriptionID(v int64) *UsageLogCreate {
 func (_c *UsageLogCreate) SetNillableSubscriptionID(v *int64) *UsageLogCreate {
 	if v != nil {
 		_c.SetSubscriptionID(*v)
+	}
+	return _c
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (_c *UsageLogCreate) SetPlatformID(v int64) *UsageLogCreate {
+	_c.mutation.SetPlatformID(v)
+	return _c
+}
+
+// SetNillablePlatformID sets the "platform_id" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillablePlatformID(v *int64) *UsageLogCreate {
+	if v != nil {
+		_c.SetPlatformID(*v)
+	}
+	return _c
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (_c *UsageLogCreate) SetBillingSourceType(v string) *UsageLogCreate {
+	_c.mutation.SetBillingSourceType(v)
+	return _c
+}
+
+// SetNillableBillingSourceType sets the "billing_source_type" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableBillingSourceType(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetBillingSourceType(*v)
 	}
 	return _c
 }
@@ -634,6 +663,11 @@ func (_c *UsageLogCreate) SetSubscription(v *UserSubscription) *UsageLogCreate {
 	return _c.SetSubscriptionID(v.ID)
 }
 
+// SetPlatform sets the "platform" edge to the Platform entity.
+func (_c *UsageLogCreate) SetPlatform(v *Platform) *UsageLogCreate {
+	return _c.SetPlatformID(v.ID)
+}
+
 // Mutation returns the UsageLogMutation object of the builder.
 func (_c *UsageLogCreate) Mutation() *UsageLogMutation {
 	return _c.mutation
@@ -803,6 +837,11 @@ func (_c *UsageLogCreate) check() error {
 			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_mode": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.BillingSourceType(); ok {
+		if err := usagelog.BillingSourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "billing_source_type", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_source_type": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.InputTokens(); !ok {
 		return &ValidationError{Name: "input_tokens", err: errors.New(`ent: missing required field "UsageLog.input_tokens"`)}
 	}
@@ -965,6 +1004,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.BillingMode(); ok {
 		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
 		_node.BillingMode = &value
+	}
+	if value, ok := _c.mutation.BillingSourceType(); ok {
+		_spec.SetField(usagelog.FieldBillingSourceType, field.TypeString, value)
+		_node.BillingSourceType = &value
 	}
 	if value, ok := _c.mutation.InputTokens(); ok {
 		_spec.SetField(usagelog.FieldInputTokens, field.TypeInt, value)
@@ -1177,6 +1220,23 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.SubscriptionID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PlatformIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   usagelog.PlatformTable,
+			Columns: []string{usagelog.PlatformColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(platform.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.PlatformID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -1438,6 +1498,42 @@ func (u *UsageLogUpsert) UpdateSubscriptionID() *UsageLogUpsert {
 // ClearSubscriptionID clears the value of the "subscription_id" field.
 func (u *UsageLogUpsert) ClearSubscriptionID() *UsageLogUpsert {
 	u.SetNull(usagelog.FieldSubscriptionID)
+	return u
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (u *UsageLogUpsert) SetPlatformID(v int64) *UsageLogUpsert {
+	u.Set(usagelog.FieldPlatformID, v)
+	return u
+}
+
+// UpdatePlatformID sets the "platform_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdatePlatformID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldPlatformID)
+	return u
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (u *UsageLogUpsert) ClearPlatformID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldPlatformID)
+	return u
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (u *UsageLogUpsert) SetBillingSourceType(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldBillingSourceType, v)
+	return u
+}
+
+// UpdateBillingSourceType sets the "billing_source_type" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateBillingSourceType() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldBillingSourceType)
+	return u
+}
+
+// ClearBillingSourceType clears the value of the "billing_source_type" field.
+func (u *UsageLogUpsert) ClearBillingSourceType() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldBillingSourceType)
 	return u
 }
 
@@ -2292,6 +2388,48 @@ func (u *UsageLogUpsertOne) UpdateSubscriptionID() *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) ClearSubscriptionID() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearSubscriptionID()
+	})
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (u *UsageLogUpsertOne) SetPlatformID(v int64) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetPlatformID(v)
+	})
+}
+
+// UpdatePlatformID sets the "platform_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdatePlatformID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdatePlatformID()
+	})
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (u *UsageLogUpsertOne) ClearPlatformID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearPlatformID()
+	})
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (u *UsageLogUpsertOne) SetBillingSourceType(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetBillingSourceType(v)
+	})
+}
+
+// UpdateBillingSourceType sets the "billing_source_type" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateBillingSourceType() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateBillingSourceType()
+	})
+}
+
+// ClearBillingSourceType clears the value of the "billing_source_type" field.
+func (u *UsageLogUpsertOne) ClearBillingSourceType() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearBillingSourceType()
 	})
 }
 
@@ -3406,6 +3544,48 @@ func (u *UsageLogUpsertBulk) UpdateSubscriptionID() *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) ClearSubscriptionID() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearSubscriptionID()
+	})
+}
+
+// SetPlatformID sets the "platform_id" field.
+func (u *UsageLogUpsertBulk) SetPlatformID(v int64) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetPlatformID(v)
+	})
+}
+
+// UpdatePlatformID sets the "platform_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdatePlatformID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdatePlatformID()
+	})
+}
+
+// ClearPlatformID clears the value of the "platform_id" field.
+func (u *UsageLogUpsertBulk) ClearPlatformID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearPlatformID()
+	})
+}
+
+// SetBillingSourceType sets the "billing_source_type" field.
+func (u *UsageLogUpsertBulk) SetBillingSourceType(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetBillingSourceType(v)
+	})
+}
+
+// UpdateBillingSourceType sets the "billing_source_type" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateBillingSourceType() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateBillingSourceType()
+	})
+}
+
+// ClearBillingSourceType clears the value of the "billing_source_type" field.
+func (u *UsageLogUpsertBulk) ClearBillingSourceType() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearBillingSourceType()
 	})
 }
 

@@ -63,3 +63,16 @@ describe('AppSidebar subscription navigation', () => {
     expect(componentSource).toContain("path: '/admin/subscriptions'")
   })
 })
+
+describe('AppSidebar platform asset navigation', () => {
+  it('keeps the legacy groups editor out of the default admin navigation', () => {
+    const start = componentSource.indexOf('const adminNavItems')
+    const end = componentSource.indexOf('function toggleSidebar', start)
+    const adminNavSource = start >= 0 && end >= 0 ? componentSource.slice(start, end) : undefined
+
+    expect(adminNavSource).toBeDefined()
+    expect(adminNavSource).not.toContain("path: '/admin/groups'")
+    expect(adminNavSource).toContain("path: '/admin/platforms'")
+    expect(adminNavSource).toContain("path: '/admin/subscriptions'")
+  })
+})

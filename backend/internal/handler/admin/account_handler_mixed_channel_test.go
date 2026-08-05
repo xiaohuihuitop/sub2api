@@ -98,6 +98,7 @@ func TestAccountHandlerCreateMixedChannelConflictSimplifiedResponse(t *testing.T
 	body, _ := json.Marshal(map[string]any{
 		"name":        "ag-oauth-1",
 		"platform":    "antigravity",
+		"platform_id": 1,
 		"type":        "oauth",
 		"credentials": map[string]any{"refresh_token": "rt"},
 		"group_ids":   []int64{27},
@@ -147,14 +148,8 @@ func TestAccountHandlerUpdateMixedChannelConflictSimplifiedResponse(t *testing.T
 	require.False(t, hasRequireConfirmation)
 }
 
-func TestAccountHandlerBulkUpdateMixedChannelConflict(t *testing.T) {
+func TestAccountHandlerBulkUpdateMixedChannelRouterRejectsLegacyGroupBindings(t *testing.T) {
 	adminSvc := newStubAdminService()
-	adminSvc.bulkUpdateAccountErr = &service.MixedChannelError{
-		GroupID:         27,
-		GroupName:       "claude-max",
-		CurrentPlatform: "Antigravity",
-		OtherPlatform:   "Anthropic",
-	}
 	router := setupAccountMixedChannelRouter(adminSvc)
 
 	body, _ := json.Marshal(map[string]any{
@@ -166,14 +161,12 @@ func TestAccountHandlerBulkUpdateMixedChannelConflict(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(rec, req)
 
-	require.Equal(t, http.StatusConflict, rec.Code)
-	var resp map[string]any
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	require.Equal(t, "mixed_channel_warning", resp["error"])
-	require.Contains(t, resp["message"], "claude-max")
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "legacy account group bindings")
+	require.Nil(t, adminSvc.lastBulkUpdateAccountInput)
 }
 
-func TestAccountHandlerBulkUpdateMixedChannelConfirmSkips(t *testing.T) {
+func TestAccountHandlerBulkUpdateRejectsLegacyGroupBindingsWhenConfirmed(t *testing.T) {
 	adminSvc := newStubAdminService()
 	router := setupAccountMixedChannelRouter(adminSvc)
 
@@ -187,14 +180,9 @@ func TestAccountHandlerBulkUpdateMixedChannelConfirmSkips(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(rec, req)
 
-	require.Equal(t, http.StatusOK, rec.Code)
-	var resp map[string]any
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
-	require.Equal(t, float64(0), resp["code"])
-	data, ok := resp["data"].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, float64(2), data["success"])
-	require.Equal(t, float64(0), data["failed"])
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "legacy account group bindings")
+	require.Nil(t, adminSvc.lastBulkUpdateAccountInput)
 }
 
 func TestBulkUpdateAcceptsFilterTargetRequest(t *testing.T) {

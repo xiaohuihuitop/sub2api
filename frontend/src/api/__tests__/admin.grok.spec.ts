@@ -26,6 +26,7 @@ describe('admin Grok SSO import API', () => {
 
     await createFromSSO({
       sso_tokens: Array.from({ length: keyCount }, (_, index) => `sso-${index + 1}`),
+      platform_id: 42,
     })
 
     expect(post).toHaveBeenCalledWith(

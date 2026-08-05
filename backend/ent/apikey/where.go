@@ -90,6 +90,11 @@ func GroupID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
 }
 
+// AllowBalance applies equality check predicate on the "allow_balance" field. It's identical to AllowBalanceEQ.
+func AllowBalance(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldAllowBalance, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldStatus, v))
@@ -468,6 +473,16 @@ func GroupIDIsNil() predicate.APIKey {
 // GroupIDNotNil applies the NotNil predicate on the "group_id" field.
 func GroupIDNotNil() predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotNull(FieldGroupID))
+}
+
+// AllowBalanceEQ applies the EQ predicate on the "allow_balance" field.
+func AllowBalanceEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldAllowBalance, v))
+}
+
+// AllowBalanceNEQ applies the NEQ predicate on the "allow_balance" field.
+func AllowBalanceNEQ(v bool) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldAllowBalance, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.
@@ -1163,6 +1178,52 @@ func HasGroup() predicate.APIKey {
 func HasGroupWith(preds ...predicate.Group) predicate.APIKey {
 	return predicate.APIKey(func(s *sql.Selector) {
 		step := newGroupStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPlatforms applies the HasEdge predicate on the "platforms" edge.
+func HasPlatforms() predicate.APIKey {
+	return predicate.APIKey(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, PlatformsTable, PlatformsPrimaryKey...),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPlatformsWith applies the HasEdge predicate on the "platforms" edge with a given conditions (other predicates).
+func HasPlatformsWith(preds ...predicate.Platform) predicate.APIKey {
+	return predicate.APIKey(func(s *sql.Selector) {
+		step := newPlatformsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasSubscriptionPlans applies the HasEdge predicate on the "subscription_plans" edge.
+func HasSubscriptionPlans() predicate.APIKey {
+	return predicate.APIKey(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, SubscriptionPlansTable, SubscriptionPlansPrimaryKey...),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSubscriptionPlansWith applies the HasEdge predicate on the "subscription_plans" edge with a given conditions (other predicates).
+func HasSubscriptionPlansWith(preds ...predicate.SubscriptionPlan) predicate.APIKey {
+	return predicate.APIKey(func(s *sql.Selector) {
+		step := newSubscriptionPlansStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

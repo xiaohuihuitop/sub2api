@@ -19,6 +19,13 @@ import (
 // APIKeyHandler handles API key-related requests
 type APIKeyHandler struct {
 	apiKeyService *service.APIKeyService
+	platformPools platformPoolLister
+}
+
+// platformPoolLister keeps the API-key selector independent from platform
+// administration and exposes only the read capability it needs.
+type platformPoolLister interface {
+	List(ctx context.Context) ([]service.Platform, error)
 }
 
 // NewAPIKeyHandler creates a new APIKeyHandler
@@ -28,16 +35,26 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 	}
 }
 
+type availablePlatformPoolResponse struct {
+	ID              int64  `json:"id"`
+	Code            string `json:"code"`
+	Name            string `json:"name"`
+	AccountPlatform string `json:"account_platform"`
+}
+
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
-	Name          string   `json:"name" binding:"required"`
-	GroupID       *int64   `json:"group_id"` // nullable
-	GroupIDs      []int64  `json:"group_ids"`
-	CustomKey     *string  `json:"custom_key"`      // 可选的自定义key
-	IPWhitelist   []string `json:"ip_whitelist"`    // IP 白名单
-	IPBlacklist   []string `json:"ip_blacklist"`    // IP 黑名单
-	Quota         *float64 `json:"quota"`           // 配额限制 (USD)
-	ExpiresInDays *int     `json:"expires_in_days"` // 过期天数
+	Name                string   `json:"name" binding:"required"`
+	GroupID             *int64   `json:"group_id"` // nullable
+	GroupIDs            []int64  `json:"group_ids"`
+	PlatformIDs         []int64  `json:"platform_ids"`
+	SubscriptionPlanIDs []int64  `json:"subscription_plan_ids"`
+	AllowBalance        *bool    `json:"allow_balance"`
+	CustomKey           *string  `json:"custom_key"`      // 可选的自定义key
+	IPWhitelist         []string `json:"ip_whitelist"`    // IP 白名单
+	IPBlacklist         []string `json:"ip_blacklist"`    // IP 黑名单
+	Quota               *float64 `json:"quota"`           // 配额限制 (USD)
+	ExpiresInDays       *int     `json:"expires_in_days"` // 过期天数
 
 	// Rate limit fields (0 = unlimited)
 	RateLimit5h *float64 `json:"rate_limit_5h"`
@@ -47,15 +64,18 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
-	Name        string    `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	GroupIDs    *[]int64  `json:"group_ids"`
-	Status      string    `json:"status" binding:"omitempty,oneof=active inactive"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
-	Quota       *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
-	ExpiresAt   *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
-	ResetQuota  *bool     `json:"reset_quota"`  // 重置已用配额
+	Name                string    `json:"name"`
+	GroupID             *int64    `json:"group_id"`
+	GroupIDs            *[]int64  `json:"group_ids"`
+	PlatformIDs         *[]int64  `json:"platform_ids"`
+	SubscriptionPlanIDs *[]int64  `json:"subscription_plan_ids"`
+	AllowBalance        *bool     `json:"allow_balance"`
+	Status              string    `json:"status" binding:"omitempty,oneof=active inactive"`
+	IPWhitelist         *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist         *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Quota               *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
+	ExpiresAt           *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
+	ResetQuota          *bool     `json:"reset_quota"`  // 重置已用配额
 
 	// Rate limit fields (nil = no change, 0 = unlimited)
 	RateLimit5h         *float64 `json:"rate_limit_5h"`
@@ -156,13 +176,16 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 	}
 
 	svcReq := service.CreateAPIKeyRequest{
-		Name:          req.Name,
-		GroupID:       req.GroupID,
-		GroupIDs:      req.GroupIDs,
-		CustomKey:     req.CustomKey,
-		IPWhitelist:   req.IPWhitelist,
-		IPBlacklist:   req.IPBlacklist,
-		ExpiresInDays: req.ExpiresInDays,
+		Name:                req.Name,
+		GroupID:             req.GroupID,
+		GroupIDs:            req.GroupIDs,
+		PlatformIDs:         req.PlatformIDs,
+		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
+		AllowBalance:        req.AllowBalance,
+		CustomKey:           req.CustomKey,
+		IPWhitelist:         req.IPWhitelist,
+		IPBlacklist:         req.IPBlacklist,
+		ExpiresInDays:       req.ExpiresInDays,
 	}
 	if req.Quota != nil {
 		svcReq.Quota = *req.Quota
@@ -209,6 +232,9 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 
 	svcReq := service.UpdateAPIKeyRequest{
 		GroupIDs:            req.GroupIDs,
+		PlatformIDs:         req.PlatformIDs,
+		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
+		AllowBalance:        req.AllowBalance,
 		IPWhitelist:         req.IPWhitelist,
 		IPBlacklist:         req.IPBlacklist,
 		Quota:               req.Quota,
@@ -294,4 +320,40 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 		out = append(out, *dto.GroupFromService(&groups[i]))
 	}
 	response.Success(c, out)
+}
+
+// GetAvailablePlatforms returns active platform-pool metadata for API Key
+// authorization. It intentionally excludes model rules, legacy groups, and
+// account details.
+// GET /api/v1/platforms/available
+func (h *APIKeyHandler) GetAvailablePlatforms(c *gin.Context) {
+	if _, ok := middleware2.GetAuthSubjectFromContext(c); !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if h.platformPools == nil {
+		response.InternalError(c, "Platform pools are unavailable")
+		return
+	}
+
+	platforms, err := h.platformPools.List(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	available := make([]availablePlatformPoolResponse, 0, len(platforms))
+	for index := range platforms {
+		platform := platforms[index]
+		if !platform.IsActive() {
+			continue
+		}
+		available = append(available, availablePlatformPoolResponse{
+			ID:              platform.ID,
+			Code:            platform.Code,
+			Name:            platform.Name,
+			AccountPlatform: platform.AccountPlatform,
+		})
+	}
+	response.Success(c, available)
 }

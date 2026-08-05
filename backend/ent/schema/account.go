@@ -64,6 +64,11 @@ func (Account) Fields() []ent.Field {
 		field.String("platform").
 			MaxLen(50).
 			NotEmpty(),
+		// V2 account-pool ownership. Nullable preserves legacy group routing
+		// until each account is explicitly assigned by an administrator.
+		field.Int64("platform_id").
+			Optional().
+			Nillable(),
 
 		// type: 认证类型，如 "api_key", "oauth", "cookie" 等
 		// 不同类型决定了 credentials 中存储的数据结构
@@ -212,6 +217,10 @@ func (Account) Edges() []ent.Edge {
 		// 一个账户可以属于多个分组，一个分组可以包含多个账户
 		edge.To("groups", Group.Type).
 			Through("account_groups", AccountGroup.Type),
+		edge.From("platform_pool", Platform.Type).
+			Ref("accounts").
+			Field("platform_id").
+			Unique(),
 		// proxy: 账户使用的代理配置（可选的一对一关系）
 		// 使用已有的 proxy_id 外键字段
 		edge.To("proxy", Proxy.Type).
@@ -235,6 +244,7 @@ func (Account) Edges() []ent.Edge {
 func (Account) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("platform"),            // 按平台筛选
+		index.Fields("platform_id"),
 		index.Fields("type"),                // 按认证类型筛选
 		index.Fields("status"),              // 按状态筛选
 		index.Fields("proxy_id"),            // 按代理筛选

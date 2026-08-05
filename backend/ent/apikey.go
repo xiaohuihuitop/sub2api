@@ -34,6 +34,8 @@ type APIKey struct {
 	Name string `json:"name,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID *int64 `json:"group_id,omitempty"`
+	// AllowBalance holds the value of the "allow_balance" field.
+	AllowBalance bool `json:"allow_balance,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Last usage time of this API key
@@ -78,11 +80,15 @@ type APIKeyEdges struct {
 	User *User `json:"user,omitempty"`
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
+	// Platforms holds the value of the platforms edge.
+	Platforms []*Platform `json:"platforms,omitempty"`
+	// SubscriptionPlans holds the value of the subscription_plans edge.
+	SubscriptionPlans []*SubscriptionPlan `json:"subscription_plans,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -107,10 +113,28 @@ func (e APIKeyEdges) GroupOrErr() (*Group, error) {
 	return nil, &NotLoadedError{edge: "group"}
 }
 
+// PlatformsOrErr returns the Platforms value or an error if the edge
+// was not loaded in eager-loading.
+func (e APIKeyEdges) PlatformsOrErr() ([]*Platform, error) {
+	if e.loadedTypes[2] {
+		return e.Platforms, nil
+	}
+	return nil, &NotLoadedError{edge: "platforms"}
+}
+
+// SubscriptionPlansOrErr returns the SubscriptionPlans value or an error if the edge
+// was not loaded in eager-loading.
+func (e APIKeyEdges) SubscriptionPlansOrErr() ([]*SubscriptionPlan, error) {
+	if e.loadedTypes[3] {
+		return e.SubscriptionPlans, nil
+	}
+	return nil, &NotLoadedError{edge: "subscription_plans"}
+}
+
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e APIKeyEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[4] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -123,6 +147,8 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
+		case apikey.FieldAllowBalance:
+			values[i] = new(sql.NullBool)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
@@ -195,6 +221,12 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.GroupID = new(int64)
 				*_m.GroupID = value.Int64
+			}
+		case apikey.FieldAllowBalance:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field allow_balance", values[i])
+			} else if value.Valid {
+				_m.AllowBalance = value.Bool
 			}
 		case apikey.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -324,6 +356,16 @@ func (_m *APIKey) QueryGroup() *GroupQuery {
 	return NewAPIKeyClient(_m.config).QueryGroup(_m)
 }
 
+// QueryPlatforms queries the "platforms" edge of the APIKey entity.
+func (_m *APIKey) QueryPlatforms() *PlatformQuery {
+	return NewAPIKeyClient(_m.config).QueryPlatforms(_m)
+}
+
+// QuerySubscriptionPlans queries the "subscription_plans" edge of the APIKey entity.
+func (_m *APIKey) QuerySubscriptionPlans() *SubscriptionPlanQuery {
+	return NewAPIKeyClient(_m.config).QuerySubscriptionPlans(_m)
+}
+
 // QueryUsageLogs queries the "usage_logs" edge of the APIKey entity.
 func (_m *APIKey) QueryUsageLogs() *UsageLogQuery {
 	return NewAPIKeyClient(_m.config).QueryUsageLogs(_m)
@@ -376,6 +418,9 @@ func (_m *APIKey) String() string {
 		builder.WriteString("group_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("allow_balance=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AllowBalance))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

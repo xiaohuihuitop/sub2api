@@ -44,6 +44,8 @@ func (APIKey) Fields() []ent.Field {
 		field.Int64("group_id").
 			Optional().
 			Nillable(),
+		field.Bool("allow_balance").
+			Default(true),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),
@@ -129,6 +131,8 @@ func (APIKey) Edges() []ent.Edge {
 			Ref("api_keys").
 			Field("group_id").
 			Unique(),
+		edge.To("platforms", Platform.Type),
+		edge.To("subscription_plans", SubscriptionPlan.Type),
 		edge.To("usage_logs", UsageLog.Type),
 	}
 }

@@ -609,6 +609,8 @@ export default {
       supportedTypes: '支持的支付方式',
       supportedTypesHint: '选择此服务商支持的支付方式',
       rateMultiplier: '费率倍数',
+      globalBalanceRateMultiplier: '余额倍率',
+      invalidGlobalBalanceRateMultiplier: '余额倍率必须为 0 或正数',
       dashboardTitle: '支付概览',
       dashboardDesc: '充值订单统计与分析',
       daySuffix: '天',

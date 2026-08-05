@@ -28,6 +28,28 @@ func TestUsageLogFromService_IncludesOpenAIWSMode(t *testing.T) {
 	require.False(t, UsageLogFromServiceAdmin(httpLog).OpenAIWSMode)
 }
 
+func TestUsageLogFromServiceIncludesV2PlatformAndBillingSource(t *testing.T) {
+	platformID := int64(17)
+	billingSource := "subscription"
+	log := &service.UsageLog{
+		PlatformID:        &platformID,
+		PlatformCode:      "openai-primary",
+		PlatformName:      "OpenAI 主账号池",
+		BillingSourceType: &billingSource,
+		Subscription: &service.UserSubscription{
+			PlanNameSnapshot: "大包",
+		},
+	}
+
+	dto := UsageLogFromService(log)
+
+	require.Equal(t, &platformID, dto.PlatformID)
+	require.Equal(t, "openai-primary", dto.PlatformCode)
+	require.Equal(t, "OpenAI 主账号池", dto.PlatformName)
+	require.Equal(t, "subscription", dto.BillingSourceType)
+	require.Equal(t, "大包", dto.SubscriptionName)
+}
+
 func TestUsageLogFromService_PrefersRequestTypeForLegacyFields(t *testing.T) {
 	t.Parallel()
 

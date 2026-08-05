@@ -32,6 +32,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
+	"github.com/Wei-Shaw/sub2api/ent/platform"
+	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/promocode"
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
@@ -755,6 +757,60 @@ func (f TraversePendingAuthSession) Traverse(ctx context.Context, q ent.Query) e
 	return fmt.Errorf("unexpected query type %T. expect *ent.PendingAuthSessionQuery", q)
 }
 
+// The PlatformFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PlatformFunc func(context.Context, *ent.PlatformQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PlatformFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PlatformQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PlatformQuery", q)
+}
+
+// The TraversePlatform type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePlatform func(context.Context, *ent.PlatformQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePlatform) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePlatform) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PlatformQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PlatformQuery", q)
+}
+
+// The PlatformModelRuleFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PlatformModelRuleFunc func(context.Context, *ent.PlatformModelRuleQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PlatformModelRuleFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PlatformModelRuleQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PlatformModelRuleQuery", q)
+}
+
+// The TraversePlatformModelRule type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePlatformModelRule func(context.Context, *ent.PlatformModelRuleQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePlatformModelRule) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePlatformModelRule) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PlatformModelRuleQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PlatformModelRuleQuery", q)
+}
+
 // The PromoCodeFunc type is an adapter to allow the use of ordinary function as a Querier.
 type PromoCodeFunc func(context.Context, *ent.PromoCodeQuery) (ent.Value, error)
 
@@ -1238,6 +1294,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.PaymentProviderInstanceQuery, predicate.PaymentProviderInstance, paymentproviderinstance.OrderOption]{typ: ent.TypePaymentProviderInstance, tq: q}, nil
 	case *ent.PendingAuthSessionQuery:
 		return &query[*ent.PendingAuthSessionQuery, predicate.PendingAuthSession, pendingauthsession.OrderOption]{typ: ent.TypePendingAuthSession, tq: q}, nil
+	case *ent.PlatformQuery:
+		return &query[*ent.PlatformQuery, predicate.Platform, platform.OrderOption]{typ: ent.TypePlatform, tq: q}, nil
+	case *ent.PlatformModelRuleQuery:
+		return &query[*ent.PlatformModelRuleQuery, predicate.PlatformModelRule, platformmodelrule.OrderOption]{typ: ent.TypePlatformModelRule, tq: q}, nil
 	case *ent.PromoCodeQuery:
 		return &query[*ent.PromoCodeQuery, predicate.PromoCode, promocode.OrderOption]{typ: ent.TypePromoCode, tq: q}, nil
 	case *ent.PromoCodeUsageQuery:

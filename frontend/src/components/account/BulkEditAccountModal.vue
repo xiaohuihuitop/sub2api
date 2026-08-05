@@ -1211,32 +1211,6 @@
         </div>
       </div>
 
-      <!-- Groups -->
-      <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
-        <div class="mb-3 flex items-center justify-between">
-          <label
-            id="bulk-edit-groups-label"
-            class="input-label mb-0"
-            for="bulk-edit-groups-enabled"
-          >
-            {{ t('nav.groups') }}
-          </label>
-          <input
-            v-model="enableGroups"
-            id="bulk-edit-groups-enabled"
-            type="checkbox"
-            aria-controls="bulk-edit-groups"
-            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-        </div>
-        <div id="bulk-edit-groups" :class="!enableGroups && 'pointer-events-none opacity-50'">
-          <GroupSelector
-            v-model="groupIds"
-            :groups="groups"
-            aria-labelledby="bulk-edit-groups-label"
-          />
-        </div>
-      </div>
     </form>
 
     <template #footer>
@@ -1278,16 +1252,6 @@
     </template>
   </BaseDialog>
 
-  <ConfirmDialog
-    :show="showMixedChannelWarning"
-    :title="t('admin.accounts.mixedChannelWarningTitle')"
-    :message="mixedChannelWarningMessage"
-    :confirm-text="t('common.confirm')"
-    :cancel-text="t('common.cancel')"
-    :danger="true"
-    @confirm="handleMixedChannelConfirm"
-    @cancel="handleMixedChannelCancel"
-  />
 </template>
 
 <script setup lang="ts">
@@ -1295,12 +1259,10 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
-import type { Proxy as ProxyConfig, AdminGroup, AccountPlatform, AccountType, OpenAICompactMode } from '@/types'
+import type { Proxy as ProxyConfig, AccountPlatform, AccountType, OpenAICompactMode } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
-import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import Icon from '@/components/icons/Icon.vue'
 import {
@@ -1339,7 +1301,6 @@ interface Props {
     selectedTypes?: AccountType[]
   }
   proxies: ProxyConfig[]
-  groups: AdminGroup[]
 }
 
 const props = defineProps<Props>()
@@ -1457,7 +1418,6 @@ const enableLoadFactor = ref(false)
 const enablePriority = ref(false)
 const enableRateMultiplier = ref(false)
 const enableStatus = ref(false)
-const enableGroups = ref(false)
 const enableOpenAIPassthrough = ref(false)
 const enableOpenAIFlattenNamespaces = ref(false)
 const enableOpenAIWSMode = ref(false)
@@ -1471,9 +1431,6 @@ const enableRpmLimit = ref(false)
 
 // State - field values
 const submitting = ref(false)
-const showMixedChannelWarning = ref(false)
-const mixedChannelWarningMessage = ref('')
-const pendingUpdatesForConfirm = ref<Record<string, unknown> | null>(null)
 const baseUrl = ref('')
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
@@ -1489,7 +1446,6 @@ const loadFactor = ref<number | null>(null)
 const priority = ref(1)
 const rateMultiplier = ref(1)
 const status = ref<'active' | 'inactive'>('active')
-const groupIds = ref<number[]>([])
 const openaiPassthroughEnabled = ref(false)
 // Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
 const openaiFlattenNamespacesEnabled = ref(false)
@@ -1682,10 +1638,6 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     updates.status = status.value
   }
 
-  if (enableGroups.value) {
-    updates.group_ids = groupIds.value
-  }
-
   if (enableBaseUrl.value) {
     const baseUrlValue = baseUrl.value.trim()
     if (baseUrlValue) {
@@ -1827,44 +1779,8 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
   return Object.keys(updates).length > 0 ? updates : null
 }
 
-const mixedChannelConfirmed = ref(false)
-
-// 是否需要预检查：改了分组 + 全是单一的 antigravity 或 anthropic 平台
-// 多平台混合的情况由 submitBulkUpdate 的 409 catch 兜底
-const canPreCheck = () =>
-  enableGroups.value &&
-  groupIds.value.length > 0 &&
-  targetSelectedPlatforms.value.length === 1 &&
-  (targetSelectedPlatforms.value[0] === 'antigravity' || targetSelectedPlatforms.value[0] === 'anthropic')
-
 const handleClose = () => {
-  showMixedChannelWarning.value = false
-  mixedChannelWarningMessage.value = ''
-  pendingUpdatesForConfirm.value = null
-  mixedChannelConfirmed.value = false
   emit('close')
-}
-
-// 预检查：提交前调接口检测，有风险就弹窗阻止，返回 false 表示需要用户确认
-const preCheckMixedChannelRisk = async (built: Record<string, unknown>): Promise<boolean> => {
-  if (!canPreCheck()) return true
-  if (mixedChannelConfirmed.value) return true
-
-  try {
-    const result = await adminAPI.accounts.checkMixedChannelRisk({
-      platform: targetSelectedPlatforms.value[0],
-      group_ids: groupIds.value
-    })
-    if (!result.has_risk) return true
-
-    pendingUpdatesForConfirm.value = built
-    mixedChannelWarningMessage.value = result.message || t('admin.accounts.bulkEdit.failed')
-    showMixedChannelWarning.value = true
-    return false
-  } catch (error: any) {
-    appStore.showError(error.message || t('admin.accounts.bulkEdit.failed'))
-    return false
-  }
 }
 
 const handleSubmit = async () => {
@@ -1887,7 +1803,6 @@ const handleSubmit = async () => {
     enablePriority.value ||
     enableRateMultiplier.value ||
     enableStatus.value ||
-    enableGroups.value ||
     enableOpenAIWSMode.value ||
     enableOpenAIAPIKeyWSMode.value ||
     enableUpstreamBillingAutoProbe.value ||
@@ -1933,18 +1848,10 @@ const handleSubmit = async () => {
     return
   }
 
-  const canContinue = await preCheckMixedChannelRisk(built)
-  if (!canContinue) return
-
   await submitBulkUpdate(built)
 }
 
-const submitBulkUpdate = async (baseUpdates: Record<string, unknown>) => {
-  // 无论是预检查确认还是 409 兜底确认，只要 mixedChannelConfirmed 为 true 就带上 flag
-  const updates = mixedChannelConfirmed.value
-    ? { ...baseUpdates, confirm_mixed_channel_risk: true }
-    : baseUpdates
-
+const submitBulkUpdate = async (updates: Record<string, unknown>) => {
   submitting.value = true
 
   try {
@@ -1966,36 +1873,15 @@ const submitBulkUpdate = async (baseUpdates: Record<string, unknown>) => {
     }
 
     if (success > 0) {
-      pendingUpdatesForConfirm.value = null
       emit('updated')
       handleClose()
     }
   } catch (error: any) {
-    // 兜底：多平台混合场景下，预检查跳过，由后端 409 触发确认框
-    if (error.status === 409 && error.error === 'mixed_channel_warning') {
-      pendingUpdatesForConfirm.value = baseUpdates
-      mixedChannelWarningMessage.value = error.message
-      showMixedChannelWarning.value = true
-    } else {
-      appStore.showError(error.message || t('admin.accounts.bulkEdit.failed'))
-      console.error('Error bulk updating accounts:', error)
-    }
+    appStore.showError(error.message || t('admin.accounts.bulkEdit.failed'))
+    console.error('Error bulk updating accounts:', error)
   } finally {
     submitting.value = false
   }
-}
-
-const handleMixedChannelConfirm = async () => {
-  showMixedChannelWarning.value = false
-  mixedChannelConfirmed.value = true
-  if (pendingUpdatesForConfirm.value) {
-    await submitBulkUpdate(pendingUpdatesForConfirm.value)
-  }
-}
-
-const handleMixedChannelCancel = () => {
-  showMixedChannelWarning.value = false
-  pendingUpdatesForConfirm.value = null
 }
 
 // Reset form when modal closes
@@ -2015,7 +1901,6 @@ watch(
       enablePriority.value = false
       enableRateMultiplier.value = false
       enableStatus.value = false
-      enableGroups.value = false
       enableOpenAIPassthrough.value = false
       enableOpenAIFlattenNamespaces.value = false
       enableOpenAIWSMode.value = false
@@ -2045,7 +1930,6 @@ watch(
       priority.value = 1
       rateMultiplier.value = 1
       status.value = 'active'
-      groupIds.value = []
       openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       upstreamBillingAutoProbeMode.value = 'enabled'
@@ -2058,12 +1942,6 @@ watch(
       bulkRpmStrategy.value = 'tiered'
       bulkRpmStickyBuffer.value = null
       userMsgQueueMode.value = null
-
-      // Reset mixed channel warning state
-      showMixedChannelWarning.value = false
-      mixedChannelWarningMessage.value = ''
-      pendingUpdatesForConfirm.value = null
-      mixedChannelConfirmed.value = false
     }
   }
 )

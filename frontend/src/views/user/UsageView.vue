@@ -103,10 +103,6 @@
               <label class="input-label">{{ t('usage.model') }}</label>
               <Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" />
             </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.group') }}</label>
-              <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
-            </div>
             <div class="w-full sm:w-auto sm:min-w-[180px]">
               <label class="input-label">{{ t('usage.type') }}</label>
               <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
@@ -216,7 +212,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
-import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
+import { keysAPI, usageAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
@@ -237,7 +233,6 @@ import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usag
 import type {
   ApiKey,
   EndpointStat,
-  Group,
   GroupStat,
   ModelStat,
   TrendDataPoint,
@@ -358,11 +353,12 @@ const defaultViewState: UserUsageViewState = {
   page: 1,
 }
 const persistedUserFilterKeys = new Set([
-  'model', 'api_key_id', 'group_id', 'request_type', 'billing_type', 'billing_mode',
+  'model', 'api_key_id', 'request_type', 'billing_type', 'billing_mode',
 ])
+const legacyPersistedUserFilterKeys = new Set([...persistedUserFilterKeys, 'group_id'])
 const isPersistedUserFilters = (value: unknown): value is Partial<UsageQueryParams> => {
   if (!value || typeof value !== 'object') return false
-  return Object.keys(value).every((key) => persistedUserFilterKeys.has(key))
+  return Object.keys(value).every((key) => legacyPersistedUserFilterKeys.has(key))
 }
 const isUserUsageViewState = (value: unknown): value is UserUsageViewState => {
   if (!value || typeof value !== 'object') return false
@@ -380,6 +376,8 @@ const initialViewState = readPersistedViewState(
 const startDate = ref(initialViewState.startDate)
 const endDate = ref(initialViewState.endDate)
 const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
+const initialFilters: Partial<UsageQueryParams> = { ...initialViewState.filters }
+delete initialFilters.group_id
 
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
 const groupDistributionMetric = ref<DistributionMetric>('tokens')
@@ -389,7 +387,7 @@ const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
 
 const filters = ref<UsageQueryParams>({
-  ...initialViewState.filters,
+  ...initialFilters,
   start_date: startDate.value,
   end_date: endDate.value,
   request_type: undefined,
@@ -403,12 +401,12 @@ const pagination = reactive({
   total: 0,
 })
 const persistUsageViewState = () => {
-  const { model, api_key_id, group_id, request_type, billing_type, billing_mode } = filters.value
+  const { model, api_key_id, request_type, billing_type, billing_mode } = filters.value
   writePersistedViewState(USAGE_VIEW_STORAGE_KEY, {
     startDate: startDate.value,
     endDate: endDate.value,
     granularity: granularity.value,
-    filters: { model, api_key_id, group_id, request_type, billing_type, billing_mode },
+    filters: { model, api_key_id, request_type, billing_type, billing_mode },
     page: pagination.page,
   })
 }
@@ -442,16 +440,11 @@ const billingModeOptions = computed<SelectOption[]>(() => [
 ])
 
 const apiKeys = ref<ApiKey[]>([])
-const groups = ref<Group[]>([])
 const modelOptionValues = ref<string[]>([])
 
 const apiKeyOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('usage.allApiKeys') },
   ...apiKeys.value.map((key) => ({ value: key.id, label: key.name })),
-])
-const groupOptions = computed<SelectOption[]>(() => [
-  { value: null, label: t('admin.usage.allGroups') },
-  ...groups.value.map((group) => ({ value: group.id, label: group.name })),
 ])
 const modelOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('admin.usage.allModels') },
@@ -667,6 +660,14 @@ const getDisplayBillingMode = (
   return row?.billing_mode
 }
 
+const getBillingSourceExportText = (log: UsageLog): string => {
+  if (log.billing_source_type === 'subscription') {
+    return log.subscription_name || log.subscription?.plan_name_snapshot || t('usage.subscription')
+  }
+  if (log.billing_source_type === 'balance') return t('usage.balance')
+  return log.group?.name || ''
+}
+
 const escapeCSVValue = (value: unknown): string => {
   if (value == null) return ''
   const str = String(value)
@@ -701,6 +702,8 @@ const exportToCSV = async () => {
       'Model',
       'Reasoning Effort',
       'Inbound Endpoint',
+      'Platform',
+      'Billing Source',
       'IP Address',
       'Type',
       'Billing Mode',
@@ -720,6 +723,8 @@ const exportToCSV = async () => {
       log.model,
       formatReasoningEffort(log.reasoning_effort),
       log.inbound_endpoint || '',
+      log.platform_name || log.platform_code || '',
+      getBillingSourceExportText(log),
       log.ip_address || '',
       getRequestTypeExportText(log),
       getBillingModeLabel(getDisplayBillingMode(log), t),
@@ -754,16 +759,18 @@ const exportToCSV = async () => {
 }
 
 const ALWAYS_VISIBLE = ['created_at']
-const DEFAULT_HIDDEN_COLUMNS = ['ip_address', 'billing_mode', 'user_agent']
+const DEFAULT_HIDDEN_COLUMNS = ['platform', 'ip_address', 'billing_mode', 'user_agent']
 const HIDDEN_COLUMNS_KEY = 'user-usage-hidden-columns'
+const PLATFORM_COLUMN_MIGRATION_KEY = 'user-usage-hidden-columns-platform-v2'
 
 const allColumns = computed<Column[]>(() => [
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
   { key: 'model', label: t('usage.model'), sortable: true },
   { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
   { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
+  { key: 'platform', label: t('usage.platform'), sortable: false },
   { key: 'ip_address', label: 'IP', sortable: false },
-  { key: 'group', label: t('admin.usage.group'), sortable: false },
+  { key: 'group', label: t('usage.billingSource'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
   { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
@@ -784,11 +791,18 @@ const toggleColumn = (key: string) => {
   if (hiddenColumns.has(key)) hiddenColumns.delete(key)
   else hiddenColumns.add(key)
   localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
+  localStorage.setItem(PLATFORM_COLUMN_MIGRATION_KEY, '1')
 }
 const loadSavedColumns = () => {
   try {
     const saved = localStorage.getItem(HIDDEN_COLUMNS_KEY)
-    const values = saved ? JSON.parse(saved) as string[] : DEFAULT_HIDDEN_COLUMNS
+    const values = saved ? JSON.parse(saved) : [...DEFAULT_HIDDEN_COLUMNS]
+    if (!Array.isArray(values)) throw new Error('Invalid usage column preferences')
+    if (saved && localStorage.getItem(PLATFORM_COLUMN_MIGRATION_KEY) !== '1') {
+      if (!values.includes('platform')) values.push('platform')
+      localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(values))
+      localStorage.setItem(PLATFORM_COLUMN_MIGRATION_KEY, '1')
+    }
     values.forEach((key) => hiddenColumns.add(key))
   } catch {
     DEFAULT_HIDDEN_COLUMNS.forEach((key) => hiddenColumns.add(key))
@@ -862,12 +876,8 @@ const handleColumnClickOutside = (event: MouseEvent) => {
 
 const loadFilterOptions = async () => {
   try {
-    const [keys, availableGroups] = await Promise.all([
-      keysAPI.list(1, 100),
-      userGroupsAPI.getAvailable(),
-    ])
+    const keys = await keysAPI.list(1, 100)
     apiKeys.value = keys.items
-    groups.value = availableGroups
   } catch (error) {
     console.error('Failed to load usage filter options:', error)
   }

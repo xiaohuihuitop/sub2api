@@ -427,6 +427,43 @@ func TestOpenAIGatewayServiceRecordUsage_IgnoresLegacyUserSpecificGroupRate(t *t
 	require.Equal(t, 1, userRepo.deductCalls)
 }
 
+func TestOpenAIGatewayServiceRecordUsage_PlatformAssetUsesResolvedBalanceMultiplier(t *testing.T) {
+	platformID := int64(71)
+	usage := OpenAIUsage{InputTokens: 15, OutputTokens: 4, CacheReadInputTokens: 3}
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, &openAIRecordUsageSubRepoStub{}, nil)
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform:        &ResolvedPlatformModel{PlatformID: platformID, AccountPlatform: PlatformOpenAI},
+		BillingAsset:    &ResolvedBillingAsset{Source: BillingSourceBalance, RateMultiplier: 0.5},
+		SchedulingScope: PlatformSchedulingScope{PlatformID: platformID, AccountPlatform: PlatformOpenAI},
+	})
+
+	err := svc.RecordUsage(ctx, &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID: "resp_platform_balance_rate",
+			Usage:     usage,
+			Model:     "gpt-5.1",
+			Duration:  time.Second,
+		},
+		APIKey:  &APIKey{ID: 1006, Group: &Group{RateMultiplier: 3}},
+		User:    &User{ID: 2006},
+		Account: &Account{ID: 3006},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 0.5, usageRepo.lastLog.RateMultiplier)
+	require.NotNil(t, usageRepo.lastLog.PlatformID)
+	require.Equal(t, platformID, *usageRepo.lastLog.PlatformID)
+	require.NotNil(t, usageRepo.lastLog.BillingSourceType)
+	require.Equal(t, BillingSourceBalance, *usageRepo.lastLog.BillingSourceType)
+
+	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, 0.5)
+	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
+}
+
 func TestOpenAIGatewayServiceRecordUsage_PeakRateAffectsTokenModeImageOutputTokens(t *testing.T) {
 	groupID := int64(14)
 	groupRate := 1.0
@@ -2469,15 +2506,59 @@ func newOpenAITokenImageChannelPricingResolverForTest(t *testing.T, groupID int6
 
 type openAIMediaPriceGroupRepoStub struct {
 	GroupRepository
-	group *Group
-	err   error
+	group       *Group
+	err         error
+	lastGroupID int64
 }
 
-func (s *openAIMediaPriceGroupRepoStub) GetByIDLite(context.Context, int64) (*Group, error) {
+func (s *openAIMediaPriceGroupRepoStub) GetByIDLite(_ context.Context, groupID int64) (*Group, error) {
+	s.lastGroupID = groupID
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.group, nil
+}
+
+func TestOpenAIGatewayServiceAPIKeyWithFreshGroupMediaPricing_PrefersPlatformPricingGroup(t *testing.T) {
+	platformPricingGroupID := int64(133)
+	legacyKeyGroupID := int64(134)
+	platformImagePrice2K := 0.021
+	legacyImagePrice2K := 0.099
+	groupRepo := &openAIMediaPriceGroupRepoStub{group: &Group{
+		ID:             platformPricingGroupID,
+		Platform:       PlatformOpenAI,
+		RateMultiplier: 1,
+		ImagePrice2K:   &platformImagePrice2K,
+	}}
+	svc := &OpenAIGatewayService{channelService: &ChannelService{groupRepo: groupRepo}}
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID:      1,
+			AccountPlatform: PlatformOpenAI,
+		},
+		SchedulingScope: PlatformSchedulingScope{
+			PlatformID:      1,
+			AccountPlatform: PlatformOpenAI,
+		},
+		PricingGroupID: &platformPricingGroupID,
+	})
+	apiKey := &APIKey{
+		GroupID: &legacyKeyGroupID,
+		Group: &Group{
+			ID:             legacyKeyGroupID,
+			Platform:       PlatformOpenAI,
+			RateMultiplier: 1,
+			ImagePrice2K:   &legacyImagePrice2K,
+		},
+	}
+
+	refreshed := svc.apiKeyWithFreshGroupMediaPricing(ctx, apiKey)
+
+	require.NotSame(t, apiKey, refreshed)
+	require.NotNil(t, refreshed.GroupID)
+	require.Equal(t, platformPricingGroupID, *refreshed.GroupID)
+	require.Same(t, groupRepo.group, refreshed.Group)
+	require.Equal(t, platformPricingGroupID, groupRepo.lastGroupID)
 }
 
 func TestGatewayServiceCalculateRecordUsageCost_ChannelImageBillingUsesImageCount(t *testing.T) {

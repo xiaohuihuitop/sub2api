@@ -163,6 +163,19 @@
         </div>
       </div>
 
+      <div>
+        <label class="input-label">{{ t('admin.accounts.platformPool') }}</label>
+        <Select
+          v-model="form.platform_id"
+          :options="platformPoolOptions"
+          :placeholder="t('admin.accounts.platformPoolRequired')"
+          :aria-label="t('admin.accounts.platformPool')"
+        />
+        <p v-if="platformPoolOptions.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
+          {{ t('admin.accounts.noPlatformPool') }}
+        </p>
+      </div>
+
       <!-- Account Type Selection (Anthropic) -->
       <div v-if="form.platform === 'anthropic'">
         <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
@@ -3107,8 +3120,8 @@
       </div>
 
       <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
-        <!-- Mixed Scheduling (only for antigravity accounts) -->
-        <div v-if="form.platform === 'antigravity'" class="flex items-center gap-2">
+        <!-- Legacy cross-platform routing is intentionally unavailable in V2. -->
+        <div v-if="false" class="flex items-center gap-2">
           <label class="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
@@ -3136,7 +3149,7 @@
             </div>
           </div>
         </div>
-        <div v-if="form.platform === 'antigravity'" class="mt-3 flex items-center gap-2">
+        <div v-if="form.platform === 'antigravity'" class="flex items-center gap-2">
           <label class="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
@@ -3165,14 +3178,6 @@
         </div>
 
         <!-- Group Selection - 仅标准模式显示 -->
-        <GroupSelector
-          v-if="!authStore.isSimpleMode"
-          v-model="form.group_ids"
-          :groups="groups"
-          :platform="form.platform"
-          :mixed-scheduling="mixedScheduling"
-          data-tour="account-form-groups"
-        />
       </div>
 
     </form>
@@ -3513,17 +3518,6 @@
     </template>
   </BaseDialog>
 
-  <!-- Mixed Channel Warning Dialog -->
-  <ConfirmDialog
-    :show="showMixedChannelWarning"
-    :title="t('admin.accounts.mixedChannelWarningTitle')"
-    :message="mixedChannelWarningMessageText"
-    :confirm-text="t('common.confirm')"
-    :cancel-text="t('common.cancel')"
-    :danger="true"
-    @confirm="handleMixedChannelConfirm"
-    @cancel="handleMixedChannelCancel"
-  />
 </template>
 
 <script setup lang="ts">
@@ -3539,7 +3533,6 @@ import {
   fetchAntigravityDefaultMappings,
   isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
-import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
 import {
@@ -3553,24 +3546,21 @@ import { useAntigravityOAuth } from '@/composables/useAntigravityOAuth'
 import { useGrokOAuth } from '@/composables/useGrokOAuth'
 import type {
   Proxy,
-  AdminGroup,
   AccountPlatform,
   AccountType,
-  CheckMixedChannelResponse,
   CreateAccountRequest,
   CodexSessionImportMessage,
   OpenAICompactMode,
   OpenAIResponsesMode,
-  OpenAIEndpointCapability
+  OpenAIEndpointCapability,
+  PlatformPool
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
-import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import Toggle from '@/components/common/Toggle.vue'
@@ -3615,7 +3605,6 @@ interface OAuthFlowExposed {
 }
 
 const { t } = useI18n()
-const authStore = useAuthStore()
 
 const oauthStepTitle = computed(() => {
   if (form.platform === 'openai') return t('admin.accounts.oauth.openai.title')
@@ -3643,7 +3632,7 @@ const apiKeyHint = computed(() => {
 interface Props {
   show: boolean
   proxies: Proxy[]
-  groups: AdminGroup[]
+  platformPools: PlatformPool[]
 }
 
 const props = defineProps<Props>()
@@ -3942,7 +3931,6 @@ const applyOpenAIEndpointCapabilities = (credentials: Record<string, unknown>) =
 
 function buildAntigravityExtra(): Record<string, unknown> | undefined {
   const extra: Record<string, unknown> = {}
-  if (mixedScheduling.value) extra.mixed_scheduling = true
   if (allowOverages.value) extra.allow_overages = true
   return Object.keys(extra).length > 0 ? extra : undefined
 }
@@ -3950,13 +3938,6 @@ function buildAntigravityExtra(): Record<string, unknown> | undefined {
 const buildOpenAICompactModelMapping = () =>
   buildModelMappingObject('mapping', [], openAICompactModelMappings.value)
 
-const showMixedChannelWarning = ref(false)
-const mixedChannelWarningDetails = ref<{ groupName: string; currentPlatform: string; otherPlatform: string } | null>(
-  null
-)
-const mixedChannelWarningRawMessage = ref('')
-const mixedChannelWarningAction = ref<(() => Promise<void>) | null>(null)
-const antigravityMixedChannelConfirmed = ref(false)
 const showAdvancedOAuth = ref(false)
 const showGeminiHelpDialog = ref(false)
 
@@ -4035,13 +4016,6 @@ const isOpenAIModelRestrictionDisabled = computed(() =>
   form.platform === 'openai' && openaiPassthroughEnabled.value
 )
 
-const mixedChannelWarningMessageText = computed(() => {
-  if (mixedChannelWarningDetails.value) {
-    return t('admin.accounts.mixedChannelWarning', mixedChannelWarningDetails.value)
-  }
-  return mixedChannelWarningRawMessage.value
-})
-
 const geminiQuotaDocs = {
   codeAssist: 'https://developers.google.com/gemini-code-assist/resources/quotas',
   aiStudio: 'https://ai.google.dev/pricing',
@@ -4100,9 +4074,30 @@ const form = reactive({
   load_factor: null as number | null,
   priority: 1,
   rate_multiplier: 1,
-  group_ids: [] as number[],
+  platform_id: 0,
   expires_at: null as number | null
 })
+
+const platformPoolOptions = computed(() =>
+  props.platformPools
+    .filter((pool) => pool.status === 'active' && pool.account_platform === form.platform)
+    .map((pool) => ({ value: pool.id, label: `${pool.name} (${pool.code})` }))
+)
+
+const selectDefaultPlatformPool = () => {
+  if (platformPoolOptions.value.some((option) => option.value === form.platform_id)) {
+    return
+  }
+  form.platform_id = platformPoolOptions.value[0]?.value ?? 0
+}
+
+const ensurePlatformPoolSelected = () => {
+  if (platformPoolOptions.value.some((option) => option.value === form.platform_id)) {
+    return true
+  }
+  appStore.showError(t('admin.accounts.platformPoolRequired'))
+  return false
+}
 
 // Helper to check if current type needs OAuth flow
 const isOAuthFlow = computed(() => {
@@ -4152,6 +4147,7 @@ watch(
   () => props.show,
   (newVal) => {
     if (newVal) {
+      selectDefaultPlatformPool()
       // Load TLS fingerprint profiles
       adminAPI.tlsFingerprintProfiles.list()
         .then(profiles => { tlsFingerprintProfiles.value = profiles.map(p => ({ id: p.id, name: p.name })) })
@@ -4173,7 +4169,8 @@ watch(
     } else {
       resetForm()
     }
-  }
+  },
+  { immediate: true }
 )
 
 // Sync form.type based on accountCategory, addMethod, and platform-specific type
@@ -4205,6 +4202,7 @@ watch(
 watch(
   () => form.platform,
   (newPlatform) => {
+    selectDefaultPlatformPool()
     // Reset base URL based on platform
     apiKeyBaseUrl.value =
       (newPlatform === 'openai')
@@ -4290,6 +4288,11 @@ watch(
     antigravityOAuth.resetState()
     grokOAuth.resetState()
   }
+)
+
+watch(
+  () => props.platformPools,
+  () => selectDefaultPlatformPool()
 )
 
 // Gemini AI Studio OAuth availability (requires operator-configured OAuth client)
@@ -4528,85 +4531,10 @@ const splitTempUnschedKeywords = (value: string) => {
     .filter((item) => item.length > 0)
 }
 
-const needsMixedChannelCheck = (platform: AccountPlatform) => platform === 'antigravity' || platform === 'anthropic'
-
-const buildMixedChannelDetails = (resp?: CheckMixedChannelResponse) => {
-  const details = resp?.details
-  if (!details) {
-    return null
-  }
-  return {
-    groupName: details.group_name || 'Unknown',
-    currentPlatform: details.current_platform || 'Unknown',
-    otherPlatform: details.other_platform || 'Unknown'
-  }
-}
-
-const clearMixedChannelDialog = () => {
-  showMixedChannelWarning.value = false
-  mixedChannelWarningDetails.value = null
-  mixedChannelWarningRawMessage.value = ''
-  mixedChannelWarningAction.value = null
-}
-
-const openMixedChannelDialog = (opts: {
-  response?: CheckMixedChannelResponse
-  message?: string
-  onConfirm: () => Promise<void>
-}) => {
-  mixedChannelWarningDetails.value = buildMixedChannelDetails(opts.response)
-  mixedChannelWarningRawMessage.value =
-    opts.message || opts.response?.message || t('admin.accounts.failedToCreate')
-  mixedChannelWarningAction.value = opts.onConfirm
-  showMixedChannelWarning.value = true
-}
-
-const withAntigravityConfirmFlag = (payload: CreateAccountRequest): CreateAccountRequest => {
-  if (needsMixedChannelCheck(payload.platform) && antigravityMixedChannelConfirmed.value) {
-    return {
-      ...payload,
-      confirm_mixed_channel_risk: true
-    }
-  }
-  const cloned = { ...payload }
-  delete cloned.confirm_mixed_channel_risk
-  return cloned
-}
-
-const ensureAntigravityMixedChannelConfirmed = async (onConfirm: () => Promise<void>): Promise<boolean> => {
-  if (!needsMixedChannelCheck(form.platform)) {
-    return true
-  }
-  if (antigravityMixedChannelConfirmed.value) {
-    return true
-  }
-
-  try {
-    const result = await adminAPI.accounts.checkMixedChannelRisk({
-      platform: form.platform,
-      group_ids: form.group_ids
-    })
-    if (!result.has_risk) {
-      return true
-    }
-    openMixedChannelDialog({
-      response: result,
-      onConfirm: async () => {
-        antigravityMixedChannelConfirmed.value = true
-        await onConfirm()
-      }
-    })
-    return false
-  } catch (error: any) {
-    appStore.showError(error.response?.data?.message || error.response?.data?.detail || t('admin.accounts.failedToCreate'))
-    return false
-  }
-}
-
 const submitCreateAccount = async (payload: CreateAccountRequest) => {
   submitting.value = true
   try {
-    const account = await adminAPI.accounts.create(withAntigravityConfirmFlag(payload))
+    const account = await adminAPI.accounts.create(payload)
     if (
       payload.platform === 'openai' &&
       payload.type === 'apikey' &&
@@ -4622,16 +4550,6 @@ const submitCreateAccount = async (payload: CreateAccountRequest) => {
     emit('created')
     handleClose()
   } catch (error: any) {
-    if (error.response?.status === 409 && error.response?.data?.error === 'mixed_channel_warning' && needsMixedChannelCheck(form.platform)) {
-      openMixedChannelDialog({
-        message: error.response?.data?.message,
-        onConfirm: async () => {
-          antigravityMixedChannelConfirmed.value = true
-          await submitCreateAccount(payload)
-        }
-      })
-      return
-    }
     appStore.showError(error.response?.data?.message || error.response?.data?.detail || t('admin.accounts.failedToCreate'))
   } finally {
     submitting.value = false
@@ -4651,7 +4569,7 @@ const resetForm = () => {
   form.load_factor = null
   form.priority = 1
   form.rate_multiplier = 1
-  form.group_ids = []
+  form.platform_id = 0
   form.expires_at = null
   accountCategory.value = 'oauth-based'
   addMethod.value = 'oauth'
@@ -4743,13 +4661,9 @@ const resetForm = () => {
   antigravityOAuth.resetState()
   grokOAuth.resetState()
   oauthFlowRef.value?.reset()
-  antigravityMixedChannelConfirmed.value = false
-  clearMixedChannelDialog()
 }
 
 const handleClose = () => {
-  antigravityMixedChannelConfirmed.value = false
-  clearMixedChannelDialog()
   emit('close')
 }
 
@@ -4853,35 +4767,11 @@ const buildAnthropicExtra = (base?: Record<string, unknown>): Record<string, unk
   return Object.keys(extra).length > 0 ? extra : undefined
 }
 
-// Helper function to create account with mixed channel warning handling
 const doCreateAccount = async (payload: CreateAccountRequest) => {
-  const canContinue = await ensureAntigravityMixedChannelConfirmed(async () => {
-    await submitCreateAccount(payload)
-  })
-  if (!canContinue) {
+  if (!ensurePlatformPoolSelected()) {
     return
   }
   await submitCreateAccount(payload)
-}
-
-// Handle mixed channel warning confirmation
-const handleMixedChannelConfirm = async () => {
-  const action = mixedChannelWarningAction.value
-  if (!action) {
-    clearMixedChannelDialog()
-    return
-  }
-  clearMixedChannelDialog()
-  submitting.value = true
-  try {
-    await action()
-  } finally {
-    submitting.value = false
-  }
-}
-
-const handleMixedChannelCancel = () => {
-  clearMixedChannelDialog()
 }
 
 const normalizePoolModeRetryCount = (value: number) => {
@@ -4945,16 +4835,13 @@ const handleVertexServiceAccountDrop = async (event: DragEvent) => {
 }
 
 const handleSubmit = async () => {
+  if (!ensurePlatformPoolSelected()) {
+    return
+  }
   // For OAuth-based type, handle OAuth flow (goes to step 2)
   if (isOAuthFlow.value) {
     if (!isGrokSSOInputMethod.value && !form.name.trim()) {
       appStore.showError(t('admin.accounts.pleaseEnterAccountName'))
-      return
-    }
-    const canContinue = await ensureAntigravityMixedChannelConfirmed(async () => {
-      step.value = 2
-    })
-    if (!canContinue) {
       return
     }
     step.value = 2
@@ -5162,7 +5049,6 @@ const handleSubmit = async () => {
 
   await doCreateAccount({
     ...form,
-    group_ids: form.group_ids,
     extra,
     upstream_billing_probe_enabled:
       form.platform === 'openai' ? upstreamBillingAutoProbeEnabled.value : undefined,
@@ -5292,7 +5178,7 @@ const createAccountAndFinish = async (
     load_factor: form.load_factor ?? undefined,
     priority: form.priority,
     rate_multiplier: form.rate_multiplier,
-    group_ids: form.group_ids,
+    platform_id: form.platform_id,
     expires_at: form.expires_at,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
@@ -5356,7 +5242,7 @@ const handleGrokValidateRT = async (refreshTokenInput: string) => {
           load_factor: form.load_factor ?? undefined,
           priority: form.priority,
           rate_multiplier: form.rate_multiplier,
-          group_ids: form.group_ids,
+          platform_id: form.platform_id,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
         })
@@ -5418,7 +5304,7 @@ const handleGrokImportSSO = async (ssoInput: string) => {
       name: form.name || undefined,
       notes: form.notes || undefined,
       proxy_id: form.proxy_id,
-      group_ids: form.group_ids,
+      platform_id: form.platform_id,
       credentials,
       concurrency: form.concurrency,
       load_factor: form.load_factor ?? undefined,
@@ -5522,7 +5408,7 @@ const handleOpenAIExchange = async (authCode: string) => {
         load_factor: form.load_factor ?? undefined,
         priority: form.priority,
         rate_multiplier: form.rate_multiplier,
-        group_ids: form.group_ids,
+        platform_id: form.platform_id,
         expires_at: form.expires_at,
         auto_pause_on_expired: autoPauseOnExpired.value
       })
@@ -5627,7 +5513,7 @@ const handleOpenAIImportCodexSession = async (content: string) => {
       load_factor: form.load_factor ?? undefined,
       priority: form.priority,
       rate_multiplier: form.rate_multiplier,
-      group_ids: form.group_ids,
+      platform_id: form.platform_id,
       expires_at: form.expires_at,
       auto_pause_on_expired: autoPauseOnExpired.value,
       credential_extras: Object.keys(credentialExtras).length > 0 ? credentialExtras : undefined,
@@ -5705,7 +5591,7 @@ const handleOpenAIImportCodexPAT = async (accessToken: string) => {
       load_factor: form.load_factor ?? undefined,
       priority: form.priority,
       rate_multiplier: form.rate_multiplier,
-      group_ids: form.group_ids,
+      platform_id: form.platform_id,
       expires_at: form.expires_at,
       auto_pause_on_expired: autoPauseOnExpired.value,
       credential_extras: Object.keys(credentialExtras).length > 0 ? credentialExtras : undefined,
@@ -5803,7 +5689,7 @@ const handleOpenAIBatchRT = async (refreshTokenInput: string, clientId?: string)
             load_factor: form.load_factor ?? undefined,
             priority: form.priority,
             rate_multiplier: form.rate_multiplier,
-            group_ids: form.group_ids,
+            platform_id: form.platform_id,
             expires_at: form.expires_at,
             auto_pause_on_expired: autoPauseOnExpired.value
           })
@@ -5890,7 +5776,7 @@ const handleAntigravityValidateRT = async (refreshTokenInput: string) => {
         const accountName = refreshTokens.length > 1 ? `${form.name} #${i + 1}` : form.name
 
         // Note: Antigravity doesn't have buildExtraInfo, so we pass empty extra or rely on credentials
-        const createPayload = withAntigravityConfirmFlag({
+        const createPayload: CreateAccountRequest = {
           name: accountName,
           notes: form.notes,
           platform: 'antigravity',
@@ -5902,10 +5788,10 @@ const handleAntigravityValidateRT = async (refreshTokenInput: string) => {
           load_factor: form.load_factor ?? undefined,
           priority: form.priority,
           rate_multiplier: form.rate_multiplier,
-          group_ids: form.group_ids,
+          platform_id: form.platform_id,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
-        })
+        }
         await adminAPI.accounts.create(createPayload)
         successCount++
       } catch (error: any) {
@@ -6283,7 +6169,7 @@ const handleCookieAuth = async (sessionKey: string) => {
           load_factor: form.load_factor ?? undefined,
           priority: form.priority,
           rate_multiplier: form.rate_multiplier,
-          group_ids: form.group_ids,
+          platform_id: form.platform_id,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
         })
