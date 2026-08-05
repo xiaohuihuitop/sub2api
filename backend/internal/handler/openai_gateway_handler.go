@@ -143,6 +143,13 @@ func usageRecordContext(parent context.Context, base context.Context) context.Co
 	if parent == nil {
 		return base
 	}
+	// Usage recording runs after the request may have been cancelled, so the
+	// worker must use its own lifetime while retaining the resolved V2 route.
+	// Without this copy, platform attribution and the selected billing asset
+	// disappear before the usage/billing service builds its log and command.
+	if route, ok := service.GatewayPlatformAssetContextFromContext(parent); ok {
+		base = service.WithGatewayPlatformAssetContext(base, route)
+	}
 	if clientRequestID, _ := parent.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
 		base = context.WithValue(base, ctxkey.ClientRequestID, strings.TrimSpace(clientRequestID))
 	}
