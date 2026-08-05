@@ -16,6 +16,12 @@
 - 旧 Group 相关数据继续只用于历史与兼容，不能重新成为 V2 的平台授权、资产选择或倍率权威来源。
 - 每次同步 `upstream/main` 后，必须先运行产品核心与运行时桥的契约测试，再检查 V2 网关用量和平台权限回归。
 
+## 首次发布验证
+
+- `my2-v0.2.3` 使用该边界实现构建并成功发布为独立预发布镜像，未覆盖正式 `latest` 标签。
+- 部署时只替换 `sub2api` 应用容器，保留 PostgreSQL、Redis 和现有数据卷；升级前必须备份 Compose、`.env`、当前镜像信息和 PostgreSQL 归档。
+- 部署后必须检查三个容器健康状态、首页 HTTP 200、匿名入口 401，以及启动日志无 `panic`/`fatal`；真实 API Key 业务场景仍需人工验收。
+
 ## 相关文件
 
 - `docs/superpowers/specs/2026-08-05-product-core-runtime-boundary-design.md`
