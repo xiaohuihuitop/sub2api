@@ -28,10 +28,15 @@ type platformPoolLister interface {
 	List(ctx context.Context) ([]service.Platform, error)
 }
 
-// NewAPIKeyHandler creates a new APIKeyHandler
-func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
+// NewAPIKeyHandler creates a new APIKeyHandler.
+//
+// The platform-pool lister is mandatory for the V2 API Key authorization
+// selector. Keeping it in the constructor makes stale dependency injection a
+// compile-time failure instead of silently rendering an empty selector.
+func NewAPIKeyHandler(apiKeyService *service.APIKeyService, platformPools platformPoolLister) *APIKeyHandler {
 	return &APIKeyHandler{
 		apiKeyService: apiKeyService,
+		platformPools: platformPools,
 	}
 }
 

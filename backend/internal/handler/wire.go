@@ -18,9 +18,7 @@ func ProvideAdminPlatformHandler(platformService *service.PlatformService) *admi
 // ProvideAPIKeyHandler adds the read-only platform selector used by API Key
 // authorization without coupling user routes to administrator handlers.
 func ProvideAPIKeyHandler(apiKeyService *service.APIKeyService, platformService *service.PlatformService) *APIKeyHandler {
-	handler := NewAPIKeyHandler(apiKeyService)
-	handler.platformPools = platformService
-	return handler
+	return NewAPIKeyHandler(apiKeyService, platformService)
 }
 
 // ProvideAdminHandlers creates the AdminHandlers struct

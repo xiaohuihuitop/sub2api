@@ -8,6 +8,7 @@ type NavigationGuard = (
 
 const routerHarness = vi.hoisted(() => ({
   guard: null as NavigationGuard | null,
+  routeRecords: null as Array<Record<string, any>> | null,
 }))
 
 const authStore = vi.hoisted(() => ({
@@ -32,13 +33,16 @@ const appStore = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   createWebHistory: vi.fn(() => ({})),
-  createRouter: vi.fn(() => ({
-    beforeEach: vi.fn((guard: NavigationGuard) => {
-      routerHarness.guard = guard
-    }),
-    afterEach: vi.fn(),
-    onError: vi.fn(),
-  })),
+  createRouter: vi.fn((options: { routes: Array<Record<string, any>> }) => {
+    routerHarness.routeRecords = options.routes
+    return {
+      beforeEach: vi.fn((guard: NavigationGuard) => {
+        routerHarness.guard = guard
+      }),
+      afterEach: vi.fn(),
+      onError: vi.fn(),
+    }
+  }),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -117,6 +121,13 @@ describe('feature route guard', () => {
     appStore.publicSettingsLoaded = false
     appStore.cachedPublicSettings = null
     appStore.fetchPublicSettings.mockReset()
+  })
+
+  it('does not gate admin subscription plan management on checkout availability', () => {
+    const planRoute = routerHarness.routeRecords?.find((route) => route.name === 'AdminPaymentPlans')
+
+    expect(planRoute).toBeDefined()
+    expect(planRoute?.meta?.requiresPayment).toBeUndefined()
   })
 
   it('waits for the first public-settings request before deciding payment access', async () => {

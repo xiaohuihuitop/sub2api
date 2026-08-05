@@ -12,8 +12,8 @@ const {
   updateKey,
   getPublicSettings,
   getDashboardApiKeysUsage,
-  getAvailableGroups,
-  getUserGroupRates,
+  getAvailablePlatforms,
+  getActiveSubscriptions,
   showError,
   showSuccess,
   copyToClipboard,
@@ -25,8 +25,8 @@ const {
   updateKey: vi.fn(),
   getPublicSettings: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
-  getAvailableGroups: vi.fn(),
-  getUserGroupRates: vi.fn(),
+  getAvailablePlatforms: vi.fn(),
+  getActiveSubscriptions: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -67,6 +67,7 @@ vi.mock('@/api', () => ({
     update: updateKey,
     delete: vi.fn(),
     toggleStatus: vi.fn(),
+    getAvailablePlatforms,
   },
   authAPI: {
     getPublicSettings,
@@ -74,10 +75,10 @@ vi.mock('@/api', () => ({
   usageAPI: {
     getDashboardApiKeysUsage,
   },
-  userGroupsAPI: {
-    getAvailable: getAvailableGroups,
-    getUserGroupRates,
-  },
+}))
+
+vi.mock('@/api/subscriptions', () => ({
+  getActiveSubscriptions,
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -127,6 +128,9 @@ const createApiKey = (): ApiKey => ({
   created_at: '2026-06-27T00:00:00Z',
   updated_at: '2026-06-27T00:00:00Z',
   current_concurrency: 3,
+  platform_ids: [101],
+  subscription_plan_ids: [],
+  allow_balance: true,
   rate_limit_5h: 0,
   rate_limit_1d: 0,
   rate_limit_7d: 0,
@@ -243,7 +247,6 @@ const mountView = async () => {
         UseKeyModal: true,
         EndpointPopover: true,
         GroupBadge: true,
-        GroupOptionItem: true,
         Teleport: true,
       },
     },
@@ -276,8 +279,8 @@ describe('user KeysView column settings', () => {
     updateKey.mockReset()
     getPublicSettings.mockReset()
     getDashboardApiKeysUsage.mockReset()
-    getAvailableGroups.mockReset()
-    getUserGroupRates.mockReset()
+    getAvailablePlatforms.mockReset()
+    getActiveSubscriptions.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
     copyToClipboard.mockReset()
@@ -293,8 +296,10 @@ describe('user KeysView column settings', () => {
     })
     getPublicSettings.mockResolvedValue({})
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
-    getAvailableGroups.mockResolvedValue([])
-    getUserGroupRates.mockResolvedValue({})
+    getAvailablePlatforms.mockResolvedValue([
+      { id: 101, code: 'openai-primary', name: 'OpenAI Primary', account_platform: 'openai' },
+    ])
+    getActiveSubscriptions.mockResolvedValue([])
     isCurrentStep.mockReturnValue(false)
     createKey.mockResolvedValue(createApiKey())
     updateKey.mockResolvedValue(createApiKey())
@@ -306,7 +311,7 @@ describe('user KeysView column settings', () => {
     expect(visibleColumnKeys(wrapper)).toEqual([
       'name',
       'key',
-      'group',
+      'authorization',
       'current_concurrency',
       'usage',
       'expires_at',
@@ -365,7 +370,7 @@ describe('user KeysView column settings', () => {
   })
 
   it('restores column preferences from localStorage on mount', async () => {
-    localStorage.setItem('api-key-hidden-columns', JSON.stringify(['group', 'created_at']))
+    localStorage.setItem('api-key-hidden-columns', JSON.stringify(['authorization', 'created_at']))
     localStorage.setItem('api-key-column-settings-version', '1')
 
     const wrapper = await mountView()
@@ -382,7 +387,7 @@ describe('user KeysView column settings', () => {
       'actions',
     ])
     expect(localStorage.getItem('api-key-hidden-columns')).toBe(
-      JSON.stringify(['group', 'created_at', 'last_used_ip', 'id'])
+      JSON.stringify(['authorization', 'created_at', 'last_used_ip', 'id'])
     )
     expect(localStorage.getItem('api-key-column-settings-version')).toBe('3')
   })
@@ -419,7 +424,6 @@ describe('user KeysView column settings', () => {
   })
 
   it('keeps filters and selected page size when sorting by current concurrency', async () => {
-    getAvailableGroups.mockResolvedValue([{ id: 42, name: 'OpenAI' }])
     const wrapper = await mountView()
 
     await wrapper.get('[data-test="page-size-50"]').trigger('click')
@@ -430,9 +434,7 @@ describe('user KeysView column settings', () => {
     await flushPromises()
 
     const selects = wrapper.findAllComponents({ name: 'Select' })
-    await selects[0].vm.$emit('update:modelValue', 42)
-    await flushPromises()
-    await selects[1].vm.$emit('update:modelValue', 'active')
+    await selects[0].vm.$emit('update:modelValue', 'active')
     await flushPromises()
 
     listKeys.mockClear()
@@ -446,7 +448,6 @@ describe('user KeysView column settings', () => {
       {
         search: 'target',
         status: 'active',
-        group_id: 42,
         sort_by: 'current_concurrency',
         sort_order: 'asc',
       },
@@ -454,40 +455,41 @@ describe('user KeysView column settings', () => {
     )
   })
 
-  it('creates a key with balance and multiple plan groups', async () => {
-    getAvailableGroups.mockResolvedValue([
-		{ id: 30, name: 'Balance', sort_order: 3, subscription_type: 'standard', platform: 'openai' },
-		{ id: 10, name: 'Plan A', sort_order: 1, subscription_type: 'subscription', platform: 'openai' },
-		{ id: 20, name: 'Plan B', sort_order: 2, subscription_type: 'subscription', platform: 'openai' },
-	])
+  it('creates a key with independent platforms, subscription plans, and balance', async () => {
+    getAvailablePlatforms.mockResolvedValue([
+      { id: 10, code: 'openai-primary', name: 'OpenAI Primary', account_platform: 'openai' },
+      { id: 20, code: 'grok-primary', name: 'Grok Primary', account_platform: 'grok' },
+    ])
+    getActiveSubscriptions.mockResolvedValue([
+      { id: 301, subscription_plan_id: 30, plan_name_snapshot: 'Plan A' },
+      { id: 302, subscription_plan_id: 40, plan_name_snapshot: 'Plan B' },
+    ])
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
     await nextTick()
     const dialog = wrapper.get('[data-test="dialog"]')
     await dialog.get('input[type="text"]').setValue('multi-key')
-    const groupCheckboxes = dialog.findAll('[data-test="key-group-option"] input[type="checkbox"]')
-    expect(groupCheckboxes).toHaveLength(3)
-    await groupCheckboxes[0].setValue(true)
-    await groupCheckboxes[1].setValue(true)
-    await groupCheckboxes[2].setValue(true)
+    const platformCheckboxes = dialog.findAll('[data-test^="key-platform-"]')
+    const planCheckboxes = dialog.findAll('[data-test^="key-plan-"]')
+    expect(platformCheckboxes).toHaveLength(2)
+    expect(planCheckboxes).toHaveLength(2)
+    await platformCheckboxes[0].setValue(true)
+    await platformCheckboxes[1].setValue(true)
+    await planCheckboxes[0].setValue(true)
+    await planCheckboxes[1].setValue(true)
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
-    expect(createKey).toHaveBeenCalledWith(
-      'multi-key',
-      10,
-      [10, 20, 30],
-      undefined,
-      [],
-      [],
-      0,
-      undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 },
-    )
+    expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'multi-key',
+      platform_ids: [10, 20],
+      subscription_plan_ids: [30, 40],
+      allow_balance: true,
+    }))
   })
 
-  it('allows creating an unbound key', async () => {
+  it('requires a platform before creating a key', async () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
@@ -497,25 +499,16 @@ describe('user KeysView column settings', () => {
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
-    expect(showError).not.toHaveBeenCalled()
-    expect(createKey).toHaveBeenCalledWith(
-      'unbound-key', null, [], undefined, [], [], 0, undefined,
-      { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 },
-    )
+    expect(showError).toHaveBeenCalledWith('keys.platformRequired')
+    expect(createKey).not.toHaveBeenCalled()
   })
 
-  it('shows an existing unavailable plan and allows clearing it', async () => {
+  it('shows unavailable V2 permissions and allows clearing a plan when balance is enabled', async () => {
     const key = {
       ...createApiKey(),
-      group_id: 99,
-      group_ids: [99],
-      groups: [{
-        id: 99,
-        name: 'Expired Plan',
-        sort_order: 1,
-        subscription_type: 'subscription',
-        platform: 'openai',
-      }],
+      platform_ids: [99],
+      subscription_plan_ids: [99],
+      allow_balance: false,
     } as ApiKey
     listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
     const wrapper = await mountView()
@@ -523,21 +516,25 @@ describe('user KeysView column settings', () => {
     ;(wrapper.vm as unknown as { editKey: (key: ApiKey) => void }).editKey(key)
     await nextTick()
     const dialog = wrapper.get('[data-test="dialog"]')
-    const checkbox = dialog.get('[data-test="key-group-option"] input[type="checkbox"]')
-    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
-    await checkbox.setValue(false)
+    const platformCheckbox = dialog.get('[data-test="key-platform-99"]')
+    const planCheckbox = dialog.get('[data-test="key-plan-99"]')
+    expect((platformCheckbox.element as HTMLInputElement).checked).toBe(true)
+    expect((planCheckbox.element as HTMLInputElement).checked).toBe(true)
+    await dialog.get('[data-test="key-balance"]').setValue(true)
+    await planCheckbox.setValue(false)
     await dialog.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
-      group_id: null,
-      group_ids: [],
+      platform_ids: [99],
+      subscription_plan_ids: [],
+      allow_balance: true,
     }))
   })
 })
 
-describe('user KeysView multi-group editor', () => {
-  it('imports the group option component used by the multi-group checkbox list', () => {
-    expect(keysViewSource).toContain("import GroupOptionItem from '@/components/common/GroupOptionItem.vue'")
+describe('user KeysView asset permission editor', () => {
+  it('uses the V2 platform, subscription, and balance permission form', () => {
+    expect(keysViewSource).toContain("import KeyAssetPermissionsForm, { type SubscriptionPlanPermissionOption } from '@/components/keys/KeyAssetPermissionsForm.vue'")
   })
 })

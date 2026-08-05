@@ -75,4 +75,17 @@ describe('AppSidebar platform asset navigation', () => {
     expect(adminNavSource).toContain("path: '/admin/platforms'")
     expect(adminNavSource).toContain("path: '/admin/subscriptions'")
   })
+
+  it('keeps subscription plan management available when checkout is disabled', () => {
+    const start = componentSource.indexOf('const adminNavItems')
+    const end = componentSource.indexOf('function toggleSidebar', start)
+    const adminNavSource = start >= 0 && end >= 0 ? componentSource.slice(start, end) : undefined
+
+    expect(adminNavSource).toContain(
+      "{ path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon, hideInSimpleMode: true },"
+    )
+    expect(adminNavSource?.indexOf("path: '/admin/orders/plans'")).toBeLessThan(
+      adminNavSource?.indexOf("path: '/admin/orders',") ?? -1
+    )
+  })
 })

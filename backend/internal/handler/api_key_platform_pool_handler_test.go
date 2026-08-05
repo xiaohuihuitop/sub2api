@@ -24,12 +24,11 @@ func (s apiKeyPlatformPoolListerStub) List(context.Context) ([]service.Platform,
 
 func TestAPIKeyHandlerAvailablePlatformsReturnsOnlyActivePoolMetadata(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := &APIKeyHandler{
-		platformPools: apiKeyPlatformPoolListerStub{platforms: []service.Platform{
+	handler := NewAPIKeyHandler(nil, apiKeyPlatformPoolListerStub{platforms: []service.Platform{
 			{ID: 11, Code: "openai-primary", Name: "OpenAI Primary", AccountPlatform: service.PlatformOpenAI, Status: service.PlatformStatusActive},
 			{ID: 12, Code: "grok-paused", Name: "Grok Paused", AccountPlatform: service.PlatformGrok, Status: service.StatusDisabled},
-		}},
-	}
+		},
+	})
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})

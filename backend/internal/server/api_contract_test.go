@@ -231,6 +231,9 @@ func TestAPIContracts(t *testing.T) {
 					"name": "Key One",
 					"group_id": null,
 					"group_ids": [],
+					"platform_ids": [],
+					"subscription_plan_ids": [],
+					"allow_balance": true,
 					"status": "active",
 					"ip_whitelist": null,
 					"ip_blacklist": null,
@@ -283,6 +286,9 @@ func TestAPIContracts(t *testing.T) {
 							"name": "Key One",
 							"group_id": null,
 							"group_ids": [],
+							"platform_ids": [],
+							"subscription_plan_ids": [],
+							"allow_balance": false,
 							"status": "active",
 							"ip_whitelist": null,
 							"ip_blacklist": null,
@@ -1421,7 +1427,7 @@ func newContractDeps(t *testing.T) *contractDeps {
 
 	adminService := service.NewAdminService(userRepo, groupRepo, &accountRepo, proxyRepo, apiKeyRepo, redeemRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	authHandler := handler.NewAuthHandler(cfg, nil, userService, settingService, nil, redeemService, nil, nil)
-	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService)
+	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService, nil)
 	usageHandler := handler.NewUsageHandler(usageService, apiKeyService, nil, nil)
 	adminSettingHandler := adminhandler.NewSettingHandler(settingService, nil, nil, nil, nil, nil, nil)
 	adminAccountHandler := adminhandler.NewAccountHandler(adminService, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
