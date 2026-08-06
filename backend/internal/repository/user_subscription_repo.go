@@ -481,11 +481,8 @@ func (r *userSubscriptionRepository) IncrementUsage(ctx context.Context, id int6
 			weekly_usage_usd = us.weekly_usage_usd + $1,
 			monthly_usage_usd = us.monthly_usage_usd + $1,
 			updated_at = NOW()
-		FROM groups g
 		WHERE us.id = $2
 			AND us.deleted_at IS NULL
-			AND us.group_id = g.id
-			AND g.deleted_at IS NULL
 	`
 
 	client := clientFromContext(ctx, r.client)

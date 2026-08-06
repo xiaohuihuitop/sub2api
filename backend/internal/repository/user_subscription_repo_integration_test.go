@@ -823,19 +823,41 @@ func (s *UserSubscriptionRepoSuite) TestActiveExpiredBoundaries_UsageAndReset_Ba
 
 // --- 软删除过滤测试 ---
 
-func (s *UserSubscriptionRepoSuite) TestIncrementUsage_SoftDeletedGroup() {
+func (s *UserSubscriptionRepoSuite) TestIncrementUsage_IgnoresSoftDeletedLegacyGroup() {
 	user := s.mustCreateUser("softdeleted@test.com", service.RoleUser)
 	group := s.mustCreateGroup("g-softdeleted")
 	sub := s.mustCreateSubscription(user.ID, group.ID, nil)
 
-	// 软删除分组
+	// Legacy group state no longer controls subscription usage billing.
 	_, err := s.client.Group.UpdateOneID(group.ID).SetDeletedAt(time.Now()).Save(s.ctx)
 	s.Require().NoError(err, "soft delete group")
 
-	// IncrementUsage 应该失败，因为分组已软删除
+	// The subscription remains billable because its own row is still active.
 	err = s.repo.IncrementUsage(s.ctx, sub.ID, 1.0)
-	s.Require().Error(err, "should fail for soft-deleted group")
-	s.Require().ErrorIs(err, service.ErrSubscriptionNotFound)
+	s.Require().NoError(err, "should ignore legacy group state")
+
+	got, err := s.repo.GetByID(s.ctx, sub.ID)
+	s.Require().NoError(err)
+	s.Require().InDelta(1.0, got.DailyUsageUSD, 1e-6)
+}
+
+func (s *UserSubscriptionRepoSuite) TestIncrementUsage_UngroupedSubscription() {
+	user := s.mustCreateUser("ungrouped-usage@test.com", service.RoleUser)
+	now := time.Now()
+	sub, err := s.client.UserSubscription.Create().
+		SetUserID(user.ID).
+		SetStartsAt(now.Add(-time.Hour)).
+		SetExpiresAt(now.Add(24 * time.Hour)).
+		SetStatus(service.SubscriptionStatusActive).
+		SetAssignedAt(now).
+		SetNotes("").
+		Save(s.ctx)
+	s.Require().NoError(err, "create ungrouped subscription")
+
+	s.Require().NoError(s.repo.IncrementUsage(s.ctx, sub.ID, 1.25))
+	got, err := s.repo.GetByID(s.ctx, sub.ID)
+	s.Require().NoError(err)
+	s.Require().InDelta(1.25, got.DailyUsageUSD, 1e-6)
 }
 
 func (s *UserSubscriptionRepoSuite) TestIncrementUsage_NotFound() {
