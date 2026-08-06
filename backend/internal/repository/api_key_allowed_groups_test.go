@@ -100,7 +100,7 @@ func TestAPIKeyRepositoryReplaceAssetPermissionsUsesAtomicStatement(t *testing.T
 		SubscriptionPlanIDs: []int64{80, 20, 80},
 		AllowBalance:        false,
 	}
-	mock.ExpectExec(`(?s)WITH updated AS.*UPDATE api_keys.*DELETE FROM api_key_platforms.*DELETE FROM api_key_subscription_plans.*INSERT INTO api_key_subscription_plans`).
+	mock.ExpectExec(`(?s)WITH target AS.*normalized_platforms AS.*normalized_plans AS.*DELETE FROM api_key_platforms.*NOT EXISTS.*DELETE FROM api_key_subscription_plans.*NOT EXISTS.*INSERT INTO api_key_subscription_plans`).
 		WithArgs(int64(7), false, pq.Array([]int64{10, 30}), pq.Array([]int64{20, 80})).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 

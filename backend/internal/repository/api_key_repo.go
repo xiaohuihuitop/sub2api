@@ -1254,17 +1254,11 @@ func (r *apiKeyRepository) ReplaceAssetPermissions(
 ) error {
 	permissions = service.NormalizeAPIKeyAssetPermissions(permissions)
 	_, err := r.rawExecutor(ctx).ExecContext(ctx, `
-		WITH updated AS (
-			UPDATE api_keys
-			SET allow_balance = $2, updated_at = NOW()
+		WITH target AS (
+			SELECT id
+			FROM api_keys
 			WHERE id = $1 AND deleted_at IS NULL
-			RETURNING id
-		), deleted_platforms AS (
-			DELETE FROM api_key_platforms
-			WHERE api_key_id IN (SELECT id FROM updated)
-		), deleted_plans AS (
-			DELETE FROM api_key_subscription_plans
-			WHERE api_key_id IN (SELECT id FROM updated)
+			FOR UPDATE
 		), normalized_platforms AS (
 			SELECT DISTINCT platform_id
 			FROM unnest($3::bigint[]) AS platform_id
@@ -1273,15 +1267,37 @@ func (r *apiKeyRepository) ReplaceAssetPermissions(
 			SELECT DISTINCT subscription_plan_id
 			FROM unnest($4::bigint[]) AS subscription_plan_id
 			WHERE subscription_plan_id > 0
+		), deleted_platforms AS (
+			DELETE FROM api_key_platforms AS links
+			USING target
+			WHERE links.api_key_id = target.id
+			  AND NOT EXISTS (
+				SELECT 1
+				FROM normalized_platforms
+				WHERE normalized_platforms.platform_id = links.platform_id
+			  )
+		), deleted_plans AS (
+			DELETE FROM api_key_subscription_plans AS links
+			USING target
+			WHERE links.api_key_id = target.id
+			  AND NOT EXISTS (
+				SELECT 1
+				FROM normalized_plans
+				WHERE normalized_plans.subscription_plan_id = links.subscription_plan_id
+			  )
+		), updated AS (
+			UPDATE api_keys
+			SET allow_balance = $2, updated_at = NOW()
+			WHERE id IN (SELECT id FROM target)
 		), inserted_platforms AS (
 			INSERT INTO api_key_platforms (api_key_id, platform_id)
-			SELECT updated.id, normalized_platforms.platform_id
-			FROM updated CROSS JOIN normalized_platforms
+			SELECT target.id, normalized_platforms.platform_id
+			FROM target CROSS JOIN normalized_platforms
 			ON CONFLICT (api_key_id, platform_id) DO NOTHING
 		)
 		INSERT INTO api_key_subscription_plans (api_key_id, subscription_plan_id)
-		SELECT updated.id, normalized_plans.subscription_plan_id
-		FROM updated CROSS JOIN normalized_plans
+		SELECT target.id, normalized_plans.subscription_plan_id
+		FROM target CROSS JOIN normalized_plans
 		ON CONFLICT (api_key_id, subscription_plan_id) DO NOTHING
 	`, keyID, permissions.AllowBalance, pq.Array(permissions.PlatformIDs), pq.Array(permissions.SubscriptionPlanIDs))
 	return err

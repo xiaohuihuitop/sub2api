@@ -531,6 +531,39 @@ describe('user KeysView column settings', () => {
       allow_balance: true,
     }))
   })
+
+  it('submits platform and subscription selections together when editing a key', async () => {
+    const key = {
+      ...createApiKey(),
+      platform_ids: [101],
+      subscription_plan_ids: [201],
+      allow_balance: true,
+    } as ApiKey
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+    getAvailablePlatforms.mockResolvedValue([
+      { id: 101, code: 'openai-primary', name: 'OpenAI Primary', account_platform: 'openai' },
+      { id: 102, code: 'grok-primary', name: 'Grok Primary', account_platform: 'grok' },
+    ])
+    getActiveSubscriptions.mockResolvedValue([
+      { id: 301, subscription_plan_id: 201, plan_name_snapshot: 'Plan A' },
+      { id: 302, subscription_plan_id: 202, plan_name_snapshot: 'Plan B' },
+    ])
+    const wrapper = await mountView()
+
+    ;(wrapper.vm as unknown as { editKey: (key: ApiKey) => void }).editKey(key)
+    await nextTick()
+    const dialog = wrapper.get('[data-test="dialog"]')
+    await dialog.get('[data-test="key-platform-102"]').setValue(true)
+    await dialog.get('[data-test="key-plan-202"]').setValue(true)
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
+      platform_ids: [101, 102],
+      subscription_plan_ids: [201, 202],
+      allow_balance: true,
+    }))
+  })
 })
 
 describe('user KeysView asset permission editor', () => {
