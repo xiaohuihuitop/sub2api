@@ -52,7 +52,6 @@ type createPlatformRequest struct {
 	Name            string                     `json:"name" binding:"required"`
 	AccountPlatform string                     `json:"account_platform" binding:"required"`
 	Status          string                     `json:"status"`
-	LegacyGroupID   *int64                     `json:"legacy_group_id"`
 	ModelRules      []platformModelRuleRequest `json:"model_rules"`
 }
 
@@ -66,29 +65,24 @@ func (r createPlatformRequest) toServiceInput() service.CreatePlatformInput {
 		Name:            r.Name,
 		AccountPlatform: r.AccountPlatform,
 		Status:          r.Status,
-		LegacyGroupID:   r.LegacyGroupID,
 		ModelRules:      rules,
 	}
 }
 
 type updatePlatformRequest struct {
-	Code             *string                     `json:"code"`
-	Name             *string                     `json:"name"`
-	AccountPlatform  *string                     `json:"account_platform"`
-	Status           *string                     `json:"status"`
-	LegacyGroupID    *int64                      `json:"legacy_group_id"`
-	ClearLegacyGroup bool                        `json:"clear_legacy_group"`
-	ModelRules       *[]platformModelRuleRequest `json:"model_rules"`
+	Code            *string                     `json:"code"`
+	Name            *string                     `json:"name"`
+	AccountPlatform *string                     `json:"account_platform"`
+	Status          *string                     `json:"status"`
+	ModelRules      *[]platformModelRuleRequest `json:"model_rules"`
 }
 
 func (r updatePlatformRequest) toServiceInput() service.UpdatePlatformInput {
 	result := service.UpdatePlatformInput{
-		Code:             r.Code,
-		Name:             r.Name,
-		AccountPlatform:  r.AccountPlatform,
-		Status:           r.Status,
-		LegacyGroupID:    r.LegacyGroupID,
-		ClearLegacyGroup: r.ClearLegacyGroup,
+		Code:            r.Code,
+		Name:            r.Name,
+		AccountPlatform: r.AccountPlatform,
+		Status:          r.Status,
 	}
 	if r.ModelRules == nil {
 		return result
@@ -115,7 +109,6 @@ type platformResponse struct {
 	Name            string                      `json:"name"`
 	AccountPlatform string                      `json:"account_platform"`
 	Status          string                      `json:"status"`
-	LegacyGroupID   *int64                      `json:"legacy_group_id,omitempty"`
 	ModelRules      []platformModelRuleResponse `json:"model_rules"`
 }
 
@@ -142,7 +135,6 @@ func platformResponseFromService(platform *service.Platform) platformResponse {
 		Name:            platform.Name,
 		AccountPlatform: platform.AccountPlatform,
 		Status:          platform.Status,
-		LegacyGroupID:   platform.LegacyGroupID,
 		ModelRules:      rules,
 	}
 }

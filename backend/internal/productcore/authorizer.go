@@ -18,15 +18,36 @@ func (a *Authorizer) Resolve(ctx context.Context, grant AccessGrant, request Req
 	if a == nil || a.platforms == nil {
 		return nil, ErrModelUnavailable
 	}
-	platform, err := a.platforms.ResolveModel(ctx, request.Model)
+	candidates, err := a.platforms.ListModelCandidates(ctx, request.Model)
 	if err != nil {
 		return nil, err
 	}
-	if platform == nil || !allowsPlatform(grant.PlatformIDs, platform.ID) {
+	if len(candidates) == 0 {
+		return nil, ErrModelUnavailable
+	}
+
+	authorized := make([]*Platform, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate != nil && allowsPlatform(grant.PlatformIDs, candidate.ID) {
+			authorized = append(authorized, candidate)
+		}
+	}
+	if len(authorized) == 0 {
 		return nil, ErrPlatformForbidden
 	}
-	if !supportsEndpoint(platform.EndpointCapabilities, request.EndpointCapability) {
+
+	endpointCandidates := make([]*Platform, 0, len(authorized))
+	for _, candidate := range authorized {
+		if supportsEndpoint(candidate.EndpointCapabilities, request.EndpointCapability) {
+			endpointCandidates = append(endpointCandidates, candidate)
+		}
+	}
+	if len(endpointCandidates) == 0 {
 		return nil, ErrEndpointUnsupported
+	}
+	platform, err := selectPlatformCandidate(endpointCandidates)
+	if err != nil {
+		return nil, err
 	}
 	if a.assets == nil {
 		return nil, ErrNoBillingAsset
@@ -41,6 +62,29 @@ func (a *Authorizer) Resolve(ctx context.Context, grant AccessGrant, request Req
 	return &Decision{Platform: clonePlatform(*platform), BillingAsset: cloneBillingAsset(asset)}, nil
 }
 
+func selectPlatformCandidate(candidates []*Platform) (*Platform, error) {
+	if len(candidates) == 0 {
+		return nil, ErrModelUnavailable
+	}
+	best := candidates[0]
+	for _, candidate := range candidates[1:] {
+		if candidate == nil {
+			continue
+		}
+		if best == nil || candidate.MatchPriority > best.MatchPriority {
+			best = candidate
+			continue
+		}
+		if candidate.MatchPriority == best.MatchPriority && candidate.ID != best.ID {
+			return nil, ErrPlatformAmbiguous
+		}
+	}
+	if best == nil {
+		return nil, ErrModelUnavailable
+	}
+	return best, nil
+}
+
 func allowsPlatform(allowed []int64, platformID int64) bool {
 	for _, candidate := range allowed {
 		if candidate == platformID {
@@ -52,7 +96,7 @@ func allowsPlatform(allowed []int64, platformID int64) bool {
 
 func supportsEndpoint(configured []string, requested string) bool {
 	requested = strings.TrimSpace(requested)
-	if requested == "" || len(configured) == 0 {
+	if requested == "" {
 		return true
 	}
 	for _, capability := range configured {

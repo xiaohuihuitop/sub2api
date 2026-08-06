@@ -8,9 +8,10 @@ import (
 )
 
 type platformRepositoryStub struct {
-	allRules  []PlatformModelRule
-	platforms []Platform
-	created   *Platform
+	allRules    []PlatformModelRule
+	platforms   []Platform
+	created     *Platform
+	hasAccounts bool
 }
 
 func (r *platformRepositoryStub) Create(_ context.Context, platform *Platform) error {
@@ -24,6 +25,10 @@ func (r *platformRepositoryStub) ListModelRules(context.Context) ([]PlatformMode
 
 func (r *platformRepositoryStub) List(context.Context) ([]Platform, error) {
 	return append([]Platform(nil), r.platforms...), nil
+}
+
+func (r *platformRepositoryStub) HasAccountsByPlatformID(context.Context, int64) (bool, error) {
+	return r.hasAccounts, nil
 }
 
 type platformManagementRepositoryStub struct {
@@ -41,13 +46,14 @@ func (r *platformManagementRepositoryStub) Update(_ context.Context, platform *P
 	return nil
 }
 
-func TestPlatformServiceCreateRejectsCrossPlatformModelOverlap(t *testing.T) {
+func TestPlatformServiceCreateAllowsCrossPlatformModelOverlap(t *testing.T) {
 	repo := &platformRepositoryStub{
 		allRules: []PlatformModelRule{{
-			PlatformID:   1,
-			PlatformCode: PlatformOpenAI,
-			ModelPattern: "gpt-*",
-			Enabled:      true,
+			PlatformID:           1,
+			PlatformCode:         PlatformOpenAI,
+			ModelPattern:         "gpt-*",
+			EndpointCapabilities: []string{"chat_completions"},
+			Enabled:              true,
 		}},
 	}
 	svc := NewPlatformService(repo)
@@ -57,24 +63,26 @@ func TestPlatformServiceCreateRejectsCrossPlatformModelOverlap(t *testing.T) {
 		Name:            "Grok",
 		AccountPlatform: PlatformOpenAI,
 		ModelRules: []PlatformModelRule{{
-			ModelPattern: "gpt-4o",
-			Enabled:      true,
+			ModelPattern:         "gpt-4o",
+			EndpointCapabilities: []string{"responses"},
+			Enabled:              true,
 		}},
 	})
 
-	require.ErrorContains(t, err, "overlaps")
-	require.Nil(t, repo.created)
+	require.NoError(t, err)
+	require.NotNil(t, repo.created)
 }
 
 func TestPlatformServiceResolveModelUsesActiveRepositoryRules(t *testing.T) {
 	repo := &platformRepositoryStub{
 		allRules: []PlatformModelRule{{
-			ID:            22,
-			PlatformID:    2,
-			PlatformCode:  PlatformOpenAI,
-			ModelPattern:  "gpt-4o",
-			UpstreamModel: "gpt-4o-2024-08-06",
-			Enabled:       true,
+			ID:                   22,
+			PlatformID:           2,
+			PlatformCode:         PlatformOpenAI,
+			ModelPattern:         "gpt-4o",
+			UpstreamModel:        "gpt-4o-2024-08-06",
+			EndpointCapabilities: []string{"chat_completions"},
+			Enabled:              true,
 		}},
 	}
 	svc := NewPlatformService(repo)
@@ -91,10 +99,11 @@ func TestPlatformServiceUpdateReplacesOwnRuleWithoutSelfConflict(t *testing.T) {
 	repo := &platformManagementRepositoryStub{
 		platformRepositoryStub: platformRepositoryStub{
 			allRules: []PlatformModelRule{{
-				PlatformID:   1,
-				PlatformCode: PlatformOpenAI,
-				ModelPattern: "gpt-*",
-				Enabled:      true,
+				PlatformID:           1,
+				PlatformCode:         PlatformOpenAI,
+				ModelPattern:         "gpt-*",
+				EndpointCapabilities: []string{"chat_completions"},
+				Enabled:              true,
 			}},
 		},
 		platform: &Platform{
@@ -111,7 +120,7 @@ func TestPlatformServiceUpdateReplacesOwnRuleWithoutSelfConflict(t *testing.T) {
 		},
 	}
 	svc := NewPlatformService(repo)
-	rules := []PlatformModelRule{{ModelPattern: "gpt-*", Enabled: true}}
+	rules := []PlatformModelRule{{ModelPattern: "gpt-*", EndpointCapabilities: []string{"chat_completions"}, Enabled: true}}
 
 	updated, err := svc.Update(context.Background(), 1, UpdatePlatformInput{ModelRules: &rules})
 
@@ -120,6 +129,19 @@ func TestPlatformServiceUpdateReplacesOwnRuleWithoutSelfConflict(t *testing.T) {
 	require.NotNil(t, repo.updated)
 	require.Equal(t, int64(1), repo.updated.ModelRules[0].PlatformID)
 	require.Equal(t, PlatformOpenAI, repo.updated.ModelRules[0].PlatformCode)
+}
+
+func TestPlatformServiceUpdateRejectsAdapterChangeWhenAccountsExist(t *testing.T) {
+	repo := &platformManagementRepositoryStub{
+		platformRepositoryStub: platformRepositoryStub{hasAccounts: true},
+		platform:               &Platform{ID: 1, Code: "openai-main", Name: "OpenAI", AccountPlatform: PlatformOpenAI, Status: PlatformStatusActive},
+	}
+
+	anthropic := PlatformAnthropic
+	_, err := NewPlatformService(repo).Update(context.Background(), 1, UpdatePlatformInput{AccountPlatform: &anthropic})
+
+	require.ErrorIs(t, err, ErrPlatformInvalid)
+	require.Nil(t, repo.updated)
 }
 
 func TestPlatformServiceListReturnsIndependentPlatformCopies(t *testing.T) {

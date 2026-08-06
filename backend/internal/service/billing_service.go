@@ -925,7 +925,8 @@ func (s *BillingService) GetModelPricingWithChannel(model string, channelPricing
 type CostInput struct {
 	Ctx                       context.Context
 	Model                     string
-	GroupID                   *int64 // 用于渠道定价查找
+	Adapter                   string // V2 平台适配器，用于独立定价查找
+	GroupID                   *int64 // 旧渠道定价查找
 	Tokens                    UsageTokens
 	RequestCount              int    // 按次计费时使用
 	SizeTier                  string // 按次/图片模式的层级标签（"1K","2K","4K","HD" 等）
@@ -960,6 +961,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	if resolved == nil {
 		resolved = input.Resolver.Resolve(input.Ctx, PricingInput{
 			Model:   input.Model,
+			Adapter: input.Adapter,
 			GroupID: input.GroupID,
 		})
 	}

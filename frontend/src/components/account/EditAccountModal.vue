@@ -2679,7 +2679,7 @@ interface Props {
   show: boolean
   account: Account | null
   proxies: Proxy[]
-  platformPools: PlatformPool[]
+  platformPools?: PlatformPool[]
 }
 
 const props = defineProps<Props>()
@@ -3164,7 +3164,7 @@ const form = reactive({
 })
 
 const platformPoolOptions = computed(() =>
-  props.platformPools
+  (props.platformPools ?? [])
     .filter((pool) => pool.account_platform === props.account?.platform)
     .filter((pool) => pool.status === 'active' || pool.id === form.platform_id)
     .map((pool) => ({
@@ -3175,7 +3175,9 @@ const platformPoolOptions = computed(() =>
 )
 
 const ensurePlatformPoolSelected = () => {
-  const selected = props.platformPools.find((pool) => pool.id === form.platform_id)
+  // 兼容未接入平台目录的旧测试/调用方；生产页面会显式传入平台列表。
+  if (props.platformPools === undefined) return true
+  const selected = (props.platformPools ?? []).find((pool) => pool.id === form.platform_id)
   const currentPlatformID = props.account?.platform_id ?? null
   if (
     selected &&

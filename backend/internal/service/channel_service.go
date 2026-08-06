@@ -76,6 +76,16 @@ type channelGroupPlatformKey struct {
 	platform string
 }
 
+type platformModelKey struct {
+	platform string
+	model    string
+}
+
+type platformWildcardPricingEntry struct {
+	prefix  string
+	pricing *ChannelModelPricing
+}
+
 // wildcardPricingEntry 通配符定价条目
 type wildcardPricingEntry struct {
 	prefix  string
@@ -93,6 +103,8 @@ type channelCache struct {
 	// 热路径查找
 	pricingByGroupModel     map[channelModelKey]*ChannelModelPricing            // (groupID, platform, model) → 定价
 	wildcardByGroupPlatform map[channelGroupPlatformKey][]*wildcardPricingEntry // (groupID, platform) → 通配符定价（按配置顺序，先匹配先使用）
+	pricingByPlatformModel  map[platformModelKey]*ChannelModelPricing           // independent pricing catalog: (adapter, model) → pricing
+	wildcardByPlatform      map[string][]*platformWildcardPricingEntry          // independent wildcard pricing by adapter
 	mappingByGroupModel     map[channelModelKey]string                          // (groupID, platform, model) → 映射目标
 	wildcardMappingByGP     map[channelGroupPlatformKey][]*wildcardMappingEntry // (groupID, platform) → 通配符映射（按配置顺序，先匹配先使用）
 	channelByGroupID        map[int64]*Channel                                  // groupID → 渠道
@@ -205,6 +217,8 @@ func newEmptyChannelCache() *channelCache {
 	return &channelCache{
 		pricingByGroupModel:     make(map[channelModelKey]*ChannelModelPricing),
 		wildcardByGroupPlatform: make(map[channelGroupPlatformKey][]*wildcardPricingEntry),
+		pricingByPlatformModel:  make(map[platformModelKey]*ChannelModelPricing),
+		wildcardByPlatform:      make(map[string][]*platformWildcardPricingEntry),
 		mappingByGroupModel:     make(map[channelModelKey]string),
 		wildcardMappingByGP:     make(map[channelGroupPlatformKey][]*wildcardMappingEntry),
 		channelByGroupID:        make(map[int64]*Channel),
@@ -329,6 +343,7 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 		channels[i].normalizeBillingModelSource()
 		ch := &channels[i]
 		cache.byID[ch.ID] = ch
+		expandPlatformPricingToCache(cache, ch)
 		for _, gid := range ch.GroupIDs {
 			cache.channelByGroupID[gid] = ch
 			platform := groupPlatforms[gid]
@@ -338,6 +353,37 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 	}
 
 	return cache
+}
+
+// expandPlatformPricingToCache builds the independent pricing catalog from
+// explicit adapter-labelled entries. Group membership is intentionally not
+// part of this index; the request path supplies the selected adapter only.
+func expandPlatformPricingToCache(cache *channelCache, ch *Channel) {
+	if cache == nil || ch == nil || !ch.IsActive() {
+		return
+	}
+	for index := range ch.ModelPricing {
+		pricing := &ch.ModelPricing[index]
+		adapter := strings.ToLower(strings.TrimSpace(pricing.Platform))
+		if adapter == "" {
+			continue
+		}
+		for _, model := range pricing.Models {
+			model = normalizeChannelPricingModelName(model)
+			if strings.HasSuffix(model, "*") {
+				prefix := strings.TrimSuffix(model, "*")
+				cache.wildcardByPlatform[adapter] = append(cache.wildcardByPlatform[adapter], &platformWildcardPricingEntry{
+					prefix:  prefix,
+					pricing: pricing,
+				})
+				continue
+			}
+			key := platformModelKey{platform: adapter, model: model}
+			if _, exists := cache.pricingByPlatformModel[key]; !exists {
+				cache.pricingByPlatformModel[key] = pricing
+			}
+		}
+	}
 }
 
 // invalidateCache 使缓存失效，让下次读取时自然重建
@@ -512,6 +558,36 @@ func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int
 		return nil
 	}
 
+	cp := pricing.Clone()
+	return &cp
+}
+
+// GetPlatformModelPricing resolves the independent pricing catalog by adapter
+// and model. It never reads an API Key, GroupID, or group-to-channel relation.
+func (s *ChannelService) GetPlatformModelPricing(ctx context.Context, adapter, model string) *ChannelModelPricing {
+	cache, err := s.loadCache(ctx)
+	if err != nil {
+		slog.Warn("failed to load platform pricing catalog", "adapter", adapter, "error", err)
+		return nil
+	}
+	adapter = strings.ToLower(strings.TrimSpace(adapter))
+	model = normalizeChannelPricingModelName(model)
+	if adapter == "" || model == "" {
+		return nil
+	}
+	pricing := cache.pricingByPlatformModel[platformModelKey{platform: adapter, model: model}]
+	if pricing == nil {
+		bestPrefix := ""
+		for _, candidate := range cache.wildcardByPlatform[adapter] {
+			if strings.HasPrefix(model, candidate.prefix) && len(candidate.prefix) > len(bestPrefix) {
+				bestPrefix = candidate.prefix
+				pricing = candidate.pricing
+			}
+		}
+	}
+	if pricing == nil {
+		return nil
+	}
 	cp := pricing.Clone()
 	return &cp
 }

@@ -1,5 +1,9 @@
 # 平台与资产解耦 Implementation Plan
 
+> **历史计划，不再执行：** 本文件对应 `my2-v0.2.x` 第一阶段。后续不得继续执行其中的
+> 双读兼容、Legacy Key 回退或全局唯一模型平台步骤；当前设计以
+> `docs/superpowers/specs/2026-08-06-platform-pool-account-adapter-design.md` 为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **实施进度（2026-08-05）：** 本计划是最初的执行蓝图。平台、迁移、API Key

@@ -42,6 +42,36 @@ func TestResolve_NoGroupID(t *testing.T) {
 	require.Equal(t, "litellm", resolved.Source)
 }
 
+func TestResolve_WithPlatformPricingDoesNotRequireGroupID(t *testing.T) {
+	price := 10e-6
+	repo := &mockChannelRepository{
+		listAllFn: func(_ context.Context) ([]Channel, error) {
+			return []Channel{{
+				ID:     1,
+				Status: StatusActive,
+				ModelPricing: []ChannelModelPricing{{
+					Platform:    PlatformOpenAI,
+					Models:      []string{"gpt-custom"},
+					BillingMode: BillingModeToken,
+					InputPrice:  &price,
+				}},
+			}}, nil
+		},
+	}
+	resolver := NewModelPricingResolver(NewChannelService(repo, nil, nil, nil), newTestBillingServiceForResolver())
+
+	resolved := resolver.Resolve(context.Background(), PricingInput{
+		Model:   "gpt-custom",
+		Adapter: PlatformOpenAI,
+	})
+
+	require.NotNil(t, resolved)
+	require.Equal(t, PricingSourceChannel, resolved.Source)
+	require.Equal(t, BillingModeToken, resolved.Mode)
+	require.NotNil(t, resolved.BasePricing)
+	require.InDelta(t, price, resolved.BasePricing.InputPricePerToken, 1e-12)
+}
+
 func TestResolve_UnknownModel(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
 	r := NewModelPricingResolver(&ChannelService{}, bs)

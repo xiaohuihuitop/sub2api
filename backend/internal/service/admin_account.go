@@ -281,7 +281,11 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		expiresAt = &unix
 	}
 	autoPauseOnExpired := source.AutoPauseOnExpired
-	groups, groupIDs := duplicateAccountGroups(source)
+	var groups []AccountGroup
+	var groupIDs []int64
+	if source.PlatformID == nil {
+		groups, groupIDs = duplicateAccountGroups(source)
+	}
 	proxyID := source.ProxyID
 	if source.ProxyFallbackOriginID != nil {
 		// Proxy fallback is transient runtime state; duplicate the configured origin.
@@ -291,6 +295,7 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		Name:                  duplicateAccountName(source.Name),
 		Notes:                 cloneAccountValuePointer(source.Notes),
 		Platform:              source.Platform,
+		PlatformID:            cloneAccountValuePointer(source.PlatformID),
 		Type:                  source.Type,
 		Credentials:           credentials,
 		Extra:                 extra,
@@ -515,6 +520,20 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
+	if input == nil {
+		return nil, ErrAccountNilInput
+	}
+	if input.PlatformID != nil {
+		binding, err := s.resolvePlatformAccountBinding(ctx, *input.PlatformID)
+		if err != nil {
+			return nil, err
+		}
+		// Platform is a server-derived adapter snapshot. The client may select
+		// the pool, but cannot make the pool use a different protocol.
+		normalized := *input
+		normalized.Platform = binding.AccountPlatform
+		input = &normalized
+	}
 	if input.PlatformID != nil && len(input.GroupIDs) > 0 {
 		return nil, fmt.Errorf("%w: V2 platform accounts cannot be created with legacy group bindings", ErrPlatformInvalid)
 	}
@@ -612,6 +631,26 @@ func (s *adminServiceImpl) validatePlatformAccountBinding(ctx context.Context, a
 	return validator.ValidatePlatformAccountBinding(ctx, *account.PlatformID, account.Platform)
 }
 
+func (s *adminServiceImpl) resolvePlatformAccountBinding(ctx context.Context, platformID int64) (PlatformAccountBinding, error) {
+	if platformID <= 0 {
+		return PlatformAccountBinding{}, fmt.Errorf("%w: platform id is required", ErrPlatformInvalid)
+	}
+	resolver, ok := s.accountRepo.(PlatformAccountBindingResolver)
+	if !ok {
+		return PlatformAccountBinding{}, fmt.Errorf("%w: account repository cannot resolve platform pool", ErrPlatformInvalid)
+	}
+	return resolver.ResolvePlatformAccountBinding(ctx, platformID)
+}
+
+func validatePlatformAccountAdapterChange(current, target string) error {
+	current = strings.TrimSpace(current)
+	target = strings.TrimSpace(target)
+	if current == "" || target == "" || strings.EqualFold(current, target) {
+		return nil
+	}
+	return fmt.Errorf("%w: account adapter %q cannot move to platform adapter %q; create a new account instead", ErrPlatformInvalid, current, target)
+}
+
 type accountProbeEnabledAtomicUpdater interface {
 	UpdateWithUpstreamBillingProbeEnabled(context.Context, *Account, bool) error
 }
@@ -670,7 +709,15 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		account.Name = input.Name
 	}
 	if input.PlatformID != nil {
+		binding, resolveErr := s.resolvePlatformAccountBinding(ctx, *input.PlatformID)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		if adapterErr := validatePlatformAccountAdapterChange(account.Platform, binding.AccountPlatform); adapterErr != nil {
+			return nil, adapterErr
+		}
 		account.PlatformID = clonePlatformInt64Pointer(input.PlatformID)
+		account.Platform = binding.AccountPlatform
 	}
 	if input.Type != "" {
 		account.Type = input.Type

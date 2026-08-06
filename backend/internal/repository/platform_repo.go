@@ -21,6 +21,16 @@ func newPlatformRepository(db *sql.DB) *platformRepository {
 	return &platformRepository{db: db}
 }
 
+func (r *platformRepository) HasAccountsByPlatformID(ctx context.Context, platformID int64) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM accounts WHERE platform_id = $1)`, platformID,
+	).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check platform accounts: %w", err)
+	}
+	return exists, nil
+}
+
 // Create persists the platform and all of its model rules in one transaction.
 // A partial account-pool configuration must never become schedulable.
 func (r *platformRepository) Create(ctx context.Context, platform *service.Platform) error {

@@ -3,7 +3,7 @@ package productcore
 import "context"
 
 type PlatformCatalog interface {
-	ResolveModel(context.Context, string) (*Platform, error)
+	ListModelCandidates(context.Context, string) ([]*Platform, error)
 }
 
 type AssetSelector interface {

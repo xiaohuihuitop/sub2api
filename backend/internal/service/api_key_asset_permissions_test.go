@@ -124,6 +124,26 @@ func TestAPIKeyServiceUpdateReplacesExplicitAssetPermissions(t *testing.T) {
 	}}, repo.replaced)
 }
 
+func TestAPIKeyServiceUpdateClearsLegacyGroupWhenPlatformIsAuthorized(t *testing.T) {
+	legacyGroupID := int64(9)
+	platformIDs := []int64{30}
+	allowBalance := true
+	repo := &assetPermissionsAPIKeyRepoStub{apiKeyRepoStub: &apiKeyRepoStub{apiKey: &APIKey{
+		ID: 101, UserID: 7, Key: "sk-existing-key-credential", Status: StatusActive,
+		GroupID: &legacyGroupID, AllowedGroupIDs: []int64{9},
+	}}}
+	svc := &APIKeyService{apiKeyRepo: repo, userRepo: &userRepoStub{user: &User{ID: 7}}}
+
+	updated, err := svc.Update(context.Background(), 101, 7, UpdateAPIKeyRequest{
+		PlatformIDs:  &platformIDs,
+		AllowBalance: &allowBalance,
+	})
+
+	require.NoError(t, err)
+	require.Nil(t, updated.GroupID)
+	require.Empty(t, updated.AllowedGroupIDs)
+}
+
 func TestAPIKeyAuthSnapshotRoundTripPreservesAssetPermissions(t *testing.T) {
 	svc := &APIKeyService{}
 	key := &APIKey{

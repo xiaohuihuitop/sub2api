@@ -1,5 +1,9 @@
 # Subscription Billing Redesign Implementation Plan
 
+> **已完成的历史计划，不再执行：** 本文件用于追溯 `my2-v0.2.0`。后续不得继续其中的
+> Group 路由、BillingProfile 或双读迁移步骤；套餐实例规则继续保留，当前平台与定价设计
+> 以 `docs/superpowers/specs/2026-08-06-platform-pool-account-adapter-design.md` 为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Every production behavior change starts with a focused failing test and ends with the named verification command.
 
 **Goal:** 将套餐、余额定价与账号分组拆分：套餐保存金额额度、有效期和独立倍率；余额与套餐都可使用同一个账号分组；同组多个套餐实例按最早到期、再按创建时间依次使用，耗尽或过期后自动切换，最后才回退余额。

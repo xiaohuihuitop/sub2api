@@ -25,7 +25,6 @@ func gatewayPlatformAssetContextFromDecision(
 			RequestedModel:       platform.RequestedModel,
 			UpstreamModel:        platform.UpstreamModel,
 			EndpointCapabilities: append([]string(nil), platform.EndpointCapabilities...),
-			LegacyGroupID:        clonePlatformInt64Pointer(platform.LegacyPricingGroupID),
 		},
 		BillingAsset: resolvedBillingAssetFromProduct(decision.BillingAsset, subscription),
 		SchedulingScope: PlatformSchedulingScope{
@@ -33,7 +32,6 @@ func gatewayPlatformAssetContextFromDecision(
 			PlatformCode:    platform.Code,
 			AccountPlatform: platform.AccountPlatform,
 		},
-		PricingGroupID: clonePlatformInt64Pointer(platform.LegacyPricingGroupID),
 	}
 }
 

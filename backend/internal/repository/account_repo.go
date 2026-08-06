@@ -1957,22 +1957,36 @@ func (r *accountRepository) ListSchedulableByPlatformPool(ctx context.Context, p
 	return r.accountsToService(ctx, accounts)
 }
 
-func (r *accountRepository) ValidatePlatformAccountBinding(ctx context.Context, platformID int64, accountPlatform string) error {
+func (r *accountRepository) ResolvePlatformAccountBinding(ctx context.Context, platformID int64) (service.PlatformAccountBinding, error) {
 	if platformID <= 0 {
-		return fmt.Errorf("%w: platform id is required", service.ErrPlatformInvalid)
+		return service.PlatformAccountBinding{}, fmt.Errorf("%w: platform id is required", service.ErrPlatformInvalid)
 	}
 	platform, err := r.client.Platform.Query().Where(dbplatform.IDEQ(platformID)).Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
-			return service.ErrPlatformNotFound
+			return service.PlatformAccountBinding{}, service.ErrPlatformNotFound
 		}
-		return fmt.Errorf("get platform account pool: %w", err)
+		return service.PlatformAccountBinding{}, fmt.Errorf("get platform account pool: %w", err)
 	}
 	if platform.Status != service.StatusActive {
-		return fmt.Errorf("%w: platform %d is not active", service.ErrPlatformInvalid, platformID)
+		return service.PlatformAccountBinding{}, fmt.Errorf("%w: platform %d is not active", service.ErrPlatformInvalid, platformID)
 	}
-	if !strings.EqualFold(strings.TrimSpace(platform.AccountPlatform), strings.TrimSpace(accountPlatform)) {
-		return fmt.Errorf("%w: account protocol %q does not match platform protocol %q", service.ErrPlatformInvalid, accountPlatform, platform.AccountPlatform)
+	return service.PlatformAccountBinding{
+		ID:              platform.ID,
+		Code:            platform.Code,
+		AccountPlatform: platform.AccountPlatform,
+		Status:          platform.Status,
+	}, nil
+
+}
+
+func (r *accountRepository) ValidatePlatformAccountBinding(ctx context.Context, platformID int64, accountPlatform string) error {
+	binding, err := r.ResolvePlatformAccountBinding(ctx, platformID)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(strings.TrimSpace(binding.AccountPlatform), strings.TrimSpace(accountPlatform)) {
+		return fmt.Errorf("%w: account protocol %q does not match platform protocol %q", service.ErrPlatformInvalid, accountPlatform, binding.AccountPlatform)
 	}
 	return nil
 }

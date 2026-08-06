@@ -24,9 +24,9 @@ type PlatformAssetRequestAuthorizer interface {
 	Resolve(context.Context, *service.APIKey, string, string, bool) (*service.PlatformAssetResolution, error)
 }
 
-// NewPlatformAssetAuthorizationMiddleware activates only for API keys with
-// explicit platform permissions. Legacy keys continue through the group-based
-// request path unchanged.
+// NewPlatformAssetAuthorizationMiddleware applies platform authorization to
+// every model request. Keys without an explicit platform grant are rejected;
+// they are no longer allowed to fall back to legacy group routing.
 func NewPlatformAssetAuthorizationMiddleware(
 	authorizer PlatformAssetRequestAuthorizer,
 	cfg *config.Config,
@@ -62,7 +62,7 @@ func newPlatformAssetAuthorizationMiddleware(
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
-		if !ok || !service.UsesPlatformAssetPermissions(apiKey) {
+		if !ok || apiKey == nil {
 			c.Next()
 			return
 		}
@@ -157,6 +157,8 @@ func abortPlatformAssetResolutionError(c *gin.Context, err error, writeError pla
 		writeError(c, http.StatusBadRequest, "PLATFORM_MODEL_NOT_FOUND", "Model is not available for this API key")
 	case errors.Is(err, service.ErrAPIKeyPlatformForbidden):
 		writeError(c, http.StatusForbidden, "API_KEY_PLATFORM_FORBIDDEN", "API key is not authorized for this model platform")
+	case errors.Is(err, service.ErrPlatformModelAmbiguous):
+		writeError(c, http.StatusBadRequest, "PLATFORM_MODEL_AMBIGUOUS", "Model matches multiple equally preferred platforms")
 	case errors.Is(err, service.ErrPlatformEndpointUnsupported):
 		writeError(c, http.StatusForbidden, "PLATFORM_ENDPOINT_UNSUPPORTED", "The model platform does not support this endpoint")
 	case errors.Is(err, service.ErrInsufficientBalance):

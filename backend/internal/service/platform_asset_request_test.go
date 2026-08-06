@@ -18,6 +18,13 @@ func (s platformModelResolverStub) ResolveModel(context.Context, string) (*Resol
 	return s.resolved, s.err
 }
 
+func (s platformModelResolverStub) ResolveModelCandidates(context.Context, string) ([]*ResolvedPlatformModel, error) {
+	if s.resolved == nil {
+		return nil, s.err
+	}
+	return []*ResolvedPlatformModel{s.resolved}, s.err
+}
+
 func TestResolvePlatformAssetRequestRejectsUnapprovedPlatform(t *testing.T) {
 	apiKey := &APIKey{
 		UserID:             7,
@@ -133,4 +140,17 @@ func TestPlatformAssetBillingFactsOverrideLegacyGroupValues(t *testing.T) {
 	applyPlatformAssetUsageAttribution(ctx, usageLog)
 	require.Equal(t, platformID, *usageLog.PlatformID)
 	require.Equal(t, BillingSourceSubscription, *usageLog.BillingSourceType)
+}
+
+func TestEffectivePricingGroupIDDoesNotFallBackInsidePlatformRoute(t *testing.T) {
+	legacyGroupID := int64(99)
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform:        &ResolvedPlatformModel{PlatformID: 1, AccountPlatform: PlatformOpenAI},
+		SchedulingScope: PlatformSchedulingScope{PlatformID: 1, AccountPlatform: PlatformOpenAI},
+		PricingGroupID:  nil,
+	})
+	apiKey := &APIKey{GroupID: &legacyGroupID}
+
+	require.Nil(t, effectivePricingGroupID(ctx, apiKey))
+	require.Equal(t, PlatformOpenAI, effectivePricingAdapter(ctx, apiKey))
 }

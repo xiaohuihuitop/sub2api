@@ -1,5 +1,10 @@
 # 产品核心与网关运行时隔离 Implementation Plan
 
+> **已完成的历史计划：** 本文件用于追溯第一阶段边界实现，不是当前执行入口。后续继续
+> 保留 ProductCore/GatewayRuntime 分层，但不得恢复本文的 Legacy Key 或旧 Group 运行时
+> 回退；当前设计以 `docs/superpowers/specs/2026-08-06-platform-pool-account-adapter-design.md`
+> 为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在不修改 Sub2API 账号调度、OAuth 刷新、协议适配或上游重试的情况下，为 My2 V2 平台资产链路建立自有产品核心和稳定的网关运行时契约。

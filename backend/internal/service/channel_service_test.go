@@ -822,6 +822,52 @@ func TestGetChannelModelPricing_ReturnsCopy(t *testing.T) {
 	require.Equal(t, int64(100), result2.ID)
 }
 
+func TestGetPlatformModelPricing_UsesAdapterAndLongestWildcard(t *testing.T) {
+	ch := Channel{
+		ID:     1,
+		Status: StatusActive,
+		ModelPricing: []ChannelModelPricing{
+			{ID: 100, Platform: PlatformOpenAI, Models: []string{"gpt-*"}, InputPrice: testPtrFloat64(5e-6)},
+			{ID: 200, Platform: PlatformOpenAI, Models: []string{"gpt-5-*"}, InputPrice: testPtrFloat64(3e-6)},
+			{ID: 300, Platform: PlatformOpenAI, Models: []string{"gpt-5.6"}, InputPrice: testPtrFloat64(1e-6)},
+			{ID: 400, Platform: PlatformAnthropic, Models: []string{"claude-*"}, InputPrice: testPtrFloat64(15e-6)},
+		},
+	}
+	repo := &mockChannelRepository{
+		listAllFn: func(_ context.Context) ([]Channel, error) { return []Channel{ch}, nil },
+	}
+	svc := newTestChannelService(repo)
+
+	exact := svc.GetPlatformModelPricing(context.Background(), PlatformOpenAI, "gpt-5.6")
+	require.NotNil(t, exact)
+	require.Equal(t, int64(300), exact.ID)
+
+	wildcard := svc.GetPlatformModelPricing(context.Background(), PlatformOpenAI, "gpt-5-preview")
+	require.NotNil(t, wildcard)
+	require.Equal(t, int64(200), wildcard.ID)
+
+	require.Nil(t, svc.GetPlatformModelPricing(context.Background(), PlatformAnthropic, "gpt-5-preview"))
+}
+
+func TestGetPlatformModelPricing_IgnoresInactiveChannels(t *testing.T) {
+	repo := &mockChannelRepository{
+		listAllFn: func(_ context.Context) ([]Channel, error) {
+			return []Channel{{
+				ID:     1,
+				Status: StatusDisabled,
+				ModelPricing: []ChannelModelPricing{{
+					ID:       100,
+					Platform: PlatformOpenAI,
+					Models:   []string{"gpt-*"},
+				}},
+			}}, nil
+		},
+	}
+
+	svc := newTestChannelService(repo)
+	require.Nil(t, svc.GetPlatformModelPricing(context.Background(), PlatformOpenAI, "gpt-5"))
+}
+
 // --- 4.3 ResolveChannelMapping ---
 
 func TestResolveChannelMapping_NoChannel(t *testing.T) {

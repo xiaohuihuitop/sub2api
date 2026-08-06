@@ -1,5 +1,10 @@
 # My2 产品核心与 Sub2API 运行时隔离设计
 
+> **边界继续有效，兼容策略已修订：** ProductCore 与 GatewayRuntime 的职责边界继续保留；
+> 本文件中的 Legacy Key、旧 Group 路由兼容和旧定价引用仅描述第一阶段实现，已被
+> [平台唯一入口与账号适配器派生设计](2026-08-06-platform-pool-account-adapter-design.md)
+> 替代。
+
 ## 状态
 
 - 状态：已确认，等待实施

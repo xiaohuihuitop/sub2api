@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -34,6 +35,9 @@ func validatePlatformModelRules(rules []PlatformModelRule) error {
 		if rule.PlatformID <= 0 {
 			return fmt.Errorf("%w: platform id is required", ErrPlatformModelRule)
 		}
+		if len(normalizeEndpointCapabilities(rule.EndpointCapabilities)) == 0 {
+			return fmt.Errorf("%w: endpoint capabilities are required for model pattern %q", ErrPlatformModelRule, rule.ModelPattern)
+		}
 		key := fmt.Sprintf("%d:%s", rule.PlatformID, pattern)
 		if _, exists := seen[key]; exists {
 			return fmt.Errorf("%w: duplicate pattern %q on platform %d", ErrPlatformModelRule, rule.ModelPattern, rule.PlatformID)
@@ -41,37 +45,36 @@ func validatePlatformModelRules(rules []PlatformModelRule) error {
 		seen[key] = struct{}{}
 	}
 
-	return validateCrossPlatformModelPatternOverlap(rules)
-}
-
-func validateCrossPlatformModelPatternOverlap(rules []PlatformModelRule) error {
-	for left := range rules {
-		if !rules[left].Enabled {
-			continue
-		}
-		leftPattern, _, _ := normalizePlatformModelPattern(rules[left].ModelPattern)
-		for right := left + 1; right < len(rules); right++ {
-			if !rules[right].Enabled || rules[left].PlatformID == rules[right].PlatformID {
-				continue
-			}
-			rightPattern, _, _ := normalizePlatformModelPattern(rules[right].ModelPattern)
-			if platformModelPatternsOverlap(leftPattern, rightPattern) {
-				return fmt.Errorf("%w: %q overlaps %q across platforms %d and %d", ErrPlatformModelRule, rules[left].ModelPattern, rules[right].ModelPattern, rules[left].PlatformID, rules[right].PlatformID)
-			}
-		}
-	}
 	return nil
 }
 
 func (r *platformModelResolver) Resolve(requestedModel string) (*ResolvedPlatformModel, error) {
+	candidates, err := r.ListCandidates(requestedModel)
+	if err != nil {
+		return nil, err
+	}
+	if len(candidates) > 1 {
+		bestPriority := candidates[0].MatchPriority
+		bestPlatformID := candidates[0].PlatformID
+		for _, candidate := range candidates[1:] {
+			if candidate.MatchPriority != bestPriority {
+				break
+			}
+			if candidate.PlatformID != bestPlatformID {
+				return nil, ErrPlatformModelAmbiguous
+			}
+		}
+	}
+	return candidates[0], nil
+}
+
+func (r *platformModelResolver) ListCandidates(requestedModel string) ([]*ResolvedPlatformModel, error) {
 	requested := strings.TrimSpace(requestedModel)
 	if requested == "" {
 		return nil, ErrPlatformModelNotFound
 	}
 
-	var best *PlatformModelRule
-	bestExact := false
-	bestPrefixLength := -1
+	candidates := make([]*ResolvedPlatformModel, 0)
 	for index := range r.rules {
 		rule := &r.rules[index]
 		if !rule.Enabled {
@@ -81,34 +84,53 @@ func (r *platformModelResolver) Resolve(requestedModel string) (*ResolvedPlatfor
 		if err != nil || !platformModelRuleMatches(strings.ToLower(requested), pattern, wildcard) {
 			continue
 		}
-		if best == nil || shouldPreferPlatformModelRule(*rule, pattern, wildcard, *best, bestExact, bestPrefixLength) {
-			best = rule
-			bestExact = !wildcard
-			bestPrefixLength = len(strings.TrimSuffix(pattern, "*"))
-			continue
+		upstream := rule.UpstreamModel
+		if upstream == "" {
+			upstream = requested
 		}
-		if samePlatformModelRulePriority(pattern, wildcard, *best, bestExact, bestPrefixLength) {
-			return nil, ErrPlatformModelAmbiguous
+		priority := len(strings.TrimSuffix(pattern, "*"))
+		if !wildcard {
+			priority += 1_000_000
 		}
+		candidates = append(candidates, &ResolvedPlatformModel{
+			PlatformID:           rule.PlatformID,
+			PlatformCode:         rule.PlatformCode,
+			AccountPlatform:      rule.AccountPlatform,
+			RequestedModel:       requested,
+			UpstreamModel:        upstream,
+			EndpointCapabilities: append([]string(nil), rule.EndpointCapabilities...),
+			MatchPriority:        priority,
+			LegacyGroupID:        clonePlatformInt64Pointer(rule.LegacyGroupID),
+			RuleID:               rule.ID,
+		})
 	}
-	if best == nil {
+	if len(candidates) == 0 {
 		return nil, ErrPlatformModelNotFound
 	}
+	sort.SliceStable(candidates, func(left, right int) bool {
+		if candidates[left].MatchPriority != candidates[right].MatchPriority {
+			return candidates[left].MatchPriority > candidates[right].MatchPriority
+		}
+		return candidates[left].RuleID < candidates[right].RuleID
+	})
+	return candidates, nil
+}
 
-	upstream := best.UpstreamModel
-	if upstream == "" {
-		upstream = requested
+func normalizeEndpointCapabilities(capabilities []string) []string {
+	seen := make(map[string]struct{}, len(capabilities))
+	result := make([]string, 0, len(capabilities))
+	for _, capability := range capabilities {
+		capability = strings.ToLower(strings.TrimSpace(capability))
+		if capability == "" {
+			continue
+		}
+		if _, exists := seen[capability]; exists {
+			continue
+		}
+		seen[capability] = struct{}{}
+		result = append(result, capability)
 	}
-	return &ResolvedPlatformModel{
-		PlatformID:           best.PlatformID,
-		PlatformCode:         best.PlatformCode,
-		AccountPlatform:      best.AccountPlatform,
-		RequestedModel:       requested,
-		UpstreamModel:        upstream,
-		EndpointCapabilities: append([]string(nil), best.EndpointCapabilities...),
-		LegacyGroupID:        clonePlatformInt64Pointer(best.LegacyGroupID),
-		RuleID:               best.ID,
-	}, nil
+	return result
 }
 
 func normalizePlatformModelPattern(raw string) (string, bool, error) {
@@ -119,47 +141,9 @@ func normalizePlatformModelPattern(raw string) (string, bool, error) {
 	return pattern, strings.HasSuffix(pattern, "*"), nil
 }
 
-func platformModelPatternsOverlap(left, right string) bool {
-	leftPrefix, leftWildcard := strings.TrimSuffix(left, "*"), strings.HasSuffix(left, "*")
-	rightPrefix, rightWildcard := strings.TrimSuffix(right, "*"), strings.HasSuffix(right, "*")
-	switch {
-	case !leftWildcard && !rightWildcard:
-		return leftPrefix == rightPrefix
-	case leftWildcard && rightWildcard:
-		return strings.HasPrefix(leftPrefix, rightPrefix) || strings.HasPrefix(rightPrefix, leftPrefix)
-	case leftWildcard:
-		return strings.HasPrefix(rightPrefix, leftPrefix)
-	default:
-		return strings.HasPrefix(leftPrefix, rightPrefix)
-	}
-}
-
 func platformModelRuleMatches(requested, pattern string, wildcard bool) bool {
 	if wildcard {
 		return strings.HasPrefix(requested, strings.TrimSuffix(pattern, "*"))
 	}
 	return requested == pattern
-}
-
-func shouldPreferPlatformModelRule(candidate PlatformModelRule, pattern string, wildcard bool, best PlatformModelRule, bestExact bool, bestPrefixLength int) bool {
-	if !wildcard && !bestExact {
-		return true
-	}
-	if wildcard && bestExact {
-		return false
-	}
-	if wildcard {
-		return len(strings.TrimSuffix(pattern, "*")) > bestPrefixLength
-	}
-	return false
-}
-
-func samePlatformModelRulePriority(pattern string, wildcard bool, best PlatformModelRule, bestExact bool, bestPrefixLength int) bool {
-	if wildcard != !bestExact {
-		return false
-	}
-	if wildcard {
-		return len(strings.TrimSuffix(pattern, "*")) == bestPrefixLength
-	}
-	return true
 }

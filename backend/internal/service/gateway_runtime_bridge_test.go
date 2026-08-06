@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGatewayRuntimeBridgePreservesSchedulerAndPricingFacts(t *testing.T) {
+func TestGatewayRuntimeBridgeDoesNotInheritLegacyPricingFacts(t *testing.T) {
 	legacyGroupID := int64(9)
 	subscriptionID := int64(22)
 	decision := &productcore.Decision{
@@ -33,7 +33,8 @@ func TestGatewayRuntimeBridgePreservesSchedulerAndPricingFacts(t *testing.T) {
 	legacy, ok := GatewayPlatformAssetContextFromContext(ctx)
 	require.True(t, ok)
 	require.Equal(t, PlatformOpenAI, legacy.SchedulingScope.AccountPlatform)
-	require.Equal(t, legacyGroupID, *legacy.PricingGroupID)
+	require.Nil(t, legacy.PricingGroupID)
+	require.Nil(t, legacy.Platform.LegacyGroupID)
 	require.Equal(t, 0.5, legacy.BillingAsset.RateMultiplier)
 }
 

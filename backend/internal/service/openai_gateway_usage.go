@@ -347,7 +347,19 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	applyPlatformAssetUsageAttribution(ctx, usageLog)
 
 	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
-	if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
+	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.Platform != nil {
+		applyPlatformAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
+			route.Platform.AccountPlatform, result.UpstreamModel, result.Model,
+			UsageTokens{
+				InputTokens:         result.Usage.InputTokens,
+				OutputTokens:        result.Usage.OutputTokens,
+				CacheCreationTokens: result.Usage.CacheCreationInputTokens,
+				CacheReadTokens:     result.Usage.CacheReadInputTokens,
+				ImageOutputTokens:   result.Usage.ImageOutputTokens,
+			},
+			cost.TotalCost,
+		)
+	} else if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *pricingGroupID, result.UpstreamModel, result.Model,
 			tokens, cost.TotalCost,
@@ -491,11 +503,13 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageTokenCost(
 	serviceTier string,
 	longContextBillingEnabled bool,
 ) (*CostBreakdown, error) {
-	if pricingGroupID := effectivePricingGroupID(ctx, apiKey); s.resolver != nil && pricingGroupID != nil {
+	pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
+	if s.resolver != nil && (pricingInput.Adapter != "" || pricingInput.GroupID != nil) {
 		return s.billingService.CalculateCostUnified(CostInput{
 			Ctx:                       ctx,
 			Model:                     billingModel,
-			GroupID:                   pricingGroupID,
+			Adapter:                   pricingInput.Adapter,
+			GroupID:                   pricingInput.GroupID,
 			Tokens:                    tokens,
 			RequestCount:              1,
 			RateMultiplier:            multiplier,
@@ -534,11 +548,12 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	}
 	if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
-		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        pricingGroupID,
+			Adapter:        pricingInput.Adapter,
+			GroupID:        pricingInput.GroupID,
 			RequestCount:   result.ImageCount,
 			SizeTier:       sizeTier,
 			RateMultiplier: multiplier,
@@ -581,11 +596,12 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 	if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		// 渠道 per_request/image 定价保持"按请求次数"口径（价格由管理员按次配置），不乘视频时长。
-		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        pricingGroupID,
+			Adapter:        pricingInput.Adapter,
+			GroupID:        pricingInput.GroupID,
 			RequestCount:   videoCount,
 			SizeTier:       resolution,
 			RateMultiplier: multiplier,
@@ -603,6 +619,9 @@ func (s *OpenAIGatewayService) calculateOpenAIVideoCost(
 }
 
 func (s *OpenAIGatewayService) apiKeyWithFreshGroupMediaPricing(ctx context.Context, apiKey *APIKey) *APIKey {
+	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.PricingGroupID == nil {
+		return apiKey
+	}
 	pricingGroupID := effectivePricingGroupID(ctx, apiKey)
 	if apiKey == nil || pricingGroupID == nil || *pricingGroupID <= 0 {
 		return apiKey
@@ -642,11 +661,10 @@ func groupMediaPricingLooksIncomplete(group *Group) bool {
 }
 
 func (s *OpenAIGatewayService) resolveOpenAIChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
-	pricingGroupID := effectivePricingGroupID(ctx, apiKey)
-	if s.resolver == nil || pricingGroupID == nil {
+	if s.resolver == nil {
 		return nil
 	}
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: pricingGroupID})
+	resolved := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
 	if resolved.Source == PricingSourceChannel {
 		return resolved
 	}

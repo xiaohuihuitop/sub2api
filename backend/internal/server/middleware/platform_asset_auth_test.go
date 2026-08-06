@@ -39,6 +39,13 @@ func (s platformAssetModelResolverStub) ResolveModel(context.Context, string) (*
 	return s.resolved, s.err
 }
 
+func (s platformAssetModelResolverStub) ResolveModelCandidates(context.Context, string) ([]*service.ResolvedPlatformModel, error) {
+	if s.resolved == nil {
+		return nil, s.err
+	}
+	return []*service.ResolvedPlatformModel{s.resolved}, s.err
+}
+
 func TestPlatformAssetAuthorizationBuildsExplicitPlatformRouteAndPreservesBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{RunMode: config.RunModeStandard}
@@ -95,6 +102,47 @@ func TestPlatformAssetAuthorizationBuildsExplicitPlatformRouteAndPreservesBody(t
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
+func TestPlatformAssetAuthorizationRejectsKeyWithoutPlatformGrant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
+	apiKey := &service.APIKey{
+		ID: 10, UserID: user.ID, Key: "legacy-key", Status: service.StatusActive,
+		User: user, AllowBalance: true,
+	}
+	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	}, nil, nil, nil, nil, nil, cfg)
+	resolver := platformAssetModelResolverStub{resolved: &service.ResolvedPlatformModel{
+		PlatformID: 3, AccountPlatform: service.PlatformOpenAI,
+		EndpointCapabilities: []string{string(service.OpenAIEndpointCapabilityChatCompletions)},
+	}}
+
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
+	router.Use(NewPlatformAssetAuthorizationMiddleware(
+		service.NewPlatformAssetProductCoreAdapter(apiKeyService, nil, resolver), cfg,
+	))
+	router.POST("/v1/chat/completions", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "API_KEY_PLATFORM_FORBIDDEN")
+}
+
 func TestPlatformAssetAuthorizationUsesAuthorizedSubscriptionWithoutLegacyBalance(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{RunMode: config.RunModeStandard}
@@ -133,9 +181,10 @@ func TestPlatformAssetAuthorizationUsesAuthorizedSubscriptionWithoutLegacyBalanc
 	}, nil, nil, cfg)
 	t.Cleanup(subscriptionService.Stop)
 	resolver := platformAssetModelResolverStub{resolved: &service.ResolvedPlatformModel{
-		PlatformID:      3,
-		PlatformCode:    "gpt",
-		AccountPlatform: service.PlatformOpenAI,
+		PlatformID:           3,
+		PlatformCode:         "gpt",
+		AccountPlatform:      service.PlatformOpenAI,
+		EndpointCapabilities: []string{string(service.OpenAIEndpointCapabilityChatCompletions)},
 	}}
 
 	router := gin.New()

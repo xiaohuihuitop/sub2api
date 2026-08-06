@@ -7,8 +7,8 @@ import (
 
 const PlatformStatusActive = "active"
 
-// Platform owns one provider-specific account pool. LegacyGroupID only bridges
-// the existing pricing context while the old group path remains available.
+// Platform owns one provider-specific account pool. LegacyGroupID is retained
+// only for historical read paths; new routing and billing must not consult it.
 type Platform struct {
 	ID                   int64
 	Code                 string
@@ -43,14 +43,14 @@ type PlatformModelRule struct {
 	UpdatedAt            time.Time
 }
 
-// PlatformModelResolver resolves a client model to its unique active platform.
-// It keeps the request path dependent on a small capability rather than on the
-// full administrator service implementation.
+// PlatformModelResolver returns all active platform candidates for a model.
+// ProductCore applies API Key authorization and endpoint capability filtering
+// before selecting the actual platform.
 type PlatformModelResolver interface {
-	ResolveModel(ctx context.Context, requestedModel string) (*ResolvedPlatformModel, error)
+	ResolveModelCandidates(ctx context.Context, requestedModel string) ([]*ResolvedPlatformModel, error)
 }
 
-// ResolvedPlatformModel is the only valid platform target for a client model.
+// ResolvedPlatformModel is one platform target for a client model.
 type ResolvedPlatformModel struct {
 	PlatformID           int64
 	PlatformCode         string
@@ -58,6 +58,7 @@ type ResolvedPlatformModel struct {
 	RequestedModel       string
 	UpstreamModel        string
 	EndpointCapabilities []string
+	MatchPriority        int
 	LegacyGroupID        *int64
 	RuleID               int64
 }

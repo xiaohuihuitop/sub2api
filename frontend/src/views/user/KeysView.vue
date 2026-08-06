@@ -1279,11 +1279,11 @@ const billingSourceSummary = (key: ApiKey): string => {
   })
   if (key.allow_balance !== false) planNames.push(t('keys.balanceEnabled'))
   if (planNames.length) return planNames.join(' / ')
-  return key.group_id || key.group_ids?.length ? t('keys.legacyAuthorization') : t('keys.noBillingSource')
+  return t('keys.noBillingSource')
 }
 
 const primaryUsePlatform = (key: ApiKey | null) => {
-  return displayPlatforms(key)[0]?.account_platform ?? key?.group?.platform ?? null
+  return displayPlatforms(key)[0]?.account_platform ?? null
 }
 
 const copyToClipboard = async (text: string, keyId: number) => {

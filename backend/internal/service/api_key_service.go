@@ -495,14 +495,15 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
-	if createAPIKeyAssetPermissionsProvided(req) {
-		if err := ValidateAPIKeyAssetPermissions(APIKeyAssetPermissions{
-			PlatformIDs:         req.PlatformIDs,
-			SubscriptionPlanIDs: req.SubscriptionPlanIDs,
-			AllowBalance:        req.AllowBalance == nil || *req.AllowBalance,
-		}); err != nil {
-			return nil, err
-		}
+	if err := ValidateAPIKeyAssetPermissions(APIKeyAssetPermissions{
+		PlatformIDs:         req.PlatformIDs,
+		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
+		AllowBalance:        req.AllowBalance == nil || *req.AllowBalance,
+	}); err != nil {
+		return nil, err
+	}
+	if len(req.PlatformIDs) > 0 && (req.GroupID != nil || len(req.GroupIDs) > 0) {
+		return nil, ErrAPIKeyLegacyGroupUnsupported
 	}
 
 	// 验证 IP 白名单格式
@@ -849,6 +850,9 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 	groupsChanged := req.GroupID != nil || req.GroupIDs != nil
 	if groupsChanged {
+		if req.PlatformIDs != nil || len(apiKey.AllowedPlatformIDs) > 0 {
+			return nil, ErrAPIKeyLegacyGroupUnsupported
+		}
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
@@ -870,6 +874,15 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			apiKey.GroupID = &apiKey.AllowedGroups[0].ID
 			apiKey.Group = &apiKey.AllowedGroups[0]
 		}
+		fields.GroupID = true
+	}
+	if req.PlatformIDs != nil && len(apiKey.AllowedPlatformIDs) > 0 {
+		// A platform-authorized key no longer carries a second, mutable group
+		// routing source. Clear the historical fields in the same update.
+		apiKey.GroupID = nil
+		apiKey.Group = nil
+		apiKey.AllowedGroupIDs = nil
+		apiKey.AllowedGroups = nil
 		fields.GroupID = true
 	}
 

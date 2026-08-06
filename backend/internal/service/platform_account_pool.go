@@ -26,6 +26,20 @@ type PlatformAccountBindingValidator interface {
 	ValidatePlatformAccountBinding(ctx context.Context, platformID int64, accountPlatform string) error
 }
 
+// PlatformAccountBindingResolver returns the server-owned adapter snapshot for
+// one platform pool. Account create/update must derive Platform from this
+// record rather than trusting a client-supplied adapter string.
+type PlatformAccountBinding struct {
+	ID              int64
+	Code            string
+	AccountPlatform string
+	Status          string
+}
+
+type PlatformAccountBindingResolver interface {
+	ResolvePlatformAccountBinding(ctx context.Context, platformID int64) (PlatformAccountBinding, error)
+}
+
 func WithPlatformSchedulingScope(ctx context.Context, scope PlatformSchedulingScope) context.Context {
 	normalized, ok := normalizePlatformSchedulingScope(scope)
 	if ctx == nil || !ok {

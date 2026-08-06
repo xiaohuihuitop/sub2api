@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
@@ -21,9 +22,9 @@ type GatewayPlatformAssetContext struct {
 	PricingGroupID  *int64
 }
 
-// UsesPlatformAssetPermissions distinguishes explicitly migrated API keys from
-// legacy keys. A key without platform IDs must remain on the legacy path until
-// an administrator grants its new permissions explicitly.
+// UsesPlatformAssetPermissions reports whether an API Key has at least one
+// explicit platform grant. New model requests require this grant; the result
+// is not a signal to fall back to legacy group routing.
 func UsesPlatformAssetPermissions(apiKey *APIKey) bool {
 	return apiKey != nil && len(apiKey.AllowedPlatformIDs) > 0
 }
@@ -87,6 +88,14 @@ func PlatformAssetPricingGroupIDFromContext(ctx context.Context) (*int64, bool) 
 }
 
 func effectivePricingGroupID(ctx context.Context, apiKey *APIKey) *int64 {
+	if _, ok := GatewayPlatformAssetContextFromContext(ctx); ok {
+		// A V2 route is priced by its resolved adapter. Never fall back to the
+		// API key's historical GroupID after the route has been resolved.
+		if groupID, ok := PlatformAssetPricingGroupIDFromContext(ctx); ok {
+			return groupID
+		}
+		return nil
+	}
 	if groupID, ok := PlatformAssetPricingGroupIDFromContext(ctx); ok {
 		return groupID
 	}
@@ -94,6 +103,33 @@ func effectivePricingGroupID(ctx context.Context, apiKey *APIKey) *int64 {
 		return nil
 	}
 	return clonePlatformInt64Pointer(apiKey.GroupID)
+}
+
+func effectivePricingAdapter(ctx context.Context, apiKey *APIKey) string {
+	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.Platform != nil {
+		if adapter := strings.TrimSpace(route.Platform.AccountPlatform); adapter != "" {
+			return adapter
+		}
+	}
+	if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok {
+		return strings.TrimSpace(platform)
+	}
+	// Legacy API keys continue to resolve pricing through GroupID. Their group
+	// platform is a routing hint only and must not silently become a new
+	// independent pricing selector.
+	return ""
+}
+
+func pricingInputForRequest(ctx context.Context, apiKey *APIKey, model string) PricingInput {
+	input := PricingInput{
+		Model:   model,
+		Adapter: effectivePricingAdapter(ctx, apiKey),
+		GroupID: effectivePricingGroupID(ctx, apiKey),
+	}
+	if input.Adapter != "" {
+		input.GroupID = nil
+	}
+	return input
 }
 
 func overridePlatformAssetBillingMultipliers(ctx context.Context, token, image, video float64) (float64, float64, float64) {

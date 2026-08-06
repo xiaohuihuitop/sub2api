@@ -730,8 +730,20 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		requestedModel, multiplier, imageMultiplier, accountRateMultiplier, billingType, cacheTTLOverridden, cost, opts)
 	applyPlatformAssetUsageAttribution(ctx, usageLog)
 
-	// 计算账号统计定价费用（使用最终上游模型匹配自定义规则）
-	if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
+	// V2 使用解析后的适配器定价；历史 API Key 才使用旧分组统计定价。
+	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.Platform != nil {
+		applyPlatformAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
+			route.Platform.AccountPlatform, result.UpstreamModel, result.Model,
+			UsageTokens{
+				InputTokens:         result.Usage.InputTokens,
+				OutputTokens:        result.Usage.OutputTokens,
+				CacheCreationTokens: result.Usage.CacheCreationInputTokens,
+				CacheReadTokens:     result.Usage.CacheReadInputTokens,
+				ImageOutputTokens:   result.Usage.ImageOutputTokens,
+			},
+			cost.TotalCost,
+		)
+	} else if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *pricingGroupID, result.UpstreamModel, result.Model,
 			// Anthropic's input_tokens excludes cache_read and cache_creation (billed separately);
@@ -861,11 +873,10 @@ func (s *GatewayService) hasResolvableTokenPricing(ctx context.Context, model st
 // resolveChannelPricing 检查指定模型是否存在渠道级别定价。
 // 返回非 nil 的 ResolvedPricing 表示有渠道定价，nil 表示走默认定价路径。
 func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
-	pricingGroupID := effectivePricingGroupID(ctx, apiKey)
-	if s.resolver == nil || pricingGroupID == nil {
+	if s.resolver == nil {
 		return nil
 	}
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: pricingGroupID})
+	resolved := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
 	if resolved.Source == PricingSourceChannel {
 		return resolved
 	}
@@ -891,11 +902,12 @@ func (s *GatewayService) calculateImageCost(
 			OutputTokens:      result.Usage.OutputTokens,
 			ImageOutputTokens: result.Usage.ImageOutputTokens,
 		}
-		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        pricingGroupID,
+			Adapter:        pricingInput.Adapter,
+			GroupID:        pricingInput.GroupID,
 			Tokens:         tokens,
 			RequestCount:   result.ImageCount,
 			SizeTier:       sizeTier,
@@ -937,11 +949,12 @@ func (s *GatewayService) calculateTokenCost(
 
 	// 优先尝试渠道定价 → CalculateCostUnified
 	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
-		pricingGroupID := effectivePricingGroupID(ctx, apiKey)
+		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
-			GroupID:        pricingGroupID,
+			Adapter:        pricingInput.Adapter,
+			GroupID:        pricingInput.GroupID,
 			Tokens:         tokens,
 			RequestCount:   1,
 			RateMultiplier: multiplier,

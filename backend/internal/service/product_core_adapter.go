@@ -35,18 +35,28 @@ type platformCatalogAdapter struct {
 	resolver PlatformModelResolver
 }
 
-func (a platformCatalogAdapter) ResolveModel(ctx context.Context, model string) (*productcore.Platform, error) {
-	resolved, err := a.resolver.ResolveModel(ctx, model)
+func (a platformCatalogAdapter) ListModelCandidates(ctx context.Context, model string) ([]*productcore.Platform, error) {
+	resolved, err := a.resolver.ResolveModelCandidates(ctx, model)
 	if err != nil {
 		if errors.Is(err, ErrPlatformModelNotFound) {
 			return nil, productcore.ErrModelUnavailable
 		}
 		return nil, err
 	}
-	if resolved == nil {
+	if len(resolved) == 0 {
 		return nil, productcore.ErrModelUnavailable
 	}
-	return productPlatformFromResolved(resolved), nil
+	platforms := make([]*productcore.Platform, 0, len(resolved))
+	for _, candidate := range resolved {
+		if candidate == nil {
+			continue
+		}
+		platforms = append(platforms, productPlatformFromResolved(candidate))
+	}
+	if len(platforms) == 0 {
+		return nil, productcore.ErrModelUnavailable
+	}
+	return platforms, nil
 }
 
 type requestAssetSelector struct {
@@ -156,7 +166,7 @@ func productPlatformFromResolved(resolved *ResolvedPlatformModel) *productcore.P
 		RequestedModel:       resolved.RequestedModel,
 		UpstreamModel:        resolved.UpstreamModel,
 		EndpointCapabilities: append([]string(nil), resolved.EndpointCapabilities...),
-		LegacyPricingGroupID: clonePlatformInt64Pointer(resolved.LegacyGroupID),
+		MatchPriority:        resolved.MatchPriority,
 	}
 }
 
@@ -183,6 +193,8 @@ func mapProductCoreError(err error) error {
 		return ErrPlatformModelNotFound
 	case errors.Is(err, productcore.ErrPlatformForbidden):
 		return ErrAPIKeyPlatformForbidden
+	case errors.Is(err, productcore.ErrPlatformAmbiguous):
+		return ErrPlatformModelAmbiguous
 	case errors.Is(err, productcore.ErrEndpointUnsupported):
 		return ErrPlatformEndpointUnsupported
 	case errors.Is(err, productcore.ErrNoBillingAsset):

@@ -31,6 +31,10 @@ type PlatformManagementRepository interface {
 	Update(ctx context.Context, platform *Platform) error
 }
 
+type PlatformAccountOwnershipReader interface {
+	HasAccountsByPlatformID(ctx context.Context, platformID int64) (bool, error)
+}
+
 // CreatePlatformInput contains all fields that must be decided at platform
 // creation time. A platform is an account pool, never a billing asset.
 type CreatePlatformInput struct {
@@ -114,14 +118,37 @@ func (s *PlatformService) Create(ctx context.Context, input CreatePlatformInput)
 	return platform, nil
 }
 
-// ResolveModel resolves against the current durable rule set. This avoids a
-// stale in-process mapping after an administrator changes a platform.
-func (s *PlatformService) ResolveModel(ctx context.Context, requestedModel string) (*ResolvedPlatformModel, error) {
+// ResolveModelCandidates resolves against the current durable rule set. This
+// avoids a stale in-process mapping after an administrator changes a platform.
+func (s *PlatformService) ResolveModelCandidates(ctx context.Context, requestedModel string) ([]*ResolvedPlatformModel, error) {
 	rules, err := s.repo.ListModelRules(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list platform model rules: %w", err)
 	}
-	return newPlatformModelResolver(rules).Resolve(requestedModel)
+	return newPlatformModelResolver(rules).ListCandidates(requestedModel)
+}
+
+// ResolveModel remains an administrator-facing convenience for callers that
+// need the highest-priority unfiltered candidate. Gateway requests use
+// ResolveModelCandidates so authorization and endpoint filtering happen first.
+func (s *PlatformService) ResolveModel(ctx context.Context, requestedModel string) (*ResolvedPlatformModel, error) {
+	candidates, err := s.ResolveModelCandidates(ctx, requestedModel)
+	if err != nil {
+		return nil, err
+	}
+	if len(candidates) > 1 {
+		bestPriority := candidates[0].MatchPriority
+		bestPlatformID := candidates[0].PlatformID
+		for _, candidate := range candidates[1:] {
+			if candidate.MatchPriority != bestPriority {
+				break
+			}
+			if candidate.PlatformID != bestPlatformID {
+				return nil, ErrPlatformModelAmbiguous
+			}
+		}
+	}
+	return candidates[0], nil
 }
 
 func (s *PlatformService) Update(ctx context.Context, id int64, input UpdatePlatformInput) (*Platform, error) {
@@ -136,6 +163,17 @@ func (s *PlatformService) Update(ctx context.Context, id int64, input UpdatePlat
 	candidate := clonePlatform(current)
 	if err := applyPlatformUpdate(candidate, input); err != nil {
 		return nil, err
+	}
+	if !strings.EqualFold(current.AccountPlatform, candidate.AccountPlatform) {
+		if ownership, ok := s.repo.(PlatformAccountOwnershipReader); ok {
+			hasAccounts, ownershipErr := ownership.HasAccountsByPlatformID(ctx, id)
+			if ownershipErr != nil {
+				return nil, fmt.Errorf("check platform account ownership: %w", ownershipErr)
+			}
+			if hasAccounts {
+				return nil, fmt.Errorf("%w: platform adapter cannot change while accounts are attached; create a new platform", ErrPlatformInvalid)
+			}
+		}
 	}
 	candidate.ModelRules = bindPlatformToRules(candidate.ModelRules, candidate.ID, candidate.Code)
 	if err := s.validateCandidate(ctx, candidate, candidate.ID); err != nil {

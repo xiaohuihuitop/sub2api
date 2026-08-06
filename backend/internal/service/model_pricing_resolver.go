@@ -42,22 +42,31 @@ type ResolvedPricing struct {
 // ModelPricingResolver 统一模型定价解析器。
 // 解析链：Channel → LiteLLM → Fallback。
 type ModelPricingResolver struct {
-	channelService *ChannelService
-	billingService *BillingService
+	channelService  *ChannelService
+	billingService  *BillingService
+	platformPricing PlatformPricingCatalog
+}
+
+// PlatformPricingCatalog resolves model pricing by the selected account
+// adapter. It deliberately has no API key or legacy group input.
+type PlatformPricingCatalog interface {
+	GetPlatformModelPricing(context.Context, string, string) *ChannelModelPricing
 }
 
 // NewModelPricingResolver 创建定价解析器实例
 func NewModelPricingResolver(channelService *ChannelService, billingService *BillingService) *ModelPricingResolver {
 	return &ModelPricingResolver{
-		channelService: channelService,
-		billingService: billingService,
+		channelService:  channelService,
+		billingService:  billingService,
+		platformPricing: channelService,
 	}
 }
 
 // PricingInput 定价解析输入
 type PricingInput struct {
 	Model   string
-	GroupID *int64 // nil 表示不检查渠道
+	Adapter string // resolved account adapter; independent pricing path
+	GroupID *int64 // legacy channel pricing lookup
 }
 
 // Resolve 解析模型定价。
@@ -65,7 +74,10 @@ type PricingInput struct {
 // 2. 如果指定了 GroupID，查找渠道定价并覆盖
 func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) *ResolvedPricing {
 	var chPricing *ChannelModelPricing
-	if input.GroupID != nil && r.channelService != nil {
+	if input.Adapter != "" && r.platformPricing != nil {
+		chPricing = r.platformPricing.GetPlatformModelPricing(ctx, input.Adapter, input.Model)
+	}
+	if chPricing == nil && input.Adapter == "" && input.GroupID != nil && r.channelService != nil {
 		chPricing = r.channelService.GetChannelModelPricing(ctx, *input.GroupID, input.Model)
 		if chPricing != nil {
 			mode := chPricing.BillingMode
@@ -99,7 +111,7 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 		resolved.Source = PricingSourceChannel
 		resolved.channelPricing = chPricing
 		r.applyTokenOverrides(chPricing, resolved)
-	} else if input.GroupID != nil {
+	} else if input.GroupID != nil && input.Adapter == "" {
 		r.applyChannelOverrides(ctx, *input.GroupID, input.Model, resolved)
 	}
 

@@ -39,7 +39,11 @@ func TestPlatformAssetProductCoreAdapterFallsBackToBalance(t *testing.T) {
 			candidates:   []UserSubscription{{ID: 21, UserID: 7, SubscriptionPlanID: int64Pointer(17)}},
 			validateErrs: map[int64]error{21: ErrDailyLimitExceeded},
 		},
-		platformModelResolverStub{resolved: &ResolvedPlatformModel{PlatformID: 3, AccountPlatform: PlatformOpenAI}},
+		platformModelResolverStub{resolved: &ResolvedPlatformModel{
+			PlatformID:           3,
+			AccountPlatform:      PlatformOpenAI,
+			EndpointCapabilities: []string{string(OpenAIEndpointCapabilityChatCompletions)},
+		}},
 	)
 	resolution, err := fallback.Resolve(context.Background(), apiKeyWithPlatformAndPlan(3, 17),
 		"gpt-4o", "/v1/chat/completions", false)

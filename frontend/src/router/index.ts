@@ -468,7 +468,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Platform Pools',
+      title: 'Platforms',
       titleKey: 'admin.platforms.title',
       descriptionKey: 'admin.platforms.description'
     }

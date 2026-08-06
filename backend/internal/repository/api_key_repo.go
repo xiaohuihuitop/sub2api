@@ -844,8 +844,29 @@ func (r *apiKeyRepository) loadAssetPermissionIDs(
 	table, column string,
 	assign func(*service.APIKey, int64),
 ) error {
-	query := fmt.Sprintf("SELECT api_key_id, %s FROM %s WHERE api_key_id = ANY($1::bigint[])", column, table)
-	rows, err := r.rawExecutor(ctx).QueryContext(ctx, query, pq.Array(keyIDs))
+	if len(keyIDs) == 0 {
+		return nil
+	}
+
+	var query string
+	var args []any
+	// Lightweight sqlmock repositories do not carry an Ent client; retain the
+	// historical PostgreSQL query shape for those callers.
+	isPostgres := r.client == nil || r.client.Driver().Dialect() == dialect.Postgres
+	if isPostgres {
+		query = fmt.Sprintf("SELECT api_key_id, %s FROM %s WHERE api_key_id = ANY($1::bigint[])", column, table)
+		args = []any{pq.Array(keyIDs)}
+	} else {
+		placeholders := make([]string, len(keyIDs))
+		args = make([]any, len(keyIDs))
+		for i, keyID := range keyIDs {
+			placeholders[i] = "?"
+			args[i] = keyID
+		}
+		query = fmt.Sprintf("SELECT api_key_id, %s FROM %s WHERE api_key_id IN (%s)", column, table, strings.Join(placeholders, ", "))
+	}
+
+	rows, err := r.rawExecutor(ctx).QueryContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}

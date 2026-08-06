@@ -295,6 +295,7 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 				{
 					"name":        "acc",
 					"platform":    service.PlatformOpenAI,
+					"platform_id": 42,
 					"type":        service.AccountTypeOAuth,
 					"credentials": map[string]any{"token": "x"},
 					"proxy_key":   "socks5|1.2.3.4|1080|u|p",

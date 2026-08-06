@@ -1,5 +1,9 @@
 # Sub2API 订阅与计费重构设计
 
+> **历史设计：** 本文件记录 `my2-v0.2.0` 的 Group/BillingProfile 过渡模型。
+> 套餐实例快照、套餐优先和余额回退继续有效；Group 路由、BillingProfile 和迁移兼容
+> 已被 `2026-08-06-platform-pool-account-adapter-design.md` 替代。
+
 ## 状态
 
 - 状态：已实施；迁移、后端、前端和定向验证已于 2026-08-04 完成

@@ -245,3 +245,40 @@ func applyAccountStatsCost(
 		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost,
 	)
 }
+
+// applyPlatformAccountStatsCost prices a V2 usage record from the resolved
+// adapter catalog. It intentionally has no group lookup or legacy fallback.
+func applyPlatformAccountStatsCost(
+	ctx context.Context,
+	usageLog *UsageLog,
+	cs *ChannelService,
+	bs *BillingService,
+	adapter, upstreamModel, requestedModel string,
+	tokens UsageTokens,
+	totalCost float64,
+) {
+	if usageLog == nil {
+		return
+	}
+	model := upstreamModel
+	if model == "" {
+		model = requestedModel
+	}
+	requestCount := 1
+	if usageLog.ImageCount > 0 {
+		requestCount = usageLog.ImageCount
+	}
+	if cs != nil {
+		if pricing := cs.GetPlatformModelPricing(ctx, adapter, model); pricing != nil {
+			usageLog.AccountStatsCost = calculateStatsCost(pricing, tokens, requestCount)
+			if usageLog.AccountStatsCost != nil {
+				return
+			}
+		}
+	}
+	if totalCost > 0 {
+		// The platform catalog is authoritative when configured. If it has no
+		// entry, preserve the standard upstream pricing fallback for stats.
+		usageLog.AccountStatsCost = tryModelFilePricing(bs, model, tokens)
+	}
+}

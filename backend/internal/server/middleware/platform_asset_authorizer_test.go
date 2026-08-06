@@ -89,8 +89,8 @@ func TestPlatformAssetAuthorizationUsesFacadeAndKeepsSubscriptionContext(t *test
 	require.Equal(t, 1, authorizer.calls)
 }
 
-func TestPlatformAssetAuthorizationSkipsFacadeForLegacyKey(t *testing.T) {
-	authorizer := &platformAssetAuthorizerStub{t: t}
+func TestPlatformAssetAuthorizationFacadeRejectsKeyWithoutPlatformGrant(t *testing.T) {
+	authorizer := &platformAssetAuthorizerStub{t: t, err: service.ErrAPIKeyPlatformForbidden}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set(string(ContextKeyAPIKey), &service.APIKey{})
@@ -103,8 +103,9 @@ func TestPlatformAssetAuthorizationSkipsFacadeForLegacyKey(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o"}`))
 	router.ServeHTTP(response, request)
 
-	require.Equal(t, http.StatusNoContent, response.Code)
-	require.Zero(t, authorizer.calls)
+	require.Equal(t, http.StatusForbidden, response.Code)
+	require.Contains(t, response.Body.String(), "API_KEY_PLATFORM_FORBIDDEN")
+	require.Equal(t, 1, authorizer.calls)
 }
 
 func TestPlatformAssetAuthorizationKeepsEndpointErrorEnvelope(t *testing.T) {

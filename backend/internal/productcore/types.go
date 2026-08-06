@@ -22,6 +22,7 @@ type Platform struct {
 	RequestedModel       string
 	UpstreamModel        string
 	EndpointCapabilities []string
+	MatchPriority        int
 	LegacyPricingGroupID *int64
 }
 

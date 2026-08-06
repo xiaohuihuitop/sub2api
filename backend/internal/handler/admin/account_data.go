@@ -60,7 +60,8 @@ type DataProxy struct {
 type DataAccount struct {
 	Name               string         `json:"name"`
 	Notes              *string        `json:"notes,omitempty"`
-	Platform           string         `json:"platform"`
+	Platform           string         `json:"platform,omitempty"` // deprecated display snapshot; platform_id is authoritative
+	PlatformID         *int64         `json:"platform_id"`
 	Type               string         `json:"type"`
 	Credentials        map[string]any `json:"credentials"`
 	Extra              map[string]any `json:"extra,omitempty"`
@@ -199,10 +200,16 @@ func (h *AccountHandler) ExportData(c *gin.Context) {
 			v := acc.ExpiresAt.Unix()
 			expiresAt = &v
 		}
+		var platformID *int64
+		if acc.PlatformID != nil {
+			v := *acc.PlatformID
+			platformID = &v
+		}
 		dataAccounts = append(dataAccounts, DataAccount{
 			Name:               acc.Name,
 			Notes:              acc.Notes,
 			Platform:           acc.Platform,
+			PlatformID:         platformID,
 			Type:               acc.Type,
 			Credentials:        acc.Credentials,
 			Extra:              acc.Extra,
@@ -433,6 +440,7 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 			Name:                 item.Name,
 			Notes:                item.Notes,
 			Platform:             item.Platform,
+			PlatformID:           item.PlatformID,
 			Type:                 item.Type,
 			Credentials:          item.Credentials,
 			Extra:                item.Extra,
@@ -680,7 +688,10 @@ func validateDataAccount(item DataAccount) error {
 		return errors.New("account name is required")
 	}
 	if strings.TrimSpace(item.Platform) == "" {
-		return errors.New("account platform is required")
+		return errors.New("account platform snapshot is required")
+	}
+	if item.PlatformID == nil || *item.PlatformID <= 0 {
+		return errors.New("account platform_id is required")
 	}
 	if strings.TrimSpace(item.Type) == "" {
 		return errors.New("account type is required")

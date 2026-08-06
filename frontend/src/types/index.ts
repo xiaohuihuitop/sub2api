@@ -846,7 +846,6 @@ export interface PlatformPool {
   name: string
   account_platform: AccountPlatform
   status: 'active' | 'disabled'
-  legacy_group_id?: number | null
   model_rules: PlatformModelRule[]
 }
 
@@ -864,7 +863,6 @@ export interface CreatePlatformPoolRequest {
   name: string
   account_platform: AccountPlatform
   status?: 'active' | 'disabled'
-  legacy_group_id?: number | null
   model_rules?: PlatformModelRule[]
 }
 
@@ -873,8 +871,6 @@ export interface UpdatePlatformPoolRequest {
   name?: string
   account_platform?: AccountPlatform
   status?: 'active' | 'disabled'
-  legacy_group_id?: number | null
-  clear_legacy_group?: boolean
   model_rules?: PlatformModelRule[]
 }
 
