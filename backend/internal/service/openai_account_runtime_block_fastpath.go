@@ -259,12 +259,16 @@ func (s *OpenAIGatewayService) getOpenAIAccountModelTransientState() *openAIAcco
 	return s.openaiModelTransient
 }
 
-func canonicalOpenAIAccountSchedulingModel(account *Account, requestedModel string) string {
+func canonicalOpenAIAccountSchedulingModel(account *Account, requestedModel string, requestContexts ...context.Context) string {
 	model := strings.TrimSpace(requestedModel)
 	if account == nil || model == "" {
 		return model
 	}
-	if mapped := strings.TrimSpace(account.GetMappedModel(model)); mapped != "" {
+	requestContext := context.Background()
+	if len(requestContexts) > 0 && requestContexts[0] != nil {
+		requestContext = requestContexts[0]
+	}
+	if mapped := strings.TrimSpace(resolveOpenAIForwardModelWithContext(requestContext, account, model, "")); mapped != "" {
 		return mapped
 	}
 	return model

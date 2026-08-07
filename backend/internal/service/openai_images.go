@@ -579,13 +579,15 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 ) (*OpenAIForwardResult, error) {
 	startTime := time.Now()
 	requestModel := strings.TrimSpace(parsed.Model)
-	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
+	if platformModel, ok := ResolvedUpstreamModelFromContext(ctx); ok {
+		requestModel = platformModel
+	} else if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
 		requestModel = mapped
 	}
 	if err := validateOpenAIImagesModel(requestModel); err != nil {
 		return nil, err
 	}
-	upstreamModel := account.GetMappedModel(requestModel)
+	upstreamModel := resolveOpenAIForwardModelWithContext(ctx, account, requestModel, "")
 	if err := validateOpenAIImagesModel(upstreamModel); err != nil {
 		return nil, err
 	}

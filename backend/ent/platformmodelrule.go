@@ -3,7 +3,6 @@
 package ent
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -29,8 +28,6 @@ type PlatformModelRule struct {
 	ModelPattern string `json:"model_pattern,omitempty"`
 	// UpstreamModel holds the value of the "upstream_model" field.
 	UpstreamModel string `json:"upstream_model,omitempty"`
-	// EndpointCapabilities holds the value of the "endpoint_capabilities" field.
-	EndpointCapabilities []string `json:"endpoint_capabilities,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -64,8 +61,6 @@ func (*PlatformModelRule) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case platformmodelrule.FieldEndpointCapabilities:
-			values[i] = new([]byte)
 		case platformmodelrule.FieldID, platformmodelrule.FieldPlatformID:
 			values[i] = new(sql.NullInt64)
 		case platformmodelrule.FieldModelPattern, platformmodelrule.FieldUpstreamModel, platformmodelrule.FieldStatus:
@@ -122,14 +117,6 @@ func (_m *PlatformModelRule) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field upstream_model", values[i])
 			} else if value.Valid {
 				_m.UpstreamModel = value.String
-			}
-		case platformmodelrule.FieldEndpointCapabilities:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field endpoint_capabilities", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &_m.EndpointCapabilities); err != nil {
-					return fmt.Errorf("unmarshal field endpoint_capabilities: %w", err)
-				}
 			}
 		case platformmodelrule.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -192,9 +179,6 @@ func (_m *PlatformModelRule) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("upstream_model=")
 	builder.WriteString(_m.UpstreamModel)
-	builder.WriteString(", ")
-	builder.WriteString("endpoint_capabilities=")
-	builder.WriteString(fmt.Sprintf("%v", _m.EndpointCapabilities))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

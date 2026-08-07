@@ -249,3 +249,59 @@ func TestDiagnoseModelAvailabilityForPlatform_WrongPlatformFiltersOut(t *testing
 	require.False(t, diag.HasAccountsInPool, "OpenAI route must not see Anthropic accounts in pool")
 	require.False(t, diag.HasModelSupport)
 }
+
+func TestDiagnoseModelAvailabilityForPlatform_PlatformScopeIgnoresStaleAccountMapping(t *testing.T) {
+	platformID := int64(77)
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{
+				ID: 77, PlatformID: &platformID, Platform: PlatformOpenAI,
+				Status: StatusActive, Schedulable: true,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{"legacy-model": "legacy-model"},
+				},
+			},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID: 77, PlatformCode: "openai-primary", AccountPlatform: PlatformOpenAI,
+	})
+
+	diag := svc.DiagnoseModelAvailabilityForPlatform(ctx, nil, "platform-model", PlatformOpenAI)
+
+	require.True(t, diag.HasAccountsInPool)
+	require.True(t, diag.HasModelSupport, "platform model policy must supersede stale account model_mapping")
+}
+
+func TestOpenAIDiagnoseModelAvailabilityForPlatform_PlatformScopeIgnoresStaleAccountMapping(t *testing.T) {
+	platformID := int64(78)
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			{
+				ID: 78, PlatformID: &platformID, Platform: PlatformOpenAI,
+				Status: StatusActive, Schedulable: true,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{"legacy-model": "legacy-model"},
+				},
+			},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+	svc := &OpenAIGatewayService{accountRepo: repo, cfg: testConfig()}
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID: 78, PlatformCode: "openai-primary", AccountPlatform: PlatformOpenAI,
+	})
+
+	diag := svc.DiagnoseModelAvailabilityForPlatform(ctx, nil, "platform-model", PlatformOpenAI)
+
+	require.True(t, diag.HasAccountsInPool)
+	require.True(t, diag.HasModelSupport, "OpenAI platform model policy must supersede stale account model_mapping")
+}

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent/schema"
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
@@ -49,6 +48,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -1669,6 +1669,10 @@ func init() {
 	platform.DefaultStatus = platformDescStatus.Default.(string)
 	// platform.StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	platform.StatusValidator = platformDescStatus.Validators[0].(func(string) error)
+	// platformDescEndpointCapabilities is the schema descriptor for endpoint_capabilities field.
+	platformDescEndpointCapabilities := platformFields[4].Descriptor()
+	// platform.DefaultEndpointCapabilities holds the default value on creation for the endpoint_capabilities field.
+	platform.DefaultEndpointCapabilities = platformDescEndpointCapabilities.Default.([]string)
 	platformmodelruleMixin := schema.PlatformModelRule{}.Mixin()
 	platformmodelruleMixinFields0 := platformmodelruleMixin[0].Fields()
 	_ = platformmodelruleMixinFields0
@@ -1708,12 +1712,8 @@ func init() {
 	platformmodelrule.DefaultUpstreamModel = platformmodelruleDescUpstreamModel.Default.(string)
 	// platformmodelrule.UpstreamModelValidator is a validator for the "upstream_model" field. It is called by the builders before save.
 	platformmodelrule.UpstreamModelValidator = platformmodelruleDescUpstreamModel.Validators[0].(func(string) error)
-	// platformmodelruleDescEndpointCapabilities is the schema descriptor for endpoint_capabilities field.
-	platformmodelruleDescEndpointCapabilities := platformmodelruleFields[3].Descriptor()
-	// platformmodelrule.DefaultEndpointCapabilities holds the default value on creation for the endpoint_capabilities field.
-	platformmodelrule.DefaultEndpointCapabilities = platformmodelruleDescEndpointCapabilities.Default.([]string)
 	// platformmodelruleDescStatus is the schema descriptor for status field.
-	platformmodelruleDescStatus := platformmodelruleFields[4].Descriptor()
+	platformmodelruleDescStatus := platformmodelruleFields[3].Descriptor()
 	// platformmodelrule.DefaultStatus holds the default value on creation for the status field.
 	platformmodelrule.DefaultStatus = platformmodelruleDescStatus.Default.(string)
 	// platformmodelrule.StatusValidator is a validator for the "status" field. It is called by the builders before save.

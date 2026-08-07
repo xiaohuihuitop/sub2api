@@ -7,6 +7,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPlatformServiceListAuthorizedModels(t *testing.T) {
+	repo := &platformRepositoryStub{allRules: []PlatformModelRule{
+		{PlatformID: 1, ModelPattern: "gpt-5.6", Enabled: true},
+		{PlatformID: 1, ModelPattern: "gpt-*", Enabled: true},
+		{PlatformID: 2, ModelPattern: "glm-4.6", Enabled: true},
+		{PlatformID: 2, ModelPattern: " glm-4.6 ", Enabled: true},
+		{PlatformID: 3, ModelPattern: "grok-4", Enabled: true},
+		{PlatformID: 2, ModelPattern: "disabled-model", Enabled: false},
+	}}
+
+	models, err := NewPlatformService(repo).ListAuthorizedModels(context.Background(), []int64{1, 2})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"glm-4.6", "gpt-5.6"}, models)
+}
+
+func TestPlatformServiceListAuthorizedModelsRequiresPlatformAuthorization(t *testing.T) {
+	_, err := NewPlatformService(&platformRepositoryStub{}).ListAuthorizedModels(context.Background(), nil)
+
+	require.ErrorIs(t, err, ErrAPIKeyPlatformForbidden)
+}
+
 type platformRepositoryStub struct {
 	allRules    []PlatformModelRule
 	platforms   []Platform
@@ -59,9 +81,10 @@ func TestPlatformServiceCreateAllowsCrossPlatformModelOverlap(t *testing.T) {
 	svc := NewPlatformService(repo)
 
 	_, err := svc.Create(context.Background(), CreatePlatformInput{
-		Code:            "grok",
-		Name:            "Grok",
-		AccountPlatform: PlatformOpenAI,
+		Code:                 "grok",
+		Name:                 "Grok",
+		AccountPlatform:      PlatformOpenAI,
+		EndpointCapabilities: []string{"responses"},
 		ModelRules: []PlatformModelRule{{
 			ModelPattern:         "gpt-4o",
 			EndpointCapabilities: []string{"responses"},
@@ -71,6 +94,39 @@ func TestPlatformServiceCreateAllowsCrossPlatformModelOverlap(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, repo.created)
+}
+
+func TestPlatformServiceCreateBindsPlatformEndpointsToRules(t *testing.T) {
+	repo := &platformRepositoryStub{}
+
+	created, err := NewPlatformService(repo).Create(context.Background(), CreatePlatformInput{
+		Code:                 "openai-primary",
+		Name:                 "OpenAI Primary",
+		AccountPlatform:      PlatformOpenAI,
+		Status:               PlatformStatusActive,
+		EndpointCapabilities: []string{"responses", "chat_completions", "responses"},
+		ModelRules: []PlatformModelRule{{
+			ModelPattern:  "gpt-5.6",
+			UpstreamModel: "gpt-5.6",
+			Enabled:       true,
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"chat_completions", "responses"}, created.EndpointCapabilities)
+	require.Equal(t, created.EndpointCapabilities, created.ModelRules[0].EndpointCapabilities)
+}
+
+func TestPlatformServiceRejectsActivePlatformWithoutEndpoints(t *testing.T) {
+	_, err := NewPlatformService(&platformRepositoryStub{}).Create(context.Background(), CreatePlatformInput{
+		Code:            "openai-primary",
+		Name:            "OpenAI Primary",
+		AccountPlatform: PlatformOpenAI,
+		Status:          PlatformStatusActive,
+		ModelRules:      []PlatformModelRule{{ModelPattern: "gpt-5.6", Enabled: true}},
+	})
+
+	require.ErrorIs(t, err, ErrPlatformInvalid)
 }
 
 func TestPlatformServiceResolveModelUsesActiveRepositoryRules(t *testing.T) {
@@ -107,10 +163,11 @@ func TestPlatformServiceUpdateReplacesOwnRuleWithoutSelfConflict(t *testing.T) {
 			}},
 		},
 		platform: &Platform{
-			ID:     1,
-			Code:   PlatformOpenAI,
-			Name:   "OpenAI",
-			Status: PlatformStatusActive,
+			ID:                   1,
+			Code:                 PlatformOpenAI,
+			Name:                 "OpenAI",
+			EndpointCapabilities: []string{"chat_completions"},
+			Status:               PlatformStatusActive,
 			ModelRules: []PlatformModelRule{{
 				PlatformID:   1,
 				PlatformCode: PlatformOpenAI,

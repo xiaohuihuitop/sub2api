@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -585,6 +586,35 @@ func TestResolveBedrockModelID(t *testing.T) {
 		_, ok := ResolveBedrockModelID(account, "claude-3-5-sonnet-20241022")
 		assert.False(t, ok)
 	})
+}
+
+func TestResolveBedrockModelIDForRequestPrefersPlatformModel(t *testing.T) {
+	account := &Account{
+		Platform: PlatformAnthropic,
+		Type:     AccountTypeBedrock,
+		Credentials: map[string]any{
+			"aws_region": "eu-west-1",
+			"model_mapping": map[string]any{
+				"public-claude": "claude-sonnet-4-5",
+			},
+		},
+	}
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID:     7,
+			RequestedModel: "public-claude",
+			UpstreamModel:  "claude-opus-4-6",
+		},
+		SchedulingScope: PlatformSchedulingScope{
+			PlatformID:      7,
+			AccountPlatform: PlatformAnthropic,
+		},
+	})
+
+	modelID, ok := ResolveBedrockModelIDForRequest(ctx, account, "public-claude")
+
+	require.True(t, ok)
+	assert.Equal(t, "eu.anthropic.claude-opus-4-6-v1", modelID)
 }
 
 func TestAutoInjectBedrockBetaTokens(t *testing.T) {

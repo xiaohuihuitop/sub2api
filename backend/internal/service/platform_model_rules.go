@@ -35,9 +35,6 @@ func validatePlatformModelRules(rules []PlatformModelRule) error {
 		if rule.PlatformID <= 0 {
 			return fmt.Errorf("%w: platform id is required", ErrPlatformModelRule)
 		}
-		if len(normalizeEndpointCapabilities(rule.EndpointCapabilities)) == 0 {
-			return fmt.Errorf("%w: endpoint capabilities are required for model pattern %q", ErrPlatformModelRule, rule.ModelPattern)
-		}
 		key := fmt.Sprintf("%d:%s", rule.PlatformID, pattern)
 		if _, exists := seen[key]; exists {
 			return fmt.Errorf("%w: duplicate pattern %q on platform %d", ErrPlatformModelRule, rule.ModelPattern, rule.PlatformID)
@@ -130,6 +127,7 @@ func normalizeEndpointCapabilities(capabilities []string) []string {
 		seen[capability] = struct{}{}
 		result = append(result, capability)
 	}
+	sort.Strings(result)
 	return result
 }
 

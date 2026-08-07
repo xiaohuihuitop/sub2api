@@ -85,6 +85,7 @@ export default {
       platformPool: 'Platform',
       platformPoolRequired: 'Select a platform',
       noPlatformPool: 'No active platform is available. Create and enable one first.',
+      platformModelPolicyNotice: 'Models and request endpoints are inherited from the selected platform.',
       allPlatforms: 'All Platforms',
       allTypes: 'All Types',
       allStatus: 'All Status',

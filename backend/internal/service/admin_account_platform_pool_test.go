@@ -69,3 +69,37 @@ func TestValidatePlatformAccountAdapterChangeRejectsCrossAdapterMove(t *testing.
 func TestValidatePlatformAccountAdapterChangeAllowsSameAdapterPoolMove(t *testing.T) {
 	require.NoError(t, validatePlatformAccountAdapterChange(PlatformOpenAI, " OPENAI "))
 }
+
+func TestPlatformBoundAccountAdminModelPolicyIsInert(t *testing.T) {
+	platformID := int64(7)
+	account := &Account{
+		PlatformID: &platformID,
+		Platform:   PlatformOpenAI,
+		Credentials: map[string]any{
+			"model_mapping":       map[string]any{"public": "old-upstream"},
+			"openai_capabilities": []any{"chat_completions"},
+		},
+	}
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID: 7, PlatformCode: "openai-primary", AccountPlatform: PlatformOpenAI,
+	})
+
+	require.True(t, platformRouteOwnsModelPolicy(ctx))
+	require.True(t, (&GatewayService{}).isModelSupportedByAccountWithContext(ctx, account, "new-model"))
+}
+
+func TestAccountCredentialMergeRetainsLegacyPlatformPolicyFields(t *testing.T) {
+	merged := MergePreservingSensitiveCreds(
+		map[string]any{
+			"api_key":             "secret",
+			"model_mapping":       map[string]any{"public": "old-upstream"},
+			"openai_capabilities": []any{"chat_completions"},
+		},
+		map[string]any{"base_url": "https://new.example/v1"},
+	)
+
+	require.Equal(t, "https://new.example/v1", merged["base_url"])
+	require.Equal(t, "secret", merged["api_key"])
+	require.Contains(t, merged, "model_mapping")
+	require.Contains(t, merged, "openai_capabilities")
+}

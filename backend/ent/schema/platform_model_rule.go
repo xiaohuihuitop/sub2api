@@ -5,7 +5,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 
 	"entgo.io/ent"
-	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
@@ -33,9 +32,6 @@ func (PlatformModelRule) Fields() []ent.Field {
 		field.Int64("platform_id"),
 		field.String("model_pattern").MaxLen(100).NotEmpty(),
 		field.String("upstream_model").MaxLen(100).Default(""),
-		field.JSON("endpoint_capabilities", []string{}).
-			Default([]string{}).
-			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
 		field.String("status").MaxLen(20).Default(domain.StatusActive),
 	}
 }

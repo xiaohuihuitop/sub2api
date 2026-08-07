@@ -5,6 +5,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
@@ -36,6 +37,9 @@ func (Platform) Fields() []ent.Field {
 		// a business pool, so GPT and GLM can both use the OpenAI adapter.
 		field.String("account_platform").MaxLen(50).NotEmpty(),
 		field.String("status").MaxLen(20).Default(domain.StatusActive),
+		field.JSON("endpoint_capabilities", []string{}).
+			Default([]string{}).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
 		field.Int64("legacy_group_id").Optional().Nillable().Unique(),
 	}
 }

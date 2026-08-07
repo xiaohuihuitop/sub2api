@@ -496,10 +496,10 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return 0, nil, "", nil
 	}
-	if requestedModel != "" && !account.IsModelSupported(requestedModel) {
+	if !platformRouteOwnsModelPolicy(ctx) && requestedModel != "" && !account.IsModelSupported(requestedModel) {
 		return 0, nil, "", nil
 	}
-	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
+	if !accountSupportsOpenAIEndpointForRequest(ctx, account, requiredCapability) {
 		return 0, nil, "", nil
 	}
 	// Quota auto-pause must also gate the previous_response_id sticky path; otherwise an
@@ -523,10 +523,10 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 			_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 			return 0, nil, "", nil
 		}
-		if requestedModel != "" && !latest.IsModelSupported(requestedModel) {
+		if !platformRouteOwnsModelPolicy(ctx) && requestedModel != "" && !latest.IsModelSupported(requestedModel) {
 			return 0, nil, "", nil
 		}
-		if !latest.SupportsOpenAIEndpointCapability(requiredCapability) {
+		if !accountSupportsOpenAIEndpointForRequest(ctx, latest, requiredCapability) {
 			return 0, nil, "", nil
 		}
 		if paused, _ := shouldAutoPauseOpenAIAccountByQuota(ctx, latest); paused {

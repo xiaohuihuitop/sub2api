@@ -77,12 +77,6 @@ func (_c *PlatformModelRuleCreate) SetNillableUpstreamModel(v *string) *Platform
 	return _c
 }
 
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (_c *PlatformModelRuleCreate) SetEndpointCapabilities(v []string) *PlatformModelRuleCreate {
-	_c.mutation.SetEndpointCapabilities(v)
-	return _c
-}
-
 // SetStatus sets the "status" field.
 func (_c *PlatformModelRuleCreate) SetStatus(v string) *PlatformModelRuleCreate {
 	_c.mutation.SetStatus(v)
@@ -149,10 +143,6 @@ func (_c *PlatformModelRuleCreate) defaults() {
 		v := platformmodelrule.DefaultUpstreamModel
 		_c.mutation.SetUpstreamModel(v)
 	}
-	if _, ok := _c.mutation.EndpointCapabilities(); !ok {
-		v := platformmodelrule.DefaultEndpointCapabilities
-		_c.mutation.SetEndpointCapabilities(v)
-	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := platformmodelrule.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -185,9 +175,6 @@ func (_c *PlatformModelRuleCreate) check() error {
 		if err := platformmodelrule.UpstreamModelValidator(v); err != nil {
 			return &ValidationError{Name: "upstream_model", err: fmt.Errorf(`ent: validator failed for field "PlatformModelRule.upstream_model": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.EndpointCapabilities(); !ok {
-		return &ValidationError{Name: "endpoint_capabilities", err: errors.New(`ent: missing required field "PlatformModelRule.endpoint_capabilities"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "PlatformModelRule.status"`)}
@@ -242,10 +229,6 @@ func (_c *PlatformModelRuleCreate) createSpec() (*PlatformModelRule, *sqlgraph.C
 	if value, ok := _c.mutation.UpstreamModel(); ok {
 		_spec.SetField(platformmodelrule.FieldUpstreamModel, field.TypeString, value)
 		_node.UpstreamModel = value
-	}
-	if value, ok := _c.mutation.EndpointCapabilities(); ok {
-		_spec.SetField(platformmodelrule.FieldEndpointCapabilities, field.TypeJSON, value)
-		_node.EndpointCapabilities = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(platformmodelrule.FieldStatus, field.TypeString, value)
@@ -368,18 +351,6 @@ func (u *PlatformModelRuleUpsert) UpdateUpstreamModel() *PlatformModelRuleUpsert
 	return u
 }
 
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (u *PlatformModelRuleUpsert) SetEndpointCapabilities(v []string) *PlatformModelRuleUpsert {
-	u.Set(platformmodelrule.FieldEndpointCapabilities, v)
-	return u
-}
-
-// UpdateEndpointCapabilities sets the "endpoint_capabilities" field to the value that was provided on create.
-func (u *PlatformModelRuleUpsert) UpdateEndpointCapabilities() *PlatformModelRuleUpsert {
-	u.SetExcluded(platformmodelrule.FieldEndpointCapabilities)
-	return u
-}
-
 // SetStatus sets the "status" field.
 func (u *PlatformModelRuleUpsert) SetStatus(v string) *PlatformModelRuleUpsert {
 	u.Set(platformmodelrule.FieldStatus, v)
@@ -490,20 +461,6 @@ func (u *PlatformModelRuleUpsertOne) SetUpstreamModel(v string) *PlatformModelRu
 func (u *PlatformModelRuleUpsertOne) UpdateUpstreamModel() *PlatformModelRuleUpsertOne {
 	return u.Update(func(s *PlatformModelRuleUpsert) {
 		s.UpdateUpstreamModel()
-	})
-}
-
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (u *PlatformModelRuleUpsertOne) SetEndpointCapabilities(v []string) *PlatformModelRuleUpsertOne {
-	return u.Update(func(s *PlatformModelRuleUpsert) {
-		s.SetEndpointCapabilities(v)
-	})
-}
-
-// UpdateEndpointCapabilities sets the "endpoint_capabilities" field to the value that was provided on create.
-func (u *PlatformModelRuleUpsertOne) UpdateEndpointCapabilities() *PlatformModelRuleUpsertOne {
-	return u.Update(func(s *PlatformModelRuleUpsert) {
-		s.UpdateEndpointCapabilities()
 	})
 }
 
@@ -785,20 +742,6 @@ func (u *PlatformModelRuleUpsertBulk) SetUpstreamModel(v string) *PlatformModelR
 func (u *PlatformModelRuleUpsertBulk) UpdateUpstreamModel() *PlatformModelRuleUpsertBulk {
 	return u.Update(func(s *PlatformModelRuleUpsert) {
 		s.UpdateUpstreamModel()
-	})
-}
-
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (u *PlatformModelRuleUpsertBulk) SetEndpointCapabilities(v []string) *PlatformModelRuleUpsertBulk {
-	return u.Update(func(s *PlatformModelRuleUpsert) {
-		s.SetEndpointCapabilities(v)
-	})
-}
-
-// UpdateEndpointCapabilities sets the "endpoint_capabilities" field to the value that was provided on create.
-func (u *PlatformModelRuleUpsertBulk) UpdateEndpointCapabilities() *PlatformModelRuleUpsertBulk {
-	return u.Update(func(s *PlatformModelRuleUpsert) {
-		s.UpdateEndpointCapabilities()
 	})
 }
 

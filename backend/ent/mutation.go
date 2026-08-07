@@ -12,7 +12,6 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
@@ -56,6 +55,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 const (
@@ -36877,33 +36877,35 @@ func (m *PendingAuthSessionMutation) ResetEdge(name string) error {
 // PlatformMutation represents an operation that mutates the Platform nodes in the graph.
 type PlatformMutation struct {
 	config
-	op                  Op
-	typ                 string
-	id                  *int64
-	created_at          *time.Time
-	updated_at          *time.Time
-	code                *string
-	name                *string
-	account_platform    *string
-	status              *string
-	clearedFields       map[string]struct{}
-	legacy_group        *int64
-	clearedlegacy_group bool
-	model_rules         map[int64]struct{}
-	removedmodel_rules  map[int64]struct{}
-	clearedmodel_rules  bool
-	accounts            map[int64]struct{}
-	removedaccounts     map[int64]struct{}
-	clearedaccounts     bool
-	api_keys            map[int64]struct{}
-	removedapi_keys     map[int64]struct{}
-	clearedapi_keys     bool
-	usage_logs          map[int64]struct{}
-	removedusage_logs   map[int64]struct{}
-	clearedusage_logs   bool
-	done                bool
-	oldValue            func(context.Context) (*Platform, error)
-	predicates          []predicate.Platform
+	op                          Op
+	typ                         string
+	id                          *int64
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	code                        *string
+	name                        *string
+	account_platform            *string
+	status                      *string
+	endpoint_capabilities       *[]string
+	appendendpoint_capabilities []string
+	clearedFields               map[string]struct{}
+	legacy_group                *int64
+	clearedlegacy_group         bool
+	model_rules                 map[int64]struct{}
+	removedmodel_rules          map[int64]struct{}
+	clearedmodel_rules          bool
+	accounts                    map[int64]struct{}
+	removedaccounts             map[int64]struct{}
+	clearedaccounts             bool
+	api_keys                    map[int64]struct{}
+	removedapi_keys             map[int64]struct{}
+	clearedapi_keys             bool
+	usage_logs                  map[int64]struct{}
+	removedusage_logs           map[int64]struct{}
+	clearedusage_logs           bool
+	done                        bool
+	oldValue                    func(context.Context) (*Platform, error)
+	predicates                  []predicate.Platform
 }
 
 var _ ent.Mutation = (*PlatformMutation)(nil)
@@ -37218,6 +37220,57 @@ func (m *PlatformMutation) OldStatus(ctx context.Context) (v string, err error) 
 // ResetStatus resets all changes to the "status" field.
 func (m *PlatformMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (m *PlatformMutation) SetEndpointCapabilities(s []string) {
+	m.endpoint_capabilities = &s
+	m.appendendpoint_capabilities = nil
+}
+
+// EndpointCapabilities returns the value of the "endpoint_capabilities" field in the mutation.
+func (m *PlatformMutation) EndpointCapabilities() (r []string, exists bool) {
+	v := m.endpoint_capabilities
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEndpointCapabilities returns the old "endpoint_capabilities" field's value of the Platform entity.
+// If the Platform object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformMutation) OldEndpointCapabilities(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEndpointCapabilities is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEndpointCapabilities requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEndpointCapabilities: %w", err)
+	}
+	return oldValue.EndpointCapabilities, nil
+}
+
+// AppendEndpointCapabilities adds s to the "endpoint_capabilities" field.
+func (m *PlatformMutation) AppendEndpointCapabilities(s []string) {
+	m.appendendpoint_capabilities = append(m.appendendpoint_capabilities, s...)
+}
+
+// AppendedEndpointCapabilities returns the list of values that were appended to the "endpoint_capabilities" field in this mutation.
+func (m *PlatformMutation) AppendedEndpointCapabilities() ([]string, bool) {
+	if len(m.appendendpoint_capabilities) == 0 {
+		return nil, false
+	}
+	return m.appendendpoint_capabilities, true
+}
+
+// ResetEndpointCapabilities resets all changes to the "endpoint_capabilities" field.
+func (m *PlatformMutation) ResetEndpointCapabilities() {
+	m.endpoint_capabilities = nil
+	m.appendendpoint_capabilities = nil
 }
 
 // SetLegacyGroupID sets the "legacy_group_id" field.
@@ -37546,7 +37599,7 @@ func (m *PlatformMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PlatformMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.created_at != nil {
 		fields = append(fields, platform.FieldCreatedAt)
 	}
@@ -37564,6 +37617,9 @@ func (m *PlatformMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, platform.FieldStatus)
+	}
+	if m.endpoint_capabilities != nil {
+		fields = append(fields, platform.FieldEndpointCapabilities)
 	}
 	if m.legacy_group != nil {
 		fields = append(fields, platform.FieldLegacyGroupID)
@@ -37588,6 +37644,8 @@ func (m *PlatformMutation) Field(name string) (ent.Value, bool) {
 		return m.AccountPlatform()
 	case platform.FieldStatus:
 		return m.Status()
+	case platform.FieldEndpointCapabilities:
+		return m.EndpointCapabilities()
 	case platform.FieldLegacyGroupID:
 		return m.LegacyGroupID()
 	}
@@ -37611,6 +37669,8 @@ func (m *PlatformMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldAccountPlatform(ctx)
 	case platform.FieldStatus:
 		return m.OldStatus(ctx)
+	case platform.FieldEndpointCapabilities:
+		return m.OldEndpointCapabilities(ctx)
 	case platform.FieldLegacyGroupID:
 		return m.OldLegacyGroupID(ctx)
 	}
@@ -37663,6 +37723,13 @@ func (m *PlatformMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case platform.FieldEndpointCapabilities:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEndpointCapabilities(v)
 		return nil
 	case platform.FieldLegacyGroupID:
 		v, ok := value.(int64)
@@ -37749,6 +37816,9 @@ func (m *PlatformMutation) ResetField(name string) error {
 		return nil
 	case platform.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case platform.FieldEndpointCapabilities:
+		m.ResetEndpointCapabilities()
 		return nil
 	case platform.FieldLegacyGroupID:
 		m.ResetLegacyGroupID()
@@ -37940,22 +38010,20 @@ func (m *PlatformMutation) ResetEdge(name string) error {
 // PlatformModelRuleMutation represents an operation that mutates the PlatformModelRule nodes in the graph.
 type PlatformModelRuleMutation struct {
 	config
-	op                          Op
-	typ                         string
-	id                          *int64
-	created_at                  *time.Time
-	updated_at                  *time.Time
-	model_pattern               *string
-	upstream_model              *string
-	endpoint_capabilities       *[]string
-	appendendpoint_capabilities []string
-	status                      *string
-	clearedFields               map[string]struct{}
-	platform                    *int64
-	clearedplatform             bool
-	done                        bool
-	oldValue                    func(context.Context) (*PlatformModelRule, error)
-	predicates                  []predicate.PlatformModelRule
+	op              Op
+	typ             string
+	id              *int64
+	created_at      *time.Time
+	updated_at      *time.Time
+	model_pattern   *string
+	upstream_model  *string
+	status          *string
+	clearedFields   map[string]struct{}
+	platform        *int64
+	clearedplatform bool
+	done            bool
+	oldValue        func(context.Context) (*PlatformModelRule, error)
+	predicates      []predicate.PlatformModelRule
 }
 
 var _ ent.Mutation = (*PlatformModelRuleMutation)(nil)
@@ -38236,57 +38304,6 @@ func (m *PlatformModelRuleMutation) ResetUpstreamModel() {
 	m.upstream_model = nil
 }
 
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (m *PlatformModelRuleMutation) SetEndpointCapabilities(s []string) {
-	m.endpoint_capabilities = &s
-	m.appendendpoint_capabilities = nil
-}
-
-// EndpointCapabilities returns the value of the "endpoint_capabilities" field in the mutation.
-func (m *PlatformModelRuleMutation) EndpointCapabilities() (r []string, exists bool) {
-	v := m.endpoint_capabilities
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldEndpointCapabilities returns the old "endpoint_capabilities" field's value of the PlatformModelRule entity.
-// If the PlatformModelRule object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PlatformModelRuleMutation) OldEndpointCapabilities(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldEndpointCapabilities is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldEndpointCapabilities requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldEndpointCapabilities: %w", err)
-	}
-	return oldValue.EndpointCapabilities, nil
-}
-
-// AppendEndpointCapabilities adds s to the "endpoint_capabilities" field.
-func (m *PlatformModelRuleMutation) AppendEndpointCapabilities(s []string) {
-	m.appendendpoint_capabilities = append(m.appendendpoint_capabilities, s...)
-}
-
-// AppendedEndpointCapabilities returns the list of values that were appended to the "endpoint_capabilities" field in this mutation.
-func (m *PlatformModelRuleMutation) AppendedEndpointCapabilities() ([]string, bool) {
-	if len(m.appendendpoint_capabilities) == 0 {
-		return nil, false
-	}
-	return m.appendendpoint_capabilities, true
-}
-
-// ResetEndpointCapabilities resets all changes to the "endpoint_capabilities" field.
-func (m *PlatformModelRuleMutation) ResetEndpointCapabilities() {
-	m.endpoint_capabilities = nil
-	m.appendendpoint_capabilities = nil
-}
-
 // SetStatus sets the "status" field.
 func (m *PlatformModelRuleMutation) SetStatus(s string) {
 	m.status = &s
@@ -38384,7 +38401,7 @@ func (m *PlatformModelRuleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PlatformModelRuleMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 6)
 	if m.created_at != nil {
 		fields = append(fields, platformmodelrule.FieldCreatedAt)
 	}
@@ -38399,9 +38416,6 @@ func (m *PlatformModelRuleMutation) Fields() []string {
 	}
 	if m.upstream_model != nil {
 		fields = append(fields, platformmodelrule.FieldUpstreamModel)
-	}
-	if m.endpoint_capabilities != nil {
-		fields = append(fields, platformmodelrule.FieldEndpointCapabilities)
 	}
 	if m.status != nil {
 		fields = append(fields, platformmodelrule.FieldStatus)
@@ -38424,8 +38438,6 @@ func (m *PlatformModelRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelPattern()
 	case platformmodelrule.FieldUpstreamModel:
 		return m.UpstreamModel()
-	case platformmodelrule.FieldEndpointCapabilities:
-		return m.EndpointCapabilities()
 	case platformmodelrule.FieldStatus:
 		return m.Status()
 	}
@@ -38447,8 +38459,6 @@ func (m *PlatformModelRuleMutation) OldField(ctx context.Context, name string) (
 		return m.OldModelPattern(ctx)
 	case platformmodelrule.FieldUpstreamModel:
 		return m.OldUpstreamModel(ctx)
-	case platformmodelrule.FieldEndpointCapabilities:
-		return m.OldEndpointCapabilities(ctx)
 	case platformmodelrule.FieldStatus:
 		return m.OldStatus(ctx)
 	}
@@ -38494,13 +38504,6 @@ func (m *PlatformModelRuleMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpstreamModel(v)
-		return nil
-	case platformmodelrule.FieldEndpointCapabilities:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetEndpointCapabilities(v)
 		return nil
 	case platformmodelrule.FieldStatus:
 		v, ok := value.(string)
@@ -38575,9 +38578,6 @@ func (m *PlatformModelRuleMutation) ResetField(name string) error {
 		return nil
 	case platformmodelrule.FieldUpstreamModel:
 		m.ResetUpstreamModel()
-		return nil
-	case platformmodelrule.FieldEndpointCapabilities:
-		m.ResetEndpointCapabilities()
 		return nil
 	case platformmodelrule.FieldStatus:
 		m.ResetStatus()

@@ -23,6 +23,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
@@ -36,6 +37,10 @@ import (
 const gatewayCompatibilityMetricsLogInterval = 1024
 
 var gatewayCompatibilityMetricsLogCounter atomic.Uint64
+
+type authorizedPlatformModelLister interface {
+	ListAuthorizedModels(context.Context, []int64) ([]string, error)
+}
 
 // GatewayHandler handles API gateway requests
 type GatewayHandler struct {
@@ -57,6 +62,7 @@ type GatewayHandler struct {
 	maxAccountSwitchesGemini  int
 	cfg                       *config.Config
 	settingService            *service.SettingService
+	platformModels            authorizedPlatformModelLister
 }
 
 // NewGatewayHandler creates a new GatewayHandler
@@ -76,6 +82,7 @@ func NewGatewayHandler(
 	userMsgQueueService *service.UserMessageQueueService,
 	cfg *config.Config,
 	settingService *service.SettingService,
+	platformModels authorizedPlatformModelLister,
 ) *GatewayHandler {
 	pingInterval := time.Duration(0)
 	maxAccountSwitches := 10
@@ -114,6 +121,7 @@ func NewGatewayHandler(
 		maxAccountSwitchesGemini:  maxAccountSwitchesGemini,
 		cfg:                       cfg,
 		settingService:            settingService,
+		platformModels:            platformModels,
 	}
 }
 
@@ -1028,6 +1036,19 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 // Falls back to default models if no whitelist is configured
 func (h *GatewayHandler) Models(c *gin.Context) {
 	apiKey, _ := middleware2.GetAPIKeyFromContext(c)
+	if service.UsesPlatformAssetPermissions(apiKey) {
+		if h.platformModels == nil {
+			response.ErrorFrom(c, service.ErrAPIKeyPlatformForbidden)
+			return
+		}
+		models, err := h.platformModels.ListAuthorizedModels(c.Request.Context(), apiKey.AllowedPlatformIDs)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		writeModelsList(c, "", models)
+		return
+	}
 
 	var groupID *int64
 	var platform string

@@ -38,25 +38,27 @@ type PlatformAccountOwnershipReader interface {
 // CreatePlatformInput contains all fields that must be decided at platform
 // creation time. A platform is an account pool, never a billing asset.
 type CreatePlatformInput struct {
-	Code            string
-	Name            string
-	AccountPlatform string
-	Status          string
-	LegacyGroupID   *int64
-	ModelRules      []PlatformModelRule
+	Code                 string
+	Name                 string
+	AccountPlatform      string
+	Status               string
+	EndpointCapabilities []string
+	LegacyGroupID        *int64
+	ModelRules           []PlatformModelRule
 }
 
 // UpdatePlatformInput contains only the editable platform fields. A nil field
 // keeps its current value; ClearLegacyGroup explicitly removes the legacy
 // compatibility reference.
 type UpdatePlatformInput struct {
-	Code             *string
-	Name             *string
-	AccountPlatform  *string
-	Status           *string
-	LegacyGroupID    *int64
-	ClearLegacyGroup bool
-	ModelRules       *[]PlatformModelRule
+	Code                 *string
+	Name                 *string
+	AccountPlatform      *string
+	Status               *string
+	EndpointCapabilities *[]string
+	LegacyGroupID        *int64
+	ClearLegacyGroup     bool
+	ModelRules           *[]PlatformModelRule
 }
 
 // PlatformService validates the unique model-to-platform mapping before the
@@ -108,6 +110,7 @@ func (s *PlatformService) Create(ctx context.Context, input CreatePlatformInput)
 	if err != nil {
 		return nil, err
 	}
+	platform.ModelRules = bindPlatformToRules(platform.ModelRules, platform.ID, platform.Code, platform.EndpointCapabilities)
 
 	if err := s.validateCandidate(ctx, platform, math.MaxInt64); err != nil {
 		return nil, err
@@ -175,7 +178,7 @@ func (s *PlatformService) Update(ctx context.Context, id int64, input UpdatePlat
 			}
 		}
 	}
-	candidate.ModelRules = bindPlatformToRules(candidate.ModelRules, candidate.ID, candidate.Code)
+	candidate.ModelRules = bindPlatformToRules(candidate.ModelRules, candidate.ID, candidate.Code, candidate.EndpointCapabilities)
 	if err := s.validateCandidate(ctx, candidate, candidate.ID); err != nil {
 		return nil, err
 	}
@@ -189,13 +192,16 @@ func (s *PlatformService) validateCandidate(ctx context.Context, platform *Platf
 	if s == nil || s.repo == nil {
 		return fmt.Errorf("%w: platform repository is required", ErrPlatformInvalid)
 	}
+	if platform.IsActive() && len(platform.EndpointCapabilities) == 0 {
+		return fmt.Errorf("%w: active platform requires at least one endpoint capability", ErrPlatformInvalid)
+	}
 
 	existing, err := s.repo.ListModelRules(ctx)
 	if err != nil {
 		return fmt.Errorf("list platform model rules: %w", err)
 	}
 	existing = excludePlatformRules(existing, candidateID)
-	candidateRules := platformRulesForValidation(platform.ModelRules, candidateID, platform.Code, platform.IsActive())
+	candidateRules := platformRulesForValidation(platform.ModelRules, candidateID, platform.Code, platform.EndpointCapabilities, platform.IsActive())
 	rules := make([]PlatformModelRule, 0, len(existing)+len(candidateRules))
 	rules = append(rules, existing...)
 	rules = append(rules, candidateRules...)
@@ -233,14 +239,19 @@ func platformFromCreateInput(input CreatePlatformInput) (*Platform, error) {
 	if err != nil {
 		return nil, err
 	}
+	endpointCapabilities := normalizeEndpointCapabilities(input.EndpointCapabilities)
+	if status == PlatformStatusActive && len(endpointCapabilities) == 0 {
+		return nil, fmt.Errorf("%w: active platform requires at least one endpoint capability", ErrPlatformInvalid)
+	}
 
 	return &Platform{
-		Code:            code,
-		Name:            name,
-		AccountPlatform: accountPlatform,
-		Status:          status,
-		LegacyGroupID:   clonePlatformInt64Pointer(input.LegacyGroupID),
-		ModelRules:      clonePlatformModelRules(input.ModelRules),
+		Code:                 code,
+		Name:                 name,
+		AccountPlatform:      accountPlatform,
+		Status:               status,
+		EndpointCapabilities: endpointCapabilities,
+		LegacyGroupID:        clonePlatformInt64Pointer(input.LegacyGroupID),
+		ModelRules:           clonePlatformModelRules(input.ModelRules),
 	}, nil
 }
 
@@ -272,6 +283,9 @@ func applyPlatformUpdate(platform *Platform, input UpdatePlatformInput) error {
 			return err
 		}
 		platform.Status = status
+	}
+	if input.EndpointCapabilities != nil {
+		platform.EndpointCapabilities = normalizeEndpointCapabilities(*input.EndpointCapabilities)
 	}
 	if input.ClearLegacyGroup {
 		platform.LegacyGroupID = nil
@@ -317,19 +331,20 @@ func normalizePlatformAccountPlatform(raw string) (string, error) {
 	return platform, nil
 }
 
-func platformRulesForValidation(rules []PlatformModelRule, platformID int64, platformCode string, enabled bool) []PlatformModelRule {
-	cloned := bindPlatformToRules(rules, platformID, platformCode)
+func platformRulesForValidation(rules []PlatformModelRule, platformID int64, platformCode string, endpoints []string, enabled bool) []PlatformModelRule {
+	cloned := bindPlatformToRules(rules, platformID, platformCode, endpoints)
 	for index := range cloned {
 		cloned[index].Enabled = cloned[index].Enabled && enabled
 	}
 	return cloned
 }
 
-func bindPlatformToRules(rules []PlatformModelRule, platformID int64, platformCode string) []PlatformModelRule {
+func bindPlatformToRules(rules []PlatformModelRule, platformID int64, platformCode string, endpoints []string) []PlatformModelRule {
 	cloned := clonePlatformModelRules(rules)
 	for index := range cloned {
 		cloned[index].PlatformID = platformID
 		cloned[index].PlatformCode = platformCode
+		cloned[index].EndpointCapabilities = append([]string(nil), endpoints...)
 	}
 	return cloned
 }
@@ -363,12 +378,7 @@ func clonePlatform(platform *Platform) *Platform {
 	cloned := *platform
 	cloned.LegacyGroupID = clonePlatformInt64Pointer(platform.LegacyGroupID)
 	cloned.ModelRules = clonePlatformModelRules(platform.ModelRules)
-	if platform.EndpointCapabilities != nil {
-		cloned.EndpointCapabilities = make(map[string]bool, len(platform.EndpointCapabilities))
-		for key, value := range platform.EndpointCapabilities {
-			cloned.EndpointCapabilities[key] = value
-		}
-	}
+	cloned.EndpointCapabilities = append([]string(nil), platform.EndpointCapabilities...)
 	if platform.SchedulingConfig != nil {
 		cloned.SchedulingConfig = make(map[string]any, len(platform.SchedulingConfig))
 		for key, value := range platform.SchedulingConfig {

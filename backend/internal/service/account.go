@@ -1498,6 +1498,54 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	return configured[string(capability)]
 }
 
+// SupportsOpenAIEndpointTechnicalCapability returns constraints imposed by
+// the account credential and upstream adapter itself. Platform routes may
+// replace the administrator's endpoint allowlist, but they must retain these
+// runtime safety checks.
+func (a *Account) SupportsOpenAIEndpointTechnicalCapability(capability OpenAIEndpointCapability) bool {
+	if a == nil {
+		return false
+	}
+	if capability == "" {
+		return true
+	}
+	if !a.IsOpenAICompatible() {
+		return false
+	}
+	if a.IsGrok() {
+		switch capability {
+		case OpenAIEndpointCapabilityChatCompletions:
+			return true
+		case OpenAIEndpointCapabilityGrokMediaGeneration:
+			eligible, reason := a.GrokMediaGenerationEligibility()
+			return eligible || reason == "billing_unobserved"
+		default:
+			return false
+		}
+	}
+
+	switch capability {
+	case OpenAIEndpointCapabilityChatCompletions:
+		return true
+	case OpenAIEndpointCapabilityResponses:
+		if a.Type == AccountTypeAPIKey && !openai_compat.ShouldUseResponsesAPI(a.Extra) {
+			return false
+		}
+		return true
+	case OpenAIEndpointCapabilityLive:
+		return a.Platform == PlatformOpenAI &&
+			a.Type == AccountTypeOAuth &&
+			!a.IsOpenAIPersonalAccessToken() &&
+			!a.IsOpenAIAgentIdentity()
+	case OpenAIEndpointCapabilityAlphaSearch:
+		return a.Type == AccountTypeOAuth || a.Type == AccountTypeAPIKey
+	case OpenAIEndpointCapabilityEmbeddings:
+		return a.Type == AccountTypeAPIKey
+	default:
+		return false
+	}
+}
+
 // GrokMediaGenerationEligibility reports whether a Grok account may receive
 // new image/video generation requests. OAuth media fails closed unless billing
 // observations provide positive paid-entitlement evidence. An explicit

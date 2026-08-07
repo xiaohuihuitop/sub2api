@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/stretchr/testify/require"
 )
 
@@ -104,4 +105,110 @@ func TestOpenAIGatewayServiceSelectsOnlyExplicitPlatformPool(t *testing.T) {
 	require.Equal(t, platformID, repo.poolID)
 	require.Equal(t, PlatformOpenAI, repo.poolPlatform)
 	require.Zero(t, repo.legacyCalls)
+}
+
+func TestPlatformScopedAccountIgnoresAccountAdminModelAndEndpointPolicy(t *testing.T) {
+	platformID := int64(7)
+	account := &Account{
+		ID: 12, PlatformID: &platformID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"model_mapping":       map[string]any{"gpt-old": "gpt-old"},
+			"openai_capabilities": []any{"chat_completions"},
+		},
+		Status: StatusActive, Schedulable: true,
+	}
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID: 7, PlatformCode: "openai-primary", AccountPlatform: PlatformOpenAI,
+	})
+
+	require.True(t, platformRouteOwnsModelPolicy(ctx))
+	require.True(t, isOpenAICompatibleAccountEligibleForRequest(
+		ctx, account, PlatformOpenAI, "gpt-5.6", false, OpenAIEndpointCapabilityResponses,
+	))
+	require.False(t, isOpenAICompatibleAccountEligibleForRequest(
+		context.Background(), account, PlatformOpenAI, "gpt-5.6", false, OpenAIEndpointCapabilityResponses,
+	))
+}
+
+func TestPlatformScopedAccountKeepsTechnicalOpenAIConstraints(t *testing.T) {
+	platformID := int64(8)
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID: 8, PlatformCode: "openai-primary", AccountPlatform: PlatformOpenAI,
+	})
+
+	compactBlocked := &Account{
+		ID: 21, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true,
+		Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOff},
+	}
+	require.False(t, isOpenAICompatibleAccountEligibleForRequest(
+		ctx, compactBlocked, PlatformOpenAI, "gpt-5.6", true, OpenAIEndpointCapabilityResponses,
+	), "Platform routing must not bypass the account's compact capability")
+
+	imageAccount := &Account{
+		ID: 22, PlatformID: &platformID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Status: StatusActive, Schedulable: true,
+	}
+	require.True(t, accountSupportsOpenAICapabilitiesForRequest(
+		ctx, imageAccount, OpenAIEndpointCapabilityResponses, OpenAIImagesCapabilityNative,
+	), "native image capability remains an adapter-level account constraint")
+
+	mediaBlocked := &Account{
+		ID: 23, PlatformID: &platformID, Platform: PlatformGrok, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true,
+		Extra: map[string]any{GrokMediaEligibleExtraKey: false},
+	}
+	require.False(t, accountSupportsOpenAICapabilitiesForRequest(
+		ctx, mediaBlocked, OpenAIEndpointCapabilityGrokMediaGeneration, ""),
+		"Grok media eligibility remains an adapter-level account constraint")
+}
+
+func TestPlatformScopedAccountKeepsOpenAITechnicalEndpointConstraints(t *testing.T) {
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID: 9, PlatformCode: "openai-primary", AccountPlatform: PlatformOpenAI,
+	})
+
+	apiKey := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Status:   StatusActive,
+		Extra:    map[string]any{},
+	}
+	require.False(t, accountSupportsOpenAIEndpointForRequest(ctx, apiKey, OpenAIEndpointCapabilityLive),
+		"Live requires an OpenAI OAuth account")
+
+	oauth := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeOAuth,
+		Status:   StatusActive,
+	}
+	require.True(t, accountSupportsOpenAIEndpointForRequest(ctx, oauth, OpenAIEndpointCapabilityLive),
+		"OpenAI OAuth remains eligible for Live")
+
+	serviceAccount := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeServiceAccount,
+		Status:   StatusActive,
+	}
+	require.False(t, accountSupportsOpenAIEndpointForRequest(ctx, serviceAccount, OpenAIEndpointCapabilityLive),
+		"non-OAuth accounts cannot be routed to Live")
+
+	upstream := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeUpstream,
+		Status:   StatusActive,
+	}
+	require.False(t, accountSupportsOpenAIEndpointForRequest(ctx, upstream, OpenAIEndpointCapabilityAlphaSearch),
+		"alpha search keeps its account-type restriction")
+
+	responsesDisabled := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Status:   StatusActive,
+		Extra: map[string]any{
+			openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
+		},
+	}
+	require.False(t, accountSupportsOpenAIEndpointForRequest(ctx, responsesDisabled, OpenAIEndpointCapabilityResponses),
+		"Responses probe/mode remains an account technical constraint")
 }

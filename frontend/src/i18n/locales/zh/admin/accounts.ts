@@ -84,6 +84,7 @@ export default {
       platformPool: '所属平台',
       platformPoolRequired: '请选择所属平台',
       noPlatformPool: '当前没有可用的平台，请先创建并启用平台',
+      platformModelPolicyNotice: '模型和请求端点统一继承所选平台的配置',
       // Filter options
       allPlatforms: '全部平台',
       allTypes: '全部类型',

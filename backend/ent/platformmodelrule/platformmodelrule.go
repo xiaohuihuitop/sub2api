@@ -24,8 +24,6 @@ const (
 	FieldModelPattern = "model_pattern"
 	// FieldUpstreamModel holds the string denoting the upstream_model field in the database.
 	FieldUpstreamModel = "upstream_model"
-	// FieldEndpointCapabilities holds the string denoting the endpoint_capabilities field in the database.
-	FieldEndpointCapabilities = "endpoint_capabilities"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// EdgePlatform holds the string denoting the platform edge name in mutations.
@@ -49,7 +47,6 @@ var Columns = []string{
 	FieldPlatformID,
 	FieldModelPattern,
 	FieldUpstreamModel,
-	FieldEndpointCapabilities,
 	FieldStatus,
 }
 
@@ -76,8 +73,6 @@ var (
 	DefaultUpstreamModel string
 	// UpstreamModelValidator is a validator for the "upstream_model" field. It is called by the builders before save.
 	UpstreamModelValidator func(string) error
-	// DefaultEndpointCapabilities holds the default value on creation for the "endpoint_capabilities" field.
-	DefaultEndpointCapabilities []string
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.

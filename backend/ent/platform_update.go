@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
@@ -92,6 +93,18 @@ func (_u *PlatformUpdate) SetNillableStatus(v *string) *PlatformUpdate {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (_u *PlatformUpdate) SetEndpointCapabilities(v []string) *PlatformUpdate {
+	_u.mutation.SetEndpointCapabilities(v)
+	return _u
+}
+
+// AppendEndpointCapabilities appends value to the "endpoint_capabilities" field.
+func (_u *PlatformUpdate) AppendEndpointCapabilities(v []string) *PlatformUpdate {
+	_u.mutation.AppendEndpointCapabilities(v)
 	return _u
 }
 
@@ -362,6 +375,14 @@ func (_u *PlatformUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(platform.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.EndpointCapabilities(); ok {
+		_spec.SetField(platform.FieldEndpointCapabilities, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedEndpointCapabilities(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, platform.FieldEndpointCapabilities, value)
+		})
 	}
 	if _u.mutation.LegacyGroupCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -651,6 +672,18 @@ func (_u *PlatformUpdateOne) SetNillableStatus(v *string) *PlatformUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (_u *PlatformUpdateOne) SetEndpointCapabilities(v []string) *PlatformUpdateOne {
+	_u.mutation.SetEndpointCapabilities(v)
+	return _u
+}
+
+// AppendEndpointCapabilities appends value to the "endpoint_capabilities" field.
+func (_u *PlatformUpdateOne) AppendEndpointCapabilities(v []string) *PlatformUpdateOne {
+	_u.mutation.AppendEndpointCapabilities(v)
 	return _u
 }
 
@@ -951,6 +984,14 @@ func (_u *PlatformUpdateOne) sqlSave(ctx context.Context) (_node *Platform, err 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(platform.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.EndpointCapabilities(); ok {
+		_spec.SetField(platform.FieldEndpointCapabilities, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedEndpointCapabilities(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, platform.FieldEndpointCapabilities, value)
+		})
 	}
 	if _u.mutation.LegacyGroupCleared() {
 		edge := &sqlgraph.EdgeSpec{

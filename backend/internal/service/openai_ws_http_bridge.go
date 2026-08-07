@@ -189,7 +189,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	var upstreamReq *http.Request
 	if account.Platform == PlatformGrok {
-		upstreamModel := resolveGrokWSUpstreamModel(account, body, originalModel)
+		upstreamModel := resolveGrokWSUpstreamModel(account, body, originalModel, ctx)
 		grokIntentSourceBody := body
 		body, err = patchGrokResponsesBody(body, upstreamModel)
 		if err != nil {
@@ -257,7 +257,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 			return nil, s.handleFailoverErrorResponsePassthrough(ctx, resp, c, account, body, respBody)
 		}
 		if account.Platform != PlatformGrok && (shouldFailover || shouldCooldownOpenAITransientUpstreamError(resp.StatusCode, respBody)) {
-			canonicalModel := canonicalOpenAIAccountSchedulingModel(account, originalModel)
+			canonicalModel := canonicalOpenAIAccountSchedulingModel(account, originalModel, ctx)
 			s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, canonicalModel)
 		}
 		_ = writeClientMessage(buildOpenAIWSHTTPBridgeErrorEvent(resp.StatusCode, upstreamMsg))
@@ -288,7 +288,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	if originalModel != "" {
 		mappedModel = strings.TrimSpace(gjson.GetBytes(body, "model").String())
 		if mappedModel == "" {
-			mappedModel = normalizeOpenAIModelForUpstream(account, account.GetMappedModel(originalModel))
+			mappedModel = normalizeOpenAIModelForUpstream(account, resolveOpenAIForwardModelWithContext(ctx, account, originalModel, ""))
 		}
 		needModelReplace = mappedModel != "" && mappedModel != originalModel
 		if needModelReplace {
@@ -412,7 +412,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 				if transientStatus := openAIWSPayloadTransientStatus(upstreamMessage); transientStatus != 0 {
 					accountStatus = transientStatus
 				}
-				canonicalModel := canonicalOpenAIAccountSchedulingModel(account, originalModel)
+				canonicalModel := canonicalOpenAIAccountSchedulingModel(account, originalModel, ctx)
 				s.handleOpenAIAccountUpstreamError(ctx, account, accountStatus, resp.Header, upstreamMessage, canonicalModel)
 			}
 			if turn == 1 && !wroteDownstream && shouldFailover {
@@ -449,7 +449,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 			return resultWithUsage(), upstreamEventErr
 		}
 		if isOpenAIWSTerminalEvent(eventType) {
-			upstreamTerminalEvent = s.handleOpenAIWSTerminalTransientFailure(ctx, account, canonicalOpenAIAccountSchedulingModel(account, originalModel), resp.Header, upstreamMessage)
+			upstreamTerminalEvent = s.handleOpenAIWSTerminalTransientFailure(ctx, account, canonicalOpenAIAccountSchedulingModel(account, originalModel, ctx), resp.Header, upstreamMessage)
 			terminalEventCount++
 			firstTokenMsValue := -1
 			if firstTokenMs != nil {
@@ -495,7 +495,11 @@ func resolveGrokWSCacheIdentity(c *gin.Context, account *Account, seedPayload, c
 	if err != nil {
 		return "", err
 	}
-	upstreamModel := resolveGrokWSUpstreamModel(account, currentPayload, originalModel)
+	var requestContext context.Context
+	if c != nil && c.Request != nil {
+		requestContext = c.Request.Context()
+	}
+	upstreamModel := resolveGrokWSUpstreamModel(account, currentPayload, originalModel, requestContext)
 	body, err = patchGrokResponsesBody(body, upstreamModel)
 	if err != nil {
 		return "", err
@@ -503,14 +507,18 @@ func resolveGrokWSCacheIdentity(c *gin.Context, account *Account, seedPayload, c
 	return resolveGrokCacheIdentity(c, body, "", upstreamModel), nil
 }
 
-func resolveGrokWSUpstreamModel(account *Account, body []byte, originalModel string) string {
+func resolveGrokWSUpstreamModel(account *Account, body []byte, originalModel string, requestContexts ...context.Context) string {
 	upstreamModel := strings.TrimSpace(gjson.GetBytes(body, "model").String())
 	originalModel = strings.TrimSpace(originalModel)
 	// Shared ingress has already applied channel and account mappings when the
 	// body model differs from the client-facing model. Only resolve from the
 	// original model when the body still carries that original value.
 	if account != nil && originalModel != "" && (upstreamModel == "" || upstreamModel == originalModel) {
-		if mappedModel := normalizeOpenAIModelForUpstream(account, account.GetMappedModel(originalModel)); mappedModel != "" {
+		requestContext := context.Background()
+		if len(requestContexts) > 0 && requestContexts[0] != nil {
+			requestContext = requestContexts[0]
+		}
+		if mappedModel := normalizeOpenAIModelForUpstream(account, resolveOpenAIForwardModelWithContext(requestContext, account, originalModel, "")); mappedModel != "" {
 			upstreamModel = mappedModel
 		}
 	}

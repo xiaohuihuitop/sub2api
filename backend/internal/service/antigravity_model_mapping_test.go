@@ -3,10 +3,31 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveAntigravityRequestModelPrefersPlatformRoute(t *testing.T) {
+	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
+		Platform: &ResolvedPlatformModel{
+			PlatformID: 7, RequestedModel: "public-claude", UpstreamModel: "platform-upstream",
+		},
+		SchedulingScope: PlatformSchedulingScope{
+			PlatformID: 7, PlatformCode: "antigravity-primary", AccountPlatform: PlatformAntigravity,
+		},
+	})
+	account := &Account{
+		Platform: PlatformAntigravity,
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{"public-claude": "legacy-upstream"},
+		},
+	}
+
+	require.Equal(t, "platform-upstream", resolveAntigravityRequestModel(ctx, account, "public-claude"))
+	require.Equal(t, "legacy-upstream", resolveAntigravityRequestModel(context.Background(), account, "public-claude"))
+}
 
 func TestAntigravityGatewayService_GetMappedModel(t *testing.T) {
 	svc := &AntigravityGatewayService{}

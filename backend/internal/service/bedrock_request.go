@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -141,11 +142,18 @@ func normalizeBedrockModelID(modelID string) (normalized string, shouldAdjustReg
 // It applies account model_mapping first, then default Bedrock aliases, and finally
 // adjusts Anthropic cross-region prefixes to match the account region.
 func ResolveBedrockModelID(account *Account, requestedModel string) (string, bool) {
+	return ResolveBedrockModelIDForRequest(context.Background(), account, requestedModel)
+}
+
+// ResolveBedrockModelIDForRequest applies the Platform route model before
+// Bedrock's region-specific adapter normalization. The legacy wrapper above
+// keeps account-test and unscoped callers unchanged.
+func ResolveBedrockModelIDForRequest(ctx context.Context, account *Account, requestedModel string) (string, bool) {
 	if account == nil {
 		return "", false
 	}
 
-	mappedModel := account.GetMappedModel(requestedModel)
+	mappedModel := resolveOpenAIForwardModelWithContext(ctx, account, requestedModel, "")
 	modelID, shouldAdjustRegion, ok := normalizeBedrockModelID(mappedModel)
 	if !ok {
 		return "", false

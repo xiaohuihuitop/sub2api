@@ -319,56 +319,37 @@ describe('EditAccountModal', () => {
     authIsSimpleMode.value = true
   })
 
-  it('reopening the same account rehydrates the OpenAI whitelist from props', async () => {
-    const account = buildAccount()
-    updateAccountMock.mockReset()
-    checkMixedChannelRiskMock.mockReset()
-    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
-    updateAccountMock.mockResolvedValue(account)
+  it('does not render account-level model policy controls', () => {
+    const wrapper = mountModal()
 
-    const wrapper = mountModal(account)
-
-    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('gpt-5.2')
-
-    await wrapper.get('[data-testid="rewrite-to-snapshot"]').trigger('click')
-    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('gpt-5.2-2025-12-11')
-
-    await wrapper.setProps({ show: false })
-    await wrapper.setProps({ show: true })
-
-    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('gpt-5.2')
-
-    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
-
-    expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
-      'gpt-5.2': 'gpt-5.2'
-    })
+    expect(wrapper.findComponent(ModelWhitelistSelectorStub).exists()).toBe(false)
+    expect(wrapper.find('[data-testid="model-whitelist-value"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('admin.accounts.modelRestriction')
   })
 
-  it('preserves model mappings when editing the whitelist', async () => {
+  it('preserves legacy model policy while saving unrelated account fields', async () => {
     const account = buildAccount()
     account.credentials.model_mapping = {
       'gpt-5.2': 'gpt-5.2',
       'gpt-latest': 'gpt-5.2'
     }
+    account.credentials.openai_capabilities = ['chat_completions']
     updateAccountMock.mockReset()
     checkMixedChannelRiskMock.mockReset()
     checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
     updateAccountMock.mockResolvedValue(account)
 
     const wrapper = mountModal(account)
-
-    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('gpt-5.2')
-
-    await wrapper.get('[data-testid="rewrite-to-snapshot"]').trigger('click')
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
-      'gpt-5.2-2025-12-11': 'gpt-5.2-2025-12-11',
+      'gpt-5.2': 'gpt-5.2',
       'gpt-latest': 'gpt-5.2'
     })
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.openai_capabilities).toEqual([
+      'chat_completions'
+    ])
   })
 
   it('submits OpenAI compact mode and compact-only model mapping', async () => {
@@ -548,7 +529,7 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_long_context_billing_enabled).toBe(false)
   })
 
-  it('loads and submits Grok OAuth model mapping edits', async () => {
+  it('does not expose Grok OAuth model mapping controls and preserves legacy mapping', async () => {
     const account = buildGrokOAuthAccount()
     updateAccountMock.mockReset()
     checkMixedChannelRiskMock.mockReset()
@@ -556,24 +537,15 @@ describe('EditAccountModal', () => {
     updateAccountMock.mockResolvedValue(account)
 
     const wrapper = mountModal(account)
-    expect(wrapper.text()).toContain('Imagine Image')
-    expect(wrapper.text()).toContain('Imagine Video')
+    expect(wrapper.findComponent(ModelWhitelistSelectorStub).exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Imagine Image')
+    expect(wrapper.text()).not.toContain('Imagine Video')
 
-    const inputWithValue = (value: string) => {
-      const input = wrapper
-        .findAll('input')
-        .find((input) => (input.element as HTMLInputElement).value === value)
-      expect(input).toBeTruthy()
-      return input!
-    }
-
-    await inputWithValue('grok-latest').setValue('grok')
-    await inputWithValue('grok-4.3').setValue('grok-build-0.1')
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
-      grok: 'grok-build-0.1'
+      'grok-latest': 'grok-4.3'
     })
   })
 
@@ -680,7 +652,7 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_responses_supported).toBe(true)
   })
 
-  it('submits OpenAI APIKey endpoint capabilities from credentials', async () => {
+  it('preserves legacy OpenAI APIKey endpoint capabilities without rendering controls', async () => {
     const account = buildAccount()
     account.credentials.openai_capabilities = ['chat_completions']
     updateAccountMock.mockReset()
@@ -690,7 +662,7 @@ describe('EditAccountModal', () => {
 
     const wrapper = mountModal(account)
 
-    expect(wrapper.findAll('input[type="checkbox"]').some((input) => (input.element as HTMLInputElement).checked)).toBe(true)
+    expect(wrapper.find('[data-testid="openai-endpoint-capability-chat_completions"]').exists()).toBe(false)
 
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
@@ -743,8 +715,9 @@ describe('EditAccountModal', () => {
 	  expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.auto_pause_7d_disabled).toBeUndefined()
 	})
 
-  it('keeps at least one OpenAI APIKey endpoint capability selected', async () => {
+  it('does not render account-level endpoint capability controls', async () => {
     const account = buildAccount()
+    account.credentials.openai_capabilities = ['chat_completions']
     updateAccountMock.mockReset()
     checkMixedChannelRiskMock.mockReset()
     checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
@@ -752,25 +725,8 @@ describe('EditAccountModal', () => {
 
     const wrapper = mountModal(account)
 
-    const chatCheckbox = wrapper.get<HTMLInputElement>(
-      '[data-testid="openai-endpoint-capability-chat_completions"]'
-    )
-    const embeddingsCheckbox = wrapper.get<HTMLInputElement>(
-      '[data-testid="openai-endpoint-capability-embeddings"]'
-    )
-
-    expect(chatCheckbox.element.checked).toBe(true)
-    expect(embeddingsCheckbox.element.checked).toBe(true)
-
-    await embeddingsCheckbox.setValue(false)
-
-    expect(chatCheckbox.element.checked).toBe(true)
-    expect(embeddingsCheckbox.element.checked).toBe(false)
-
-    await chatCheckbox.setValue(false)
-
-    expect(chatCheckbox.element.checked).toBe(true)
-    expect(embeddingsCheckbox.element.checked).toBe(false)
+    expect(wrapper.find('[data-testid="openai-endpoint-capability-chat_completions"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="openai-endpoint-capability-embeddings"]').exists()).toBe(false)
 
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 

@@ -10,7 +10,6 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
@@ -75,18 +74,6 @@ func (_u *PlatformModelRuleUpdate) SetNillableUpstreamModel(v *string) *Platform
 	if v != nil {
 		_u.SetUpstreamModel(*v)
 	}
-	return _u
-}
-
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (_u *PlatformModelRuleUpdate) SetEndpointCapabilities(v []string) *PlatformModelRuleUpdate {
-	_u.mutation.SetEndpointCapabilities(v)
-	return _u
-}
-
-// AppendEndpointCapabilities appends value to the "endpoint_capabilities" field.
-func (_u *PlatformModelRuleUpdate) AppendEndpointCapabilities(v []string) *PlatformModelRuleUpdate {
-	_u.mutation.AppendEndpointCapabilities(v)
 	return _u
 }
 
@@ -200,14 +187,6 @@ func (_u *PlatformModelRuleUpdate) sqlSave(ctx context.Context) (_node int, err 
 	if value, ok := _u.mutation.UpstreamModel(); ok {
 		_spec.SetField(platformmodelrule.FieldUpstreamModel, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.EndpointCapabilities(); ok {
-		_spec.SetField(platformmodelrule.FieldEndpointCapabilities, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedEndpointCapabilities(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, platformmodelrule.FieldEndpointCapabilities, value)
-		})
-	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(platformmodelrule.FieldStatus, field.TypeString, value)
 	}
@@ -305,18 +284,6 @@ func (_u *PlatformModelRuleUpdateOne) SetNillableUpstreamModel(v *string) *Platf
 	if v != nil {
 		_u.SetUpstreamModel(*v)
 	}
-	return _u
-}
-
-// SetEndpointCapabilities sets the "endpoint_capabilities" field.
-func (_u *PlatformModelRuleUpdateOne) SetEndpointCapabilities(v []string) *PlatformModelRuleUpdateOne {
-	_u.mutation.SetEndpointCapabilities(v)
-	return _u
-}
-
-// AppendEndpointCapabilities appends value to the "endpoint_capabilities" field.
-func (_u *PlatformModelRuleUpdateOne) AppendEndpointCapabilities(v []string) *PlatformModelRuleUpdateOne {
-	_u.mutation.AppendEndpointCapabilities(v)
 	return _u
 }
 
@@ -459,14 +426,6 @@ func (_u *PlatformModelRuleUpdateOne) sqlSave(ctx context.Context) (_node *Platf
 	}
 	if value, ok := _u.mutation.UpstreamModel(); ok {
 		_spec.SetField(platformmodelrule.FieldUpstreamModel, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.EndpointCapabilities(); ok {
-		_spec.SetField(platformmodelrule.FieldEndpointCapabilities, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedEndpointCapabilities(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, platformmodelrule.FieldEndpointCapabilities, value)
-		})
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(platformmodelrule.FieldStatus, field.TypeString, value)

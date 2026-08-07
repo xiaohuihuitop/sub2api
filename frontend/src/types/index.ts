@@ -834,7 +834,6 @@ export interface PlatformModelRule {
   id?: number
   model_pattern: string
   upstream_model: string
-  endpoint_capabilities: string[]
   enabled: boolean
 }
 
@@ -846,6 +845,7 @@ export interface PlatformPool {
   name: string
   account_platform: AccountPlatform
   status: 'active' | 'disabled'
+  endpoint_capabilities: string[]
   model_rules: PlatformModelRule[]
 }
 
@@ -863,6 +863,7 @@ export interface CreatePlatformPoolRequest {
   name: string
   account_platform: AccountPlatform
   status?: 'active' | 'disabled'
+  endpoint_capabilities?: string[]
   model_rules?: PlatformModelRule[]
 }
 
@@ -871,6 +872,7 @@ export interface UpdatePlatformPoolRequest {
   name?: string
   account_platform?: AccountPlatform
   status?: 'active' | 'disabled'
+  endpoint_capabilities?: string[]
   model_rules?: PlatformModelRule[]
 }
 

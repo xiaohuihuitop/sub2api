@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -30,6 +31,8 @@ type Platform struct {
 	AccountPlatform string `json:"account_platform,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// EndpointCapabilities holds the value of the "endpoint_capabilities" field.
+	EndpointCapabilities []string `json:"endpoint_capabilities,omitempty"`
 	// LegacyGroupID holds the value of the "legacy_group_id" field.
 	LegacyGroupID *int64 `json:"legacy_group_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -107,6 +110,8 @@ func (*Platform) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case platform.FieldEndpointCapabilities:
+			values[i] = new([]byte)
 		case platform.FieldID, platform.FieldLegacyGroupID:
 			values[i] = new(sql.NullInt64)
 		case platform.FieldCode, platform.FieldName, platform.FieldAccountPlatform, platform.FieldStatus:
@@ -169,6 +174,14 @@ func (_m *Platform) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case platform.FieldEndpointCapabilities:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field endpoint_capabilities", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.EndpointCapabilities); err != nil {
+					return fmt.Errorf("unmarshal field endpoint_capabilities: %w", err)
+				}
 			}
 		case platform.FieldLegacyGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -255,6 +268,9 @@ func (_m *Platform) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("endpoint_capabilities=")
+	builder.WriteString(fmt.Sprintf("%v", _m.EndpointCapabilities))
 	builder.WriteString(", ")
 	if v := _m.LegacyGroupID; v != nil {
 		builder.WriteString("legacy_group_id=")

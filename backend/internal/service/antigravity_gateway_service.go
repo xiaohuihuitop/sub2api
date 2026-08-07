@@ -297,6 +297,18 @@ func (s *AntigravityGatewayService) getMappedModel(account *Account, requestedMo
 	return mapAntigravityModel(account, requestedModel)
 }
 
+// resolveAntigravityRequestModel makes a Platform route authoritative for
+// request forwarding while retaining account mappings for legacy direct paths.
+func resolveAntigravityRequestModel(ctx context.Context, account *Account, requestedModel string) string {
+	if platformRouteOwnsModelPolicy(ctx) {
+		if platformModel, ok := ResolvedUpstreamModelFromContext(ctx); ok {
+			return platformModel
+		}
+		return strings.TrimSpace(requestedModel)
+	}
+	return mapAntigravityModel(account, requestedModel)
+}
+
 func resolveAntigravityProjectID(account *Account) (string, error) {
 	if account == nil {
 		return "", errAntigravityProjectIDRequired

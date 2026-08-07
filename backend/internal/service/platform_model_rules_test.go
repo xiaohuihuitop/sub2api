@@ -24,12 +24,12 @@ func TestValidatePlatformModelRulesRejectsDuplicatePatternOnSamePlatform(t *test
 	require.ErrorContains(t, err, "duplicate pattern")
 }
 
-func TestValidatePlatformModelRulesRequiresEndpointCapabilities(t *testing.T) {
+func TestValidatePlatformModelRulesDoesNotOwnEndpointCapabilities(t *testing.T) {
 	err := validatePlatformModelRules([]PlatformModelRule{
 		{PlatformID: 1, ModelPattern: "gpt-4o", Enabled: true},
 	})
 
-	require.ErrorContains(t, err, "endpoint capabilities")
+	require.NoError(t, err)
 }
 
 func TestResolvePlatformModelUsesExactBeforeSuffixWildcard(t *testing.T) {

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type gatewayRoutePlatformResolver struct {
+	platform string
+}
+
+func (r gatewayRoutePlatformResolver) ResolveModelCandidates(_ context.Context, requestedModel string) ([]*service.ResolvedPlatformModel, error) {
+	accountPlatform := r.platform
+	if r.platform == service.PlatformComposite {
+		model := strings.ToLower(strings.TrimSpace(requestedModel))
+		switch {
+		case strings.HasPrefix(model, "text-embedding"):
+			accountPlatform = service.PlatformOpenAI
+		case strings.HasPrefix(model, "grok-"):
+			accountPlatform = service.PlatformGrok
+		}
+	}
+	return []*service.ResolvedPlatformModel{{
+		PlatformID:           1,
+		PlatformCode:         "route-test-" + r.platform,
+		AccountPlatform:      accountPlatform,
+		RequestedModel:       requestedModel,
+		UpstreamModel:        requestedModel,
+		EndpointCapabilities: []string{"chat_completions", "responses"},
+	}}, nil
+}
 
 func newGatewayRoutesTestRouter(platform ...string) *gin.Engine {
 	return newGatewayRoutesTestRouterWithConfig(&config.Config{
@@ -32,6 +58,7 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 	if len(platform) > 0 && platform[0] != "" {
 		groupPlatform = platform[0]
 	}
+	apiKeyService := service.NewAPIKeyService(nil, nil, nil, nil, nil, nil, cfg)
 	RegisterGatewayRoutes(
 		router,
 		&handler.Handlers{
@@ -42,16 +69,19 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 		servermiddleware.APIKeyAuthMiddleware(func(c *gin.Context) {
 			groupID := int64(1)
 			c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{
-				GroupID: &groupID,
-				Group:   &service.Group{Platform: groupPlatform},
+				GroupID:            &groupID,
+				Group:              &service.Group{Platform: groupPlatform},
+				AllowedPlatformIDs: []int64{1},
+				AllowBalance:       true,
+				User:               &service.User{ID: 1, Balance: 100},
 			})
 			c.Next()
 		}),
+		apiKeyService,
 		nil,
 		nil,
 		nil,
-		nil,
-		nil,
+		gatewayRoutePlatformResolver{platform: groupPlatform},
 		nil,
 		cfg,
 	)

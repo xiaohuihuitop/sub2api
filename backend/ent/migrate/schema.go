@@ -1360,6 +1360,7 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 100},
 		{Name: "account_platform", Type: field.TypeString, Size: 50},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "endpoint_capabilities", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "legacy_group_id", Type: field.TypeInt64, Nullable: true},
 	}
 	// PlatformsTable holds the schema information for the "platforms" table.
@@ -1370,7 +1371,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "platforms_groups_legacy_group",
-				Columns:    []*schema.Column{PlatformsColumns[7]},
+				Columns:    []*schema.Column{PlatformsColumns[8]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1384,7 +1385,7 @@ var (
 			{
 				Name:    "platform_legacy_group_id",
 				Unique:  false,
-				Columns: []*schema.Column{PlatformsColumns[7]},
+				Columns: []*schema.Column{PlatformsColumns[8]},
 			},
 		},
 	}
@@ -1395,7 +1396,6 @@ var (
 		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "model_pattern", Type: field.TypeString, Size: 100},
 		{Name: "upstream_model", Type: field.TypeString, Size: 100, Default: ""},
-		{Name: "endpoint_capabilities", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
 		{Name: "platform_id", Type: field.TypeInt64},
 	}
@@ -1407,7 +1407,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "platform_model_rules_platforms_model_rules",
-				Columns:    []*schema.Column{PlatformModelRulesColumns[7]},
+				Columns:    []*schema.Column{PlatformModelRulesColumns[6]},
 				RefColumns: []*schema.Column{PlatformsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1416,12 +1416,12 @@ var (
 			{
 				Name:    "platformmodelrule_platform_id_model_pattern",
 				Unique:  true,
-				Columns: []*schema.Column{PlatformModelRulesColumns[7], PlatformModelRulesColumns[3]},
+				Columns: []*schema.Column{PlatformModelRulesColumns[6], PlatformModelRulesColumns[3]},
 			},
 			{
 				Name:    "platformmodelrule_status",
 				Unique:  false,
-				Columns: []*schema.Column{PlatformModelRulesColumns[6]},
+				Columns: []*schema.Column{PlatformModelRulesColumns[5]},
 			},
 		},
 	}

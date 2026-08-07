@@ -78,6 +78,7 @@
         <p v-if="platformPoolOptions.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
           {{ t('admin.accounts.noPlatformPool') }}
         </p>
+        <p class="input-hint">{{ t('admin.accounts.platformModelPolicyNotice') }}</p>
       </div>
 
       <!-- Account Type Selection (Anthropic) -->
@@ -899,7 +900,7 @@
 
       <!-- Antigravity model restriction (applies to OAuth + Upstream) -->
       <!-- Antigravity 只支持模型映射模式，不支持白名单模式 -->
-      <div v-if="form.platform === 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+      <div v-if="false && form.platform === 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
         <!-- Mapping Mode Only (no toggle for Antigravity) -->
@@ -1088,7 +1089,7 @@
         </div>
 
         <!-- Model Restriction Section (Antigravity 已在上层条件排除) -->
-        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="false" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
           <div
@@ -1606,7 +1607,7 @@
         </div>
 
         <!-- Model Restriction Section for Bedrock -->
-        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="false" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
           <!-- Mode Toggle -->
@@ -1930,7 +1931,7 @@
 
       <!-- OpenAI OAuth Model Mapping (OAuth 类型没有 apikey 容器，需要独立的模型映射区域) -->
       <div
-        v-if="(form.platform === 'openai' || form.platform === 'grok') && isOAuthFlow"
+        v-if="false && (form.platform === 'openai' || form.platform === 'grok') && isOAuthFlow"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
@@ -2973,7 +2974,7 @@
         >
           {{ t('admin.accounts.openai.responsesModeTextDisabledHint') }}
         </p>
-        <div>
+        <div v-if="false">
           <label class="input-label mb-2 block">{{ t('admin.accounts.openai.endpointCapabilities') }}</label>
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label
@@ -3824,13 +3825,10 @@ const toggleOpenAIEndpointCapability = (capability: OpenAIEndpointCapability, ev
   ])
 }
 
+// Chat/Responses ownership belongs to the selected Platform. Keep this
+// account-side state only for adapter UI, never persist it as account policy.
 const applyOpenAIEndpointCapabilities = (credentials: Record<string, unknown>) => {
-  const capabilities = normalizeOpenAIEndpointCapabilities(openAIEndpointCapabilities.value)
-  if (capabilities.length === 2) {
-    delete credentials.openai_capabilities
-    return
-  }
-  credentials.openai_capabilities = capabilities
+  delete credentials.openai_capabilities
 }
 
 function buildAntigravityExtra(): Record<string, unknown> | undefined {
@@ -4424,7 +4422,21 @@ const buildTempUnschedRules = (rules: TempUnschedRuleForm[]) => {
   return out
 }
 
+const stripCreatedAccountModelPolicy = (credentials: Record<string, unknown>) => {
+  delete credentials.model_mapping
+  delete credentials.model_whitelist
+  delete credentials.openai_capabilities
+}
+
+const sanitizeCreatedAccountPayload = <T extends { credentials?: Record<string, unknown> }>(payload: T): T => {
+  if (payload.credentials) {
+    stripCreatedAccountModelPolicy(payload.credentials)
+  }
+  return payload
+}
+
 const applyTempUnschedConfig = (credentials: Record<string, unknown>) => {
+  stripCreatedAccountModelPolicy(credentials)
   if (!tempUnschedEnabled.value) {
     delete credentials.temp_unschedulable_enabled
     delete credentials.temp_unschedulable_rules
@@ -4452,7 +4464,7 @@ const splitTempUnschedKeywords = (value: string) => {
 const submitCreateAccount = async (payload: CreateAccountRequest) => {
   submitting.value = true
   try {
-    const account = await adminAPI.accounts.create(payload)
+    const account = await adminAPI.accounts.create(sanitizeCreatedAccountPayload(payload))
     if (
       payload.platform === 'openai' &&
       payload.type === 'apikey' &&
@@ -5148,7 +5160,7 @@ const handleGrokValidateRT = async (refreshTokenInput: string) => {
           return
         }
 
-        await adminAPI.accounts.create({
+        await adminAPI.accounts.create(sanitizeCreatedAccountPayload({
           name: accountName,
           notes: form.notes,
           platform: 'grok',
@@ -5163,7 +5175,7 @@ const handleGrokValidateRT = async (refreshTokenInput: string) => {
           platform_id: form.platform_id,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
-        })
+        }))
         successCount++
       } catch (error: any) {
         failedCount++
@@ -5314,7 +5326,7 @@ const handleOpenAIExchange = async (authCode: string) => {
     }
 
     if (shouldCreateOpenAI) {
-      await adminAPI.accounts.create({
+      await adminAPI.accounts.create(sanitizeCreatedAccountPayload({
         name: form.name,
         notes: form.notes,
         platform: 'openai',
@@ -5329,7 +5341,7 @@ const handleOpenAIExchange = async (authCode: string) => {
         platform_id: form.platform_id,
         expires_at: form.expires_at,
         auto_pause_on_expired: autoPauseOnExpired.value
-      })
+      }))
       appStore.showSuccess(t('admin.accounts.accountCreated'))
     }
 
@@ -5595,7 +5607,7 @@ const handleOpenAIBatchRT = async (refreshTokenInput: string, clientId?: string)
         const accountName = refreshTokens.length > 1 ? `${baseName} #${i + 1}` : baseName
 
         if (shouldCreateOpenAI) {
-          await adminAPI.accounts.create({
+          await adminAPI.accounts.create(sanitizeCreatedAccountPayload({
             name: accountName,
             notes: form.notes,
             platform: 'openai',
@@ -5610,7 +5622,7 @@ const handleOpenAIBatchRT = async (refreshTokenInput: string, clientId?: string)
             platform_id: form.platform_id,
             expires_at: form.expires_at,
             auto_pause_on_expired: autoPauseOnExpired.value
-          })
+          }))
         }
 
         successCount++
@@ -5710,7 +5722,7 @@ const handleAntigravityValidateRT = async (refreshTokenInput: string) => {
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
         }
-        await adminAPI.accounts.create(createPayload)
+        await adminAPI.accounts.create(sanitizeCreatedAccountPayload(createPayload))
         successCount++
       } catch (error: any) {
         failedCount++
@@ -6075,7 +6087,7 @@ const handleCookieAuth = async (sessionKey: string) => {
           credentials.temp_unschedulable_rules = tempUnschedPayload
         }
 
-        await adminAPI.accounts.create({
+        await adminAPI.accounts.create(sanitizeCreatedAccountPayload({
           name: accountName,
           notes: form.notes,
           platform: form.platform,
@@ -6090,7 +6102,7 @@ const handleCookieAuth = async (sessionKey: string) => {
           platform_id: form.platform_id,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
-        })
+        }))
 
         successCount++
       } catch (error: any) {

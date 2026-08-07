@@ -87,6 +87,12 @@ func (_c *PlatformCreate) SetNillableStatus(v *string) *PlatformCreate {
 	return _c
 }
 
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (_c *PlatformCreate) SetEndpointCapabilities(v []string) *PlatformCreate {
+	_c.mutation.SetEndpointCapabilities(v)
+	return _c
+}
+
 // SetLegacyGroupID sets the "legacy_group_id" field.
 func (_c *PlatformCreate) SetLegacyGroupID(v int64) *PlatformCreate {
 	_c.mutation.SetLegacyGroupID(v)
@@ -213,6 +219,10 @@ func (_c *PlatformCreate) defaults() {
 		v := platform.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.EndpointCapabilities(); !ok {
+		v := platform.DefaultEndpointCapabilities
+		_c.mutation.SetEndpointCapabilities(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -254,6 +264,9 @@ func (_c *PlatformCreate) check() error {
 		if err := platform.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Platform.status": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.EndpointCapabilities(); !ok {
+		return &ValidationError{Name: "endpoint_capabilities", err: errors.New(`ent: missing required field "Platform.endpoint_capabilities"`)}
 	}
 	return nil
 }
@@ -305,6 +318,10 @@ func (_c *PlatformCreate) createSpec() (*Platform, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(platform.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.EndpointCapabilities(); ok {
+		_spec.SetField(platform.FieldEndpointCapabilities, field.TypeJSON, value)
+		_node.EndpointCapabilities = value
 	}
 	if nodes := _c.mutation.LegacyGroupIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -499,6 +516,18 @@ func (u *PlatformUpsert) UpdateStatus() *PlatformUpsert {
 	return u
 }
 
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (u *PlatformUpsert) SetEndpointCapabilities(v []string) *PlatformUpsert {
+	u.Set(platform.FieldEndpointCapabilities, v)
+	return u
+}
+
+// UpdateEndpointCapabilities sets the "endpoint_capabilities" field to the value that was provided on create.
+func (u *PlatformUpsert) UpdateEndpointCapabilities() *PlatformUpsert {
+	u.SetExcluded(platform.FieldEndpointCapabilities)
+	return u
+}
+
 // SetLegacyGroupID sets the "legacy_group_id" field.
 func (u *PlatformUpsert) SetLegacyGroupID(v int64) *PlatformUpsert {
 	u.Set(platform.FieldLegacyGroupID, v)
@@ -629,6 +658,20 @@ func (u *PlatformUpsertOne) SetStatus(v string) *PlatformUpsertOne {
 func (u *PlatformUpsertOne) UpdateStatus() *PlatformUpsertOne {
 	return u.Update(func(s *PlatformUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (u *PlatformUpsertOne) SetEndpointCapabilities(v []string) *PlatformUpsertOne {
+	return u.Update(func(s *PlatformUpsert) {
+		s.SetEndpointCapabilities(v)
+	})
+}
+
+// UpdateEndpointCapabilities sets the "endpoint_capabilities" field to the value that was provided on create.
+func (u *PlatformUpsertOne) UpdateEndpointCapabilities() *PlatformUpsertOne {
+	return u.Update(func(s *PlatformUpsert) {
+		s.UpdateEndpointCapabilities()
 	})
 }
 
@@ -931,6 +974,20 @@ func (u *PlatformUpsertBulk) SetStatus(v string) *PlatformUpsertBulk {
 func (u *PlatformUpsertBulk) UpdateStatus() *PlatformUpsertBulk {
 	return u.Update(func(s *PlatformUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetEndpointCapabilities sets the "endpoint_capabilities" field.
+func (u *PlatformUpsertBulk) SetEndpointCapabilities(v []string) *PlatformUpsertBulk {
+	return u.Update(func(s *PlatformUpsert) {
+		s.SetEndpointCapabilities(v)
+	})
+}
+
+// UpdateEndpointCapabilities sets the "endpoint_capabilities" field to the value that was provided on create.
+func (u *PlatformUpsertBulk) UpdateEndpointCapabilities() *PlatformUpsertBulk {
+	return u.Update(func(s *PlatformUpsert) {
+		s.UpdateEndpointCapabilities()
 	})
 }
 

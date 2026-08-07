@@ -212,11 +212,22 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(wrapper.find('[data-testid="legacy-mixed-channel-dialog"]').exists()).toBe(false)
   })
 
+  it('does not render account-level model or endpoint policy controls', async () => {
+    const wrapper = mountModal()
+    await selectPlatformPool(wrapper, 'openai')
+
+    expect(wrapper.findComponent({ name: 'ModelWhitelistSelector' }).exists()).toBe(false)
+    expect(wrapper.find('[data-testid="openai-endpoint-capability-chat_completions"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('admin.accounts.modelRestriction')
+  })
+
   it('sends false explicitly for normal OpenAI account creation by default', async () => {
     await submitApiKeyAccount('openai')
 
     expect(createAccountMock).toHaveBeenCalledTimes(1)
     expect(createAccountMock.mock.calls[0]?.[0]?.extra?.openai_long_context_billing_enabled).toBe(false)
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).not.toHaveProperty('model_mapping')
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).not.toHaveProperty('openai_capabilities')
   })
 
   // namespace 摊平是仅 OAuth 的兼容开关：API Key 走 chat completions 回退桥时由桥自行摊平

@@ -26,6 +26,8 @@ const (
 	FieldAccountPlatform = "account_platform"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldEndpointCapabilities holds the string denoting the endpoint_capabilities field in the database.
+	FieldEndpointCapabilities = "endpoint_capabilities"
 	// FieldLegacyGroupID holds the string denoting the legacy_group_id field in the database.
 	FieldLegacyGroupID = "legacy_group_id"
 	// EdgeLegacyGroup holds the string denoting the legacy_group edge name in mutations.
@@ -84,6 +86,7 @@ var Columns = []string{
 	FieldName,
 	FieldAccountPlatform,
 	FieldStatus,
+	FieldEndpointCapabilities,
 	FieldLegacyGroupID,
 }
 
@@ -120,6 +123,8 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultEndpointCapabilities holds the default value on creation for the "endpoint_capabilities" field.
+	DefaultEndpointCapabilities []string
 )
 
 // OrderOption defines the ordering options for the Platform queries.

@@ -28,10 +28,9 @@ func NewPlatformHandler(platforms platformManagementService) *PlatformHandler {
 }
 
 type platformModelRuleRequest struct {
-	ModelPattern         string   `json:"model_pattern" binding:"required"`
-	UpstreamModel        string   `json:"upstream_model"`
-	EndpointCapabilities []string `json:"endpoint_capabilities"`
-	Enabled              *bool    `json:"enabled"`
+	ModelPattern  string `json:"model_pattern" binding:"required"`
+	UpstreamModel string `json:"upstream_model"`
+	Enabled       *bool  `json:"enabled"`
 }
 
 func (r platformModelRuleRequest) toServiceRule() service.PlatformModelRule {
@@ -40,19 +39,19 @@ func (r platformModelRuleRequest) toServiceRule() service.PlatformModelRule {
 		enabled = *r.Enabled
 	}
 	return service.PlatformModelRule{
-		ModelPattern:         r.ModelPattern,
-		UpstreamModel:        r.UpstreamModel,
-		EndpointCapabilities: append([]string(nil), r.EndpointCapabilities...),
-		Enabled:              enabled,
+		ModelPattern:  r.ModelPattern,
+		UpstreamModel: r.UpstreamModel,
+		Enabled:       enabled,
 	}
 }
 
 type createPlatformRequest struct {
-	Code            string                     `json:"code" binding:"required"`
-	Name            string                     `json:"name" binding:"required"`
-	AccountPlatform string                     `json:"account_platform" binding:"required"`
-	Status          string                     `json:"status"`
-	ModelRules      []platformModelRuleRequest `json:"model_rules"`
+	Code                 string                     `json:"code" binding:"required"`
+	Name                 string                     `json:"name" binding:"required"`
+	AccountPlatform      string                     `json:"account_platform" binding:"required"`
+	Status               string                     `json:"status"`
+	EndpointCapabilities []string                   `json:"endpoint_capabilities"`
+	ModelRules           []platformModelRuleRequest `json:"model_rules"`
 }
 
 func (r createPlatformRequest) toServiceInput() service.CreatePlatformInput {
@@ -61,28 +60,31 @@ func (r createPlatformRequest) toServiceInput() service.CreatePlatformInput {
 		rules[index] = r.ModelRules[index].toServiceRule()
 	}
 	return service.CreatePlatformInput{
-		Code:            r.Code,
-		Name:            r.Name,
-		AccountPlatform: r.AccountPlatform,
-		Status:          r.Status,
-		ModelRules:      rules,
+		Code:                 r.Code,
+		Name:                 r.Name,
+		AccountPlatform:      r.AccountPlatform,
+		Status:               r.Status,
+		EndpointCapabilities: r.EndpointCapabilities,
+		ModelRules:           rules,
 	}
 }
 
 type updatePlatformRequest struct {
-	Code            *string                     `json:"code"`
-	Name            *string                     `json:"name"`
-	AccountPlatform *string                     `json:"account_platform"`
-	Status          *string                     `json:"status"`
-	ModelRules      *[]platformModelRuleRequest `json:"model_rules"`
+	Code                 *string                     `json:"code"`
+	Name                 *string                     `json:"name"`
+	AccountPlatform      *string                     `json:"account_platform"`
+	Status               *string                     `json:"status"`
+	EndpointCapabilities *[]string                   `json:"endpoint_capabilities"`
+	ModelRules           *[]platformModelRuleRequest `json:"model_rules"`
 }
 
 func (r updatePlatformRequest) toServiceInput() service.UpdatePlatformInput {
 	result := service.UpdatePlatformInput{
-		Code:            r.Code,
-		Name:            r.Name,
-		AccountPlatform: r.AccountPlatform,
-		Status:          r.Status,
+		Code:                 r.Code,
+		Name:                 r.Name,
+		AccountPlatform:      r.AccountPlatform,
+		Status:               r.Status,
+		EndpointCapabilities: r.EndpointCapabilities,
 	}
 	if r.ModelRules == nil {
 		return result
@@ -96,46 +98,47 @@ func (r updatePlatformRequest) toServiceInput() service.UpdatePlatformInput {
 }
 
 type platformModelRuleResponse struct {
-	ID                   int64    `json:"id"`
-	ModelPattern         string   `json:"model_pattern"`
-	UpstreamModel        string   `json:"upstream_model"`
-	EndpointCapabilities []string `json:"endpoint_capabilities"`
-	Enabled              bool     `json:"enabled"`
+	ID            int64  `json:"id"`
+	ModelPattern  string `json:"model_pattern"`
+	UpstreamModel string `json:"upstream_model"`
+	Enabled       bool   `json:"enabled"`
 }
 
 type platformResponse struct {
-	ID              int64                       `json:"id"`
-	Code            string                      `json:"code"`
-	Name            string                      `json:"name"`
-	AccountPlatform string                      `json:"account_platform"`
-	Status          string                      `json:"status"`
-	ModelRules      []platformModelRuleResponse `json:"model_rules"`
+	ID                   int64                       `json:"id"`
+	Code                 string                      `json:"code"`
+	Name                 string                      `json:"name"`
+	AccountPlatform      string                      `json:"account_platform"`
+	Status               string                      `json:"status"`
+	EndpointCapabilities []string                    `json:"endpoint_capabilities"`
+	ModelRules           []platformModelRuleResponse `json:"model_rules"`
 }
 
 func platformResponseFromService(platform *service.Platform) platformResponse {
 	if platform == nil {
-		return platformResponse{ModelRules: []platformModelRuleResponse{}}
+		return platformResponse{EndpointCapabilities: []string{}, ModelRules: []platformModelRuleResponse{}}
 	}
 	rules := make([]platformModelRuleResponse, len(platform.ModelRules))
 	for index := range platform.ModelRules {
 		rules[index] = platformModelRuleResponse{
-			ID:                   platform.ModelRules[index].ID,
-			ModelPattern:         platform.ModelRules[index].ModelPattern,
-			UpstreamModel:        platform.ModelRules[index].UpstreamModel,
-			EndpointCapabilities: append([]string(nil), platform.ModelRules[index].EndpointCapabilities...),
-			Enabled:              platform.ModelRules[index].Enabled,
-		}
-		if rules[index].EndpointCapabilities == nil {
-			rules[index].EndpointCapabilities = []string{}
+			ID:            platform.ModelRules[index].ID,
+			ModelPattern:  platform.ModelRules[index].ModelPattern,
+			UpstreamModel: platform.ModelRules[index].UpstreamModel,
+			Enabled:       platform.ModelRules[index].Enabled,
 		}
 	}
+	endpointCapabilities := append([]string(nil), platform.EndpointCapabilities...)
+	if endpointCapabilities == nil {
+		endpointCapabilities = []string{}
+	}
 	return platformResponse{
-		ID:              platform.ID,
-		Code:            platform.Code,
-		Name:            platform.Name,
-		AccountPlatform: platform.AccountPlatform,
-		Status:          platform.Status,
-		ModelRules:      rules,
+		ID:                   platform.ID,
+		Code:                 platform.Code,
+		Name:                 platform.Name,
+		AccountPlatform:      platform.AccountPlatform,
+		Status:               platform.Status,
+		EndpointCapabilities: endpointCapabilities,
+		ModelRules:           rules,
 	}
 }
 

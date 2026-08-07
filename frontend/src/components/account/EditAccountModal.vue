@@ -24,6 +24,7 @@
           :placeholder="t('admin.accounts.notesPlaceholder')"
         ></textarea>
         <p class="input-hint">{{ t('admin.accounts.notesHint') }}</p>
+        <p class="input-hint">{{ t('admin.accounts.platformModelPolicyNotice') }}</p>
       </div>
 
       <!-- API Key fields (only for apikey type) -->
@@ -79,7 +80,7 @@
         </div>
 
         <!-- Model Restriction Section (不适用于 Antigravity) -->
-        <div v-if="account.platform !== 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="false && account?.platform !== 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
           <div
@@ -532,7 +533,7 @@
 
       <!-- OpenAI/Grok OAuth Model Mapping (OAuth 类型没有 apikey 容器，需要独立的模型映射区域) -->
       <div
-        v-if="(account.platform === 'openai' || account.platform === 'grok') && account.type === 'oauth'"
+        v-if="false && (account?.platform === 'openai' || account?.platform === 'grok') && account?.type === 'oauth'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
@@ -730,7 +731,7 @@
         </div>
 
         <!-- Model Restriction Section for Service Account -->
-        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="false" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
           <!-- Mode Toggle -->
@@ -978,7 +979,7 @@
         </div>
 
         <!-- Model Restriction for Bedrock -->
-        <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div v-if="false" class="border-t border-gray-200 pt-4 dark:border-dark-600">
           <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
           <!-- Mode Toggle -->
@@ -1627,7 +1628,7 @@
         >
           {{ t('admin.accounts.openai.responsesModeTextDisabledHint') }}
         </div>
-        <div>
+        <div v-if="false">
           <label class="input-label mb-2 block">{{ t('admin.accounts.openai.endpointCapabilities') }}</label>
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label
@@ -3063,13 +3064,19 @@ const toggleOpenAIEndpointCapability = (capability: OpenAIEndpointCapability, ev
   ])
 }
 
-const applyOpenAIEndpointCapabilities = (credentials: Record<string, unknown>) => {
-  const capabilities = normalizeOpenAIEndpointCapabilities(openAIEndpointCapabilities.value)
-  if (capabilities.length === 2) {
-    delete credentials.openai_capabilities
-    return
+// Endpoint capabilities are owned by Platform. Existing account JSON is kept
+// untouched for rollback, but the editor never writes a new account policy.
+const applyOpenAIEndpointCapabilities = (_credentials: Record<string, unknown>) => {}
+
+const preserveLegacyAccountModelPolicy = (credentials: Record<string, unknown>) => {
+  const current = (props.account?.credentials as Record<string, unknown>) || {}
+  for (const key of ['model_mapping', 'model_whitelist', 'openai_capabilities']) {
+    if (Object.prototype.hasOwnProperty.call(current, key)) {
+      credentials[key] = current[key]
+    } else {
+      delete credentials[key]
+    }
   }
-  credentials.openai_capabilities = capabilities
 }
 const normalizeOpenAIResponsesMode = (mode: unknown): OpenAIResponsesMode => {
   if (mode === 'force_responses' || mode === 'force_chat_completions') {
@@ -4598,6 +4605,9 @@ const handleSubmit = async () => {
       updatePayload.extra = newExtra
     }
 
+    if (updatePayload.credentials) {
+      preserveLegacyAccountModelPolicy(updatePayload.credentials as Record<string, unknown>)
+    }
     await submitUpdateAccount(accountID, updatePayload)
   } catch (error: any) {
     appStore.showError(error.message || t('admin.accounts.failedToUpdate'))

@@ -102,7 +102,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		passthroughBody := parsed.Body.Bytes()
 		passthroughModel := parsed.Model
 		if passthroughModel != "" {
-			if mappedModel := account.GetMappedModel(passthroughModel); mappedModel != passthroughModel {
+			mappedModel, _ := resolveRequestUpstreamModel(ctx, account, passthroughModel)
+			if mappedModel != passthroughModel {
 				passthroughBody = s.replaceModelInBody(passthroughBody, mappedModel)
 				logger.LegacyPrintf("service.gateway", "Passthrough model mapping: %s -> %s (account: %s)", parsed.Model, mappedModel, account.Name)
 				passthroughModel = mappedModel
@@ -263,7 +264,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// - OAuth/SetupToken 账号：使用 Anthropic 标准映射（短ID → 长ID）
 	mappedModel := reqModel
 	mappingSource := ""
-	if account.Type == AccountTypeAPIKey {
+	if platformModel, ok := ResolvedUpstreamModelFromContext(ctx); ok {
+		mappedModel = platformModel
+		mappingSource = "platform"
+	} else if account.Type == AccountTypeAPIKey {
 		mappedModel = account.GetMappedModel(reqModel)
 		if mappedModel != reqModel {
 			mappingSource = "account"
@@ -938,7 +942,7 @@ func (s *GatewayService) isUpstreamModelRestrictedByChannel(ctx context.Context,
 	if s.channelService == nil {
 		return false
 	}
-	upstreamModel := resolveAccountUpstreamModel(account, requestedModel)
+	upstreamModel := resolveAccountUpstreamModel(account, requestedModel, ctx)
 	if upstreamModel == "" {
 		return false
 	}
@@ -946,7 +950,15 @@ func (s *GatewayService) isUpstreamModelRestrictedByChannel(ctx context.Context,
 }
 
 // resolveAccountUpstreamModel 确定账号将请求模型映射为什么上游模型。
-func resolveAccountUpstreamModel(account *Account, requestedModel string) string {
+
+func resolveAccountUpstreamModel(account *Account, requestedModel string, requestContexts ...context.Context) string {
+	requestContext := context.Background()
+	if len(requestContexts) > 0 && requestContexts[0] != nil {
+		requestContext = requestContexts[0]
+	}
+	if platformModel, ok := ResolvedUpstreamModelFromContext(requestContext); ok {
+		return platformModel
+	}
 	if account.Platform == PlatformAntigravity {
 		return mapAntigravityModel(account, requestedModel)
 	}

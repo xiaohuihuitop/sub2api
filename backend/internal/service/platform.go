@@ -15,7 +15,7 @@ type Platform struct {
 	Name                 string
 	AccountPlatform      string
 	Status               string
-	EndpointCapabilities map[string]bool
+	EndpointCapabilities []string
 	SchedulingConfig     map[string]any
 	LegacyGroupID        *int64
 	ModelRules           []PlatformModelRule

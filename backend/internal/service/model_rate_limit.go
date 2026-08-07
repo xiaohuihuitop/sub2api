@@ -66,9 +66,16 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 		return nil
 	}
 
-	modelKey := a.GetMappedModel(requestedModel)
+	modelKey := resolveOpenAIForwardModelWithContext(ctx, a, requestedModel, "")
 	if a.Platform == PlatformAntigravity {
-		modelKey = resolveFinalAntigravityModelKey(ctx, a, requestedModel)
+		if platformModel, ok := ResolvedUpstreamModelFromContext(ctx); ok {
+			modelKey = platformModel
+			if enabled, hasThinking := ThinkingEnabledFromContext(ctx); hasThinking {
+				modelKey = applyThinkingModelSuffix(modelKey, enabled)
+			}
+		} else {
+			modelKey = resolveFinalAntigravityModelKey(ctx, a, requestedModel)
+		}
 	}
 	modelKey = strings.TrimSpace(modelKey)
 	if modelKey == "" {

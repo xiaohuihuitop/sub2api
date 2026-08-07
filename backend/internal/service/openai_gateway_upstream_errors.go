@@ -461,7 +461,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	}
 	if reqModel == "" {
 		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
-		reqModel = canonicalOpenAIAccountSchedulingModel(account, reqModel)
+		reqModel = canonicalOpenAIAccountSchedulingModel(account, reqModel, ctx)
 	}
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
 	kind := "http_error"

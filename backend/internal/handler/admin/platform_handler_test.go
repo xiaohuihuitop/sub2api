@@ -37,7 +37,7 @@ func (s *platformHandlerServiceStub) GetByID(_ context.Context, id int64) (*serv
 
 func (s *platformHandlerServiceStub) Create(_ context.Context, input service.CreatePlatformInput) (*service.Platform, error) {
 	s.created = input
-	return &service.Platform{ID: 7, Code: input.Code, Name: input.Name, AccountPlatform: input.AccountPlatform, Status: service.PlatformStatusActive, ModelRules: input.ModelRules}, nil
+	return &service.Platform{ID: 7, Code: input.Code, Name: input.Name, AccountPlatform: input.AccountPlatform, Status: service.PlatformStatusActive, EndpointCapabilities: input.EndpointCapabilities, ModelRules: input.ModelRules}, nil
 }
 
 func (s *platformHandlerServiceStub) Update(_ context.Context, id int64, input service.UpdatePlatformInput) (*service.Platform, error) {
@@ -69,16 +69,16 @@ func TestPlatformHandlerListsAndCreatesPlatformPools(t *testing.T) {
 	listRecorder := httptest.NewRecorder()
 	router.ServeHTTP(listRecorder, httptest.NewRequest(http.MethodGet, "/api/v1/admin/platforms", nil))
 	require.Equal(t, http.StatusOK, listRecorder.Code)
-	require.JSONEq(t, `{"code":0,"message":"success","data":[{"id":7,"code":"gpt","name":"GPT","account_platform":"openai","status":"active","model_rules":[]}]}`, listRecorder.Body.String())
+	require.JSONEq(t, `{"code":0,"message":"success","data":[{"id":7,"code":"gpt","name":"GPT","account_platform":"openai","status":"active","endpoint_capabilities":[],"model_rules":[]}]}`, listRecorder.Body.String())
 
 	body, err := json.Marshal(map[string]any{
-		"code":             "glm",
-		"name":             "GLM",
-		"account_platform": "openai",
+		"code":                  "glm",
+		"name":                  "GLM",
+		"account_platform":      "openai",
+		"endpoint_capabilities": []string{"chat_completions", "responses"},
 		"model_rules": []map[string]any{{
-			"model_pattern":         "glm-4-*",
-			"upstream_model":        "glm-4-plus",
-			"endpoint_capabilities": []string{"chat_completions", "responses"},
+			"model_pattern":  "glm-4-*",
+			"upstream_model": "glm-4-plus",
 		}},
 	})
 	require.NoError(t, err)
@@ -91,5 +91,5 @@ func TestPlatformHandlerListsAndCreatesPlatformPools(t *testing.T) {
 	require.Equal(t, "glm", stub.created.Code)
 	require.Len(t, stub.created.ModelRules, 1)
 	require.True(t, stub.created.ModelRules[0].Enabled)
-	require.Equal(t, []string{"chat_completions", "responses"}, stub.created.ModelRules[0].EndpointCapabilities)
+	require.Equal(t, []string{"chat_completions", "responses"}, stub.created.EndpointCapabilities)
 }
