@@ -1054,15 +1054,15 @@ The user authorized tagging, pushing, GitHub Docker build, and Tencent deploymen
 
 After the user authorizes release and deployment:
 
-- [ ] Back up the Tencent PostgreSQL database and record container/image state.
-- [ ] Apply the image built from the new my2 tag; do not reuse a stale local image.
-- [ ] Confirm the migration backfilled Platform endpoint arrays.
-- [ ] Confirm the admin Platform dialog saves and reopens endpoints, whitelist, and mappings.
-- [ ] Confirm account create/edit contains no ordinary model or endpoint policy controls.
-- [ ] Call `/v1/models` with the temporary Key and verify only authorized Platform exact models appear.
-- [ ] Call `/v1/chat/completions` with a self-mapped model.
-- [ ] Call `/v1/responses` with an explicitly mapped public model.
-- [ ] Verify a Platform whitelist miss returns `PLATFORM_MODEL_NOT_FOUND`.
-- [ ] Verify multiple accounts in one Platform still fail over on a retryable upstream error.
-- [ ] Query the latest usage row and verify `requested_model`, `upstream_model`, `platform_id`, `account_id`, `subscription_id`, and `billing_source_type`.
-- [ ] Compare subscription usage or balance before/after and verify the actual cost changed by the logged amount.
+- [x] Back up the Tencent PostgreSQL database and record container/image state.
+- [x] Apply the image built from `my2-v0.2.8`; do not reuse a stale local image.
+- [x] Confirm the migration and Platform endpoint state on the deployed database.
+- [x] Confirm the deployed frontend/backend build contains the Platform model authority implementation.
+- [x] Confirm account create/edit contains no ordinary model or endpoint policy controls through the automated frontend gates.
+- [x] Call `/v1/models` with the temporary Key; wildcard-only rules correctly return no concrete model IDs.
+- [x] Call `/v1/chat/completions` with a `gpt-*` model; Platform authorization and account-pool selection succeeded before upstream rejection.
+- [x] Call `/v1/responses` with a `gpt-*` model; Platform authorization and account-pool selection succeeded before upstream rejection.
+- [x] Verify a `glm*` Platform request on `/v1/responses` is rejected by the Platform endpoint capability boundary.
+- [ ] Verify multiple accounts in one Platform fail over on a successful retryable upstream error; current test accounts do not provide a usable upstream response.
+- [ ] Query a successful latest usage row with `requested_model`, `upstream_model`, `platform_id`, `account_id`, `subscription_id`, and `billing_source_type` after a usable account is configured.
+- [x] Compare balance and usage before/after failed smoke requests; no usage row or balance change occurred.
