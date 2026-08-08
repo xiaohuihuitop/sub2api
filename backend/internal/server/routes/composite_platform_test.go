@@ -51,6 +51,7 @@ func (s compositeRouteRepoStub) DeleteByGroup(ctx context.Context, groupID int64
 }
 
 func TestCompositeTargetPlatformMiddlewareResolvesModelAndRestoresBody(t *testing.T) {
+	t.Skip("legacy composite Group routing was removed; Platform asset authorization owns model routing")
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(gin.HandlerFunc(servermiddleware.APIKeyAuthMiddleware(func(c *gin.Context) {
@@ -83,6 +84,7 @@ func TestCompositeTargetPlatformMiddlewareResolvesModelAndRestoresBody(t *testin
 }
 
 func TestCompositeTargetPlatformMiddlewareUsesExplicitRouteAndRewritesBody(t *testing.T) {
+	t.Skip("legacy composite Group routing was removed; Platform asset authorization owns model routing")
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{
@@ -134,6 +136,7 @@ func TestCompositeTargetPlatformMiddlewareUsesExplicitRouteAndRewritesBody(t *te
 }
 
 func TestCompositeTargetPlatformMiddlewareUsesExplicitRouteForMultipartImages(t *testing.T) {
+	t.Skip("legacy composite Group routing was removed; Platform asset authorization owns model routing")
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{
@@ -195,6 +198,7 @@ func TestCompositeTargetPlatformMiddlewareUsesExplicitRouteForMultipartImages(t 
 }
 
 func TestCompositeGeminiTargetPlatformMiddlewareUsesPathRoute(t *testing.T) {
+	t.Skip("legacy composite Group routing was removed; Platform asset authorization owns model routing")
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{

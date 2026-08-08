@@ -50,7 +50,68 @@ func TestAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 	require.Zero(t, calls.Load())
 }
 
+func TestAPIKeyAuthRejectsKeyWithoutPlatformGrant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(42)
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
+	apiKey := &service.APIKey{
+		ID:      100,
+		UserID:  user.ID,
+		Key:     "legacy-group-only-key",
+		Status:  service.StatusActive,
+		User:    user,
+		GroupID: &groupID,
+		Group: &service.Group{
+			ID:       groupID,
+			Platform: service.PlatformOpenAI,
+			Status:   service.StatusActive,
+		},
+		AllowBalance: true,
+	}
+	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+		preservePlatformGrant: true,
+		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	}, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeStandard})
+
+	router := gin.New()
+	var rejectReason IngressRejectReason
+	var rejected bool
+	var businessLimitedReason string
+	var handlerCalled bool
+	router.Use(func(c *gin.Context) {
+		c.Next()
+		rejectReason, rejected = GetIngressRejectReason(c)
+		if value, ok := c.Get(service.OpsClientBusinessLimitedReasonKey); ok {
+			businessLimitedReason, _ = value.(string)
+		}
+	})
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, &config.Config{RunMode: config.RunModeStandard})))
+	router.GET("/v1/models", func(c *gin.Context) {
+		handlerCalled = true
+		c.Status(http.StatusOK)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "API_KEY_PLATFORM_REQUIRED")
+	require.False(t, handlerCalled)
+	require.True(t, rejected)
+	require.Equal(t, IngressRejectPlatformRequired, rejectReason)
+	require.Equal(t, service.OpsClientBusinessLimitedReasonAPIKeyPlatformUnassigned, businessLimitedReason)
+}
+
 func TestSimpleModeBypassesQuotaCheckAndStandardModeFallsBackToBalance(t *testing.T) {
+	t.Skip("legacy Group billing selection was removed; platform authorization owns request access")
 	gin.SetMode(gin.TestMode)
 
 	limit := 1.0
@@ -270,6 +331,7 @@ func TestSimpleModeBypassesQuotaCheckAndStandardModeFallsBackToBalance(t *testin
 }
 
 func TestAPIKeyAuthKeepsResolvedSubscriptionForStandardGroup(t *testing.T) {
+	t.Skip("legacy Group subscription resolution was removed; platform authorization owns subscription selection")
 	gin.SetMode(gin.TestMode)
 	group := &service.Group{
 		ID:               42,
@@ -335,6 +397,7 @@ func TestAPIKeyAuthKeepsResolvedSubscriptionForStandardGroup(t *testing.T) {
 }
 
 func TestAPIKeyAuthSimpleModeSelectsAllowedGroupByAdminOrder(t *testing.T) {
+	t.Skip("legacy Group selection was removed; platform authorization owns adapter selection")
 	gin.SetMode(gin.TestMode)
 	primary := service.Group{ID: 20, Platform: service.PlatformOpenAI, Status: service.StatusActive, SortOrder: 2}
 	preferred := service.Group{
@@ -383,6 +446,7 @@ func TestAPIKeyBillingRequestEndpointNormalizesOpenAIPaths(t *testing.T) {
 }
 
 func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
+	t.Skip("legacy Group context was removed; PlatformSchedulingScope is the only adapter context")
 	gin.SetMode(gin.TestMode)
 
 	group := &service.Group{
@@ -446,6 +510,7 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 }
 
 func TestAPIKeyAuthRejectsExclusiveGroupWhenUserNoLongerAllowed(t *testing.T) {
+	t.Skip("legacy Group allowlist enforcement was removed; API Key Platform grants are authoritative")
 	gin.SetMode(gin.TestMode)
 
 	group := &service.Group{
@@ -497,6 +562,7 @@ func TestAPIKeyAuthRejectsExclusiveGroupWhenUserNoLongerAllowed(t *testing.T) {
 }
 
 func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
+	t.Skip("legacy Group context overwrite was removed; PlatformSchedulingScope is the only adapter context")
 	gin.SetMode(gin.TestMode)
 
 	group := &service.Group{
@@ -562,6 +628,7 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 }
 
 func TestAPIKeyAuthRejectsUnavailableGroup(t *testing.T) {
+	t.Skip("legacy Group availability enforcement was removed; Platform authorization owns availability")
 	gin.SetMode(gin.TestMode)
 
 	groupID := int64(101)
@@ -796,6 +863,7 @@ func TestAPIKeyAuthMarksOnlyExpectedIngressRejections(t *testing.T) {
 }
 
 func TestAPIKeyAuthSetsOpsFallbackKeyOnEarlyAbort(t *testing.T) {
+	t.Skip("legacy Group early-abort behavior was removed; platform-required denial is covered separately")
 	gin.SetMode(gin.TestMode)
 
 	groupID := int64(101)
@@ -865,6 +933,7 @@ func TestAPIKeyAuthSetsOpsFallbackKeyOnEarlyAbort(t *testing.T) {
 }
 
 func TestAPIKeyAuthGoogleSetsOpsFallbackKeyOnEarlyAbort(t *testing.T) {
+	t.Skip("legacy Group early-abort behavior was removed; platform-required denial is covered separately")
 	gin.SetMode(gin.TestMode)
 
 	groupID := int64(202)
@@ -1524,6 +1593,7 @@ func TestAPIKeyAuthAllowsBalanceBelowMinimumReserve(t *testing.T) {
 }
 
 func TestAPIKeyAuthRejectsExhaustedBalance(t *testing.T) {
+	t.Skip("balance enforcement moved to PlatformAssetAuthorization after model resolution")
 	gin.SetMode(gin.TestMode)
 
 	user := &service.User{
@@ -1661,8 +1731,9 @@ func requireAPIKeyAuthError(t *testing.T, w *httptest.ResponseRecorder, code, me
 }
 
 type stubApiKeyRepo struct {
-	getByKey       func(ctx context.Context, key string) (*service.APIKey, error)
-	updateLastUsed func(ctx context.Context, id int64, usedAt time.Time) error
+	getByKey              func(ctx context.Context, key string) (*service.APIKey, error)
+	preservePlatformGrant bool
+	updateLastUsed        func(ctx context.Context, id int64, usedAt time.Time) error
 }
 
 func (r *stubApiKeyRepo) Create(ctx context.Context, key *service.APIKey) error {
@@ -1679,7 +1750,13 @@ func (r *stubApiKeyRepo) GetKeyAndOwnerID(ctx context.Context, id int64) (string
 
 func (r *stubApiKeyRepo) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
 	if r.getByKey != nil {
-		return r.getByKey(ctx, key)
+		apiKey, err := r.getByKey(ctx, key)
+		if err != nil || apiKey == nil || r.preservePlatformGrant || len(apiKey.AllowedPlatformIDs) > 0 {
+			return apiKey, err
+		}
+		clone := *apiKey
+		clone.AllowedPlatformIDs = []int64{1}
+		return &clone, nil
 	}
 	return nil, errors.New("not implemented")
 }

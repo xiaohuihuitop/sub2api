@@ -107,9 +107,73 @@ func TestGoogleAPIKeyAuthV2KeyDefersBillingToPlatformRoute(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
+func TestGoogleAPIKeyAuthRejectsKeyWithoutPlatformGrant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(42)
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
+	apiKey := &service.APIKey{
+		ID:      100,
+		UserID:  user.ID,
+		Key:     "legacy-google-group-only-key",
+		Status:  service.StatusActive,
+		User:    user,
+		GroupID: &groupID,
+		Group: &service.Group{
+			ID:       groupID,
+			Platform: service.PlatformGemini,
+			Status:   service.StatusActive,
+		},
+		AllowBalance: true,
+	}
+	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
+		preservePlatformGrant: true,
+		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	})
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	router := gin.New()
+	var rejectReason IngressRejectReason
+	var rejected bool
+	var businessLimitedReason string
+	var handlerCalled bool
+	router.Use(func(c *gin.Context) {
+		c.Next()
+		rejectReason, rejected = GetIngressRejectReason(c)
+		if value, ok := c.Get(service.OpsClientBusinessLimitedReasonKey); ok {
+			businessLimitedReason, _ = value.(string)
+		}
+	})
+	router.Use(APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, cfg))
+	router.GET("/v1beta/models", func(c *gin.Context) {
+		handlerCalled = true
+		c.Status(http.StatusOK)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
+	request.Header.Set("x-goog-api-key", apiKey.Key)
+	router.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	var response googleErrorResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, http.StatusForbidden, response.Error.Code)
+	require.Contains(t, response.Error.Message, "API Key")
+	require.False(t, handlerCalled)
+	require.True(t, rejected)
+	require.Equal(t, IngressRejectPlatformRequired, rejectReason)
+	require.Equal(t, service.OpsClientBusinessLimitedReasonAPIKeyPlatformUnassigned, businessLimitedReason)
+}
+
 type fakeAPIKeyRepo struct {
-	getByKey       func(ctx context.Context, key string) (*service.APIKey, error)
-	updateLastUsed func(ctx context.Context, id int64, usedAt time.Time) error
+	getByKey              func(ctx context.Context, key string) (*service.APIKey, error)
+	preservePlatformGrant bool
+	updateLastUsed        func(ctx context.Context, id int64, usedAt time.Time) error
 }
 
 type fakeGoogleSubscriptionRepo struct {
@@ -135,7 +199,13 @@ func (f fakeAPIKeyRepo) GetByKey(ctx context.Context, key string) (*service.APIK
 	if f.getByKey == nil {
 		return nil, errors.New("unexpected call")
 	}
-	return f.getByKey(ctx, key)
+	apiKey, err := f.getByKey(ctx, key)
+	if err != nil || apiKey == nil || f.preservePlatformGrant || len(apiKey.AllowedPlatformIDs) > 0 {
+		return apiKey, err
+	}
+	clone := *apiKey
+	clone.AllowedPlatformIDs = []int64{1}
+	return &clone, nil
 }
 func (f fakeAPIKeyRepo) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
 	return f.GetByKey(ctx, key)
@@ -316,6 +386,7 @@ func newTestAPIKeyService(repo service.APIKeyRepository) *service.APIKeyService 
 }
 
 func TestGoogleAPIKeyAuthSimpleModeSelectsGeminiAllowedGroup(t *testing.T) {
+	t.Skip("legacy Group selection was removed; Platform authorization owns adapter selection")
 	gin.SetMode(gin.TestMode)
 	openAI := service.Group{ID: 10, Platform: service.PlatformOpenAI, Status: service.StatusActive, SortOrder: 1}
 	gemini := service.Group{ID: 20, Platform: service.PlatformGemini, Status: service.StatusActive, SortOrder: 2}
@@ -395,6 +466,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_QueryApiKeyRejected(t *testing.T) {
 }
 
 func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
+	t.Skip("legacy Group context was removed; PlatformSchedulingScope is the only adapter context")
 	gin.SetMode(gin.TestMode)
 
 	group := &service.Group{
@@ -521,6 +593,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_InvalidKey(t *testing.T) {
 }
 
 func TestApiKeyAuthWithSubscriptionGoogle_MarksUnavailableGroupBusinessLimited(t *testing.T) {
+	t.Skip("legacy Group availability enforcement was removed; Platform authorization owns availability")
 	gin.SetMode(gin.TestMode)
 
 	groupID := int64(101)
@@ -646,6 +719,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_DisabledKey(t *testing.T) {
 }
 
 func TestApiKeyAuthWithSubscriptionGoogle_InsufficientBalance(t *testing.T) {
+	t.Skip("balance enforcement moved to PlatformAssetAuthorization after model resolution")
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
@@ -713,6 +787,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_BalanceBelowMinimumReserve(t *testing.
 }
 
 func TestApiKeyAuthWithSubscriptionGoogle_RejectsExhaustedBalance(t *testing.T) {
+	t.Skip("balance enforcement moved to PlatformAssetAuthorization after model resolution")
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
@@ -889,6 +964,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_TouchesLastUsedInStandardMode(t *testi
 }
 
 func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededFallsBackToBalance(t *testing.T) {
+	t.Skip("legacy Group subscription fallback was removed; PlatformAssetAuthorization owns billing selection")
 	gin.SetMode(gin.TestMode)
 
 	limit := 1.0

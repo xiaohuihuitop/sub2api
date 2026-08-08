@@ -31,7 +31,7 @@ func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionS
 // /v1/usage、/v1/sub2api/billing 端点与异步生图任务查询只需鉴权，不需要计费执行。
 // usage 允许过期/配额耗尽的 Key 查询自身用量，billing 用于读取当前 Key 的倍率配置，
 // 异步生图查询允许已耗尽额度的 Key 拉取自身任务结果。
-func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
+func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, _ *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// ── 1. 提取 API Key ──────────────────────────────────────────
 		if rejectInvalidAuthAbuse(c, apiKeyService) {
@@ -157,154 +157,21 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
+		if !service.UsesPlatformAssetPermissions(apiKey) {
+			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyPlatformUnassigned)
+			MarkIngressRejected(c, IngressRejectPlatformRequired)
+			AbortWithError(c, http.StatusForbidden, "API_KEY_PLATFORM_REQUIRED", "API Key 未授权任何平台")
+			return
+		}
+
 		billingInfoRequest := c.Request.URL.Path == "/v1/sub2api/billing"
-		resolveSkipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || cfg.RunMode == config.RunModeSimple
-		if service.UsesPlatformAssetPermissions(apiKey) {
-			completePlatformAssetAPIKeyAuth(c, apiKey, apiKeyService, cfg, billingInfoRequest)
-			return
-		}
-		if len(apiKey.AllowedGroups) <= 1 {
-			if abortIfAPIKeyGroupUnavailable(c, apiKey) || abortIfAPIKeyGroupNotAllowed(c, apiKey) {
-				return
-			}
-		}
-		targetPlatform, _ := c.Request.Context().Value(ctxkey.ForcePlatform).(string)
-		if targetPlatform == "" && apiKey.Group != nil {
-			targetPlatform = apiKey.Group.Platform
-		}
-		resolvedSubscription, err := apiKeyService.ResolveBillingGroupForRequest(
-			c.Request.Context(),
-			apiKey,
-			subscriptionService,
-			resolveSkipBilling,
-			targetPlatform,
-			apiKeyBillingRequestEndpoint(c),
-		)
-		if err != nil {
-			handleAPIKeyBillingResolutionError(c, err)
-			return
-		}
-		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
-			return
-		}
-		if abortIfAPIKeyGroupNotAllowed(c, apiKey) {
-			return
-		}
-		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
-		c.Request = c.Request.WithContext(ctx)
-		// Async image task polling only reads data that already belongs to the
-		// authenticated key and must remain available after the completed
-		// generation consumes the key's remaining balance.
-		skipBilling := c.Request.URL.Path == "/v1/usage" || billingInfoRequest || isAsyncImageTaskRead(c.Request.Method, c.Request.URL.Path)
-
-		// ── 4. SimpleMode → early return ─────────────────────────────
-
-		if cfg.RunMode == config.RunModeSimple {
-			if resolvedSubscription != nil {
-				c.Set(string(ContextKeySubscription), resolvedSubscription)
-			}
-			c.Set(string(ContextKeyAPIKey), apiKey)
-			c.Set(string(ContextKeyUser), AuthSubject{
-				UserID:      apiKey.User.ID,
-				Concurrency: apiKey.User.Concurrency,
-			})
-			c.Set(string(ContextKeyUserRole), apiKey.User.Role)
-			setGroupContext(c, apiKey.Group)
-			if !billingInfoRequest {
-				_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
-			}
-			c.Next()
-			return
-		}
-
-		// ── 5. 按端点需要加载订阅 ───────────────────────────────────
-
-		// ResolveBillingGroupForRequest already selected the concrete package.
-		// Do not re-select based on the legacy group subscription type: a group
-		// can now contain several independently billable package instances.
-		subscription := resolvedSubscription
-
-		// ── 6. 计费执行（skipBilling 时整块跳过） ────────────────────
-
-		if !skipBilling {
-			// Key 状态检查
-			switch apiKey.Status {
-			case service.StatusAPIKeyQuotaExhausted:
-				abortWithAPIKeyQuotaError(c)
-				return
-			case service.StatusAPIKeyExpired:
-				AbortWithError(c, 403, "API_KEY_EXPIRED", "API key 已过期")
-				return
-			}
-
-			// 运行时过期/配额检查（即使状态是 active，也要检查时间和用量）
-			if apiKey.IsExpired() {
-				AbortWithError(c, 403, "API_KEY_EXPIRED", "API key 已过期")
-				return
-			}
-			if apiKey.IsQuotaExhausted() {
-				abortWithAPIKeyQuotaError(c)
-				return
-			}
-
-			// 订阅模式：验证订阅限额
-			if subscription != nil {
-				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-				if needsMaintenance {
-					refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
-					if maintenanceErr != nil {
-						AbortWithError(c, 500, "SUBSCRIPTION_MAINTENANCE_FAILED", "Failed to maintain subscription usage windows")
-						return
-					}
-					subscription = refreshed
-					_, validateErr = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
-				}
-				if validateErr != nil {
-					code := "SUBSCRIPTION_INVALID"
-					status := 403
-					if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
-						code = "USAGE_LIMIT_EXCEEDED"
-						status = 429
-					}
-					AbortWithError(c, status, code, validateErr.Error())
-					return
-				}
-			} else {
-				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
-					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
-					return
-				}
-			}
-		}
-
-		// ── 7. 设置上下文 → Next ─────────────────────────────────────
-
-		if subscription != nil {
-			c.Set(string(ContextKeySubscription), subscription)
-		}
-		c.Set(string(ContextKeyAPIKey), apiKey)
-		c.Set(string(ContextKeyUser), AuthSubject{
-			UserID:      apiKey.User.ID,
-			Concurrency: apiKey.User.Concurrency,
-		})
-		c.Set(string(ContextKeyUserRole), apiKey.User.Role)
-		setGroupContext(c, apiKey.Group)
-		if !billingInfoRequest {
-			_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
-		}
-
-		c.Next()
+		completePlatformAssetAPIKeyAuth(c, apiKey, apiKeyService, cfg, billingInfoRequest)
 	}
 }
 
-// completePlatformAssetAPIKeyAuth finishes the common security checks for an
-// explicitly migrated key. Billing and platform authorization are deliberately
-// deferred to NewPlatformAssetAuthorizationMiddleware, because the old group
-// resolver would otherwise reject a valid plan-only V2 key before its model is
-// resolved.
+// completePlatformAssetAPIKeyAuth finishes the common security checks for a
+// platform-authorized key. Model authorization and billing are performed by
+// NewPlatformAssetAuthorizationMiddleware after the request model is known.
 func completePlatformAssetAPIKeyAuth(
 	c *gin.Context,
 	apiKey *service.APIKey,
@@ -417,23 +284,6 @@ func apiKeyBillingRequestEndpoint(c *gin.Context) string {
 	}
 }
 
-func handleAPIKeyBillingResolutionError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, service.ErrInsufficientBalance):
-		AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
-	case errors.Is(err, service.ErrDailyLimitExceeded),
-		errors.Is(err, service.ErrWeeklyLimitExceeded),
-		errors.Is(err, service.ErrMonthlyLimitExceeded):
-		AbortWithError(c, 429, "USAGE_LIMIT_EXCEEDED", err.Error())
-	case errors.Is(err, service.ErrSubscriptionNotFound):
-		AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
-	case errors.Is(err, service.ErrNoUsableBillingGroup):
-		AbortWithError(c, 403, "NO_USABLE_BILLING_GROUP", "No usable billing group is available")
-	default:
-		AbortWithError(c, 500, "SUBSCRIPTION_RESOLUTION_FAILED", "Failed to resolve billing group")
-	}
-}
-
 // GetAPIKeyFromContext 从上下文中获取API key
 func GetAPIKeyFromContext(c *gin.Context) (*service.APIKey, bool) {
 	value, exists := c.Get(string(ContextKeyAPIKey))
@@ -472,72 +322,4 @@ func GetSubscriptionFromContext(c *gin.Context) (*service.UserSubscription, bool
 	}
 	subscription, ok := value.(*service.UserSubscription)
 	return subscription, ok
-}
-
-func setGroupContext(c *gin.Context, group *service.Group) {
-	if !service.IsGroupContextValid(group) {
-		return
-	}
-	if existing, ok := c.Request.Context().Value(ctxkey.Group).(*service.Group); ok && existing != nil && existing.ID == group.ID && service.IsGroupContextValid(existing) {
-		return
-	}
-	ctx := context.WithValue(c.Request.Context(), ctxkey.Group, group)
-	c.Request = c.Request.WithContext(ctx)
-}
-
-// apiKeyBalanceBelowAuthThreshold 保持鉴权层的历史语义：仅在余额耗尽（<=0）时拒绝。
-// MinimumBalanceReserve 只作为 billing-cache 预检的保守下限，不得复用为鉴权硬门槛，
-// 否则已配置该值的存量部署升级后，0 < balance < reserve 的用户会在所有端点被静默 403。
-func apiKeyBalanceBelowAuthThreshold(balance float64, _ *config.Config) bool {
-	return balance <= 0
-}
-
-func abortIfAPIKeyGroupUnavailable(c *gin.Context, apiKey *service.APIKey) bool {
-	code, message, ok := validateAPIKeyGroupAvailable(apiKey)
-	if ok {
-		return false
-	}
-	service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
-	if code == "GROUP_DELETED" {
-		MarkIngressRejected(c, IngressRejectGroupDeleted)
-	} else {
-		MarkIngressRejected(c, IngressRejectGroupDisabled)
-	}
-	AbortWithError(c, 403, code, message)
-	return true
-}
-
-func abortIfAPIKeyGroupNotAllowed(c *gin.Context, apiKey *service.APIKey) bool {
-	if validateAPIKeyGroupAllowed(apiKey) {
-		return false
-	}
-	service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
-	MarkIngressRejected(c, IngressRejectGroupNotAllowed)
-	AbortWithError(c, 403, "GROUP_NOT_ALLOWED", "API Key 所属专属分组不再允许当前用户使用")
-	return true
-}
-
-func validateAPIKeyGroupAllowed(apiKey *service.APIKey) bool {
-	if apiKey == nil || apiKey.GroupID == nil || apiKey.User == nil || apiKey.Group == nil {
-		return true
-	}
-	group := apiKey.Group
-	if group.IsSubscriptionType() {
-		return true
-	}
-	return apiKey.User.CanBindGroup(group.ID, group.IsExclusive)
-}
-
-func validateAPIKeyGroupAvailable(apiKey *service.APIKey) (string, string, bool) {
-	if apiKey == nil || apiKey.GroupID == nil {
-		return "", "", true
-	}
-	group := apiKey.Group
-	if group == nil || strings.EqualFold(group.Status, "deleted") {
-		return "GROUP_DELETED", "API Key 所属分组已删除", false
-	}
-	if !group.IsActive() {
-		return "GROUP_DISABLED", "API Key 所属分组已停用", false
-	}
-	return "", "", true
 }

@@ -111,6 +111,7 @@ func TestPlatformAssetAuthorizationRejectsKeyWithoutPlatformGrant(t *testing.T) 
 		User: user, AllowBalance: true,
 	}
 	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+		preservePlatformGrant: true,
 		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 			if key != apiKey.Key {
 				return nil, service.ErrAPIKeyNotFound
@@ -140,7 +141,7 @@ func TestPlatformAssetAuthorizationRejectsKeyWithoutPlatformGrant(t *testing.T) 
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusForbidden, w.Code)
-	require.Contains(t, w.Body.String(), "API_KEY_PLATFORM_FORBIDDEN")
+	require.Contains(t, w.Body.String(), "API_KEY_PLATFORM_REQUIRED")
 }
 
 func TestPlatformAssetAuthorizationUsesAuthorizedSubscriptionWithoutLegacyBalance(t *testing.T) {

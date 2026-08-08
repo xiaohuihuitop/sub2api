@@ -133,11 +133,12 @@ func TestAPIKeyAuthForwardsUserScopedOpenAIFastPolicyToUpstream(t *testing.T) {
 
 func newOpenAIFastPolicyForwardingAPIKey(id int64, key string, userID, groupID int64, group *service.Group) *service.APIKey {
 	return &service.APIKey{
-		ID:      id,
-		UserID:  userID,
-		Key:     key,
-		Status:  service.StatusActive,
-		GroupID: &groupID,
+		ID:                 id,
+		UserID:             userID,
+		Key:                key,
+		Status:             service.StatusActive,
+		GroupID:            &groupID,
+		AllowedPlatformIDs: []int64{1},
 		User: &service.User{
 			ID:          userID,
 			Role:        service.RoleUser,

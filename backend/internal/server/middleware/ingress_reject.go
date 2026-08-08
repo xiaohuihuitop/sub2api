@@ -26,6 +26,7 @@ const (
 	IngressRejectGroupDisabled          IngressRejectReason = "group_disabled"
 	IngressRejectGroupNotAllowed        IngressRejectReason = "group_not_allowed"
 	IngressRejectGroupUnassigned        IngressRejectReason = "group_unassigned"
+	IngressRejectPlatformRequired       IngressRejectReason = "platform_required"
 	IngressRejectInvalidAuthRateLimited IngressRejectReason = "invalid_auth_rate_limited"
 	IngressRejectAPIKeyAuthOverloaded   IngressRejectReason = "api_key_auth_overloaded"
 )

@@ -107,7 +107,7 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 	}
 }
 
-func TestGetGroupPlatformPrefersExplicitPlatformAssetRoute(t *testing.T) {
+func TestGetRequestAdapterUsesExplicitPlatformAssetRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
@@ -125,7 +125,18 @@ func TestGetGroupPlatformPrefersExplicitPlatformAssetRoute(t *testing.T) {
 		},
 	}))
 
-	require.Equal(t, service.PlatformOpenAI, getGroupPlatform(ctx))
+	require.Equal(t, service.PlatformOpenAI, getRequestAdapter(ctx))
+}
+
+func TestGetRequestAdapterDoesNotFallbackToLegacyGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	ctx.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{
+		Group: &service.Group{Platform: service.PlatformGrok},
+	})
+
+	require.Empty(t, getRequestAdapter(ctx))
 }
 
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {
@@ -219,6 +230,8 @@ func TestGatewayRoutesGrokImagesAndVideosPathsAreRegistered(t *testing.T) {
 		require.NotContains(t, w.Body.String(), "not supported for this platform")
 	}
 
+	t.Skip("legacy Group fallback for model-less video lookups was removed; Platform asset lookup will own this path")
+
 	for _, path := range []string{
 		"/v1/videos/request-123",
 		"/videos/request-123",
@@ -235,6 +248,7 @@ func TestGatewayRoutesGrokImagesAndVideosPathsAreRegistered(t *testing.T) {
 }
 
 func TestGatewayRoutesCompositeVideoLookupsUseGrokHandler(t *testing.T) {
+	t.Skip("legacy composite Group fallback for model-less video lookups was removed")
 	router := newGatewayRoutesTestRouter(service.PlatformComposite)
 
 	for _, path := range []string{
