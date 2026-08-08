@@ -39,7 +39,8 @@ const (
 type ResponsesSupportMode string
 
 const (
-	// ResponsesSupportModeAuto 表示跟随自动探测结果。
+	// ResponsesSupportModeAuto 表示按入站请求类型选择上游端点；Responses
+	// 请求的实际可用性仍使用自动探测结果进行能力筛选与回退。
 	ResponsesSupportModeAuto ResponsesSupportMode = "auto"
 
 	// ResponsesSupportModeForceResponses 强制使用 /v1/responses。
@@ -50,7 +51,7 @@ const (
 )
 
 // ExtraKeyResponsesMode 是 accounts.extra JSON 中存储手动覆盖模式的键名。
-// 值类型为 string：auto=跟随探测，force_responses=强制 Responses，
+// 值类型为 string：auto=按请求类型自动选择，force_responses=强制 Responses，
 // force_chat_completions=强制 Chat Completions。
 const ExtraKeyResponsesMode = "openai_responses_mode"
 
@@ -71,10 +72,25 @@ func NormalizeResponsesSupportMode(mode string) ResponsesSupportMode {
 	}
 }
 
+// ShouldRouteChatCompletionsViaResponses reports whether an API key account
+// should convert an inbound Chat Completions request to the upstream
+// Responses endpoint. Automatic mode follows the inbound request type and
+// therefore keeps Chat Completions on the upstream Chat endpoint.
+func ShouldRouteChatCompletionsViaResponses(extra map[string]any) bool {
+	if extra == nil {
+		return false
+	}
+	mode, ok := extra[ExtraKeyResponsesMode].(string)
+	if !ok {
+		return false
+	}
+	return NormalizeResponsesSupportMode(mode) == ResponsesSupportModeForceResponses
+}
+
 // ResolveResponsesSupport 从账号的 extra map 中读取手动覆盖模式与探测标记。
 //
-// 标记缺失或类型不匹配时返回 ResponsesSupportUnknown——调用方应按
-// "未探测=保留旧行为=走 Responses" 处理（参见 ShouldUseResponsesAPI）。
+// 标记缺失或类型不匹配时返回 ResponsesSupportUnknown——调用方在需要
+// 判断上游 Responses 能力时应保守保留 Responses 路径。
 func ResolveResponsesSupport(extra map[string]any) AccountResponsesSupport {
 	if extra == nil {
 		return ResponsesSupportUnknown
@@ -101,15 +117,14 @@ func ResolveResponsesSupport(extra map[string]any) AccountResponsesSupport {
 	return ResponsesSupportNo
 }
 
-// ShouldUseResponsesAPI 判断 OpenAI APIKey 账号的入站 /v1/chat/completions 请求
-// 是否应走"CC→Responses 转换 + 上游 /v1/responses"路径。
+// ShouldUseResponsesAPI 判断 OpenAI APIKey 账号在需要上游 Responses
+// 能力的请求上是否应使用 /v1/responses。
 //
 // 返回 true 的两种情况：
-//  1. 账号已探测确认支持 Responses
-//  2. 账号未探测（标记缺失）——按"现状即证据"原则保留旧行为
+//  1. 账号已探测确认支持 Responses；
+//  2. 账号未探测（标记缺失）——保守保留 Responses 路径。
 //
-// 仅当账号已探测且确认不支持时返回 false，此时调用方应走 CC 直转路径
-// （详见 internal/service/openai_gateway_chat_completions_raw.go）。
+// 仅当账号已探测且确认不支持时返回 false，此时调用方可走 Chat 直转路径。
 func ShouldUseResponsesAPI(extra map[string]any) bool {
 	return ResolveResponsesSupport(extra) != ResponsesSupportNo
 }

@@ -392,9 +392,17 @@ func resolveOpenAIUpstreamEndpoint(c *gin.Context, account *service.Account, res
 	if endpoint := service.GetActualOpenAIUpstreamEndpoint(c); endpoint != "" {
 		return endpoint
 	}
-	if account != nil && account.Type == service.AccountTypeAPIKey &&
-		!openai_compat.ShouldUseResponsesAPI(account.Extra) {
-		return EndpointChatCompletions
+	if account != nil && account.Type == service.AccountTypeAPIKey {
+		switch GetInboundEndpoint(c) {
+		case EndpointChatCompletions:
+			if !openai_compat.ShouldRouteChatCompletionsViaResponses(account.Extra) {
+				return EndpointChatCompletions
+			}
+		case EndpointResponses, EndpointResponsesCompact, EndpointMessages:
+			if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
+				return EndpointChatCompletions
+			}
+		}
 	}
 	return GetUpstreamEndpoint(c, account.Platform)
 }

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -219,6 +220,31 @@ func TestResolveOpenAIUpstreamEndpointPrefersForwardResult(t *testing.T) {
 			result:  &service.OpenAIForwardResult{},
 			want:    EndpointResponses,
 		},
+		{
+			name: "apikey automatic follows inbound chat endpoint",
+			account: &service.Account{Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode:      string(openai_compat.ResponsesSupportModeAuto),
+				openai_compat.ExtraKeyResponsesSupported: true,
+			}},
+			result: &service.OpenAIForwardResult{},
+			want:   EndpointChatCompletions,
+		},
+		{
+			name: "apikey force responses keeps bridge endpoint",
+			account: &service.Account{Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceResponses),
+			}},
+			result: &service.OpenAIForwardResult{},
+			want:   EndpointResponses,
+		},
+		{
+			name: "apikey force chat keeps raw endpoint",
+			account: &service.Account{Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Extra: map[string]any{
+				openai_compat.ExtraKeyResponsesMode: string(openai_compat.ResponsesSupportModeForceChatCompletions),
+			}},
+			result: &service.OpenAIForwardResult{},
+			want:   EndpointChatCompletions,
+		},
 	}
 
 	for _, tt := range tests {
@@ -236,6 +262,48 @@ func TestResolveOpenAIUpstreamEndpointPrefersForwardResult(t *testing.T) {
 // ──────────────────────────────────────────────────────────
 // responsesSubpathSuffix
 // ──────────────────────────────────────────────────────────
+
+func TestResolveOpenAIUpstreamEndpointUsesInboundResponsesMode(t *testing.T) {
+	tests := []struct {
+		name string
+		mode openai_compat.ResponsesSupportMode
+		want string
+	}{
+		{
+			name: "automatic keeps responses inbound on responses",
+			mode: openai_compat.ResponsesSupportModeAuto,
+			want: EndpointResponses,
+		},
+		{
+			name: "force responses keeps responses inbound on responses",
+			mode: openai_compat.ResponsesSupportModeForceResponses,
+			want: EndpointResponses,
+		},
+		{
+			name: "force chat bridges responses inbound to chat",
+			mode: openai_compat.ResponsesSupportModeForceChatCompletions,
+			want: EndpointChatCompletions,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, EndpointResponses, nil)
+			c.Set(ctxKeyInboundEndpoint, EndpointResponses)
+			account := &service.Account{
+				Platform: service.PlatformOpenAI,
+				Type:     service.AccountTypeAPIKey,
+				Extra: map[string]any{
+					openai_compat.ExtraKeyResponsesMode:      string(tt.mode),
+					openai_compat.ExtraKeyResponsesSupported: true,
+				},
+			}
+			require.Equal(t, tt.want, resolveOpenAIUpstreamEndpoint(c, account, &service.OpenAIForwardResult{}))
+		})
+	}
+}
 
 func TestResponsesSubpathSuffix(t *testing.T) {
 	tests := []struct {

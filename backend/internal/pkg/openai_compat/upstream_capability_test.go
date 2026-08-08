@@ -64,6 +64,36 @@ func TestShouldUseResponsesAPI(t *testing.T) {
 	}
 }
 
+func TestShouldRouteChatCompletionsViaResponses(t *testing.T) {
+	tests := []struct {
+		name  string
+		extra map[string]any
+		want  bool
+	}{
+		{"nil extra", nil, false},
+		{"automatic mode", map[string]any{ExtraKeyResponsesMode: string(ResponsesSupportModeAuto)}, false},
+		{"automatic mode with supported probe", map[string]any{
+			ExtraKeyResponsesMode:      string(ResponsesSupportModeAuto),
+			ExtraKeyResponsesSupported: true,
+		}, false},
+		{"automatic mode with unsupported probe", map[string]any{
+			ExtraKeyResponsesMode:      string(ResponsesSupportModeAuto),
+			ExtraKeyResponsesSupported: false,
+		}, false},
+		{"force responses", map[string]any{ExtraKeyResponsesMode: string(ResponsesSupportModeForceResponses)}, true},
+		{"force chat completions", map[string]any{ExtraKeyResponsesMode: string(ResponsesSupportModeForceChatCompletions)}, false},
+		{"missing mode", map[string]any{ExtraKeyResponsesSupported: true}, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ShouldRouteChatCompletionsViaResponses(tc.extra); got != tc.want {
+				t.Errorf("ShouldRouteChatCompletionsViaResponses(%v) = %v, want %v", tc.extra, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeResponsesSupportMode(t *testing.T) {
 	tests := []struct {
 		name string
