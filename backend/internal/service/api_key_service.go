@@ -60,9 +60,12 @@ const (
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
-	Name      bool
-	Status    bool
-	Quota     bool
+	Name   bool
+	Status bool
+	Quota  bool
+	// GroupID remains an internal persistence bit until the legacy domain is
+	// removed in the schema/admin cleanup task. It is not part of any API Key
+	// request or response contract.
 	GroupID   bool
 	ExpiresAt bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
@@ -219,8 +222,6 @@ type APIKeyAuthCacheInvalidator interface {
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
 	Name                string   `json:"name"`
-	GroupID             *int64   `json:"group_id"`
-	GroupIDs            []int64  `json:"group_ids"`
 	PlatformIDs         []int64  `json:"platform_ids"`
 	SubscriptionPlanIDs []int64  `json:"subscription_plan_ids"`
 	AllowBalance        *bool    `json:"allow_balance"`
@@ -241,8 +242,6 @@ type CreateAPIKeyRequest struct {
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
 	Name                *string   `json:"name"`
-	GroupID             *int64    `json:"group_id"`
-	GroupIDs            *[]int64  `json:"group_ids"`
 	PlatformIDs         *[]int64  `json:"platform_ids"`
 	SubscriptionPlanIDs *[]int64  `json:"subscription_plan_ids"`
 	AllowBalance        *bool     `json:"allow_balance"`
@@ -490,8 +489,8 @@ func apiKeyExistingGroupIDs(apiKey *APIKey) map[int64]struct{} {
 
 // Create 创建API Key
 func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
-	// 验证用户存在
-	user, err := s.userRepo.GetByID(ctx, userID)
+	// Verify that the owner exists before creating the key.
+	_, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}
@@ -502,10 +501,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	}); err != nil {
 		return nil, err
 	}
-	if len(req.PlatformIDs) > 0 && (req.GroupID != nil || len(req.GroupIDs) > 0) {
-		return nil, ErrAPIKeyLegacyGroupUnsupported
-	}
-
 	// 验证 IP 白名单格式
 	if len(req.IPWhitelist) > 0 {
 		if invalid := ip.ValidateIPPatterns(req.IPWhitelist); len(invalid) > 0 {
@@ -518,16 +513,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if invalid := ip.ValidateIPPatterns(req.IPBlacklist); len(invalid) > 0 {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
 		}
-	}
-
-	groupIDs := normalizeAPIKeyGroupIDs(req.GroupIDs, req.GroupID)
-	allowedGroups, err := s.validateAPIKeyAllowedGroups(ctx, user, groupIDs, nil)
-	if err != nil {
-		return nil, err
-	}
-	var primaryGroupID *int64
-	if len(allowedGroups) > 0 {
-		primaryGroupID = &allowedGroups[0].ID
 	}
 
 	var key string
@@ -570,7 +555,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	apiKey.UserID = userID
 	apiKey.Key = key
 	apiKey.Name = html.EscapeString(apiKey.Name)
-	apiKey.GroupID = primaryGroupID
 	apiKey.Status = StatusActive
 
 	// Set expiration time if specified
@@ -582,17 +566,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err := s.apiKeyRepo.Create(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
 	}
-	if writer, ok := s.apiKeyRepo.(APIKeyAllowedGroupRepository); ok {
-		if err := writer.ReplaceAllowedGroups(ctx, apiKey.ID, apiKeyGroupIDs(allowedGroups)); err != nil {
-			return nil, fmt.Errorf("replace api key allowed groups: %w", err)
-		}
-	}
-	apiKey.AllowedGroups = allowedGroups
-	apiKey.AllowedGroupIDs = apiKeyGroupIDs(allowedGroups)
-	if len(allowedGroups) > 0 {
-		apiKey.Group = &apiKey.AllowedGroups[0]
-	}
-
 	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
 	s.compileAPIKeyIPRules(apiKey)
 
@@ -848,44 +821,6 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		fields.Name = true
 	}
 
-	groupsChanged := req.GroupID != nil || req.GroupIDs != nil
-	if groupsChanged {
-		if req.PlatformIDs != nil || len(apiKey.AllowedPlatformIDs) > 0 {
-			return nil, ErrAPIKeyLegacyGroupUnsupported
-		}
-		user, err := s.userRepo.GetByID(ctx, userID)
-		if err != nil {
-			return nil, fmt.Errorf("get user: %w", err)
-		}
-		groupIDs := normalizeAPIKeyGroupIDs(nil, req.GroupID)
-		if req.GroupIDs != nil {
-			groupIDs = normalizeAPIKeyGroupIDs(*req.GroupIDs, req.GroupID)
-		}
-		allowedGroups, err := s.validateAPIKeyAllowedGroups(ctx, user, groupIDs, apiKeyExistingGroupIDs(apiKey))
-		if err != nil {
-			return nil, err
-		}
-		apiKey.AllowedGroups = allowedGroups
-		apiKey.AllowedGroupIDs = apiKeyGroupIDs(allowedGroups)
-		if len(allowedGroups) == 0 {
-			apiKey.GroupID = nil
-			apiKey.Group = nil
-		} else {
-			apiKey.GroupID = &apiKey.AllowedGroups[0].ID
-			apiKey.Group = &apiKey.AllowedGroups[0]
-		}
-		fields.GroupID = true
-	}
-	if req.PlatformIDs != nil && len(apiKey.AllowedPlatformIDs) > 0 {
-		// A platform-authorized key no longer carries a second, mutable group
-		// routing source. Clear the historical fields in the same update.
-		apiKey.GroupID = nil
-		apiKey.Group = nil
-		apiKey.AllowedGroupIDs = nil
-		apiKey.AllowedGroups = nil
-		fields.GroupID = true
-	}
-
 	if req.Status != nil {
 		apiKey.Status = *req.Status
 		fields.Status = true
@@ -969,13 +904,6 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 	if err := s.apiKeyRepo.Update(ctx, apiKey, fields); err != nil {
 		return nil, fmt.Errorf("update api key: %w", err)
-	}
-	if groupsChanged {
-		if writer, ok := s.apiKeyRepo.(APIKeyAllowedGroupRepository); ok {
-			if err := writer.ReplaceAllowedGroups(ctx, apiKey.ID, apiKey.AllowedGroupIDs); err != nil {
-				return nil, fmt.Errorf("replace api key allowed groups: %w", err)
-			}
-		}
 	}
 	if assetPermissionsChanged {
 		if err := assetPermissionsWriter.ReplaceAssetPermissions(ctx, apiKey.ID, assetPermissions); err != nil {

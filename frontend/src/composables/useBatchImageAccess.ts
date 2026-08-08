@@ -6,14 +6,14 @@ import type { ApiKey } from '@/types'
 const loaded = ref(false)
 const loading = ref(false)
 const hasAllowedBatchImageKey = ref(false)
+const geminiPlatformIDs = ref<Set<number>>(new Set())
 let pendingLoad: Promise<boolean> | null = null
 const pageSize = 100
 
 function keyAllowsBatchImage(key: ApiKey): boolean {
   return (
     key.status === 'active' &&
-    key.group?.platform === 'gemini' &&
-    key.group?.allow_batch_image_generation === true
+    (key.platform_ids || []).some((id) => geminiPlatformIDs.value.has(id))
   )
 }
 
@@ -35,6 +35,10 @@ async function loadBatchImageAccess(force = false): Promise<boolean> {
 
   loading.value = true
   pendingLoad = (async () => {
+    const platforms = await keysAPI.getAvailablePlatforms()
+    geminiPlatformIDs.value = new Set(
+      platforms.filter((platform) => platform.account_platform === 'gemini').map((platform) => platform.id),
+    )
     let page = 1
     while (true) {
       const response = await keysAPI.list(page, pageSize, {

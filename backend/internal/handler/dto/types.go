@@ -52,8 +52,6 @@ type APIKey struct {
 	UserID              int64      `json:"user_id"`
 	Key                 string     `json:"key"`
 	Name                string     `json:"name"`
-	GroupID             *int64     `json:"group_id"`
-	GroupIDs            []int64    `json:"group_ids"`
 	PlatformIDs         []int64    `json:"platform_ids"`
 	SubscriptionPlanIDs []int64    `json:"subscription_plan_ids"`
 	AllowBalance        bool       `json:"allow_balance"`
@@ -84,9 +82,7 @@ type APIKey struct {
 	Reset1dAt     *time.Time `json:"reset_1d_at,omitempty"`
 	Reset7dAt     *time.Time `json:"reset_7d_at,omitempty"`
 
-	User   *User    `json:"user,omitempty"`
-	Group  *Group   `json:"group,omitempty"`
-	Groups []*Group `json:"groups,omitempty"`
+	User *User `json:"user,omitempty"`
 }
 
 type Group struct {
@@ -651,8 +647,8 @@ type Setting struct {
 }
 
 type UserSubscription struct {
-	ID      int64 `json:"id"`
-	UserID  int64 `json:"user_id"`
+	ID      int64  `json:"id"`
+	UserID  int64  `json:"user_id"`
 	GroupID *int64 `json:"group_id,omitempty"`
 
 	SubscriptionPlanID      *int64   `json:"subscription_plan_id,omitempty"`

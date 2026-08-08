@@ -556,7 +556,7 @@
             <select v-model.number="form.apiKeyId" class="input" :disabled="loadingKeys">
               <option :value="0">{{ loadingKeys ? t('batchImage.create.loadingKeys') : t('batchImage.create.selectKeyPlaceholder') }}</option>
               <option v-for="key in geminiApiKeys" :key="key.id" :value="key.id">
-                {{ key.name }} · {{ key.group?.name || 'Gemini' }}
+                {{ key.name }} · Gemini
               </option>
             </select>
             <p v-if="!loadingKeys && geminiApiKeys.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
@@ -783,7 +783,7 @@ import {
   type BatchImageStatus,
   type BatchImageSubmitItem,
 } from '@/api/batchImage'
-import type { ApiKey } from '@/types'
+import type { ApiKey, AvailablePlatformPool } from '@/types'
 import type { Column } from '@/components/common/types'
 
 type BatchImageJobRow = Pick<BatchImageJob, 'id' | 'task_name' | 'parent_batch_id' | 'status' | 'model' | 'provider' | 'item_count' | 'success_count' | 'fail_count' | 'estimated_cost' | 'hold_amount' | 'actual_cost' | 'created_at' | 'downloaded_at'> & {
@@ -889,6 +889,7 @@ const pagination = reactive({
 })
 
 const apiKeys = ref<ApiKey[]>([])
+const availablePlatforms = ref<AvailablePlatformPool[]>([])
 const loadingKeys = ref(false)
 const loadingJobs = ref(false)
 const submitting = ref(false)
@@ -940,8 +941,9 @@ let activePromptPopoverTarget: HTMLElement | null = null
 const geminiApiKeys = computed(() =>
   apiKeys.value.filter((key) =>
     key.status === 'active' &&
-    key.group?.platform === 'gemini' &&
-    key.group?.allow_batch_image_generation === true,
+    (key.platform_ids || []).some((id) => availablePlatforms.value.some(
+      (platform) => platform.id === id && platform.account_platform === 'gemini',
+    )),
   ),
 )
 
@@ -1241,7 +1243,11 @@ function readFileAsBase64(file: File): Promise<string> {
 async function loadApiKeys() {
   loadingKeys.value = true
   try {
-    const response = await keysAPI.list(1, 100, { status: 'active', sort_by: 'created_at', sort_order: 'desc' })
+    const [response, platforms] = await Promise.all([
+      keysAPI.list(1, 100, { status: 'active', sort_by: 'created_at', sort_order: 'desc' }),
+      keysAPI.getAvailablePlatforms(),
+    ])
+    availablePlatforms.value = platforms
     apiKeys.value = response.items || []
     if (!selectedApiKey.value && geminiApiKeys.value.length > 0) {
       form.apiKeyId = geminiApiKeys.value[0].id

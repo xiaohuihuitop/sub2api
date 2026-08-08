@@ -26,7 +26,6 @@ export async function list(
   filters?: {
     search?: string
     status?: string
-    group_id?: number | string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   },

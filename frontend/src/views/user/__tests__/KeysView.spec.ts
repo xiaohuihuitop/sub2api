@@ -116,7 +116,6 @@ const createApiKey = (): ApiKey => ({
   user_id: 1,
   key: 'sk-test-key',
   name: 'test-key',
-  group_id: null,
   status: 'active',
   ip_whitelist: [],
   ip_blacklist: [],

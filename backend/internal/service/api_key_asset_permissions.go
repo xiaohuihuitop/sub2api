@@ -7,9 +7,8 @@ import (
 )
 
 var (
-	ErrAPIKeyPlatformRequired       = infraerrors.BadRequest("API_KEY_PLATFORM_REQUIRED", "api key must authorize at least one platform")
-	ErrAPIKeyBillingSourceRequired  = infraerrors.BadRequest("API_KEY_BILLING_SOURCE_REQUIRED", "api key must authorize a subscription plan or balance")
-	ErrAPIKeyLegacyGroupUnsupported = infraerrors.BadRequest("API_KEY_LEGACY_GROUP_UNSUPPORTED", "api key authorization uses platform pools and cannot include legacy groups")
+	ErrAPIKeyPlatformRequired      = infraerrors.BadRequest("API_KEY_PLATFORM_REQUIRED", "api key must authorize at least one platform")
+	ErrAPIKeyBillingSourceRequired = infraerrors.BadRequest("API_KEY_BILLING_SOURCE_REQUIRED", "api key must authorize a subscription plan or balance")
 )
 
 // APIKeyAssetPermissions separates account-pool access from the user assets

@@ -314,6 +314,14 @@ npm run typecheck
 
 按本 Task 的 Files 清单精确暂存并复核 staged diff，提交 `refactor(apikey): 删除旧分组授权契约`。
 
+### Task 2 execution result (2026-08-09)
+
+- Completed the external API Key contract cleanup: HTTP/service create and update requests, list filters, DTO mapping, frontend types, and user/admin UI no longer expose or submit `group_id`/`group_ids`.
+- Removed the user available-groups endpoint and the registered admin API-key group-rebinding route. The frontend admin API module and legacy group-rebinding tests were removed.
+- Updated API-key related consumers to derive platform behavior from `platform_ids`; batch-image and monitor key selectors no longer read `ApiKey.group`.
+- Deferred internal Ent `group_id`/Group joins and legacy repository methods to the later Platform runtime migration and schema cleanup tasks. They remain unreachable from the API-key contract and are scheduled for removal in Tasks 6/8/9.
+- Verification passed: targeted Go API-key tests, package compile-only checks, `KeysView.spec.ts`, and frontend typecheck.
+
 ## Task 3: 删除账号分组与账号级普通模型策略
 
 **Files:**

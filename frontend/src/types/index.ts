@@ -655,8 +655,6 @@ export interface ApiKey {
   user_id: number
   key: string
   name: string
-  group_id: number | null
-  group_ids?: number[]
   platform_ids?: number[]
   subscription_plan_ids?: number[]
   allow_balance?: boolean
@@ -671,8 +669,6 @@ export interface ApiKey {
   created_at: string
   updated_at: string
   current_concurrency: number
-  group?: Group
-  groups?: Group[]
   rate_limit_5h: number
   rate_limit_1d: number
   rate_limit_7d: number
@@ -689,8 +685,6 @@ export interface ApiKey {
 
 export interface CreateApiKeyRequest {
   name: string
-  group_id?: number | null
-  group_ids?: number[]
   platform_ids?: number[]
   subscription_plan_ids?: number[]
   allow_balance?: boolean
@@ -706,8 +700,6 @@ export interface CreateApiKeyRequest {
 
 export interface UpdateApiKeyRequest {
   name?: string
-  group_id?: number | null
-  group_ids?: number[]
   platform_ids?: number[]
   subscription_plan_ids?: number[]
   allow_balance?: boolean

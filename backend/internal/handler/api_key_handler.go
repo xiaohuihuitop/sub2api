@@ -50,8 +50,6 @@ type availablePlatformPoolResponse struct {
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
 	Name                string   `json:"name" binding:"required"`
-	GroupID             *int64   `json:"group_id"` // nullable
-	GroupIDs            []int64  `json:"group_ids"`
 	PlatformIDs         []int64  `json:"platform_ids"`
 	SubscriptionPlanIDs []int64  `json:"subscription_plan_ids"`
 	AllowBalance        *bool    `json:"allow_balance"`
@@ -70,8 +68,6 @@ type CreateAPIKeyRequest struct {
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
 	Name                string    `json:"name"`
-	GroupID             *int64    `json:"group_id"`
-	GroupIDs            *[]int64  `json:"group_ids"`
 	PlatformIDs         *[]int64  `json:"platform_ids"`
 	SubscriptionPlanIDs *[]int64  `json:"subscription_plan_ids"`
 	AllowBalance        *bool     `json:"allow_balance"`
@@ -115,13 +111,6 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 		filters.Search = search
 	}
 	filters.Status = c.Query("status")
-	if groupIDStr := c.Query("group_id"); groupIDStr != "" {
-		gid, err := strconv.ParseInt(groupIDStr, 10, 64)
-		if err == nil {
-			filters.GroupID = &gid
-		}
-	}
-
 	keys, result, err := h.apiKeyService.List(c.Request.Context(), subject.UserID, params, filters)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -182,8 +171,6 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 
 	svcReq := service.CreateAPIKeyRequest{
 		Name:                req.Name,
-		GroupID:             req.GroupID,
-		GroupIDs:            req.GroupIDs,
 		PlatformIDs:         req.PlatformIDs,
 		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
 		AllowBalance:        req.AllowBalance,
@@ -236,7 +223,6 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	}
 
 	svcReq := service.UpdateAPIKeyRequest{
-		GroupIDs:            req.GroupIDs,
 		PlatformIDs:         req.PlatformIDs,
 		SubscriptionPlanIDs: req.SubscriptionPlanIDs,
 		AllowBalance:        req.AllowBalance,
@@ -252,7 +238,6 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	if req.Name != "" {
 		svcReq.Name = &req.Name
 	}
-	svcReq.GroupID = req.GroupID
 	if req.Status != "" {
 		svcReq.Status = &req.Status
 	}
@@ -303,28 +288,6 @@ func (h *APIKeyHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "API key deleted successfully"})
-}
-
-// GetAvailableGroups 获取用户可以绑定的分组列表
-// GET /api/v1/groups/available
-func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return
-	}
-
-	groups, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	out := make([]dto.Group, 0, len(groups))
-	for i := range groups {
-		out = append(out, *dto.GroupFromService(&groups[i]))
-	}
-	response.Success(c, out)
 }
 
 // GetAvailablePlatforms returns active platform-pool metadata for API Key

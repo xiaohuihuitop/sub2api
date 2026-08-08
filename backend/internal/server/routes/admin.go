@@ -97,9 +97,6 @@ func RegisterAdminRoutes(
 		// TLS 指纹模板管理
 		registerTLSFingerprintProfileRoutes(admin, h)
 
-		// API Key 管理
-		registerAdminAPIKeyRoutes(admin, h)
-
 		// 定时测试计划
 		registerScheduledTestRoutes(admin, h)
 
@@ -168,13 +165,6 @@ func registerContentModerationRoutes(admin *gin.RouterGroup, h *handler.Handlers
 		risk.POST("/users/:user_id/unban", h.Admin.ContentModeration.UnbanUser)
 		risk.DELETE("/hashes", h.Admin.ContentModeration.DeleteFlaggedHash)
 		risk.DELETE("/hashes/all", h.Admin.ContentModeration.ClearFlaggedHashes)
-	}
-}
-
-func registerAdminAPIKeyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
-	apiKeys := admin.Group("/api-keys")
-	{
-		apiKeys.PUT("/:id", h.Admin.APIKey.UpdateGroup)
 	}
 }
 

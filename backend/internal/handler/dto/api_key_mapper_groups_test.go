@@ -3,13 +3,14 @@
 package dto
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 )
 
-func TestAPIKeyFromServiceMapsAllowedGroups(t *testing.T) {
+func TestAPIKeyFromServiceDoesNotExposeLegacyGroups(t *testing.T) {
 	src := &service.APIKey{
 		ID:              1,
 		AllowedGroupIDs: []int64{10, 20},
@@ -21,11 +22,12 @@ func TestAPIKeyFromServiceMapsAllowedGroups(t *testing.T) {
 
 	out := APIKeyFromService(src)
 
-	require.Equal(t, []int64{10, 20}, out.GroupIDs)
-	require.Len(t, out.Groups, 2)
-	require.Equal(t, int64(10), out.Groups[0].ID)
-	require.Equal(t, 3, out.Groups[0].SortOrder)
-	require.Equal(t, int64(20), out.Groups[1].ID)
+	body, err := json.Marshal(out)
+	require.NoError(t, err)
+	require.NotContains(t, string(body), `"group_id"`)
+	require.NotContains(t, string(body), `"group_ids"`)
+	require.NotContains(t, string(body), `"group"`)
+	require.NotContains(t, string(body), `"groups"`)
 }
 
 func TestAPIKeyFromServiceMapsAssetPermissions(t *testing.T) {
