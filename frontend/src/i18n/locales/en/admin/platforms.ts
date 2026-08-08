@@ -32,6 +32,7 @@ export default {
     created: 'Platform created',
     updated: 'Platform updated',
     loadFailed: 'Failed to load platforms',
+    retry: 'Retry',
     saveFailed: 'Failed to save platform',
   },
 }

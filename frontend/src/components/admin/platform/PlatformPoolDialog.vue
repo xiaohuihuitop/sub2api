@@ -162,7 +162,7 @@ import Icon from '@/components/icons/Icon.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import { getPresetMappingsByPlatform } from '@/composables/useModelWhitelist'
 import { buildPlatformModelRules, resolvePlatformModelPreset, splitPlatformModelRules, type PlatformModelMapping } from './platformModelRules'
-import type { AccountPlatform, CreatePlatformPoolRequest, PlatformPool } from '@/types'
+import type { AccountPlatform, CreatePlatformPoolRequest, PlatformModelRule, PlatformPool } from '@/types'
 
 type MappingForm = PlatformModelMapping & { key: string }
 
@@ -198,6 +198,7 @@ const form = reactive({
   endpoint_capabilities: [] as string[],
   allowed_models: [] as string[],
   mappings: [] as MappingForm[],
+  disabled_rules: [] as PlatformModelRule[],
 })
 
 const modelPreset = computed(() => resolvePlatformModelPreset(form.code, form.account_platform))
@@ -224,6 +225,7 @@ function resetForm() {
   const split = splitPlatformModelRules(props.platform?.model_rules ?? [])
   form.allowed_models = split.allowedModels
   form.mappings = split.mappings.map(mapping => newMapping(mapping.from, mapping.to))
+  form.disabled_rules = split.disabledRules
 }
 
 function addMapping(from = '', to = '') {
@@ -242,7 +244,7 @@ function submit() {
     account_platform: form.account_platform,
     status: form.status,
     endpoint_capabilities: [...form.endpoint_capabilities],
-    model_rules: buildPlatformModelRules(form.allowed_models, form.mappings),
+    model_rules: buildPlatformModelRules(form.allowed_models, form.mappings, form.disabled_rules),
   })
 }
 

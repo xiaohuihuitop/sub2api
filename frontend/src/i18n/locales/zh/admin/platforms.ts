@@ -32,6 +32,7 @@ export default {
     created: '平台已创建',
     updated: '平台已更新',
     loadFailed: '加载平台失败',
+    retry: '重试',
     saveFailed: '保存平台失败',
   },
 }

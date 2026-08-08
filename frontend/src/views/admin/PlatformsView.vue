@@ -11,6 +11,15 @@
         </button>
       </div>
 
+      <div
+        v-if="loadError"
+        data-test="platform-load-error"
+        class="flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+      >
+        <span>{{ t('admin.platforms.loadFailed') }}</span>
+        <button class="btn btn-secondary" type="button" @click="loadPlatforms">{{ t('admin.platforms.retry') }}</button>
+      </div>
+
       <DataTable :columns="columns" :data="platforms" :loading="loading" row-key="id">
         <template #cell-name="{ row }">
           <div class="min-w-0">
@@ -24,16 +33,28 @@
             <span class="text-sm text-gray-700 dark:text-gray-200">{{ value }}</span>
           </div>
         </template>
+        <template #cell-endpoint_capabilities="{ value }">
+          <div v-if="value?.length" class="flex flex-wrap gap-1">
+            <span
+              v-for="endpoint in value"
+              :key="endpoint"
+              class="rounded border border-primary-200 bg-primary-50 px-1.5 py-0.5 text-xs text-primary-700 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-300"
+            >
+              {{ endpointLabel(endpoint) }}
+            </span>
+          </div>
+          <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
+        </template>
         <template #cell-model_rules="{ value }">
-          <div v-if="value.length" class="flex max-w-md flex-wrap gap-1">
+          <div v-if="value?.length" class="flex max-w-md flex-wrap gap-1">
             <span
               v-for="rule in value"
               :key="rule.id ?? rule.model_pattern"
               class="rounded border px-1.5 py-0.5 font-mono text-xs"
               :class="rule.enabled ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-300' : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-400'"
-              :title="rule.endpoint_capabilities.join(', ')"
+              :title="formatModelRule(rule)"
             >
-              {{ rule.model_pattern }}
+              {{ formatModelRule(rule) }}
             </span>
           </div>
           <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{ t('admin.platforms.noRules') }}</span>
@@ -80,6 +101,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const platforms = ref<PlatformPool[]>([])
 const loading = ref(false)
+const loadError = ref(false)
 const saving = ref(false)
 const showDialog = ref(false)
 const editingPlatform = ref<PlatformPool | null>(null)
@@ -87,6 +109,7 @@ const editingPlatform = ref<PlatformPool | null>(null)
 const columns = computed((): Column[] => [
   { key: 'name', label: t('admin.platforms.name') },
   { key: 'account_platform', label: t('admin.platforms.accountPlatform') },
+  { key: 'endpoint_capabilities', label: t('admin.platforms.endpointCapabilities') },
   { key: 'model_rules', label: t('admin.platforms.modelRules') },
   { key: 'status', label: t('admin.platforms.status') },
   { key: 'actions', label: t('common.actions') },
@@ -94,13 +117,26 @@ const columns = computed((): Column[] => [
 
 async function loadPlatforms() {
   loading.value = true
+  loadError.value = false
   try {
     platforms.value = await adminAPI.platforms.list()
   } catch (error) {
+    platforms.value = []
+    loadError.value = true
     appStore.showError(extractApiErrorMessage(error, t('admin.platforms.loadFailed')))
   } finally {
     loading.value = false
   }
+}
+
+function endpointLabel(endpoint: string) {
+  return endpoint === 'chat_completions' ? 'Chat Completions' : endpoint === 'responses' ? 'Responses' : endpoint
+}
+
+function formatModelRule(rule: PlatformPool['model_rules'][number]) {
+  const pattern = rule.model_pattern.trim()
+  const upstream = rule.upstream_model.trim()
+  return upstream && upstream !== pattern ? `${pattern} -> ${upstream}` : pattern
 }
 
 function openCreate() {

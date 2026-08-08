@@ -195,6 +195,9 @@ func (s *PlatformService) validateCandidate(ctx context.Context, platform *Platf
 	if platform.IsActive() && len(platform.EndpointCapabilities) == 0 {
 		return fmt.Errorf("%w: active platform requires at least one endpoint capability", ErrPlatformInvalid)
 	}
+	if platform.IsActive() && !hasEnabledPlatformModelRule(platform.ModelRules) {
+		return fmt.Errorf("%w: active platform requires at least one enabled model rule", ErrPlatformInvalid)
+	}
 
 	existing, err := s.repo.ListModelRules(ctx)
 	if err != nil {
@@ -328,7 +331,21 @@ func normalizePlatformAccountPlatform(raw string) (string, error) {
 	if platform == "" || len(platform) > 50 {
 		return "", fmt.Errorf("%w: account platform is required and must be at most 50 characters", ErrPlatformInvalid)
 	}
-	return platform, nil
+	switch platform {
+	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok:
+		return platform, nil
+	default:
+		return "", fmt.Errorf("%w: unsupported account platform %q", ErrPlatformInvalid, raw)
+	}
+}
+
+func hasEnabledPlatformModelRule(rules []PlatformModelRule) bool {
+	for _, rule := range rules {
+		if rule.Enabled && strings.TrimSpace(rule.ModelPattern) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func platformRulesForValidation(rules []PlatformModelRule, platformID int64, platformCode string, endpoints []string, enabled bool) []PlatformModelRule {

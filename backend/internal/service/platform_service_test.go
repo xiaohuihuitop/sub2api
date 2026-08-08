@@ -129,6 +129,31 @@ func TestPlatformServiceRejectsActivePlatformWithoutEndpoints(t *testing.T) {
 	require.ErrorIs(t, err, ErrPlatformInvalid)
 }
 
+func TestPlatformServiceRejectsActivePlatformWithoutModels(t *testing.T) {
+	_, err := NewPlatformService(&platformRepositoryStub{}).Create(context.Background(), CreatePlatformInput{
+		Code:                 "openai-primary",
+		Name:                 "OpenAI Primary",
+		AccountPlatform:      PlatformOpenAI,
+		Status:               PlatformStatusActive,
+		EndpointCapabilities: []string{"chat_completions"},
+	})
+
+	require.ErrorIs(t, err, ErrPlatformInvalid)
+}
+
+func TestPlatformServiceRejectsUnknownAccountPlatform(t *testing.T) {
+	_, err := NewPlatformService(&platformRepositoryStub{}).Create(context.Background(), CreatePlatformInput{
+		Code:                 "custom",
+		Name:                 "Custom",
+		AccountPlatform:      "unsupported",
+		Status:               PlatformStatusActive,
+		EndpointCapabilities: []string{"chat_completions"},
+		ModelRules:           []PlatformModelRule{{ModelPattern: "custom-model", Enabled: true}},
+	})
+
+	require.ErrorIs(t, err, ErrPlatformInvalid)
+}
+
 func TestPlatformServiceResolveModelUsesActiveRepositoryRules(t *testing.T) {
 	repo := &platformRepositoryStub{
 		allRules: []PlatformModelRule{{

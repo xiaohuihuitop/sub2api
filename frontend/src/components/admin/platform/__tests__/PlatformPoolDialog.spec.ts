@@ -65,8 +65,8 @@ describe('PlatformPoolDialog', () => {
         status: 'active',
         endpoint_capabilities: ['chat_completions', 'responses'],
         model_rules: [
-          { model_pattern: 'gpt-5.5', upstream_model: 'gpt-5.5', enabled: true },
-          { model_pattern: 'gpt-5.6', upstream_model: 'gpt-5.6', enabled: true },
+          { model_pattern: 'gpt-5.5', upstream_model: '', enabled: true },
+          { model_pattern: 'gpt-5.6', upstream_model: '', enabled: true },
           { model_pattern: 'gpt-latest', upstream_model: 'gpt-5.6', enabled: true },
         ],
       },
