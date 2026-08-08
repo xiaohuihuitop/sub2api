@@ -119,7 +119,7 @@ func (s *sparkShadowRepoStub) ListWithFilters(_ context.Context, _ pagination.Pa
 
 // TestCreateShadow はメインのシナリオを検証する。
 //
-// Test 1 — 基本生成: ParentAccountID / QuotaDimension / 默认 spark model_mapping / 无 auth token / ProxyID 継承
+// Test 1 — 基本生成: ParentAccountID / QuotaDimension / 无凭据 / ProxyID 継承
 // Test 2 — 一母一影: 二度目の生成はエラー
 func TestCreateShadow(t *testing.T) {
 	ctx := context.Background()
@@ -146,8 +146,7 @@ func TestCreateShadow(t *testing.T) {
 	require.NotNil(t, shadow)
 	require.Equal(t, parent.ID, *shadow.ParentAccountID)
 	require.Equal(t, QuotaDimensionSpark, shadow.QuotaDimension)
-	require.Equal(t, defaultSparkShadowModelMapping(), shadow.Credentials["model_mapping"],
-		"影子默认带 spark 恒等变体映射")
+	require.Empty(t, shadow.Credentials, "影子不再写入账号级模型 mapping")
 	require.Nil(t, shadow.Credentials["refresh_token"], "影子不得持有 auth token")
 	require.Nil(t, shadow.Credentials["access_token"], "影子不得持有 auth token")
 	require.Equal(t, parent.ProxyID, shadow.ProxyID)
@@ -895,7 +894,7 @@ func TestUpdateAccount_IgnoresProxyChangeOnShadow(t *testing.T) {
 	require.Equal(t, parentProxy, *repo.accounts[shadow.ID].ProxyID, "影子 proxy 不应被独立改动,恒继承母账号")
 }
 
-func TestUpdateAccountShadowAllowsModelMappingWithoutLegacyGroupUpdate(t *testing.T) {
+func TestUpdateAccountShadowRejectsLegacyModelMapping(t *testing.T) {
 	ctx := context.Background()
 	repo := newSparkShadowRepoStub()
 	svc := &adminServiceImpl{accountRepo: repo}
@@ -923,7 +922,7 @@ func TestUpdateAccountShadowAllowsModelMappingWithoutLegacyGroupUpdate(t *testin
 	}
 	require.NoError(t, repo.Create(ctx, shadow))
 
-	updated, err := svc.UpdateAccount(ctx, shadow.ID, &UpdateAccountInput{
+	_, err := svc.UpdateAccount(ctx, shadow.ID, &UpdateAccountInput{
 		Credentials: map[string]any{
 			"model_mapping": map[string]any{
 				"gpt-5.3-codex-spark": "gpt-5.3-codex-spark",
@@ -931,10 +930,10 @@ func TestUpdateAccountShadowAllowsModelMappingWithoutLegacyGroupUpdate(t *testin
 		},
 	})
 
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
 	require.Empty(t, repo.groupsOf[shadow.ID])
-	require.Equal(t, map[string]any{"gpt-5.3-codex-spark": "gpt-5.3-codex-spark"}, updated.Credentials["model_mapping"])
-	require.Empty(t, updated.GetOpenAIAccessToken(), "影子账号不可持有母账号 access_token")
+	require.Empty(t, repo.accounts[shadow.ID].Credentials)
 }
 
 func TestUpdateAccount_ShadowEmptyCredentialsClearsModelMapping(t *testing.T) {

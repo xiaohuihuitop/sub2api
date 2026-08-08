@@ -327,7 +327,7 @@ describe('EditAccountModal', () => {
     expect(wrapper.text()).not.toContain('admin.accounts.modelRestriction')
   })
 
-  it('preserves legacy model policy while saving unrelated account fields', async () => {
+  it('drops legacy model policy while saving unrelated account fields', async () => {
     const account = buildAccount()
     account.credentials.model_mapping = {
       'gpt-5.2': 'gpt-5.2',
@@ -343,13 +343,8 @@ describe('EditAccountModal', () => {
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
-      'gpt-5.2': 'gpt-5.2',
-      'gpt-latest': 'gpt-5.2'
-    })
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.openai_capabilities).toEqual([
-      'chat_completions'
-    ])
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('model_mapping')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('openai_capabilities')
   })
 
   it('submits OpenAI compact mode and compact-only model mapping', async () => {
@@ -529,7 +524,7 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_long_context_billing_enabled).toBe(false)
   })
 
-  it('does not expose Grok OAuth model mapping controls and preserves legacy mapping', async () => {
+  it('does not expose Grok OAuth model mapping controls or resubmit legacy mapping', async () => {
     const account = buildGrokOAuthAccount()
     updateAccountMock.mockReset()
     checkMixedChannelRiskMock.mockReset()
@@ -544,9 +539,7 @@ describe('EditAccountModal', () => {
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
-      'grok-latest': 'grok-4.3'
-    })
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('model_mapping')
   })
 
   it('uses the official xAI base URL when a Grok API-key account omits base_url', async () => {
@@ -567,7 +560,7 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.base_url).toBe('https://api.x.ai/v1')
   })
 
-  it('only submits model mapping credentials when saving an OpenAI spark shadow account', async () => {
+  it('submits only compact technical mapping when saving an OpenAI spark shadow account', async () => {
     authIsSimpleMode.value = false
     const account = buildOpenAISparkShadowAccount()
     updateAccountMock.mockReset()
@@ -583,9 +576,6 @@ describe('EditAccountModal', () => {
     const payload = updateAccountMock.mock.calls[0]?.[1]
     expect(payload).not.toHaveProperty('group_ids')
     expect(payload?.credentials).toEqual({
-      model_mapping: {
-        'gpt-5.3-codex-spark': 'gpt-5.3-codex-spark'
-      },
       compact_model_mapping: {
         'gpt-5.3-codex-spark': 'gpt-5.3-codex-spark-compact'
       }
@@ -652,7 +642,7 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_responses_supported).toBe(true)
   })
 
-  it('preserves legacy OpenAI APIKey endpoint capabilities without rendering controls', async () => {
+  it('drops legacy OpenAI APIKey endpoint capabilities without rendering controls', async () => {
     const account = buildAccount()
     account.credentials.openai_capabilities = ['chat_completions']
     updateAccountMock.mockReset()
@@ -667,9 +657,7 @@ describe('EditAccountModal', () => {
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.openai_capabilities).toEqual([
-      'chat_completions'
-    ])
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('openai_capabilities')
   })
 
 	it('submits OpenAI quota auto-pause thresholds in extra', async () => {
@@ -731,12 +719,10 @@ describe('EditAccountModal', () => {
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.openai_capabilities).toEqual([
-      'chat_completions'
-    ])
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('openai_capabilities')
   })
 
-  it('disables text generation protocol when only embeddings requests are accepted', async () => {
+  it('ignores stale account endpoint capabilities when selecting the protocol', async () => {
     const account = buildAccount()
     account.credentials.openai_capabilities = ['embeddings']
     account.extra = {
@@ -754,16 +740,14 @@ describe('EditAccountModal', () => {
       '[data-testid="openai-responses-mode-select"]'
     )
 
-    expect(responsesModeSelect.element.disabled).toBe(true)
-    expect(wrapper.find('[data-testid="openai-responses-mode-not-applicable"]').exists()).toBe(true)
+    expect(responsesModeSelect.element.disabled).toBe(false)
+    expect(wrapper.find('[data-testid="openai-responses-mode-not-applicable"]').exists()).toBe(false)
 
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.openai_capabilities).toEqual([
-      'embeddings'
-    ])
-    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).not.toHaveProperty('openai_responses_mode')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).not.toHaveProperty('openai_capabilities')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_responses_mode).toBe('force_responses')
     expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.openai_responses_supported).toBe(true)
   })
 

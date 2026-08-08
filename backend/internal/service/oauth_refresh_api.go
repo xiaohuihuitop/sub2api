@@ -445,7 +445,7 @@ func MergeCredentials(oldCreds, newCreds map[string]any) map[string]any {
 			newCreds[k] = v
 		}
 	}
-	return newCreds
+	return SanitizeAccountModelPolicy(newCreds)
 }
 
 // BuildClaudeAccountCredentials 为 Claude 平台构建 OAuth credentials map

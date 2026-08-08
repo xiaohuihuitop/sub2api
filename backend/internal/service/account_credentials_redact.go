@@ -12,9 +12,9 @@ var SensitiveCredentialKeys = []string{
 	"service_account_json", "service_account", "private_key",
 }
 
-// LegacyAccountModelPolicyKeys are retained when an account edit omits the
-// retired account-level model policy fields. Platform-scoped routing ignores
-// them, but retaining the JSON keeps rollback data intact.
+// LegacyAccountModelPolicyKeys are removed whenever account credentials are
+// written. Platform owns model rules and endpoint capabilities; account-level
+// copies are no longer valid configuration.
 var LegacyAccountModelPolicyKeys = []string{
 	"model_mapping", "model_whitelist", "openai_capabilities",
 }
@@ -53,13 +53,23 @@ func MergePreservingSensitiveCreds(existing, incoming map[string]any) map[string
 			out[key] = existingVal
 		}
 	}
+	return SanitizeAccountModelPolicy(out)
+}
+
+// SanitizeAccountModelPolicy returns a copy without account-level model and
+// endpoint policy keys. Keeping this at the credential boundary prevents OAuth
+// refresh, CRS sync, bulk updates, and admin edits from reintroducing retired
+// configuration through different write paths.
+func SanitizeAccountModelPolicy(credentials map[string]any) map[string]any {
+	if credentials == nil {
+		return nil
+	}
+	out := make(map[string]any, len(credentials))
+	for key, value := range credentials {
+		out[key] = value
+	}
 	for _, key := range LegacyAccountModelPolicyKeys {
-		if _, hasIncoming := incoming[key]; hasIncoming {
-			continue
-		}
-		if existingVal, ok := existing[key]; ok {
-			out[key] = existingVal
-		}
+		delete(out, key)
 	}
 	return out
 }

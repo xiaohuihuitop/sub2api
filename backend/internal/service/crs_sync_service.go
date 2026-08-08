@@ -1288,7 +1288,7 @@ func sanitizeCredentialsMap(input map[string]any) map[string]any {
 			out[k] = v
 		}
 	}
-	return out
+	return SanitizeAccountModelPolicy(out)
 }
 
 func mapCRSStatus(isActive bool, status string) string {

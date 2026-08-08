@@ -23,17 +23,16 @@ func persistAccountCredentials(ctx context.Context, repo AccountRepository, acco
 		return nil
 	}
 
-	account.Credentials = shallowCopyMap(credentials)
+	account.Credentials = SanitizeAccountModelPolicy(shallowCopyMap(credentials))
 	if updater, ok := any(repo).(accountCredentialsUpdater); ok {
 		return updater.UpdateCredentials(ctx, account.ID, account.Credentials)
 	}
 	return repo.Update(ctx, account)
 }
 
-// sparkShadowAllowedCredentialKeys 是 spark 影子账号唯一可写的凭据键集合(仅模型映射)。
+// sparkShadowAllowedCredentialKeys 是 spark 影子账号唯一可写的协议专项凭据集合。
 // 校验(isAllowed)与 sanitize 共用此单一来源,避免两处独立硬编码列表漂移。
 var sparkShadowAllowedCredentialKeys = map[string]struct{}{
-	"model_mapping":         {},
 	"compact_model_mapping": {},
 }
 

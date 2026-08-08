@@ -103,6 +103,7 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 	if account == nil {
 		return service.ErrAccountNilInput
 	}
+	account.Credentials = service.SanitizeAccountModelPolicy(account.Credentials)
 
 	builder := client.Account.Create().
 		SetName(account.Name).
@@ -463,6 +464,7 @@ func (r *accountRepository) updateLockedAccount(ctx context.Context, client *dbe
 		return nil, err
 	}
 	account.Extra = extra
+	account.Credentials = service.SanitizeAccountModelPolicy(account.Credentials)
 
 	schedulable := account.Schedulable
 	if account.Status == service.StatusError {
@@ -691,6 +693,7 @@ func decodeAccountExtraJSON(raw []byte) (any, bool, error) {
 }
 
 func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, credentials map[string]any) error {
+	credentials = service.SanitizeAccountModelPolicy(credentials)
 	payload, err := json.Marshal(normalizeJSONMap(credentials))
 	if err != nil {
 		return err
@@ -1407,7 +1410,7 @@ func (r *accountRepository) UpdateGrokOAuthCredentialsIfUnchanged(
 	if err != nil {
 		return false, err
 	}
-	credentialsJSON, err := json.Marshal(normalizeJSONMap(credentials))
+	credentialsJSON, err := json.Marshal(normalizeJSONMap(service.SanitizeAccountModelPolicy(credentials)))
 	if err != nil {
 		return false, err
 	}
@@ -2838,6 +2841,7 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 	// JSONB 需要合并而非覆盖，使用 raw SQL 保持旧行为。
 	credentialPlaceholder := ""
 	if len(updates.Credentials) > 0 {
+		updates.Credentials = service.SanitizeAccountModelPolicy(updates.Credentials)
 		payload, err := json.Marshal(updates.Credentials)
 		if err != nil {
 			return 0, err

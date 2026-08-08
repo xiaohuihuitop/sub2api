@@ -1129,7 +1129,7 @@
 
       <!-- Antigravity model restriction (applies to all antigravity types) -->
       <!-- Antigravity 只支持模型映射模式，不支持白名单模式 -->
-      <div v-if="account.platform === 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+      <div v-if="false && account?.platform === 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
 
         <!-- Mapping Mode Only (no toggle for Antigravity) -->
@@ -2672,7 +2672,6 @@ import {
   getPresetMappingsByPlatform,
   commonErrorCodes,
   buildModelMappingObject,
-  splitModelMappingObject,
   isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
 
@@ -3023,23 +3022,7 @@ const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[])
   return selected.length > 0 ? selected : allowed
 }
 
-const readOpenAIEndpointCapabilities = (credentials?: Record<string, unknown>): OpenAIEndpointCapability[] => {
-  const raw = credentials?.openai_capabilities
-  if (Array.isArray(raw)) {
-    return normalizeOpenAIEndpointCapabilities(
-      raw.filter((value): value is OpenAIEndpointCapability =>
-        value === 'chat_completions' || value === 'embeddings'
-      )
-    )
-  }
-  if (raw !== null && typeof raw === 'object') {
-    const capabilityMap = raw as Record<string, unknown>
-    return normalizeOpenAIEndpointCapabilities(
-      openAIEndpointCapabilityOptions.value
-        .map((option) => option.value)
-        .filter((value) => capabilityMap[value] === true)
-    )
-  }
+const readOpenAIEndpointCapabilities = (_credentials?: Record<string, unknown>): OpenAIEndpointCapability[] => {
   return ['chat_completions', 'embeddings']
 }
 
@@ -3064,18 +3047,13 @@ const toggleOpenAIEndpointCapability = (capability: OpenAIEndpointCapability, ev
   ])
 }
 
-// Endpoint capabilities are owned by Platform. Existing account JSON is kept
-// untouched for rollback, but the editor never writes a new account policy.
+// Endpoint capabilities are owned by Platform; account credentials never carry
+// the legacy endpoint policy.
 const applyOpenAIEndpointCapabilities = (_credentials: Record<string, unknown>) => {}
 
-const preserveLegacyAccountModelPolicy = (credentials: Record<string, unknown>) => {
-  const current = (props.account?.credentials as Record<string, unknown>) || {}
+const removeLegacyAccountModelPolicy = (credentials: Record<string, unknown>) => {
   for (const key of ['model_mapping', 'model_whitelist', 'openai_capabilities']) {
-    if (Object.prototype.hasOwnProperty.call(current, key)) {
-      credentials[key] = current[key]
-    } else {
-      delete credentials[key]
-    }
+    delete credentials[key]
   }
 }
 const normalizeOpenAIResponsesMode = (mode: unknown): OpenAIResponsesMode => {
@@ -3230,32 +3208,14 @@ const normalizePoolModeRetryCount = (value: number) => {
   return normalized
 }
 
-const loadModelRestrictionFromMapping = (rawMapping?: Record<string, unknown>) => {
-  const parsed = splitModelMappingObject(rawMapping)
-  allowedModels.value = parsed.allowedModels
-  modelMappings.value = parsed.modelMappings
-  modelRestrictionMode.value =
-    parsed.modelMappings.length > 0 && parsed.allowedModels.length === 0
-      ? 'mapping'
-      : 'whitelist'
+const loadModelRestrictionFromMapping = (_rawMapping?: Record<string, unknown>) => {
+  allowedModels.value = []
+  modelMappings.value = []
+  modelRestrictionMode.value = 'whitelist'
 }
 
-const buildModelRestrictionMapping = () =>
-  buildModelMappingObject('combined', allowedModels.value, modelMappings.value)
-
 const applyOpenAIModelMappingCredentials = (credentials: Record<string, unknown>) => {
-  const shouldApplyModelMapping = !openaiPassthroughEnabled.value
-
-  if (shouldApplyModelMapping) {
-    const modelMapping = buildModelRestrictionMapping()
-    if (modelMapping) {
-      credentials.model_mapping = modelMapping
-    } else {
-      delete credentials.model_mapping
-    }
-  } else if (!credentials.model_mapping) {
-    delete credentials.model_mapping
-  }
+  removeLegacyAccountModelPolicy(credentials)
 
   const compactModelMapping = buildModelMappingObject('mapping', [], openAICompactModelMappings.value)
   if (compactModelMapping) {
@@ -3424,32 +3384,11 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     resetQuotaNotify()
   }
 
-  // Load antigravity model mapping (Antigravity 只支持映射模式)
+  // Account model policy is owned by Platform; reset legacy editor state.
   if (newAccount.platform === 'antigravity') {
-    const credentials = newAccount.credentials as Record<string, unknown> | undefined
-
-    // Antigravity 始终使用映射模式
     antigravityModelRestrictionMode.value = 'mapping'
     antigravityWhitelistModels.value = []
-
-    // 从 model_mapping 读取映射配置
-    const rawAgMapping = credentials?.model_mapping as Record<string, string> | undefined
-    if (rawAgMapping && typeof rawAgMapping === 'object') {
-      const entries = Object.entries(rawAgMapping)
-      // 无论是白名单样式(key===value)还是真正的映射，都统一转换为映射列表
-      antigravityModelMappings.value = entries.map(([from, to]) => ({ from, to }))
-    } else {
-      // 兼容旧数据：从 model_whitelist 读取，转换为映射格式
-      const rawWhitelist = credentials?.model_whitelist
-      if (Array.isArray(rawWhitelist) && rawWhitelist.length > 0) {
-        antigravityModelMappings.value = rawWhitelist
-          .map((v) => String(v).trim())
-          .filter((v) => v.length > 0)
-          .map((m) => ({ from: m, to: m }))
-      } else {
-        antigravityModelMappings.value = []
-      }
-    }
+    antigravityModelMappings.value = []
   } else {
     antigravityModelRestrictionMode.value = 'mapping'
     antigravityWhitelistModels.value = []
@@ -3504,8 +3443,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             : 'https://api.anthropic.com'
     editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
 
-    // Load model mappings and detect mode
-    loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
+    loadModelRestrictionFromMapping()
 
     // Load pool mode
     poolModeEnabled.value = credentials.pool_mode === true
@@ -3551,8 +3489,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     // Load quota notify for bedrock
     loadQuotaNotifyFromExtra(bedrockExtra)
 
-    // Load model mappings for bedrock
-    loadModelRestrictionFromMapping(bedrockCreds.model_mapping as Record<string, unknown> | undefined)
+    loadModelRestrictionFromMapping()
   } else if (newAccount.type === 'upstream' && newAccount.credentials) {
     const credentials = newAccount.credentials as Record<string, unknown>
     editBaseUrl.value = (credentials.base_url as string) || ''
@@ -3562,8 +3499,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editVertexClientEmail.value = (credentials.client_email as string) || ''
     editVertexLocation.value = (credentials.location as string) || (credentials.vertex_location as string) || 'us-central1'
 
-    // Load model mappings for service_account
-    loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
+    loadModelRestrictionFromMapping()
   } else {
     const platformDefaultUrl =
       newAccount.platform === 'openai'
@@ -3575,15 +3511,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 
-    // Load model mappings for OpenAI/Grok OAuth accounts
-    if ((newAccount.platform === 'openai' || newAccount.platform === 'grok') && newAccount.credentials) {
-      const oauthCredentials = newAccount.credentials as Record<string, unknown>
-      loadModelRestrictionFromMapping(oauthCredentials.model_mapping as Record<string, unknown> | undefined)
-    } else {
-      modelRestrictionMode.value = 'whitelist'
-      modelMappings.value = []
-      allowedModels.value = []
-    }
+    modelRestrictionMode.value = 'whitelist'
+    modelMappings.value = []
+    allowedModels.value = []
     poolModeEnabled.value = false
     poolModeRetryCount.value = DEFAULT_POOL_MODE_RETRY_COUNT
     poolModeRetryStatusCodesInput.value = ''
@@ -4002,7 +3932,6 @@ const handleSubmit = async () => {
     if (props.account.type === 'apikey') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
       const newBaseUrl = editBaseUrl.value.trim() || defaultBaseUrl.value
-      const shouldApplyModelMapping = !(props.account.platform === 'openai' && openaiPassthroughEnabled.value)
 
       // Always update credentials for apikey type to handle model mapping changes
       const newCredentials: Record<string, unknown> = {
@@ -4024,17 +3953,6 @@ const handleSubmit = async () => {
         return
       }
 
-      // Add model mapping if configured（OpenAI 开启自动透传时保留现有映射，不再编辑）
-      if (shouldApplyModelMapping) {
-        const modelMapping = buildModelRestrictionMapping()
-        if (modelMapping) {
-          newCredentials.model_mapping = modelMapping
-        } else {
-          delete newCredentials.model_mapping
-        }
-      } else if (currentCredentials.model_mapping) {
-        newCredentials.model_mapping = currentCredentials.model_mapping
-      }
       if (props.account.platform === 'openai') {
         applyOpenAIEndpointCapabilities(newCredentials)
         const compactModelMapping = buildModelMappingObject('mapping', [], openAICompactModelMappings.value)
@@ -4141,14 +4059,6 @@ const handleSubmit = async () => {
       newCredentials.location = editVertexLocation.value.trim()
       newCredentials.tier_id = 'vertex'
 
-      // Add model mapping if configured
-      const modelMapping = buildModelRestrictionMapping()
-      if (modelMapping) {
-        newCredentials.model_mapping = modelMapping
-      } else {
-        delete newCredentials.model_mapping
-      }
-
       applyInterceptWarmup(newCredentials, interceptWarmupRequests.value, 'edit')
       if (!applyTempUnschedConfig(newCredentials)) {
         return
@@ -4198,14 +4108,6 @@ const handleSubmit = async () => {
         delete newCredentials.pool_mode_retry_status_codes
       }
 
-      // Model mapping
-      const modelMapping = buildModelRestrictionMapping()
-      if (modelMapping) {
-        newCredentials.model_mapping = modelMapping
-      } else {
-        delete newCredentials.model_mapping
-      }
-
       applyInterceptWarmup(newCredentials, interceptWarmupRequests.value, 'edit')
       if (!applyTempUnschedConfig(newCredentials)) {
         return
@@ -4225,7 +4127,7 @@ const handleSubmit = async () => {
       updatePayload.credentials = newCredentials
     }
 
-    // OpenAI/Grok OAuth: persist model mapping to credentials
+    // OpenAI/Grok OAuth: persist protocol-specific credential settings only
     if ((props.account.platform === 'openai' || props.account.platform === 'grok') && props.account.type === 'oauth') {
       const currentCredentials = isSparkShadow.value
         ? {}
@@ -4235,12 +4137,7 @@ const handleSubmit = async () => {
       if (props.account.platform === 'openai') {
         applyOpenAIModelMappingCredentials(newCredentials)
       } else {
-        const modelMapping = buildModelRestrictionMapping()
-        if (modelMapping) {
-          newCredentials.model_mapping = modelMapping
-        } else {
-          delete newCredentials.model_mapping
-        }
+        removeLegacyAccountModelPolicy(newCredentials)
       }
 
       updatePayload.credentials = newCredentials
@@ -4297,8 +4194,7 @@ const handleSubmit = async () => {
       updatePayload.credentials = applyPlanType({ ...currentCredentials }, editPlanType.value)
     }
 
-    // Antigravity: persist model mapping to credentials (applies to all antigravity types)
-    // Antigravity 只支持映射模式
+    // Antigravity: persist technical project settings only. Model policy is Platform-owned.
     if (props.account.platform === 'antigravity') {
       const currentCredentials = (updatePayload.credentials as Record<string, unknown>) ||
         ((props.account.credentials as Record<string, unknown>) || {})
@@ -4307,19 +4203,7 @@ const handleSubmit = async () => {
         applyAntigravityProjectID(newCredentials, antigravityProjectId.value, 'edit')
       }
 
-      // 移除旧字段
-      delete newCredentials.model_whitelist
-      delete newCredentials.model_mapping
-
-      // 只使用映射模式
-      const antigravityModelMapping = buildModelMappingObject(
-        'mapping',
-        [],
-        antigravityModelMappings.value
-      )
-      if (antigravityModelMapping) {
-        newCredentials.model_mapping = antigravityModelMapping
-      }
+      removeLegacyAccountModelPolicy(newCredentials)
 
       updatePayload.credentials = newCredentials
     }
@@ -4606,7 +4490,7 @@ const handleSubmit = async () => {
     }
 
     if (updatePayload.credentials) {
-      preserveLegacyAccountModelPolicy(updatePayload.credentials as Record<string, unknown>)
+      removeLegacyAccountModelPolicy(updatePayload.credentials as Record<string, unknown>)
     }
     await submitUpdateAccount(accountID, updatePayload)
   } catch (error: any) {

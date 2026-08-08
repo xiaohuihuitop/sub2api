@@ -88,7 +88,7 @@ func TestPlatformBoundAccountAdminModelPolicyIsInert(t *testing.T) {
 	require.True(t, (&GatewayService{}).isModelSupportedByAccountWithContext(ctx, account, "new-model"))
 }
 
-func TestAccountCredentialMergeRetainsLegacyPlatformPolicyFields(t *testing.T) {
+func TestAccountCredentialMergeDropsLegacyPlatformPolicyFields(t *testing.T) {
 	merged := MergePreservingSensitiveCreds(
 		map[string]any{
 			"api_key":             "secret",
@@ -100,6 +100,6 @@ func TestAccountCredentialMergeRetainsLegacyPlatformPolicyFields(t *testing.T) {
 
 	require.Equal(t, "https://new.example/v1", merged["base_url"])
 	require.Equal(t, "secret", merged["api_key"])
-	require.Contains(t, merged, "model_mapping")
-	require.Contains(t, merged, "openai_capabilities")
+	require.NotContains(t, merged, "model_mapping")
+	require.NotContains(t, merged, "openai_capabilities")
 }

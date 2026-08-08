@@ -17,8 +17,8 @@ import (
 //  1. 凭据轮换读透（脱钩命门）——母账号 access_token 轮换后，影子通过
 //     resolveCredentialAccount / GetAccessToken 立即反映新值，零脱钩。
 //
-//  2. 路由不变量——路由资格由 IsModelSupported 决定（model_mapping 配置）；
-//     影子配了 spark mapping 则接受 spark、拒非 spark；普通账号配了 spark 同样可接 spark。
+//  2. 路由不变量——影子资格由 quota_dimension 和 Codex Spark 模型别名决定；
+//     不再依赖 credentials.model_mapping，普通账号不因旧配置获得特殊资格。
 //
 //  3. 母账号健康度联动——母不可调度（Status=error 或 Schedulable=false）
 //     时，parentHealthyForShadow 对影子返回 false。
@@ -123,22 +123,17 @@ func TestSparkShadowIntegration(t *testing.T) {
 	// ──────────────────────────────────────────────────────────────────────
 
 	t.Run("routing_invariant", func(t *testing.T) {
-		// 路由资格已从「按账号类型」改为「按账号支持模型」(model_mapping / IsModelSupported)。
+		// Spark 影子资格来自结构化 quota_dimension，而不是凭证中的旧模型配置。
 		sparkModel := "gpt-5.3-codex-spark"
 		normalModel := "gpt-5.3-codex"
-		sparkCreds := map[string]any{"model_mapping": defaultSparkShadowModelMapping()}
 
 		pid := int64(1)
-		sparkShadow := &Account{ID: 2, ParentAccountID: &pid, Platform: PlatformOpenAI, Credentials: sparkCreds}
+		sparkShadow := &Account{ID: 2, ParentAccountID: &pid, QuotaDimension: QuotaDimensionSpark, Platform: PlatformOpenAI}
 		require.True(t, sparkShadow.IsModelSupported(sparkModel), "影子配 spark → 接 spark")
 		require.False(t, sparkShadow.IsModelSupported(normalModel), "影子（仅 spark mapping）→ 拒非 spark")
 
-		normalWithSpark := &Account{ID: 3, Platform: PlatformOpenAI, Credentials: sparkCreds}
-		require.True(t, normalWithSpark.IsModelSupported(sparkModel), "普通账号配 spark → 接 spark（不再按类型排除）")
-
-		normalNoSpark := &Account{ID: 4, Platform: PlatformOpenAI,
-			Credentials: map[string]any{"model_mapping": map[string]any{normalModel: normalModel}}}
-		require.False(t, normalNoSpark.IsModelSupported(sparkModel), "普通账号未配 spark → 拒 spark（按配置）")
+		normalAccount := &Account{ID: 3, Platform: PlatformOpenAI}
+		require.True(t, normalAccount.IsModelSupported(sparkModel), "普通账号由 Platform 规则决定，不读取旧 mapping")
 	})
 
 	// ──────────────────────────────────────────────────────────────────────

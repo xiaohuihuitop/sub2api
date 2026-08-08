@@ -26,7 +26,7 @@ func TestMergePreservingSensitiveCreds_PreservesSensitiveWhenIncomingMissing(t *
 	require.Equal(t, "at-old", out["access_token"])
 	require.Equal(t, "sk-old", out["api_key"])
 	require.Equal(t, "https://new.example.com", out["base_url"], "非敏感键由 incoming 决定")
-	require.Equal(t, map[string]any{"foo": "bar"}, out["model_mapping"])
+	require.NotContains(t, out, "model_mapping")
 }
 
 func TestMergePreservingSensitiveCreds_OverwritesWhenIncomingProvidesSensitive(t *testing.T) {
@@ -87,4 +87,20 @@ func TestIsSensitiveCredentialKey(t *testing.T) {
 	require.False(t, IsSensitiveCredentialKey("base_url"))
 	require.False(t, IsSensitiveCredentialKey(""))
 	require.False(t, IsSensitiveCredentialKey("model_mapping"))
+}
+
+func TestMergeCredentialsDropsLegacyModelPolicy(t *testing.T) {
+	out := MergePreservingSensitiveCreds(
+		map[string]any{"refresh_token": "rt", "model_mapping": map[string]any{"old": "old"}},
+		map[string]any{
+			"access_token":        "at",
+			"model_whitelist":     []any{"old"},
+			"openai_capabilities": []any{"chat_completions"},
+		},
+	)
+	require.Equal(t, "rt", out["refresh_token"])
+	require.Equal(t, "at", out["access_token"])
+	require.NotContains(t, out, "model_mapping")
+	require.NotContains(t, out, "model_whitelist")
+	require.NotContains(t, out, "openai_capabilities")
 }

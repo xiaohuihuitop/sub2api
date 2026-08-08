@@ -470,7 +470,7 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Platform:    input.Platform,
 		PlatformID:  clonePlatformInt64Pointer(input.PlatformID),
 		Type:        input.Type,
-		Credentials: input.Credentials,
+		Credentials: SanitizeAccountModelPolicy(input.Credentials),
 		Extra:       accountExtra,
 		ProxyID:     input.ProxyID,
 		Concurrency: normalizeAccountConcurrency(input.Platform, input.Type, input.Concurrency),
@@ -682,7 +682,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		// 影子绝不持有凭据(凭据只在母账号)——外审 F5。
 		if !isAllowedSparkShadowCredentialsUpdate(input.Credentials) {
 			return nil, infraerrors.Newf(http.StatusBadRequest, "SPARK_SHADOW_NO_CREDENTIALS",
-				"spark shadow accounts do not hold auth credentials; only model mapping can be configured on the shadow account")
+				"spark shadow accounts do not hold auth credentials; only compact protocol mapping can be configured on the shadow account")
 		}
 		// 影子 type 不可变——很多上游逻辑按 account.Type 分支(OAuth transform / ChatGPT
 		// header 注入 / WS OAuth 决策),改成 apikey 会让 spark 影子被选中后按错误协议转发(外审 G7)。
@@ -1349,7 +1349,7 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 			"parent account already has a spark shadow account")
 	}
 
-	// 3. 构造影子账号（安全不变量：Credentials 恒不含 auth token，仅含 model_mapping）。
+	// 3. 构造影子账号（安全不变量：Credentials 恒为空，凭据始终透传母账号）。
 	// name 为空时默认 "<母账号名> (Spark)"——否则空 name 会在 ent(name NotEmpty)处变成裸 500
 	// (外审 E/P2);并 rune 安全截断到 ent MaxLen(100)。
 	name := strings.TrimSpace(opts.Name)
@@ -1378,7 +1378,7 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 		PlatformID:      clonePlatformInt64Pointer(parent.PlatformID),
 		Type:            AccountTypeOAuth,
 		Status:          StatusActive,
-		Credentials:     map[string]any{"model_mapping": defaultSparkShadowModelMapping()},
+		Credentials:     map[string]any{},
 		ParentAccountID: &parentID,
 		QuotaDimension:  QuotaDimensionSpark,
 		ProxyID:         parent.ProxyID,

@@ -346,7 +346,7 @@ npm run typecheck
 - Test: `frontend/src/components/account/__tests__/EditAccountModal.spec.ts`
 - Test: `frontend/src/components/account/__tests__/BulkEditAccountModal.spec.ts`
 
-- [ ] **Step 1: 写入账号保存净化测试**
+- [x] **Step 1: 写入账号保存净化测试**
 
 ```go
 func TestMergeCredentialsDropsLegacyModelPolicy(t *testing.T) {
@@ -367,7 +367,9 @@ func TestMergeCredentialsDropsLegacyModelPolicy(t *testing.T) {
 
 删除 `CreateAccountInput.GroupIDs`、`UpdateAccountInput.GroupIDs`、bulk `group_ids`、`CheckMixedChannelRequest`、`BindGroups`、`ListSchedulableByGroupID*` 和 scheduler payload 中的 group IDs。
 
-- [ ] **Step 3: 净化普通账号模型策略**
+> 当前 Task 3 只完成外部 bulk `group_ids` 的拒绝和 Platform 路由隔离；Account/Ent 内部 Group 投影及旧 repository 方法按 Task 8/9 的运行时与 schema 一次性删除，避免在中间版本拆断仍在迁移的旧管理域。
+
+- [x] **Step 3: 净化普通账号模型策略**
 
 服务端合并凭证后统一执行：
 
@@ -379,11 +381,11 @@ for _, key := range []string{"model_mapping", "model_whitelist", "openai_capabil
 
 删除前端所有普通模型白名单、普通模型映射和兼容回显代码。保留 `compact_model_mapping`、凭证字段和 Adapter 技术选项。
 
-- [ ] **Step 4: 替换 Spark shadow 的旧 mapping 依赖**
+- [x] **Step 4: 替换 Spark shadow 的旧 mapping 依赖**
 
 Spark 账号资格只根据 `quota_dimension == "spark"`、父账号关系、Platform 模型规则和 Adapter 内置 Spark 模型判断；不得再生成或读取 `credentials.model_mapping`。
 
-- [ ] **Step 5: 运行账号与调度回归**
+- [x] **Step 5: 运行账号与调度回归**
 
 ```powershell
 Set-Location backend

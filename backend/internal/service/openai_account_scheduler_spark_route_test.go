@@ -13,7 +13,6 @@ func TestSparkRoutingByModel(t *testing.T) {
 	ctx := context.Background()
 	sparkModel := "gpt-5.3-codex-spark"
 	normalModel := "gpt-5.3-codex"
-	sparkCreds := map[string]any{"model_mapping": defaultSparkShadowModelMapping()}
 
 	newScheduler := func(snapshot map[int64]*Account) *defaultOpenAIAccountScheduler {
 		return &defaultOpenAIAccountScheduler{service: &OpenAIGatewayService{
@@ -26,24 +25,23 @@ func TestSparkRoutingByModel(t *testing.T) {
 	sparkReq := OpenAIAccountScheduleRequest{RequestedModel: sparkModel, Platform: PlatformOpenAI}
 	normalReq := OpenAIAccountScheduleRequest{RequestedModel: normalModel, Platform: PlatformOpenAI}
 
-	t.Run("normal_account_with_spark_mapping_accepts_spark", func(t *testing.T) {
-		acc := &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Credentials: sparkCreds}
+	t.Run("normal_account_uses_platform_model_policy", func(t *testing.T) {
+		acc := &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
 		require.True(t, newScheduler(nil).isAccountRequestCompatible(ctx, acc, sparkReq),
-			"普通账号配了 spark → 可承接 spark（类型门已移除）")
+			"普通账号由 Platform 规则决定，不读取旧 mapping")
 	})
 
-	t.Run("normal_account_without_spark_rejects_spark", func(t *testing.T) {
-		acc := &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true,
-			Credentials: map[string]any{"model_mapping": map[string]any{normalModel: normalModel}}}
-		require.False(t, newScheduler(nil).isAccountRequestCompatible(ctx, acc, sparkReq),
-			"普通账号未配 spark → 拒 spark（按配置而非类型）")
+	t.Run("normal_account_old_mapping_does_not_filter", func(t *testing.T) {
+		acc := &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
+		require.True(t, newScheduler(nil).isAccountRequestCompatible(ctx, acc, sparkReq),
+			"普通账号不再因旧 mapping 被排除")
 	})
 
 	t.Run("shadow_with_spark_mapping_accepts_spark_rejects_non_spark", func(t *testing.T) {
 		pid := int64(100)
 		parent := &Account{ID: 100, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
 		shadow := &Account{ID: 200, ParentAccountID: &pid, QuotaDimension: QuotaDimensionSpark,
-			Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1, Credentials: sparkCreds}
+			Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1}
 		s := newScheduler(map[int64]*Account{100: parent})
 		require.True(t, s.isAccountRequestCompatible(ctx, shadow, sparkReq), "影子配 spark + 健康母 → 接 spark")
 		require.False(t, s.isAccountRequestCompatible(ctx, shadow, normalReq), "影子（仅 spark mapping）→ 拒非 spark")
@@ -57,7 +55,7 @@ func TestSparkRoutingByModel(t *testing.T) {
 		pid := int64(100)
 		parent := &Account{ID: 100, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
 		shadow := &Account{ID: 200, ParentAccountID: &pid, QuotaDimension: QuotaDimensionSpark,
-			Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1, Credentials: sparkCreds}
+			Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1}
 		emptyReq := OpenAIAccountScheduleRequest{RequestedModel: "", Platform: PlatformOpenAI}
 		s := newScheduler(map[int64]*Account{100: parent})
 		require.True(t, s.isAccountRequestCompatible(ctx, shadow, emptyReq),
