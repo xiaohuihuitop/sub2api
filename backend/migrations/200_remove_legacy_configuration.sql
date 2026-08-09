@@ -5,6 +5,74 @@ SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '15min';
 
 -- Preserve plan-backed assets before removing their legacy group provenance.
+-- Administrators may have deleted a sale plan after issuing a subscription
+-- asset. Materialize a non-sale plan for those assets before the legacy Group
+-- disappears so their original duration, limits, and multiplier remain usable.
+INSERT INTO subscription_plans (
+    group_id, name, description, price, original_price, currency,
+    validity_days, validity_unit, features, product_name, for_sale, sort_order,
+    daily_limit_usd, weekly_limit_usd, monthly_limit_usd, rate_multiplier,
+    created_at, updated_at
+)
+SELECT
+    g.id,
+    g.name || ' Legacy Plan',
+    'Migrated legacy subscription asset',
+    0,
+    NULL,
+    '',
+    GREATEST(
+        g.default_validity_days,
+        COALESCE((
+            SELECT MAX(rc.validity_days)
+            FROM redeem_codes rc
+            WHERE rc.group_id = g.id
+              AND rc.type = 'subscription'
+              AND rc.status = 'unused'
+              AND rc.subscription_plan_id IS NULL
+        ), 0),
+        1
+    ),
+    'day',
+    '',
+    '',
+    FALSE,
+    0,
+    g.daily_limit_usd,
+    g.weekly_limit_usd,
+    g.monthly_limit_usd,
+    g.rate_multiplier,
+    NOW(),
+    NOW()
+FROM groups g
+WHERE NOT EXISTS (
+        SELECT 1 FROM subscription_plans sp WHERE sp.group_id = g.id
+    )
+  AND (
+      EXISTS (
+          SELECT 1 FROM user_subscriptions us
+          WHERE us.group_id = g.id
+            AND us.deleted_at IS NULL
+            AND us.status = 'active'
+            AND us.expires_at > NOW()
+            AND us.subscription_plan_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1 FROM redeem_codes rc
+          WHERE rc.group_id = g.id
+            AND rc.type = 'subscription'
+            AND rc.status = 'unused'
+            AND rc.subscription_plan_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1 FROM payment_orders po
+          WHERE po.subscription_group_id = g.id
+            AND po.order_type = 'subscription'
+            AND po.status = 'paid'
+            AND po.plan_id IS NULL
+      )
+  );
+
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_subscriptions' AND column_name = 'group_id') THEN
@@ -29,6 +97,38 @@ BEGIN
             LIMIT 1
         )
         WHERE rc.type = 'subscription' AND rc.subscription_plan_id IS NULL AND rc.group_id IS NOT NULL;
+
+        UPDATE redeem_codes rc
+        SET
+            plan_name_snapshot = CASE
+                WHEN BTRIM(rc.plan_name_snapshot) = '' THEN sp.name
+                ELSE rc.plan_name_snapshot
+            END,
+            validity_days = CASE
+                WHEN rc.validity_days > 0 THEN rc.validity_days
+                ELSE GREATEST(
+                    CASE sp.validity_unit
+                        WHEN 'week' THEN sp.validity_days * 7
+                        WHEN 'weeks' THEN sp.validity_days * 7
+                        WHEN 'month' THEN sp.validity_days * 30
+                        WHEN 'months' THEN sp.validity_days * 30
+                        WHEN 'year' THEN sp.validity_days * 365
+                        WHEN 'years' THEN sp.validity_days * 365
+                        ELSE sp.validity_days
+                    END,
+                    1
+                )
+            END,
+            daily_limit_usd_snapshot = COALESCE(rc.daily_limit_usd_snapshot, sp.daily_limit_usd),
+            weekly_limit_usd_snapshot = COALESCE(rc.weekly_limit_usd_snapshot, sp.weekly_limit_usd),
+            monthly_limit_usd_snapshot = COALESCE(rc.monthly_limit_usd_snapshot, sp.monthly_limit_usd),
+            rate_multiplier_snapshot = CASE
+                WHEN BTRIM(rc.plan_name_snapshot) = '' THEN sp.rate_multiplier
+                ELSE rc.rate_multiplier_snapshot
+            END
+        FROM subscription_plans sp
+        WHERE rc.type = 'subscription'
+          AND rc.subscription_plan_id = sp.id;
     END IF;
 
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_orders' AND column_name = 'subscription_group_id') THEN
@@ -92,10 +192,24 @@ BEGIN
         ) THEN
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'platforms' AND column_name = 'legacy_group_id') THEN
                 EXECUTE format(
-                    'UPDATE %I row SET group_id = p.id FROM platforms p WHERE row.group_id = p.legacy_group_id',
+                    'UPDATE %I row SET group_id = -p.id FROM platforms p WHERE row.group_id = p.legacy_group_id',
                     target_table
                 );
             END IF;
+
+            -- Aggregate rows are derived from raw operational events. An old
+            -- billing-only Group has no Platform meaning, so discard only that
+            -- obsolete aggregate dimension. Raw operational rows retain their
+            -- event data and receive a NULL Platform instead.
+            IF target_table IN ('ops_metrics_hourly', 'ops_metrics_daily') THEN
+                EXECUTE format('DELETE FROM %I WHERE group_id >= 0', target_table);
+            ELSE
+                EXECUTE format('UPDATE %I SET group_id = NULL WHERE group_id >= 0', target_table);
+            END IF;
+
+            -- Negative IDs avoid transient unique-key collisions when legacy
+            -- Group IDs and destination Platform IDs overlap.
+            EXECUTE format('UPDATE %I SET group_id = -group_id WHERE group_id < 0', target_table);
             EXECUTE format('ALTER TABLE %I RENAME COLUMN group_id TO platform_id', target_table);
         END IF;
     END LOOP;
@@ -228,12 +342,21 @@ ALTER TABLE usage_logs DROP COLUMN IF EXISTS channel_id;
 ALTER TABLE users DROP COLUMN IF EXISTS allowed_groups;
 
 -- Recreate renamed operational indexes with Platform terminology.
-CREATE INDEX IF NOT EXISTS idx_ops_error_logs_platform_created
-    ON ops_error_logs(platform_id, created_at DESC) WHERE platform_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_ops_system_metrics_platform_created
-    ON ops_system_metrics(platform_id, created_at DESC) WHERE platform_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_ops_alert_silences_lookup
-    ON ops_alert_silences(rule_id, platform, platform_id, region, until);
+DO $$
+BEGIN
+    IF to_regclass('ops_error_logs') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_ops_error_logs_platform_created
+            ON ops_error_logs(platform_id, created_at DESC) WHERE platform_id IS NOT NULL;
+    END IF;
+    IF to_regclass('ops_system_metrics') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_ops_system_metrics_platform_created
+            ON ops_system_metrics(platform_id, created_at DESC) WHERE platform_id IS NOT NULL;
+    END IF;
+    IF to_regclass('ops_alert_silences') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_ops_alert_silences_lookup
+            ON ops_alert_silences(rule_id, platform, platform_id, region, until);
+    END IF;
+END $$;
 
 -- Drop dependent configuration tables from leaves to roots.
 DROP TABLE IF EXISTS api_key_allowed_groups;

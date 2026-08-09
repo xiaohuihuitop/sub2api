@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestContentModerationPlatformScopeMigrationProtectsLegacyMapping(t *testing.T) {
+func TestContentModerationPlatformScopeMigrationPreservesHistoryWithoutRevivingGroups(t *testing.T) {
 	path := filepath.Join("198_content_moderation_platform_scope.sql")
 	sql, err := os.ReadFile(path)
 	if err != nil {
@@ -17,7 +17,6 @@ func TestContentModerationPlatformScopeMigrationProtectsLegacyMapping(t *testing
 	for _, fragment := range []string{
 		"add column if not exists platform_id",
 		"legacy_group_id",
-		"raise exception",
 		"platform_ids",
 		"drop column if exists group_id",
 		"drop column if exists group_name",
@@ -29,5 +28,11 @@ func TestContentModerationPlatformScopeMigrationProtectsLegacyMapping(t *testing
 	}
 	if strings.Contains(source, "drop table content_moderation_logs") {
 		t.Fatal("content moderation migration must preserve audit history")
+	}
+	if strings.Contains(source, "insert into platforms") {
+		t.Fatal("content moderation history must not revive legacy groups as platforms")
+	}
+	if strings.Contains(source, "raise exception") {
+		t.Fatal("unmapped legacy moderation scope must not block one-way cleanup")
 	}
 }

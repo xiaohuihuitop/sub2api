@@ -24,6 +24,14 @@ SELECT
 FROM groups g
 WHERE g.deleted_at IS NULL
   AND g.platform IN ('openai', 'anthropic', 'gemini', 'antigravity', 'grok')
+  AND EXISTS (
+      SELECT 1
+      FROM account_groups ag
+      JOIN accounts a ON a.id = ag.account_id
+      WHERE ag.group_id = g.id
+        AND a.deleted_at IS NULL
+        AND a.platform_id IS NULL
+  )
   AND NOT EXISTS (
       SELECT 1 FROM platforms p WHERE p.legacy_group_id = g.id
   )

@@ -11,8 +11,12 @@ func TestBackfillPlatformCatalogMigratesGroupsModelsAndAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	sql := strings.ToLower(string(content))
+	compactSQL := strings.Join(strings.Fields(sql), " ")
 	for _, fragment := range []string{
 		"insert into platforms",
+		"exists (",
+		"from account_groups ag",
+		"a.platform_id is null",
 		"legacy_group_id",
 		"jsonb_array_elements_text",
 		"insert into platform_model_rules",
@@ -20,7 +24,7 @@ func TestBackfillPlatformCatalogMigratesGroupsModelsAndAccounts(t *testing.T) {
 		"row_number() over",
 		"on conflict (code) do nothing",
 	} {
-		if !strings.Contains(sql, fragment) {
+		if !strings.Contains(compactSQL, fragment) {
 			t.Fatalf("migration missing %q", fragment)
 		}
 	}
