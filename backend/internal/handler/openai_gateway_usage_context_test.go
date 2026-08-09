@@ -104,6 +104,39 @@ func TestUsageRecordContextPreservesRouteAfterParentCancellation(t *testing.T) {
 	require.Equal(t, int64(7), *route.BillingAsset.SubscriptionID)
 }
 
+func TestCyberPolicyRecordContextPreservesRouteAfterParentCancellation(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	parent = service.WithGatewayPlatformAssetContext(parent, &service.GatewayPlatformAssetContext{
+		Platform: &service.ResolvedPlatformModel{
+			PlatformID:      42,
+			PlatformCode:    "openai",
+			AccountPlatform: service.PlatformOpenAI,
+		},
+		BillingAsset: &service.ResolvedBillingAsset{
+			Source:         service.BillingSourceSubscription,
+			SubscriptionID: int64Pointer(7),
+			RateMultiplier: 1.5,
+		},
+		SchedulingScope: service.PlatformSchedulingScope{
+			PlatformID:      42,
+			PlatformCode:    "openai",
+			AccountPlatform: service.PlatformOpenAI,
+		},
+	})
+	cancelParent()
+
+	workerContext, cancelWorker := newCyberPolicyRecordContext(parent)
+	defer cancelWorker()
+	route, ok := service.GatewayPlatformAssetContextFromContext(workerContext)
+
+	require.NoError(t, workerContext.Err())
+	require.True(t, ok)
+	require.Equal(t, int64(42), route.Platform.PlatformID)
+	require.Equal(t, service.BillingSourceSubscription, route.BillingAsset.Source)
+	require.Equal(t, int64(7), *route.BillingAsset.SubscriptionID)
+	require.Equal(t, 1.5, route.BillingAsset.RateMultiplier)
+}
+
 func TestLiveCallIdentityUsesBusinessPlatformID(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)

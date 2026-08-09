@@ -156,6 +156,11 @@ func usageRecordContext(parent context.Context, base context.Context) context.Co
 	return base
 }
 
+func newCyberPolicyRecordContext(parent context.Context) (context.Context, context.CancelFunc) {
+	base, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	return usageRecordContext(parent, base), cancel
+}
+
 func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecordTask) service.UsageRecordTask {
 	if task == nil {
 		return nil
@@ -2987,8 +2992,8 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 		ClientIP:        clientIPStr,
 		CreatedAt:       time.Now(),
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	go func(parent context.Context) {
+		ctx, cancel := newCyberPolicyRecordContext(parent)
 		defer cancel()
 		if cmSvc != nil {
 			cmSvc.RecordCyberPolicyEvent(ctx, service.CyberPolicyRecordInput{
@@ -3034,7 +3039,7 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 		if opsSvc != nil {
 			enqueueOpsErrorLog(opsSvc, buildCyberPolicyOpsErrorEntry(opsMeta, mark))
 		}
-	}()
+	}(requestCtx)
 }
 
 // clearCyberPolicyTurnState resets the cyber mark and the per-request recorded

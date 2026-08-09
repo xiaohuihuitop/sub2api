@@ -18,10 +18,12 @@ Platform 仍负责模型白名单、模型映射、平台授权和账号池选�
 
 - Chat 网关入口使用 `openai_compat.ShouldRouteChatCompletionsViaResponses`，只有 `force_responses` 才进入 Chat 到 Responses 转换。
 - 使用记录和 Ops 错误日志必须优先读取服务层 `SetActualOpenAIUpstreamEndpoint` 保存的实际端点；只有转发层没有提供运行时端点时，才按入站请求和账号三态推导。
+- 每一次上游尝试都必须主动覆盖运行时端点：Responses 记录完整路径（包含 `/compact` 等合法子路径），Chat 记录 `/v1/chat/completions`。此规则同时适用于 Responses 入站、Chat→Responses 兼容、Messages→Responses 和 Messages→Chat 兼容转发器；失败切换到下一账号时不得沿用前一次的端点。
 - 同步官方代码时不得恢复平台专属分支；先保留 `ShouldRouteChatCompletionsViaResponses` helper 和三态回归测试，再处理冲突。
 
 ## 验证
 
 - `go test -tags=unit ./internal/pkg/openai_compat -run 'TestShouldRouteChatCompletionsViaResponses|TestShouldUseResponsesAPI|TestResolveResponsesSupport' -count=1`
 - `go test -tags=unit ./internal/handler -run 'TestGetUpstreamEndpointPrefersServiceRuntimeEndpoint|TestResolveOpenAIUpstreamEndpoint' -count=1`
+- `go test -tags=unit ./internal/service -run 'TestForwardResponses.*ActualEndpoint|TestForwardResponsesCompactMarksFullActualEndpoint|TestForwardAsChatCompletions_APIKeyPropagatesPromptCacheKeyInResponsesBody|TestForwardAsAnthropic_(ForceChatCompletionsNonStreaming|ResponsesSupportedAccountStillUsesResponsesEndpoint)' -count=1`
 - `go test -tags=unit ./internal/service -count=1 -timeout=15m`

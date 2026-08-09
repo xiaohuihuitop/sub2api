@@ -89,6 +89,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	if account.Type == AccountTypeAPIKey && !openai_compat.ShouldRouteChatCompletionsViaResponses(account.Extra) {
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
+	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesEndpoint)
 
 	startTime := time.Now()
 

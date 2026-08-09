@@ -148,7 +148,7 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 	for attempt := 0; attempt <= 3; attempt++ {
 		selection, _, selectErr := s.SelectAccountWithSchedulerForCapability(
 			ctx,
-			identity.PlatformID,
+			PlatformSchedulingID(ctx),
 			"",
 			uuid.NewString(),
 			"",
