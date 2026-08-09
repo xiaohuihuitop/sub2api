@@ -101,6 +101,18 @@ func PlatformSchedulingID(ctx context.Context) *int64 {
 	return platformSchedulingCacheID(scope)
 }
 
+// PlatformAssetID returns the persistent business Platform primary key.
+// Unlike PlatformSchedulingID, this value is safe for usage, audit, and
+// identity records and must never be used as a cache namespace.
+func PlatformAssetID(ctx context.Context) *int64 {
+	scope, ok := PlatformSchedulingScopeFromContext(ctx)
+	if !ok {
+		return nil
+	}
+	platformID := scope.PlatformID
+	return &platformID
+}
+
 func accountMatchesPlatformSchedulingScope(ctx context.Context, account *Account) bool {
 	scope, scoped := PlatformSchedulingScopeFromContext(ctx)
 	return !scoped || platformSchedulingScopeMatchesAccount(scope, account)

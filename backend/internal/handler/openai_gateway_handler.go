@@ -2885,7 +2885,7 @@ func (h *OpenAIGatewayHandler) enqueueCyberSessionBlockedOpsEntry(c *gin.Context
 		meta.ClientIP = strings.TrimSpace(ip.GetClientIP(c))
 	}
 	meta.APIKeyID = apiKey.ID
-	meta.PlatformID = service.PlatformSchedulingID(c.Request.Context())
+	meta.PlatformID = service.PlatformAssetID(c.Request.Context())
 	meta.APIKeyPrefix = keyPrefix(apiKey.Key, 8)
 	if apiKey.User != nil {
 		meta.UserID = apiKey.User.ID
@@ -2919,7 +2919,7 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 	if apiKey != nil {
 		apiKeyID = apiKey.ID
 		apiKeyName = apiKey.Name
-		platformID = service.PlatformSchedulingID(c.Request.Context())
+		platformID = service.PlatformAssetID(c.Request.Context())
 		if apiKey.User != nil {
 			userID = apiKey.User.ID
 			userEmail = apiKey.User.Email

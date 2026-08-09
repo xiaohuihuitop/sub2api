@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -100,6 +102,23 @@ func TestUsageRecordContextPreservesRouteAfterParentCancellation(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, service.BillingSourceSubscription, route.BillingAsset.Source)
 	require.Equal(t, int64(7), *route.BillingAsset.SubscriptionID)
+}
+
+func TestLiveCallIdentityUsesBusinessPlatformID(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	request := httptest.NewRequest("POST", "/v1/live", nil)
+	request = request.WithContext(service.WithPlatformSchedulingScope(request.Context(), service.PlatformSchedulingScope{
+		PlatformID:      42,
+		PlatformCode:    "openai",
+		AccountPlatform: service.PlatformOpenAI,
+	}))
+	c.Request = request
+
+	identity := liveCallIdentity(c, &service.APIKey{ID: 7}, 9, nil)
+
+	require.NotNil(t, identity.PlatformID)
+	require.Equal(t, int64(42), *identity.PlatformID)
 }
 
 func int64Pointer(value int64) *int64 {

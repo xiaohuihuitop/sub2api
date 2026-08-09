@@ -34,3 +34,14 @@ func TestListPlatformPoolSchedulableAccountsUsesExplicitPool(t *testing.T) {
 	require.Equal(t, PlatformOpenAI, repo.accountPlatform)
 	require.Equal(t, []Account{{ID: 9, Platform: PlatformOpenAI}}, accounts)
 }
+
+func TestPlatformAssetIDUsesBusinessPlatformID(t *testing.T) {
+	ctx := WithPlatformSchedulingScope(context.Background(), PlatformSchedulingScope{
+		PlatformID:      42,
+		PlatformCode:    "openai",
+		AccountPlatform: PlatformOpenAI,
+	})
+
+	require.Equal(t, int64(-43), *PlatformSchedulingID(ctx))
+	require.Equal(t, int64(42), *PlatformAssetID(ctx))
+}

@@ -306,6 +306,9 @@ func GetUpstreamEndpoint(c *gin.Context, platform string) string {
 				return endpoint
 			}
 		}
+		if endpoint := service.GetActualOpenAIUpstreamEndpoint(c); endpoint != "" {
+			return endpoint
+		}
 	}
 	inbound := GetInboundEndpoint(c)
 	rawPath := ""

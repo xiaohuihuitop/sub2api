@@ -181,6 +181,17 @@ func TestGetUpstreamEndpointPrefersRuntimeOverride(t *testing.T) {
 	require.Equal(t, EndpointMessages, GetUpstreamEndpoint(c, service.PlatformAntigravity))
 }
 
+func TestGetUpstreamEndpointPrefersServiceRuntimeEndpoint(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, EndpointChatCompletions, nil)
+	c.Set(ctxKeyInboundEndpoint, EndpointChatCompletions)
+
+	service.SetActualOpenAIUpstreamEndpoint(c, EndpointChatCompletions)
+
+	require.Equal(t, EndpointChatCompletions, GetUpstreamEndpoint(c, service.PlatformOpenAI))
+}
+
 func TestResolveOpenAIUpstreamEndpointPrefersForwardResult(t *testing.T) {
 	tests := []struct {
 		name            string

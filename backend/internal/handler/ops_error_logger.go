@@ -940,8 +940,8 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 				if apiKey.User != nil {
 					entry.UserID = &apiKey.User.ID
 				}
-				if service.PlatformSchedulingID(c.Request.Context()) != nil {
-					entry.PlatformID = service.PlatformSchedulingID(c.Request.Context())
+				if service.PlatformAssetID(c.Request.Context()) != nil {
+					entry.PlatformID = service.PlatformAssetID(c.Request.Context())
 				}
 				entry.Platform = service.PlatformFromAPIKey(apiKey)
 			}
@@ -1076,8 +1076,8 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			if apiKey.User != nil {
 				entry.UserID = &apiKey.User.ID
 			}
-			if service.PlatformSchedulingID(c.Request.Context()) != nil {
-				entry.PlatformID = service.PlatformSchedulingID(c.Request.Context())
+			if service.PlatformAssetID(c.Request.Context()) != nil {
+				entry.PlatformID = service.PlatformAssetID(c.Request.Context())
 			}
 			entry.Platform = service.PlatformFromAPIKey(apiKey)
 		}
@@ -1221,8 +1221,8 @@ func logOpsStreamError(c *gin.Context, ops *service.OpsService, wireStatus int) 
 		if apiKey.User != nil {
 			entry.UserID = &apiKey.User.ID
 		}
-		if service.PlatformSchedulingID(c.Request.Context()) != nil {
-			entry.PlatformID = service.PlatformSchedulingID(c.Request.Context())
+		if service.PlatformAssetID(c.Request.Context()) != nil {
+			entry.PlatformID = service.PlatformAssetID(c.Request.Context())
 		}
 		entry.Platform = service.PlatformFromAPIKey(apiKey)
 	}
