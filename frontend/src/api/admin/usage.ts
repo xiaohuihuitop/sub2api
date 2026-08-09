@@ -44,7 +44,6 @@ export interface UsageCleanupFilters {
   user_id?: number
   api_key_id?: number
   account_id?: number
-  group_id?: number
   model?: string | null
   request_type?: UsageRequestType | null
   stream?: boolean | null
@@ -72,7 +71,6 @@ export interface CreateUsageCleanupTaskRequest {
   user_id?: number
   api_key_id?: number
   account_id?: number
-  group_id?: number
   model?: string | null
   request_type?: UsageRequestType | null
   stream?: boolean | null
@@ -119,7 +117,6 @@ export async function getStats(params: {
   user_id?: number
   api_key_id?: number
   account_id?: number
-  group_id?: number
   model?: string
   request_type?: UsageRequestType
   stream?: boolean

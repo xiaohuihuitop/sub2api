@@ -82,10 +82,10 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, title: 'User Management' }
   },
   {
-    path: '/admin/groups',
-    name: 'AdminGroups',
-    component: () => import('@/views/admin/GroupsView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, title: 'Groups' }
+    path: '/admin/platforms',
+    name: 'AdminPlatforms',
+    component: () => import('@/views/admin/PlatformsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Platforms' }
   },
   {
     path: '/admin/accounts',

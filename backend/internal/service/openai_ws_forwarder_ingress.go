@@ -50,9 +50,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		return err
 	}
 
-	// 预取一次 OpenAI Fast Policy settings，绑定到 ctx，让该 WS session
-	// 内所有帧的 evaluateOpenAIFastPolicy 调用复用同一份快照，避免每帧
-	// 进入 DB / settingRepo。Trade-off 见 withOpenAIFastPolicyContext 注释。
+	// 棰勫彇涓€娆?OpenAI Fast Policy settings锛岀粦瀹氬埌 ctx锛岃璇?WS session
+	// 鍐呮墍鏈夊抚鐨?evaluateOpenAIFastPolicy 璋冪敤澶嶇敤鍚屼竴浠藉揩鐓э紝閬垮厤姣忓抚
+	// 杩涘叆 DB / settingRepo銆俆rade-off 瑙?withOpenAIFastPolicyContext 娉ㄩ噴銆?
 	if s.settingService != nil {
 		if settings, err := s.settingService.GetOpenAIFastPolicySettings(ctx); err == nil && settings != nil {
 			ctx = withOpenAIFastPolicyContext(ctx, settings)
@@ -143,7 +143,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			return next, nil
 		}
 
-		// 仅在确实需要修改 payload 且 sjson 失败时，退回 map 路径确保兼容性。
+		// 浠呭湪纭疄闇€瑕佷慨鏀?payload 涓?sjson 澶辫触鏃讹紝閫€鍥?map 璺緞纭繚鍏煎鎬с€?
 		payload := make(map[string]any)
 		if unmarshalErr := json.Unmarshal(current, &payload); unmarshalErr != nil {
 			return nil, err
@@ -206,11 +206,11 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		originalModel := strings.TrimSpace(values[1].String())
 		modelMissing := originalModel == ""
 		if originalModel == "" {
-			// 入站 WS 长会话里，部分客户端只在第一轮 response.create 上声明
-			// model，后续 turn 复用同一 session-level model。为避免因省略
-			// model 直接断开用户连接，这里回落到上一轮已通过校验的客户端模型，
-			// 并在下方写回上游 payload，保证账号模型映射/fast policy/图片权限
-			// 仍按同一模型执行。
+			// 鍏ョ珯 WS 闀夸細璇濋噷锛岄儴鍒嗗鎴风鍙湪绗竴杞?response.create 涓婂０鏄?
+			// model锛屽悗缁?turn 澶嶇敤鍚屼竴 session-level model銆備负閬垮厤鍥犵渷鐣?
+			// model 鐩存帴鏂紑鐢ㄦ埛杩炴帴锛岃繖閲屽洖钀藉埌涓婁竴杞凡閫氳繃鏍￠獙鐨勫鎴风妯″瀷锛?
+			// 骞跺湪涓嬫柟鍐欏洖涓婃父 payload锛屼繚璇佽处鍙锋ā鍨嬫槧灏?fast policy/鍥剧墖鏉冮檺
+			// 浠嶆寜鍚屼竴妯″瀷鎵ц銆?
 			originalModel = ingressSessionOriginalModel
 			if originalModel == "" {
 				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
@@ -249,7 +249,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			normalized = litePayload
 		}
 		apiKey := getAPIKeyFromContext(c)
-		imageGenerationAllowed := GroupAllowsImageGeneration(apiKeyGroup(apiKey))
+		imageGenerationAllowed := true
 		codexImageGenerationExplicitToolPolicy := codexImageGenerationExplicitToolPolicyAllow
 		if isCodexCLI {
 			codexImageGenerationExplicitToolPolicy = account.CodexImageGenerationExplicitToolPolicy()
@@ -343,7 +343,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		// single integration point for all WS ingress turns (first + follow-up
 		// frames flow through here).
 		//
-		// Model fallback: first turn still requires model at the handler layer；
+		// Model fallback: first turn still requires model at the handler layer锛?
 		// follow-up response.create frames may omit it and then reuse
 		// ingressSessionOriginalModel. We always write a concrete upstream model
 		// before evaluating policy, so whitelist / filter behavior remains stable.
@@ -358,7 +358,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			// We intentionally do NOT forward this frame upstream.
 			//
 			// coder/websocket@v1.8.14 Conn.Write is synchronous and flushes
-			// the underlying bufio writer before returning (write.go:42 →
+			// the underlying bufio writer before returning (write.go:42 鈫?
 			// 307-311), and the subsequent close handshake re-acquires the
 			// same writeFrameMu, so the error event is guaranteed to reach
 			// the kernel send buffer before any close frame is queued.
@@ -429,7 +429,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 
 	turnState := strings.TrimSpace(c.GetHeader(openAIWSTurnStateHeader))
 	stateStore := s.getOpenAIWSStateStore()
-	groupID := getOpenAIGroupIDFromContext(c)
+	platformID := getOpenAIPlatformNamespaceIDFromContext(c)
 	storeDisabledConnMode := s.openAIWSStoreDisabledConnMode()
 	sessionHash := ""
 	preferredConnID := ""
@@ -437,7 +437,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	refreshIngressRouteState := func(payload openAIWSClientPayload) {
 		sessionHash = s.GenerateSessionHash(c, payload.rawForHash)
 		if turnState == "" && stateStore != nil && sessionHash != "" {
-			if savedTurnState, ok := stateStore.GetSessionTurnState(groupID, sessionHash); ok {
+			if savedTurnState, ok := stateStore.GetSessionTurnState(platformID, sessionHash); ok {
 				turnState = savedTurnState
 			}
 		}
@@ -451,7 +451,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 
 		storeDisabled = s.isOpenAIWSStoreDisabledInRequestRaw(payload.payloadRaw, account)
 		if stateStore != nil && storeDisabled && payload.previousResponseID == "" && sessionHash != "" {
-			if connID, ok := stateStore.GetSessionConn(groupID, sessionHash); ok {
+			if connID, ok := stateStore.GetSessionConn(platformID, sessionHash); ok {
 				preferredConnID = connID
 			}
 		}
@@ -567,13 +567,13 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			if bridgeTurnState := strings.TrimSpace(result.ResponseHeaders.Get(openAIWSTurnStateHeader)); bridgeTurnState != "" {
 				turnState = bridgeTurnState
 				if stateStore != nil && sessionHash != "" {
-					stateStore.BindSessionTurnState(groupID, sessionHash, bridgeTurnState, s.openAIWSSessionStickyTTL())
+					stateStore.BindSessionTurnState(platformID, sessionHash, bridgeTurnState, s.openAIWSSessionStickyTTL())
 				}
 			}
 			responseID := strings.TrimSpace(result.RequestID)
 			if responseID != "" && stateStore != nil {
 				ttl := s.openAIWSResponseStickyTTL()
-				logOpenAIWSBindResponseAccountWarn(groupID, account.ID, responseID, stateStore.BindResponseAccount(ctx, groupID, responseID, account.ID, ttl))
+				logOpenAIWSBindResponseAccountWarn(platformID, account.ID, responseID, stateStore.BindResponseAccount(ctx, platformID, responseID, account.ID, ttl))
 			}
 			nextClientMessage, readErr := readClientMessage()
 			if readErr != nil {
@@ -677,7 +677,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		req := cloneOpenAIWSAcquireRequest(baseAcquireReq)
 		req.PreferredConnID = strings.TrimSpace(preferred)
 		req.ForcePreferredConn = forcePreferredConn
-		// dedicated 模式下每次获取均新建连接，避免跨会话复用残留上下文。
+		// dedicated 妯″紡涓嬫瘡娆¤幏鍙栧潎鏂板缓杩炴帴锛岄伩鍏嶈法浼氳瘽澶嶇敤娈嬬暀涓婁笅鏂囥€?
 		req.ForceNewConn = dedicatedMode
 		acquireCtx, acquireCancel := context.WithTimeout(ctx, acquireTimeout)
 		lease, acquireErr := pool.Acquire(acquireCtx, req)
@@ -742,7 +742,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		if handshakeTurnState := strings.TrimSpace(lease.HandshakeHeader(openAIWSTurnStateHeader)); handshakeTurnState != "" {
 			turnState = handshakeTurnState
 			if stateStore != nil && sessionHash != "" {
-				stateStore.BindSessionTurnState(groupID, sessionHash, handshakeTurnState, s.openAIWSSessionStickyTTL())
+				stateStore.BindSessionTurnState(platformID, sessionHash, handshakeTurnState, s.openAIWSSessionStickyTTL())
 			}
 			updatedHeaders := cloneHeader(baseAcquireReq.Headers)
 			if updatedHeaders == nil {
@@ -855,7 +855,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					s.openAIWSIngressPreviousResponseRecoveryEnabled() &&
 					!wroteDownstream
 				if recoverablePrevNotFound {
-					// 可恢复场景使用非 error 关键字日志，避免被 LegacyPrintf 误判为 ERROR 级别。
+					// 鍙仮澶嶅満鏅娇鐢ㄩ潪 error 鍏抽敭瀛楁棩蹇楋紝閬垮厤琚?LegacyPrintf 璇垽涓?ERROR 绾у埆銆?
 					logOpenAIWSModeInfo(
 						"ingress_ws_prev_response_recoverable account_id=%d turn=%d conn_id=%s idx=%d reason=%s code=%s type=%s message=%s previous_response_id=%s previous_response_id_kind=%s response_id=%s store_disabled=%v has_prompt_cache_key=%v",
 						account.ID,
@@ -890,8 +890,8 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 						turnPromptCacheKey != "",
 					)
 				}
-				// previous_response_not_found 在 ingress 模式支持单次恢复重试：
-				// 不把该 error 直接下发客户端，而是由上层去掉 previous_response_id 后重放当前 turn。
+				// previous_response_not_found 鍦?ingress 妯″紡鏀寔鍗曟鎭㈠閲嶈瘯锛?
+				// 涓嶆妸璇?error 鐩存帴涓嬪彂瀹㈡埛绔紝鑰屾槸鐢变笂灞傚幓鎺?previous_response_id 鍚庨噸鏀惧綋鍓?turn銆?
 				if recoverablePrevNotFound {
 					lease.MarkBroken()
 					errMsg := strings.TrimSpace(errMsgRaw)
@@ -979,7 +979,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			if isTerminalEvent {
 				canonicalModel := canonicalOpenAIAccountSchedulingModel(account, originalModel, ctx)
 				terminalEvent := s.handleOpenAIWSTerminalTransientFailure(ctx, account, canonicalModel, lease.HandshakeHeaders(), upstreamMessage)
-				// 客户端已断连时，上游连接的 session 状态不可信，标记 broken 避免回池复用。
+				// 瀹㈡埛绔凡鏂繛鏃讹紝涓婃父杩炴帴鐨?session 鐘舵€佷笉鍙俊锛屾爣璁?broken 閬垮厤鍥炴睜澶嶇敤銆?
 				if clientDisconnected {
 					lease.MarkBroken()
 				}
@@ -1074,9 +1074,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			pinnedSessionConnID = connID
 		}
 	}
-	// lastTurnClean 标记最后一轮 sendAndRelay 是否正常完成（收到终端事件且客户端未断连）。
-	// 所有异常路径（读写错误、error 事件、客户端断连）已在各自分支或上层（L3403）中 MarkBroken，
-	// 因此 releaseSessionLease 中只需在非正常结束时 MarkBroken。
+	// lastTurnClean 鏍囪鏈€鍚庝竴杞?sendAndRelay 鏄惁姝ｅ父瀹屾垚锛堟敹鍒扮粓绔簨浠朵笖瀹㈡埛绔湭鏂繛锛夈€?
+	// 鎵€鏈夊紓甯歌矾寰勶紙璇诲啓閿欒銆乪rror 浜嬩欢銆佸鎴风鏂繛锛夊凡鍦ㄥ悇鑷垎鏀垨涓婂眰锛圠3403锛変腑 MarkBroken锛?
+	// 鍥犳 releaseSessionLease 涓彧闇€鍦ㄩ潪姝ｅ父缁撴潫鏃?MarkBroken銆?
 	lastTurnClean := false
 	releaseSessionLease := func() {
 		if sessionLease == nil {
@@ -1134,15 +1134,15 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		if turnPrevRecoveryTried || !s.openAIWSIngressPreviousResponseRecoveryEnabled() {
 			return false
 		}
-		// 携带 function_call_output 的请求不能丢弃 previous_response_id：
-		// 上游 API 需要 response chain 来匹配 tool_result 与之前的 tool_use，
-		// 丢弃后会导致 "No tool call found for function call output" 400 错误。
+		// 鎼哄甫 function_call_output 鐨勮姹備笉鑳戒涪寮?previous_response_id锛?
+		// 涓婃父 API 闇€瑕?response chain 鏉ュ尮閰?tool_result 涓庝箣鍓嶇殑 tool_use锛?
+		// 涓㈠純鍚庝細瀵艰嚧 "No tool call found for function call output" 400 閿欒銆?
 		if hasCurrentOrReplayFunctionCallOutput(currentPayload) {
 			return false
 		}
 		if isStrictAffinityTurn(currentPayload) {
-			// Layer 2：严格亲和链路命中 previous_response_not_found 时，降级为“去掉 previous_response_id 后重放一次”。
-			// 该错误说明续链锚点已失效，继续 strict fail-close 只会直接中断本轮请求。
+			// Layer 2锛氫弗鏍间翰鍜岄摼璺懡涓?previous_response_not_found 鏃讹紝闄嶇骇涓衡€滃幓鎺?previous_response_id 鍚庨噸鏀句竴娆♀€濄€?
+			// 璇ラ敊璇鏄庣画閾鹃敋鐐瑰凡澶辨晥锛岀户缁?strict fail-close 鍙細鐩存帴涓柇鏈疆璇锋眰銆?
 			logOpenAIWSModeInfo(
 				"ingress_ws_prev_response_recovery_layer2 account_id=%d turn=%d conn_id=%s store_disabled_conn_mode=%s action=drop_previous_response_id_retry",
 				account.ID,
@@ -1244,8 +1244,8 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 		}
 		hasFunctionCallOutput := toolSignals.HasFunctionCallOutput
-		// store=false + function_call_output 场景必须有续链锚点。
-		// 若客户端未传 previous_response_id，优先回填上一轮响应 ID，避免上游报 call_id 无法关联。
+		// store=false + function_call_output 鍦烘櫙蹇呴』鏈夌画閾鹃敋鐐广€?
+		// 鑻ュ鎴风鏈紶 previous_response_id锛屼紭鍏堝洖濉笂涓€杞搷搴?ID锛岄伩鍏嶄笂娓告姤 call_id 鏃犳硶鍏宠仈銆?
 		if shouldInferIngressFunctionCallOutputPreviousResponseID(
 			storeDisabled,
 			turn,
@@ -1414,9 +1414,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					truncateOpenAIWSLogValue(pingErr.Error(), openAIWSLogValueMaxLen),
 				)
 				if forcePreferredConn {
-					// 携带 function_call_output 的请求不能丢弃 previous_response_id：
-					// 上游 API 需要 response chain 来匹配 tool_result 与之前的 tool_use，
-					// 除非 replay input 已经包含与每个 tool_result 匹配的 tool_use 上下文。
+					// 鎼哄甫 function_call_output 鐨勮姹備笉鑳戒涪寮?previous_response_id锛?
+					// 涓婃父 API 闇€瑕?response chain 鏉ュ尮閰?tool_result 涓庝箣鍓嶇殑 tool_use锛?
+					// 闄ら潪 replay input 宸茬粡鍖呭惈涓庢瘡涓?tool_result 鍖归厤鐨?tool_use 涓婁笅鏂囥€?
 					hasFCOutput := hasFunctionCallOutput
 					hasReplayToolContext := hasFCOutput &&
 						currentTurnReplayInputExists &&
@@ -1582,11 +1582,11 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 
 		if responseID != "" && stateStore != nil {
 			ttl := s.openAIWSResponseStickyTTL()
-			logOpenAIWSBindResponseAccountWarn(groupID, account.ID, responseID, stateStore.BindResponseAccount(ctx, groupID, responseID, account.ID, ttl))
+			logOpenAIWSBindResponseAccountWarn(platformID, account.ID, responseID, stateStore.BindResponseAccount(ctx, platformID, responseID, account.ID, ttl))
 			stateStore.BindResponseConn(responseID, connID, ttl)
 		}
 		if stateStore != nil && storeDisabled && sessionHash != "" {
-			stateStore.BindSessionConn(groupID, sessionHash, connID, s.openAIWSSessionStickyTTL())
+			stateStore.BindSessionConn(platformID, sessionHash, connID, s.openAIWSSessionStickyTTL())
 		}
 		if connID != "" {
 			preferredConnID = connID
@@ -1613,8 +1613,8 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			return parseErr
 		}
 		if nextPayload.promptCacheKey != "" {
-			// ingress 会话在整个客户端 WS 生命周期内复用同一上游连接；
-			// prompt_cache_key 对握手头的更新仅在未来需要重新建连时生效。
+			// ingress 浼氳瘽鍦ㄦ暣涓鎴风 WS 鐢熷懡鍛ㄦ湡鍐呭鐢ㄥ悓涓€涓婃父杩炴帴锛?
+			// prompt_cache_key 瀵规彙鎵嬪ご鐨勬洿鏂颁粎鍦ㄦ湭鏉ラ渶瑕侀噸鏂板缓杩炴椂鐢熸晥銆?
 			updatedHeaders, _, updHdrErr := s.buildOpenAIWSHeaders(ctx, c, account, token, wsDecision, isCodexCLI, turnState, strings.TrimSpace(c.GetHeader(openAIWSTurnMetadataHeader)), nextPayload.promptCacheKey)
 			if updHdrErr != nil {
 				logOpenAIWSModeInfo("ingress_ws_update_headers_failed account_id=%d err=%v", account.ID, updHdrErr)

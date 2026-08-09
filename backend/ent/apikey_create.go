@@ -12,7 +12,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -84,20 +83,6 @@ func (_c *APIKeyCreate) SetKey(v string) *APIKeyCreate {
 // SetName sets the "name" field.
 func (_c *APIKeyCreate) SetName(v string) *APIKeyCreate {
 	_c.mutation.SetName(v)
-	return _c
-}
-
-// SetGroupID sets the "group_id" field.
-func (_c *APIKeyCreate) SetGroupID(v int64) *APIKeyCreate {
-	_c.mutation.SetGroupID(v)
-	return _c
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (_c *APIKeyCreate) SetNillableGroupID(v *int64) *APIKeyCreate {
-	if v != nil {
-		_c.SetGroupID(*v)
-	}
 	return _c
 }
 
@@ -326,11 +311,6 @@ func (_c *APIKeyCreate) SetNillableWindow7dStart(v *time.Time) *APIKeyCreate {
 // SetUser sets the "user" edge to the User entity.
 func (_c *APIKeyCreate) SetUser(v *User) *APIKeyCreate {
 	return _c.SetUserID(v.ID)
-}
-
-// SetGroup sets the "group" edge to the Group entity.
-func (_c *APIKeyCreate) SetGroup(v *Group) *APIKeyCreate {
-	return _c.SetGroupID(v.ID)
 }
 
 // AddPlatformIDs adds the "platforms" edge to the Platform entity by IDs.
@@ -669,23 +649,6 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_node.UserID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := _c.mutation.GroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   apikey.GroupTable,
-			Columns: []string{apikey.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.GroupID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
 	if nodes := _c.mutation.PlatformsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
@@ -849,24 +812,6 @@ func (u *APIKeyUpsert) SetName(v string) *APIKeyUpsert {
 // UpdateName sets the "name" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateName() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldName)
-	return u
-}
-
-// SetGroupID sets the "group_id" field.
-func (u *APIKeyUpsert) SetGroupID(v int64) *APIKeyUpsert {
-	u.Set(apikey.FieldGroupID, v)
-	return u
-}
-
-// UpdateGroupID sets the "group_id" field to the value that was provided on create.
-func (u *APIKeyUpsert) UpdateGroupID() *APIKeyUpsert {
-	u.SetExcluded(apikey.FieldGroupID)
-	return u
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (u *APIKeyUpsert) ClearGroupID() *APIKeyUpsert {
-	u.SetNull(apikey.FieldGroupID)
 	return u
 }
 
@@ -1283,27 +1228,6 @@ func (u *APIKeyUpsertOne) SetName(v string) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateName() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateName()
-	})
-}
-
-// SetGroupID sets the "group_id" field.
-func (u *APIKeyUpsertOne) SetGroupID(v int64) *APIKeyUpsertOne {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.SetGroupID(v)
-	})
-}
-
-// UpdateGroupID sets the "group_id" field to the value that was provided on create.
-func (u *APIKeyUpsertOne) UpdateGroupID() *APIKeyUpsertOne {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.UpdateGroupID()
-	})
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (u *APIKeyUpsertOne) ClearGroupID() *APIKeyUpsertOne {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.ClearGroupID()
 	})
 }
 
@@ -1935,27 +1859,6 @@ func (u *APIKeyUpsertBulk) SetName(v string) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateName() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateName()
-	})
-}
-
-// SetGroupID sets the "group_id" field.
-func (u *APIKeyUpsertBulk) SetGroupID(v int64) *APIKeyUpsertBulk {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.SetGroupID(v)
-	})
-}
-
-// UpdateGroupID sets the "group_id" field to the value that was provided on create.
-func (u *APIKeyUpsertBulk) UpdateGroupID() *APIKeyUpsertBulk {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.UpdateGroupID()
-	})
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (u *APIKeyUpsertBulk) ClearGroupID() *APIKeyUpsertBulk {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.ClearGroupID()
 	})
 }
 

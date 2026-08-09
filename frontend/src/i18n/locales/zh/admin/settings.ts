@@ -23,13 +23,6 @@ export default {
           defaultInterval: '默认检测间隔（秒）',
           defaultIntervalHint: '新建渠道监控时表单的默认值，可被单个渠道覆盖。范围 15 – 3600 秒。',
         },
-        availableChannels: {
-          title: '可用渠道',
-          description: '向已登录用户展示他们能访问的渠道、模型和定价聚合视图。默认关闭。',
-          configureLink: '前往 渠道管理 > 渠道定价 配置模型价格',
-          enabled: '启用可用渠道',
-          enabledHint: '关闭后用户端侧边栏入口隐藏，接口返回空数组。',
-        },
         modelPlaza: {
           title: '模型广场',
           description: '以分组为单位向访客展示可用模型与价格的公开页面。默认关闭。',
@@ -324,9 +317,6 @@ export default {
         defaultSubscriptionsEmpty: '未配置默认订阅。新用户不会自动获得订阅套餐。',
         defaultSubscriptionsDuplicate: '默认订阅存在重复条目：{reference}。',
         subscriptionPlan: '订阅套餐',
-        legacySubscription: '旧配置：分组 #{groupId}，{days} 天',
-        subscriptionGroup: '订阅分组',
-        subscriptionValidityDays: '有效期（天）',
         defaultPlatformQuotas: '默认平台限额（注册时分配）',
         defaultPlatformQuotasHint: '新用户注册时自动写入平台限额记录；已有用户不受影响。留空 = 该平台该窗口不限制。',
         platformQuotaNotice: '月限额为 30 天滚动窗口，非自然月',
@@ -350,9 +340,7 @@ export default {
       },
       scheduling: {
         title: '网关调度设置',
-        description: '控制 API Key 的调度行为',
-        allowUngroupedKey: '允许未分组 Key 调度',
-        allowUngroupedKeyHint: '关闭后，未分配到任何分组的 API Key 将无法发起请求（返回 403）。建议保持关闭以确保所有 Key 都归属明确的分组。'
+        description: '控制 API Key 的调度行为'
       },
       upstreamBillingProbe: {
         title: '上游倍率自动探测',

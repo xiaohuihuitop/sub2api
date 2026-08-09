@@ -15,7 +15,6 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
@@ -25,16 +24,15 @@ import (
 // PlatformQuery is the builder for querying Platform entities.
 type PlatformQuery struct {
 	config
-	ctx             *QueryContext
-	order           []platform.OrderOption
-	inters          []Interceptor
-	predicates      []predicate.Platform
-	withLegacyGroup *GroupQuery
-	withModelRules  *PlatformModelRuleQuery
-	withAccounts    *AccountQuery
-	withAPIKeys     *APIKeyQuery
-	withUsageLogs   *UsageLogQuery
-	modifiers       []func(*sql.Selector)
+	ctx            *QueryContext
+	order          []platform.OrderOption
+	inters         []Interceptor
+	predicates     []predicate.Platform
+	withModelRules *PlatformModelRuleQuery
+	withAccounts   *AccountQuery
+	withAPIKeys    *APIKeyQuery
+	withUsageLogs  *UsageLogQuery
+	modifiers      []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -69,28 +67,6 @@ func (_q *PlatformQuery) Unique(unique bool) *PlatformQuery {
 func (_q *PlatformQuery) Order(o ...platform.OrderOption) *PlatformQuery {
 	_q.order = append(_q.order, o...)
 	return _q
-}
-
-// QueryLegacyGroup chains the current query on the "legacy_group" edge.
-func (_q *PlatformQuery) QueryLegacyGroup() *GroupQuery {
-	query := (&GroupClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(platform.Table, platform.FieldID, selector),
-			sqlgraph.To(group.Table, group.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, platform.LegacyGroupTable, platform.LegacyGroupColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
 }
 
 // QueryModelRules chains the current query on the "model_rules" edge.
@@ -368,31 +344,19 @@ func (_q *PlatformQuery) Clone() *PlatformQuery {
 		return nil
 	}
 	return &PlatformQuery{
-		config:          _q.config,
-		ctx:             _q.ctx.Clone(),
-		order:           append([]platform.OrderOption{}, _q.order...),
-		inters:          append([]Interceptor{}, _q.inters...),
-		predicates:      append([]predicate.Platform{}, _q.predicates...),
-		withLegacyGroup: _q.withLegacyGroup.Clone(),
-		withModelRules:  _q.withModelRules.Clone(),
-		withAccounts:    _q.withAccounts.Clone(),
-		withAPIKeys:     _q.withAPIKeys.Clone(),
-		withUsageLogs:   _q.withUsageLogs.Clone(),
+		config:         _q.config,
+		ctx:            _q.ctx.Clone(),
+		order:          append([]platform.OrderOption{}, _q.order...),
+		inters:         append([]Interceptor{}, _q.inters...),
+		predicates:     append([]predicate.Platform{}, _q.predicates...),
+		withModelRules: _q.withModelRules.Clone(),
+		withAccounts:   _q.withAccounts.Clone(),
+		withAPIKeys:    _q.withAPIKeys.Clone(),
+		withUsageLogs:  _q.withUsageLogs.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
-}
-
-// WithLegacyGroup tells the query-builder to eager-load the nodes that are connected to
-// the "legacy_group" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *PlatformQuery) WithLegacyGroup(opts ...func(*GroupQuery)) *PlatformQuery {
-	query := (&GroupClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withLegacyGroup = query
-	return _q
 }
 
 // WithModelRules tells the query-builder to eager-load the nodes that are connected to
@@ -517,8 +481,7 @@ func (_q *PlatformQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Pla
 	var (
 		nodes       = []*Platform{}
 		_spec       = _q.querySpec()
-		loadedTypes = [5]bool{
-			_q.withLegacyGroup != nil,
+		loadedTypes = [4]bool{
 			_q.withModelRules != nil,
 			_q.withAccounts != nil,
 			_q.withAPIKeys != nil,
@@ -545,12 +508,6 @@ func (_q *PlatformQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Pla
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
-	}
-	if query := _q.withLegacyGroup; query != nil {
-		if err := _q.loadLegacyGroup(ctx, query, nodes, nil,
-			func(n *Platform, e *Group) { n.Edges.LegacyGroup = e }); err != nil {
-			return nil, err
-		}
 	}
 	if query := _q.withModelRules; query != nil {
 		if err := _q.loadModelRules(ctx, query, nodes,
@@ -583,38 +540,6 @@ func (_q *PlatformQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Pla
 	return nodes, nil
 }
 
-func (_q *PlatformQuery) loadLegacyGroup(ctx context.Context, query *GroupQuery, nodes []*Platform, init func(*Platform), assign func(*Platform, *Group)) error {
-	ids := make([]int64, 0, len(nodes))
-	nodeids := make(map[int64][]*Platform)
-	for i := range nodes {
-		if nodes[i].LegacyGroupID == nil {
-			continue
-		}
-		fk := *nodes[i].LegacyGroupID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(group.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "legacy_group_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
 func (_q *PlatformQuery) loadModelRules(ctx context.Context, query *PlatformModelRuleQuery, nodes []*Platform, init func(*Platform), assign func(*Platform, *PlatformModelRule)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int64]*Platform)
@@ -800,9 +725,6 @@ func (_q *PlatformQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != platform.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
-		}
-		if _q.withLegacyGroup != nil {
-			_spec.Node.AddColumnOnce(platform.FieldLegacyGroupID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

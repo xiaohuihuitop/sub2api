@@ -66,15 +66,10 @@ var (
 
 // UserListFilters contains all filter options for listing users
 type UserListFilters struct {
-	Status    string // User status filter
-	Role      string // User role filter
-	Search    string // Search in email, username
-	GroupName string // Filter by allowed group name (fuzzy match)
-	// APIKeyGroupID filters users who own at least one non-soft-deleted API key
-	// bound to this group (api_keys.group_id). 0 = no filter. Covers all three
-	// group types since it matches the key's group directly, not allowed_groups.
-	APIKeyGroupID int64
-	Attributes    map[int64]string // Custom attribute filters: attributeID -> value
+	Status     string           // User status filter
+	Role       string           // User role filter
+	Search     string           // Search in email, username
+	Attributes map[int64]string // Custom attribute filters: attributeID -> value
 	// IncludeSubscriptions controls whether ListWithFilters should load active subscriptions.
 	// For large datasets this can be expensive; admin list pages should enable it on demand.
 	// nil means not specified (default: load subscriptions for backward compatibility).
@@ -111,8 +106,6 @@ type UserUpdateFields struct {
 	BalanceNotifySettings bool
 	// BalanceNotifyExtraEmails 与上一项分开，避免"改通知阈值"覆盖并发的"加通知邮箱"。
 	BalanceNotifyExtraEmails bool
-	// AllowedGroups 为 true 时才同步 user_allowed_groups 关联表。
-	AllowedGroups bool
 }
 
 // BalanceChange 记录一次余额变更前后的值。
@@ -167,11 +160,6 @@ type UserRepository interface {
 	// ExistsByEmailAlias 判断是否已有账号与该邮箱指向同一收件箱（+别名 / Gmail 点号 /
 	// FQDN 根点变体，见 NormalizeEmailForAliasDedup）。用于注册与发送验证码前的查重。
 	ExistsByEmailAlias(ctx context.Context, email string) (bool, error)
-	RemoveGroupFromAllowedGroups(ctx context.Context, groupID int64) (int64, error)
-	// AddGroupToAllowedGroups 将指定分组增量添加到用户的 allowed_groups（幂等，冲突忽略）
-	AddGroupToAllowedGroups(ctx context.Context, userID int64, groupID int64) error
-	// RemoveGroupFromUserAllowedGroups 移除单个用户的指定分组权限
-	RemoveGroupFromUserAllowedGroups(ctx context.Context, userID int64, groupID int64) error
 	ListUserAuthIdentities(ctx context.Context, userID int64) ([]UserAuthIdentityRecord, error)
 	UnbindUserAuthProvider(ctx context.Context, userID int64, provider string) error
 

@@ -127,7 +127,6 @@ function checkoutInfoWithPlansFixture(options: {
   const base = checkoutInfoFixture(options.checkout).data
   const plan: SubscriptionPlan = {
     id: 7,
-    group_id: 3,
     name: 'Starter',
     description: '',
     price: 128,
@@ -139,10 +138,8 @@ function checkoutInfoWithPlansFixture(options: {
     weekly_limit_usd: null,
     monthly_limit_usd: null,
     features: [],
-    group_platform: 'openai',
     sort_order: 1,
     for_sale: true,
-    group_name: 'OpenAI',
     ...options.plan,
   }
 
@@ -203,7 +200,7 @@ function oauthOrderFixture() {
 
 async function mountSubscriptionConfirm(
   options: Parameters<typeof checkoutInfoWithPlansFixture>[0] = {},
-  query: Record<string, string> = { tab: 'subscription', group: '3' },
+  query: Record<string, string> = { tab: 'subscription', plan: '7' },
 ) {
   vi.useRealTimers()
   routeState.path = '/purchase'

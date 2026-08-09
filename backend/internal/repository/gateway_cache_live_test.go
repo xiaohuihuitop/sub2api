@@ -24,7 +24,7 @@ func TestGatewayCacheLiveCallIdentityAndController(t *testing.T) {
 		AccountID:             11,
 		APIKeyID:              22,
 		UserID:                33,
-		GroupID:               44,
+		PlatformID:            44,
 		LeaseID:               "lease",
 		Model:                 "gpt-live-test",
 		AttestationCiphertext: "encrypted-attestation",

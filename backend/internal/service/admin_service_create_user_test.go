@@ -17,13 +17,12 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 	balance := 12.5
 
 	input := &CreateUserInput{
-		Email:         "user@test.com",
-		Password:      "strong-pass",
-		Username:      "tester",
-		Notes:         "note",
-		Balance:       &balance,
-		Concurrency:   7,
-		AllowedGroups: []int64{3, 5},
+		Email:       "user@test.com",
+		Password:    "strong-pass",
+		Username:    "tester",
+		Notes:       "note",
+		Balance:     &balance,
+		Concurrency: 7,
 	}
 
 	user, err := svc.CreateUser(context.Background(), input)
@@ -35,7 +34,6 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 	require.Equal(t, input.Notes, user.Notes)
 	require.Equal(t, balance, user.Balance)
 	require.Equal(t, input.Concurrency, user.Concurrency)
-	require.Equal(t, input.AllowedGroups, user.AllowedGroups)
 	require.Equal(t, RoleUser, user.Role)
 	require.Equal(t, StatusActive, user.Status)
 	require.True(t, user.CheckPassword(input.Password))
@@ -118,35 +116,6 @@ func TestAdminService_CreateUser_CreateError(t *testing.T) {
 	require.Empty(t, repo.created)
 }
 
-func TestAdminService_CreateUser_AssignsDefaultSubscriptions(t *testing.T) {
-	repo := &userRepoStub{nextID: 21}
-	assigner := &defaultSubscriptionAssignerStub{}
-	cfg := &config.Config{
-		Default: config.DefaultConfig{
-			UserBalance:     0,
-			UserConcurrency: 1,
-		},
-	}
-	settingService := NewSettingService(&settingRepoStub{values: map[string]string{
-		SettingKeyDefaultSubscriptions: `[{"group_id":5,"validity_days":30}]`,
-	}}, cfg)
-	svc := &adminServiceImpl{
-		userRepo:           repo,
-		settingService:     settingService,
-		defaultSubAssigner: assigner,
-	}
-
-	_, err := svc.CreateUser(context.Background(), &CreateUserInput{
-		Email:    "new-user@test.com",
-		Password: "password",
-	})
-	require.NoError(t, err)
-	require.Len(t, assigner.calls, 1)
-	require.Equal(t, int64(21), assigner.calls[0].UserID)
-	require.Equal(t, int64(5), assigner.calls[0].GroupID)
-	require.Equal(t, 30, assigner.calls[0].ValidityDays)
-}
-
 func TestAdminService_CreateUser_AssignsDefaultPlanSubscription(t *testing.T) {
 	repo := &userRepoStub{nextID: 22}
 	assigner := &defaultSubscriptionAssignerStub{}
@@ -165,7 +134,6 @@ func TestAdminService_CreateUser_AssignsDefaultPlanSubscription(t *testing.T) {
 		Password: "password",
 	})
 	require.NoError(t, err)
-	require.Empty(t, assigner.calls)
 	require.Equal(t, []AssignSubscriptionFromPlanInput{{
 		UserID: 22,
 		PlanID: 52,

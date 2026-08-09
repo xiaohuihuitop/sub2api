@@ -1,51 +1,20 @@
 package service
 
-import "time"
-
-// resolveBillingMultipliers calculates the legacy API key multiplier set.
-// V2 platform-asset requests override its result with the resolved billing
-// asset, so a group never decides a V2 request's charging multiplier.
+// resolveBillingMultipliers returns the selected asset multiplier for every
+// billing modality. Base model/media prices are resolved independently.
 func resolveBillingMultipliers(
-	apiKey *APIKey,
 	subscription *UserSubscription,
 	fallback float64,
-	now time.Time,
 ) (token, image, video float64) {
-	base := resolveBillingRateMultiplier(apiKey, subscription, fallback)
-	image = resolveImageBillingMultiplier(apiKey, base, subscription != nil)
-	video = resolveVideoBillingMultiplier(apiKey, base, subscription != nil)
-	if subscription != nil {
-		return base, image, video
-	}
-	peak := 1.0
-	if apiKey != nil && apiKey.Group != nil {
-		peak = apiKey.Group.PeakMultiplierAt(now)
-	}
-	return base * peak, image, video
+	base := resolveBillingRateMultiplier(subscription, fallback)
+	return base, base, base
 }
 
-func resolveBillingRateMultiplier(apiKey *APIKey, subscription *UserSubscription, fallback float64) float64 {
+func resolveBillingRateMultiplier(subscription *UserSubscription, fallback float64) float64 {
 	if subscription != nil {
 		return nonNegativeMultiplier(subscription.RateMultiplierSnapshot)
 	}
-	if apiKey != nil && apiKey.Group != nil {
-		return nonNegativeMultiplier(apiKey.Group.RateMultiplier)
-	}
 	return nonNegativeMultiplier(fallback)
-}
-
-func resolveImageBillingMultiplier(apiKey *APIKey, base float64, subscriptionBilling bool) float64 {
-	if subscriptionBilling {
-		return base
-	}
-	return resolveImageRateMultiplier(apiKey, base)
-}
-
-func resolveVideoBillingMultiplier(apiKey *APIKey, base float64, subscriptionBilling bool) float64 {
-	if subscriptionBilling {
-		return base
-	}
-	return resolveVideoRateMultiplier(apiKey, base)
 }
 
 func nonNegativeMultiplier(multiplier float64) float64 {

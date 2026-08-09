@@ -31,8 +31,8 @@ func (e *Enqueuer) Enqueue(ctx context.Context, req Request) error {
 		return nil
 	}
 	baseFields["config_version"] = cfg.ConfigVersion
-	if !cfg.IncludesGroup(req.GroupID) {
-		LogInfo(EventEnqueueSkipped, mergeLogFields(baseFields, map[string]any{"status": "skipped", "error_code": "group_out_of_scope"}))
+	if !cfg.IncludesPlatform(req.PlatformID) {
+		LogInfo(EventEnqueueSkipped, mergeLogFields(baseFields, map[string]any{"status": "skipped", "error_code": "platform_out_of_scope"}))
 		return nil
 	}
 	if len(cfg.EnabledEndpoints()) == 0 {

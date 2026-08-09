@@ -706,8 +706,17 @@ func betaPolicyScopeMatches(scope string, isOAuth bool, isBedrock bool) bool {
 	}
 }
 
+func matchModelPattern(pattern, model string) bool {
+	if pattern == model {
+		return true
+	}
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(model, strings.TrimSuffix(pattern, "*"))
+	}
+	return false
+}
+
 // matchModelWhitelist checks if a model matches any pattern in the whitelist.
-// Reuses matchModelPattern from group.go which supports exact and wildcard prefix matching.
 func matchModelWhitelist(model string, whitelist []string) bool {
 	for _, pattern := range whitelist {
 		if matchModelPattern(pattern, model) {

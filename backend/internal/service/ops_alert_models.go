@@ -62,10 +62,10 @@ type OpsAlertEvent struct {
 type OpsAlertSilence struct {
 	ID int64 `json:"id"`
 
-	RuleID   int64   `json:"rule_id"`
-	Platform string  `json:"platform"`
-	GroupID  *int64  `json:"group_id,omitempty"`
-	Region   *string `json:"region,omitempty"`
+	RuleID     int64   `json:"rule_id"`
+	Platform   string  `json:"platform"`
+	PlatformID *int64  `json:"platform_id,omitempty"`
+	Region     *string `json:"region,omitempty"`
 
 	Until  time.Time `json:"until"`
 	Reason string    `json:"reason"`
@@ -90,6 +90,6 @@ type OpsAlertEventFilter struct {
 	EndTime   *time.Time
 
 	// Dimensions filters (best-effort).
-	Platform string
-	GroupID  *int64
+	Platform   string
+	PlatformID *int64
 }

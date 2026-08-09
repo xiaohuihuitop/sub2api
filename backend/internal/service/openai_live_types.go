@@ -42,7 +42,7 @@ type LiveCallRequest struct {
 type LiveCallIdentity struct {
 	APIKeyID        int64
 	UserID          int64
-	GroupID         *int64
+	PlatformID      *int64
 	SubscriptionID  *int64
 	UserAgent       string
 	IPAddress       string
@@ -55,7 +55,7 @@ type LiveCallRecord struct {
 	AccountID       int64
 	APIKeyID        int64
 	UserID          int64
-	GroupID         int64
+	PlatformID      int64
 	SubscriptionID  int64
 	LeaseID         string
 	Model           string

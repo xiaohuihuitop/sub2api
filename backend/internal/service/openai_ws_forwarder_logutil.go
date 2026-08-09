@@ -513,13 +513,13 @@ func logOpenAIWSModeDebug(format string, args ...any) {
 	logger.LegacyPrintf("service.openai_gateway", "[debug] [OpenAI WS Mode][openai_ws_mode=true] "+format, args...)
 }
 
-func logOpenAIWSBindResponseAccountWarn(groupID, accountID int64, responseID string, err error) {
+func logOpenAIWSBindResponseAccountWarn(platformID, accountID int64, responseID string, err error) {
 	if err == nil {
 		return
 	}
 	logger.L().Warn(
 		"openai.ws_bind_response_account_failed",
-		zap.Int64("group_id", groupID),
+		zap.Int64("platform_namespace_id", platformID),
 		zap.Int64("account_id", accountID),
 		zap.String("response_id", truncateOpenAIWSLogValue(responseID, openAIWSIDValueMaxLen)),
 		zap.Error(err),

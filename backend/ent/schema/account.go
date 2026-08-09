@@ -24,7 +24,7 @@ import (
 //   - 存储不同平台（Claude、Gemini、OpenAI 等）的 API 凭证
 //   - 支持多种认证类型（api_key、oauth、cookie 等）
 //   - 管理账户的调度状态（可调度、速率限制、过载等）
-//   - 通过分组机制实现账户的灵活分配
+//   - 通过平台账号池实现账户隔离与调度
 type Account struct {
 	ent.Schema
 }
@@ -64,8 +64,7 @@ func (Account) Fields() []ent.Field {
 		field.String("platform").
 			MaxLen(50).
 			NotEmpty(),
-		// V2 account-pool ownership. Nullable preserves legacy group routing
-		// until each account is explicitly assigned by an administrator.
+		// 平台账号池归属。未归属平台的账号不能参与调度。
 		field.Int64("platform_id").
 			Optional().
 			Nillable(),
@@ -212,11 +211,6 @@ func (Account) Fields() []ent.Field {
 // Edges 定义账户实体的关联关系。
 func (Account) Edges() []ent.Edge {
 	return []ent.Edge{
-		// groups: 账户所属的分组（多对多关系）
-		// 通过 account_groups 中间表实现
-		// 一个账户可以属于多个分组，一个分组可以包含多个账户
-		edge.To("groups", Group.Type).
-			Through("account_groups", AccountGroup.Type),
 		edge.From("platform_pool", Platform.Type).
 			Ref("accounts").
 			Field("platform_id").
@@ -243,7 +237,7 @@ func (Account) Edges() []ent.Edge {
 // 每个索引对应一个常用的查询条件。
 func (Account) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("platform"),            // 按平台筛选
+		index.Fields("platform"), // 按平台筛选
 		index.Fields("platform_id"),
 		index.Fields("type"),                // 按认证类型筛选
 		index.Fields("status"),              // 按状态筛选

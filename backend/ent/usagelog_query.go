@@ -14,7 +14,6 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -32,7 +31,6 @@ type UsageLogQuery struct {
 	withUser         *UserQuery
 	withAPIKey       *APIKeyQuery
 	withAccount      *AccountQuery
-	withGroup        *GroupQuery
 	withSubscription *UserSubscriptionQuery
 	withPlatform     *PlatformQuery
 	modifiers        []func(*sql.Selector)
@@ -131,28 +129,6 @@ func (_q *UsageLogQuery) QueryAccount() *AccountQuery {
 			sqlgraph.From(usagelog.Table, usagelog.FieldID, selector),
 			sqlgraph.To(account.Table, account.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.AccountTable, usagelog.AccountColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryGroup chains the current query on the "group" edge.
-func (_q *UsageLogQuery) QueryGroup() *GroupQuery {
-	query := (&GroupClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(usagelog.Table, usagelog.FieldID, selector),
-			sqlgraph.To(group.Table, group.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, usagelog.GroupTable, usagelog.GroupColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -399,7 +375,6 @@ func (_q *UsageLogQuery) Clone() *UsageLogQuery {
 		withUser:         _q.withUser.Clone(),
 		withAPIKey:       _q.withAPIKey.Clone(),
 		withAccount:      _q.withAccount.Clone(),
-		withGroup:        _q.withGroup.Clone(),
 		withSubscription: _q.withSubscription.Clone(),
 		withPlatform:     _q.withPlatform.Clone(),
 		// clone intermediate query.
@@ -438,17 +413,6 @@ func (_q *UsageLogQuery) WithAccount(opts ...func(*AccountQuery)) *UsageLogQuery
 		opt(query)
 	}
 	_q.withAccount = query
-	return _q
-}
-
-// WithGroup tells the query-builder to eager-load the nodes that are connected to
-// the "group" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *UsageLogQuery) WithGroup(opts ...func(*GroupQuery)) *UsageLogQuery {
-	query := (&GroupClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withGroup = query
 	return _q
 }
 
@@ -552,11 +516,10 @@ func (_q *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Usa
 	var (
 		nodes       = []*UsageLog{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [5]bool{
 			_q.withUser != nil,
 			_q.withAPIKey != nil,
 			_q.withAccount != nil,
-			_q.withGroup != nil,
 			_q.withSubscription != nil,
 			_q.withPlatform != nil,
 		}
@@ -597,12 +560,6 @@ func (_q *UsageLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Usa
 	if query := _q.withAccount; query != nil {
 		if err := _q.loadAccount(ctx, query, nodes, nil,
 			func(n *UsageLog, e *Account) { n.Edges.Account = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withGroup; query != nil {
-		if err := _q.loadGroup(ctx, query, nodes, nil,
-			func(n *UsageLog, e *Group) { n.Edges.Group = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -701,38 +658,6 @@ func (_q *UsageLogQuery) loadAccount(ctx context.Context, query *AccountQuery, n
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "account_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
-func (_q *UsageLogQuery) loadGroup(ctx context.Context, query *GroupQuery, nodes []*UsageLog, init func(*UsageLog), assign func(*UsageLog, *Group)) error {
-	ids := make([]int64, 0, len(nodes))
-	nodeids := make(map[int64][]*UsageLog)
-	for i := range nodes {
-		if nodes[i].GroupID == nil {
-			continue
-		}
-		fk := *nodes[i].GroupID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(group.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "group_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -841,9 +766,6 @@ func (_q *UsageLogQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withAccount != nil {
 			_spec.Node.AddColumnOnce(usagelog.FieldAccountID)
-		}
-		if _q.withGroup != nil {
-			_spec.Node.AddColumnOnce(usagelog.FieldGroupID)
 		}
 		if _q.withSubscription != nil {
 			_spec.Node.AddColumnOnce(usagelog.FieldSubscriptionID)

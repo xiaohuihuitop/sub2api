@@ -23,7 +23,7 @@ INSERT INTO ops_error_logs (
   user_id,
   api_key_id,
   account_id,
-  group_id,
+  platform_id,
   client_ip,
   platform,
   model,
@@ -134,7 +134,7 @@ func opsInsertErrorLogArgs(input *service.OpsInsertErrorLogInput) []any {
 		opsNullInt64(input.UserID),
 		opsNullInt64(input.APIKeyID),
 		opsNullInt64(input.AccountID),
-		opsNullInt64(input.GroupID),
+		opsNullInt64(input.PlatformID),
 		opsNullString(input.ClientIP),
 		opsNullString(input.Platform),
 		opsNullString(input.Model),
@@ -255,7 +255,7 @@ SELECT
   e.api_key_id,
   e.account_id,
   COALESCE(a.name, ''),
-  e.group_id,
+  e.platform_id,
   COALESCE(g.name, ''),
   CASE WHEN e.client_ip IS NULL THEN NULL ELSE host(e.client_ip) END,
   COALESCE(e.request_path, ''),
@@ -270,7 +270,7 @@ SELECT
   ak.deleted_at
 FROM ops_error_logs e
 LEFT JOIN accounts a ON e.account_id = a.id
-LEFT JOIN groups g ON e.group_id = g.id
+LEFT JOIN platforms g ON e.platform_id = g.id
 LEFT JOIN users u ON e.user_id = u.id
 LEFT JOIN users u2 ON e.resolved_by_user_id = u2.id
 LEFT JOIN api_keys ak ON ak.id = e.api_key_id
@@ -293,8 +293,8 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 		var apiKeyID sql.NullInt64
 		var accountID sql.NullInt64
 		var accountName string
-		var groupID sql.NullInt64
-		var groupName string
+		var platformID sql.NullInt64
+		var platformName string
 		var userEmail string
 		var resolvedAt sql.NullTime
 		var resolvedBy sql.NullInt64
@@ -325,8 +325,8 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 			&apiKeyID,
 			&accountID,
 			&accountName,
-			&groupID,
-			&groupName,
+			&platformID,
+			&platformName,
 			&clientIP,
 			&item.RequestPath,
 			&item.Stream,
@@ -369,11 +369,11 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 			item.AccountID = &v
 		}
 		item.AccountName = accountName
-		if groupID.Valid {
-			v := groupID.Int64
-			item.GroupID = &v
+		if platformID.Valid {
+			v := platformID.Int64
+			item.PlatformID = &v
 		}
-		item.GroupName = groupName
+		item.PlatformName = platformName
 		if requestType.Valid {
 			v := int16(requestType.Int64)
 			item.RequestType = &v
@@ -431,7 +431,7 @@ SELECT
   e.api_key_id,
   e.account_id,
   COALESCE(a.name, ''),
-  e.group_id,
+  e.platform_id,
   COALESCE(g.name, ''),
   CASE WHEN e.client_ip IS NULL THEN NULL ELSE host(e.client_ip) END,
   COALESCE(e.request_path, ''),
@@ -453,7 +453,7 @@ SELECT
 FROM ops_error_logs e
 LEFT JOIN users u ON e.user_id = u.id
 LEFT JOIN accounts a ON e.account_id = a.id
-LEFT JOIN groups g ON e.group_id = g.id
+LEFT JOIN platforms g ON e.platform_id = g.id
 LEFT JOIN api_keys ak ON ak.id = e.api_key_id
 WHERE e.id = $1
 LIMIT 1`
@@ -467,7 +467,7 @@ LIMIT 1`
 	var userID sql.NullInt64
 	var apiKeyID sql.NullInt64
 	var accountID sql.NullInt64
-	var groupID sql.NullInt64
+	var platformID sql.NullInt64
 	var authLatency sql.NullInt64
 	var routingLatency sql.NullInt64
 	var upstreamLatency sql.NullInt64
@@ -505,8 +505,8 @@ LIMIT 1`
 		&apiKeyID,
 		&accountID,
 		&out.AccountName,
-		&groupID,
-		&out.GroupName,
+		&platformID,
+		&out.PlatformName,
 		&clientIP,
 		&out.RequestPath,
 		&out.Stream,
@@ -558,9 +558,9 @@ LIMIT 1`
 		v := accountID.Int64
 		out.AccountID = &v
 	}
-	if groupID.Valid {
-		v := groupID.Int64
-		out.GroupID = &v
+	if platformID.Valid {
+		v := platformID.Int64
+		out.PlatformID = &v
 	}
 	if authLatency.Valid {
 		v := authLatency.Int64
@@ -931,9 +931,9 @@ func buildOpsErrorLogsWhere(filter *service.OpsErrorLogFilter) (string, []any) {
 		args = append(args, p)
 		clauses = append(clauses, "e.platform = $"+itoa(len(args)))
 	}
-	if filter.GroupID != nil && *filter.GroupID > 0 {
-		args = append(args, *filter.GroupID)
-		clauses = append(clauses, "e.group_id = $"+itoa(len(args)))
+	if filter.PlatformID != nil && *filter.PlatformID > 0 {
+		args = append(args, *filter.PlatformID)
+		clauses = append(clauses, "e.platform_id = $"+itoa(len(args)))
 	}
 	if filter.AccountID != nil && *filter.AccountID > 0 {
 		args = append(args, *filter.AccountID)

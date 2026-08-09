@@ -61,14 +61,14 @@ func TestOpsServiceGetOpenAITokenStats_Validation(t *testing.T) {
 			wantReason: "OPS_TIME_RANGE_INVALID",
 		},
 		{
-			name: "group_id 必须大于 0",
+			name: "platform_id 必须大于 0",
 			filter: &OpsOpenAITokenStatsFilter{
-				StartTime: now.Add(-time.Hour),
-				EndTime:   now,
-				GroupID:   int64Ptr(0),
+				StartTime:  now.Add(-time.Hour),
+				EndTime:    now,
+				PlatformID: int64Ptr(0),
 			},
 			wantCode:   400,
-			wantReason: "OPS_GROUP_ID_INVALID",
+			wantReason: "OPS_PLATFORM_ID_INVALID",
 		},
 		{
 			name: "top_n 与分页参数互斥",

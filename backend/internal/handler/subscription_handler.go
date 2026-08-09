@@ -12,8 +12,8 @@ import (
 // SubscriptionSummaryItem represents a subscription item in summary
 type SubscriptionSummaryItem struct {
 	ID              int64   `json:"id"`
-	GroupID         int64   `json:"group_id"`
-	GroupName       string  `json:"group_name"`
+	PlanID          *int64  `json:"plan_id,omitempty"`
+	PlanName        string  `json:"plan_name,omitempty"`
 	Status          string  `json:"status"`
 	DailyUsedUSD    float64 `json:"daily_used_usd,omitempty"`
 	DailyLimitUSD   float64 `json:"daily_limit_usd,omitempty"`
@@ -163,22 +163,20 @@ func (h *SubscriptionHandler) GetSummary(c *gin.Context) {
 func subscriptionSummaryItemFromService(sub service.UserSubscription) SubscriptionSummaryItem {
 	item := SubscriptionSummaryItem{
 		ID:             sub.ID,
-		GroupID:        sub.GroupID,
+		PlanID:         sub.SubscriptionPlanID,
+		PlanName:       sub.PlanNameSnapshot,
 		Status:         sub.Status,
 		DailyUsedUSD:   sub.DailyUsageUSD,
 		WeeklyUsedUSD:  sub.WeeklyUsageUSD,
 		MonthlyUsedUSD: sub.MonthlyUsageUSD,
 	}
-	if sub.Group != nil {
-		item.GroupName = sub.Group.Name
-	}
-	if limit := sub.DailyLimitUSD(sub.Group); limit != nil {
+	if limit := sub.DailyLimitUSD(); limit != nil {
 		item.DailyLimitUSD = *limit
 	}
-	if limit := sub.WeeklyLimitUSD(sub.Group); limit != nil {
+	if limit := sub.WeeklyLimitUSD(); limit != nil {
 		item.WeeklyLimitUSD = *limit
 	}
-	if limit := sub.MonthlyLimitUSD(sub.Group); limit != nil {
+	if limit := sub.MonthlyLimitUSD(); limit != nil {
 		item.MonthlyLimitUSD = *limit
 	}
 	if !sub.ExpiresAt.IsZero() {

@@ -51,8 +51,8 @@ export default {
       toggleNode: '切换节点 {name}', deleteConfirm: '从草稿中删除节点“{name}”？保存配置后生效。',
     },
     policy: {
-      title: '审计策略', description: '配置适用分组、九类输入风险、Worker 与队列边界。', scope: '适用范围', allGroups: '全部分组', selectedGroups: '指定分组',
-      searchGroups: '搜索分组', noGroups: '没有匹配分组', missingGroups: '配置中包含已删除的分组 ID', selectedCount: '已选择 {count} 个分组',
+      allPlatforms: '全部平台', selectedPlatforms: '指定平台', searchPlatforms: '搜索平台', noPlatforms: '没有匹配平台', missingPlatforms: '配置中包含已删除的平台 ID', selectedPlatformCount: '已选择 {count} 个平台',
+      title: '审计策略', description: '配置适用平台、九类输入风险、Worker 与队列边界。', scope: '适用范围',
       scanners: 'Qwen3Guard 输入风险分类', workerCount: 'Worker 数量', queueCapacity: '持久队列容量', strategy: '节点策略', strategyHint: '按配置顺序优先尝试，必要时故障切换。',
     },
     saveBar: { enabled: '启用提示词审计', blocking: '同步阻止', blockingLatestTurnOnly: '仅审最新输入和上一轮输出', storePass: '保存安全事件', dirty: '有未保存的更改', synced: '配置已同步' },
@@ -62,6 +62,7 @@ export default {
       confirm: '理解风险并开启',
     },
     events: {
+      platformId: '骞冲彴 ID', platform: '骞冲彴',
       title: '审计事件', description: '按身份、入口、风险、Hash 和时间复核事件，详情中可查看完整提示词。', decision: '判定', risk: '风险等级', endpoint: '入口', groupId: '分组 ID', userId: '用户 ID', apiKeyId: 'API Key ID', keyword: '关键词',
       startAt: '开始时间', endAt: '结束时间', deleteSelected: '删除选中项（{count}）', deleteByFilter: '按筛选删除',
       filterDeleteDialogTitle: '按筛选删除审计事件', filterDeleteDialogDesc: '选择删除的时间范围与风险条件后即可执行删除；删除不可恢复。如需提前查看匹配数量，可先获取删除预览。',
@@ -91,6 +92,7 @@ export default {
     },
     messages: { saved: '提示词审计配置已保存，明文 API Key 状态已清除。', probeSucceeded: '审计节点连接正常。', deleted: '已删除 {count} 条审计事件。' },
     errors: {
+      loadPlatforms: '无法加载平台列表。', prompt_audit_platforms_required: '指定平台模式至少需要选择一个平台。',
       loadConfig: '无法加载提示词审计配置。', loadRuntime: '无法加载提示词审计运行态。', loadGroups: '无法加载分组列表。', loadEvents: '无法加载审计事件。', loadDetail: '无法加载事件详情。', saveConfig: '配置保存失败。', probe: '节点探测失败。', delete: '事件删除失败。', previewDelete: '无法生成删除预览，请检查时间范围。', deleteConfirmation: '删除确认无效或已过期，请重新预览。',
       prompt_audit_config_conflict: '配置已被其他管理员更新。请重新加载服务端配置，再决定如何合并本地草稿。',
       prompt_audit_encryption_key_required: '未配置固定加密密钥，审计节点 API Key 将在服务重启后失效。请先设置 TOTP_ENCRYPTION_KEY 环境变量并重启服务。',

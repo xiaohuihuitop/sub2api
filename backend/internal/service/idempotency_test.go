@@ -720,7 +720,7 @@ func TestIdempotencyCoordinator_ConflictBranchesAndDecodeError(t *testing.T) {
 		IdempotencyKeyHash: HashIdempotencyKey("k"),
 		RequestFingerprint: fp,
 		Status:             IdempotencyStatusFailedRetryable,
-		LockedUntil:        ptrTime(now.Add(-time.Second)),
+		LockedUntil:        func() *time.Time { value := now.Add(-time.Second); return &value }(),
 		ExpiresAt:          now.Add(time.Hour),
 	}
 	repo.tryReclaimErr = errors.New("reclaim down")

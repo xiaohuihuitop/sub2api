@@ -94,48 +94,6 @@ func (s *GatewayRoutingSuite) TestListSchedulableByPlatforms_GeminiAndAntigravit
 	s.Require().True(ids[antigravityAcc.ID])
 }
 
-// TestListSchedulableByGroupIDAndPlatforms_WithGroupBinding 验证按分组过滤
-func (s *GatewayRoutingSuite) TestListSchedulableByGroupIDAndPlatforms_WithGroupBinding() {
-	// 创建 gemini 分组
-	group := mustCreateGroup(s.T(), s.client, &service.Group{
-		Name:     "gemini-group",
-		Platform: service.PlatformGemini,
-		Status:   service.StatusActive,
-	})
-
-	// 创建账户
-	boundAcc := mustCreateAccount(s.T(), s.client, &service.Account{
-		Name:        "bound-antigravity",
-		Platform:    service.PlatformAntigravity,
-		Status:      service.StatusActive,
-		Schedulable: true,
-	})
-	unboundAcc := mustCreateAccount(s.T(), s.client, &service.Account{
-		Name:        "unbound-antigravity",
-		Platform:    service.PlatformAntigravity,
-		Status:      service.StatusActive,
-		Schedulable: true,
-	})
-
-	// 只绑定一个账户到分组
-	mustBindAccountToGroup(s.T(), s.client, boundAcc.ID, group.ID, 1)
-
-	// 查询分组内的账户
-	accounts, err := s.accountRepo.ListSchedulableByGroupIDAndPlatforms(s.ctx, group.ID, []string{
-		service.PlatformGemini,
-		service.PlatformAntigravity,
-	})
-
-	s.Require().NoError(err)
-	s.Require().Len(accounts, 1, "应只返回绑定到分组的账户")
-	s.Require().Equal(boundAcc.ID, accounts[0].ID)
-
-	// 确认未绑定的账户不在结果中
-	for _, acc := range accounts {
-		s.Require().NotEqual(unboundAcc.ID, acc.ID, "不应包含未绑定的账户")
-	}
-}
-
 // TestListSchedulableByPlatform_Antigravity 验证单平台查询
 func (s *GatewayRoutingSuite) TestListSchedulableByPlatform_Antigravity() {
 	// 创建多种平台账户

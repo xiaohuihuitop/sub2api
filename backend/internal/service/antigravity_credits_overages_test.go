@@ -129,7 +129,7 @@ func TestHandleSmartRetry_QuotaExhausted_UsesCreditsAndStoresIndependentState(t 
 		httpUpstream:   upstream,
 		accountRepo:    repo,
 		requestedModel: "claude-opus-4-6",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -190,7 +190,7 @@ func TestHandleSmartRetry_RateLimited_DoesNotUseCredits(t *testing.T) {
 		body:         []byte(`{"model":"claude-sonnet-4-5","request":{}}`),
 		httpUpstream: upstream,
 		accountRepo:  repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -257,7 +257,7 @@ func TestAntigravityRetryLoop_ModelRateLimited_InjectsCredits(t *testing.T) {
 		body:           []byte(`{"model":"claude-sonnet-4-5","request":{}}`),
 		httpUpstream:   upstream,
 		requestedModel: "claude-sonnet-4-5",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})
@@ -311,7 +311,7 @@ func TestAntigravityRetryLoop_CreditsExhausted_DoesNotInject(t *testing.T) {
 		action:         "generateContent",
 		body:           []byte(`{"model":"claude-sonnet-4-5","request":{}}`),
 		requestedModel: "claude-sonnet-4-5",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})
@@ -374,7 +374,7 @@ func TestAntigravityRetryLoop_CreditErrorMarksExhausted(t *testing.T) {
 		httpUpstream:   upstream,
 		accountRepo:    repo,
 		requestedModel: "claude-sonnet-4-5",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})

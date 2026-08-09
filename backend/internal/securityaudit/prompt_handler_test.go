@@ -208,7 +208,7 @@ func TestPromptAdminRejectsInvalidEventIDsTimesAndPagination(t *testing.T) {
 	}{
 		{http.MethodGet, "/admin/prompt-audit/events/not-a-number", nil, "prompt_audit_invalid_event_id"},
 		{http.MethodDelete, "/admin/prompt-audit/events/-1", nil, "prompt_audit_invalid_event_id"},
-		{http.MethodGet, "/admin/prompt-audit/events?group_id=bad", nil, "prompt_audit_invalid_filter_id"},
+		{http.MethodGet, "/admin/prompt-audit/events?platform_id=bad", nil, "prompt_audit_invalid_filter_id"},
 		{http.MethodGet, "/admin/prompt-audit/events?start_at=not-time", nil, "prompt_audit_invalid_time"},
 		{http.MethodGet, "/admin/prompt-audit/events?page=0", nil, "prompt_audit_invalid_pagination"},
 		{http.MethodPost, "/admin/prompt-audit/events/batch-delete", map[string]any{"ids": []int64{1, -2}}, "prompt_audit_invalid_event_id"},
@@ -226,7 +226,7 @@ func validHandlerUpdateRequest(token string) UpdateConfigRequest {
 		WorkerCount:           1,
 		QueueCapacity:         10,
 		Scanners:              []string{"pii"},
-		AllGroups:             true,
+		AllPlatforms:          true,
 		Endpoints: []UpdateEndpoint{{
 			ID: "guard-1", Name: "Guard One", Protocol: "openai_compatible",
 			BaseURL: "http://127.0.0.1:18080", Model: DefaultGuardModel, Token: token,

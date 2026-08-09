@@ -69,17 +69,8 @@ func platformBoolOverride(values map[string]any, key string, platform string) *b
 	return nil
 }
 
-// CodexImageGenerationBridgeOverride returns the channel-level override for Codex
-// image_generation bridge injection. Nil means follow the global/account policy.
-func (c *Channel) CodexImageGenerationBridgeOverride(platform string) *bool {
-	if c == nil {
-		return nil
-	}
-	return platformBoolOverride(c.FeaturesConfig, featureKeyCodexImageGenerationBridge, platform)
-}
-
 // CodexImageGenerationBridgeOverride returns the account-level override for Codex
-// image_generation bridge injection. Nil means follow the channel/global policy.
+// image_generation bridge injection. Nil means follow the global policy.
 func (a *Account) CodexImageGenerationBridgeOverride() *bool {
 	if a == nil || a.Platform != PlatformOpenAI || a.Extra == nil {
 		return nil

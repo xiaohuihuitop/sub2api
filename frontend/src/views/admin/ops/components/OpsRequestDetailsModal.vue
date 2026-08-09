@@ -22,7 +22,7 @@ interface Props {
   timeRange: string
   preset: OpsRequestDetailsPreset
   platform?: string
-  groupId?: number | null
+  platformId?: number | null
 }
 
 const props = defineProps<Props>()
@@ -76,7 +76,7 @@ const fetchData = async () => {
 
     const platform = (props.platform || '').trim()
     if (platform) params.platform = platform
-    if (typeof props.groupId === 'number' && props.groupId > 0) params.group_id = props.groupId
+    if (typeof props.platformId === 'number' && props.platformId > 0) params.platform_id = props.platformId
 
     if (typeof props.preset.min_duration_ms === 'number') params.min_duration_ms = props.preset.min_duration_ms
     if (typeof props.preset.max_duration_ms === 'number') params.max_duration_ms = props.preset.max_duration_ms
@@ -109,7 +109,7 @@ watch(
   () => [
     props.timeRange,
     props.platform,
-    props.groupId,
+    props.platformId,
     props.preset.kind,
     props.preset.sort,
     props.preset.min_duration_ms,

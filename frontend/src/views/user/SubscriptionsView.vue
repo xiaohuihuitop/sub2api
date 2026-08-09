@@ -283,9 +283,7 @@ function formatSubscriptionLimit(subscription: UserSubscription, window: Subscri
 function renewSubscription(subscription: UserSubscription) {
   const query = subscription.subscription_plan_id
     ? { tab: 'subscription', plan: String(subscription.subscription_plan_id) }
-    : subscription.group_id
-      ? { tab: 'subscription', group: String(subscription.group_id) }
-      : { tab: 'subscription' }
+    : { tab: 'subscription' }
   router.push({ path: '/purchase', query })
 }
 

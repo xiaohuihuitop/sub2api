@@ -115,22 +115,18 @@ type EndpointStat struct {
 	ActualCost  float64 `json:"actual_cost"` // 实际扣除
 }
 
-// GroupUsageSummary represents today's and cumulative cost for a single group.
-type GroupUsageSummary struct {
-	GroupID   int64   `json:"group_id"`
-	TodayCost float64 `json:"today_cost"`
-	TotalCost float64 `json:"total_cost"`
-}
-
-// GroupStat represents usage statistics for a single group
-type GroupStat struct {
-	GroupID     int64   `json:"group_id"`
-	GroupName   string  `json:"group_name"`
-	Requests    int64   `json:"requests"`
-	TotalTokens int64   `json:"total_tokens"`
-	Cost        float64 `json:"cost"`         // 标准计费
-	ActualCost  float64 `json:"actual_cost"`  // 实际扣除
-	AccountCost float64 `json:"account_cost"` // 账号成本
+// PlatformStat represents usage statistics for a single account platform.
+// Platform is the routing/observability dimension; billing source is carried
+// by each usage row and is intentionally not folded into this aggregate.
+type PlatformStat struct {
+	PlatformID   int64   `json:"platform_id"`
+	PlatformCode string  `json:"platform_code"`
+	PlatformName string  `json:"platform_name"`
+	Requests     int64   `json:"requests"`
+	TotalTokens  int64   `json:"total_tokens"`
+	Cost         float64 `json:"cost"`
+	ActualCost   float64 `json:"actual_cost"`
+	AccountCost  float64 `json:"account_cost"`
 }
 
 // UserUsageTrendPoint represents user usage trend data point
@@ -178,7 +174,7 @@ type UserBreakdownItem struct {
 
 // UserBreakdownDimension specifies the dimension to filter for user breakdown.
 type UserBreakdownDimension struct {
-	GroupID      int64  // filter by group_id (>0 to enable)
+	PlatformID   int64  // filter by platform_id (>0 to enable)
 	Model        string // filter by model name (non-empty to enable)
 	ModelType    string // "requested", "upstream", or "mapping"
 	Endpoint     string // filter by endpoint value (non-empty to enable)
@@ -249,7 +245,7 @@ type UserDashboardStats struct {
 	Rpm int64 `json:"rpm"` // 近5分钟平均每分钟请求数
 	Tpm int64 `json:"tpm"` // 近5分钟平均每分钟Token数
 
-	// 按"有效平台"维度拆分（与 ops 路径口径一致：group.platform 优先，否则 account.platform）
+	// 按用量记录绑定的平台维度拆分。
 	ByPlatform []PlatformDashboardStats `json:"by_platform,omitempty"`
 }
 
@@ -266,12 +262,12 @@ type PlatformDashboardStats struct {
 
 // UsageLogFilters represents filters for usage log queries
 type UsageLogFilters struct {
-	UserID    int64
-	APIKeyID  int64
-	AccountID int64
-	GroupID   int64
-	RequestID string
-	Model     string
+	UserID     int64
+	APIKeyID   int64
+	AccountID  int64
+	PlatformID int64
+	RequestID  string
+	Model      string
 	// ModelFilterSource controls how Model is matched. Empty preserves raw usage_logs.model semantics.
 	ModelFilterSource string
 	RequestType       *int16
@@ -303,7 +299,7 @@ type UsageStats struct {
 }
 
 // PlatformUsage 表示某用户/某 API key 在单个"有效平台"维度的用量明细。
-// Platform 取值与 ops 路径口径一致：优先 groups.platform，否则 accounts.platform。
+// Platform 取值与 ops 路径口径一致，来自用量记录的平台归属。
 type PlatformUsage struct {
 	Platform        string  `json:"platform"`
 	TodayActualCost float64 `json:"today_actual_cost"`
@@ -333,7 +329,7 @@ type AccountUsageHistory struct {
 	Tokens     int64   `json:"tokens"`
 	Cost       float64 `json:"cost"`        // 标准计费（total_cost）
 	ActualCost float64 `json:"actual_cost"` // 账号口径费用（total_cost * account_rate_multiplier）
-	UserCost   float64 `json:"user_cost"`   // 用户口径费用（actual_cost，受分组倍率影响）
+	UserCost   float64 `json:"user_cost"`   // 用户口径费用（actual_cost，受资产倍率影响）
 }
 
 // AccountUsageSummary represents summary statistics for an account

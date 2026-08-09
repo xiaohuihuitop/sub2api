@@ -2440,7 +2440,6 @@ type BatchImageTextKey =
   | 'vertexGcsBucketMissing'
   | 'queueFailed'
   | 'billingHoldFailed'
-  | 'groupDisabled'
   | 'pricingMissing'
   | 'insufficientBalance'
   | 'invalidModel'
@@ -2521,9 +2520,6 @@ function batchImageErrorMessage(error: any, fallback: string) {
   }
   if (code === 'BATCH_IMAGE_BILLING_HOLD_FAILED') {
     return batchImageAdminError(batchImageText('billingHoldFailed'), error)
-  }
-  if (code === 'BATCH_IMAGE_GROUP_DISABLED') {
-    return batchImagePlainError(batchImageText('groupDisabled'))
   }
   if (code === 'BATCH_IMAGE_SETTLEMENT_PRICING_MISSING') {
     return batchImageAdminError(batchImageText('pricingMissing'), error)

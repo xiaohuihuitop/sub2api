@@ -117,7 +117,6 @@ function mountView() {
         AccountCapacityCell: true,
         AccountStatusIndicator: true,
         AccountTodayStatsCell: true,
-        AccountGroupsCell: true,
         AccountUsageCell: true,
         Icon: true
       }

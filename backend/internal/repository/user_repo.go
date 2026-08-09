@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -13,12 +12,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
-	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -127,9 +124,6 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		return translatePersistenceError(err, nil, service.ErrEmailExists)
 	}
 
-	if err := r.syncUserAllowedGroupsWithClient(txCtx, txClient, created.ID, userIn.AllowedGroups); err != nil {
-		return err
-	}
 	if err := ensureEmailAuthIdentityWithClient(txCtx, txClient, created.ID, created.Email, "user_repo_create"); err != nil {
 		return err
 	}
@@ -150,15 +144,7 @@ func (r *userRepository) GetByID(ctx context.Context, id int64) (*service.User, 
 		return nil, translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 
-	out := userEntityToService(m)
-	groups, err := r.loadAllowedGroups(ctx, []int64{id})
-	if err != nil {
-		return nil, err
-	}
-	if v, ok := groups[id]; ok {
-		out.AllowedGroups = v
-	}
-	return out, nil
+	return userEntityToService(m), nil
 }
 
 func (r *userRepository) GetByIDIncludeDeleted(ctx context.Context, id int64) (*service.User, error) {
@@ -167,15 +153,7 @@ func (r *userRepository) GetByIDIncludeDeleted(ctx context.Context, id int64) (*
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
-	out := userEntityToService(m)
-	groups, err := r.loadAllowedGroups(ctx, []int64{id})
-	if err != nil {
-		return nil, err
-	}
-	if v, ok := groups[id]; ok {
-		out.AllowedGroups = v
-	}
-	return out, nil
+	return userEntityToService(m), nil
 }
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service.User, error) {
@@ -194,15 +172,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service
 	}
 	m := matches[0]
 
-	out := userEntityToService(m)
-	groups, err := r.loadAllowedGroups(ctx, []int64{m.ID})
-	if err != nil {
-		return nil, err
-	}
-	if v, ok := groups[m.ID]; ok {
-		out.AllowedGroups = v
-	}
-	return out, nil
+	return userEntityToService(m), nil
 }
 
 func (r *userRepository) Update(ctx context.Context, userIn *service.User, fields service.UserUpdateFields) error {
@@ -214,7 +184,7 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 		return nil
 	}
 
-	// 使用 ent 事务包裹用户更新与 allowed_groups 同步，避免跨层事务不一致。
+	// 使用 ent 事务保证用户更新的原子性。
 	tx, err := r.client.Tx(ctx)
 	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
 		return err
@@ -311,11 +281,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 		return translatePersistenceError(err, service.ErrUserNotFound, service.ErrEmailExists)
 	}
 
-	if fields.AllowedGroups {
-		if err := r.syncUserAllowedGroupsWithClient(txCtx, txClient, updated.ID, userIn.AllowedGroups); err != nil {
-			return err
-		}
-	}
 	// 始终以库中的邮箱为准补齐 email 身份：未改邮箱时 updated.Email == oldEmail，
 	// 这里退化为幂等的身份补写，与改邮箱前的行为一致。
 	if err := replaceEmailAuthIdentityWithClient(txCtx, txClient, updated.ID, oldEmail, updated.Email, "user_repo_update"); err != nil {
@@ -514,23 +479,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		)
 	}
 
-	if filters.GroupName != "" {
-		q = q.Where(dbuser.HasAllowedGroupsWith(
-			dbgroup.NameContainsFold(filters.GroupName),
-		))
-	}
-
-	if filters.APIKeyGroupID > 0 {
-		// 按"API Key 实际绑定的分组"过滤：用户只要有任意一个未软删除的 API Key
-		// 绑定到该分组即命中（EXISTS 语义）。
-		// 注意：SoftDeleteMixin 的拦截器不会自动下沉到 HasAPIKeysWith 子查询，
-		// 必须显式加 apikey.DeletedAtIsNil()，否则已软删除的 key 会污染过滤结果。
-		q = q.Where(dbuser.HasAPIKeysWith(
-			apikey.GroupIDEQ(filters.APIKeyGroupID),
-			apikey.DeletedAtIsNil(),
-		))
-	}
-
 	// If attribute filters are specified, we need to filter by user IDs first
 	var allowedUserIDs []int64
 	if len(filters.Attributes) > 0 {
@@ -579,13 +527,12 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 
 	shouldLoadSubscriptions := filters.IncludeSubscriptions == nil || *filters.IncludeSubscriptions
 	if shouldLoadSubscriptions {
-		// Batch load active subscriptions with groups to avoid N+1.
+		// Batch load active subscriptions and plan snapshots to avoid N+1 queries.
 		subs, err := r.client.UserSubscription.Query().
 			Where(
 				usersubscription.UserIDIn(userIDs...),
 				usersubscription.StatusEQ(service.SubscriptionStatusActive),
 			).
-			WithGroup().
 			All(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -595,16 +542,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 			if u, ok := userMap[subs[i].UserID]; ok {
 				u.Subscriptions = append(u.Subscriptions, *userSubscriptionEntityToService(subs[i]))
 			}
-		}
-	}
-
-	allowedGroupsByUser, err := r.loadAllowedGroups(ctx, userIDs)
-	if err != nil {
-		return nil, nil, err
-	}
-	for id, u := range userMap {
-		if groups, ok := allowedGroupsByUser[id]; ok {
-			u.AllowedGroups = groups
 		}
 	}
 
@@ -1199,40 +1136,6 @@ func emailAliasUniquenessLockKey(email string) string {
 	return "users:email-alias-identity:" + identity
 }
 
-func (r *userRepository) AddGroupToAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
-	client := clientFromContext(ctx, r.client)
-	err := client.UserAllowedGroup.Create().
-		SetUserID(userID).
-		SetGroupID(groupID).
-		OnConflictColumns(userallowedgroup.FieldUserID, userallowedgroup.FieldGroupID).
-		DoNothing().
-		Exec(ctx)
-	if isSQLNoRowsError(err) {
-		return nil
-	}
-	return err
-}
-
-func (r *userRepository) RemoveGroupFromAllowedGroups(ctx context.Context, groupID int64) (int64, error) {
-	// 仅操作 user_allowed_groups 联接表，legacy users.allowed_groups 列已弃用。
-	affected, err := r.client.UserAllowedGroup.Delete().
-		Where(userallowedgroup.GroupIDEQ(groupID)).
-		Exec(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return int64(affected), nil
-}
-
-// RemoveGroupFromUserAllowedGroups 移除单个用户的指定分组权限
-func (r *userRepository) RemoveGroupFromUserAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
-	client := clientFromContext(ctx, r.client)
-	_, err := client.UserAllowedGroup.Delete().
-		Where(userallowedgroup.UserIDEQ(userID), userallowedgroup.GroupIDEQ(groupID)).
-		Exec(ctx)
-	return err
-}
-
 func (r *userRepository) GetFirstAdmin(ctx context.Context) (*service.User, error) {
 	m, err := r.client.User.Query().
 		Where(
@@ -1245,99 +1148,7 @@ func (r *userRepository) GetFirstAdmin(ctx context.Context) (*service.User, erro
 		return nil, translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 
-	out := userEntityToService(m)
-	groups, err := r.loadAllowedGroups(ctx, []int64{m.ID})
-	if err != nil {
-		return nil, err
-	}
-	if v, ok := groups[m.ID]; ok {
-		out.AllowedGroups = v
-	}
-	return out, nil
-}
-
-func (r *userRepository) loadAllowedGroups(ctx context.Context, userIDs []int64) (map[int64][]int64, error) {
-	out := make(map[int64][]int64, len(userIDs))
-	if len(userIDs) == 0 {
-		return out, nil
-	}
-
-	rows, err := r.client.UserAllowedGroup.Query().
-		Where(userallowedgroup.UserIDIn(userIDs...)).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range rows {
-		out[rows[i].UserID] = append(out[rows[i].UserID], rows[i].GroupID)
-	}
-
-	for userID := range out {
-		sort.Slice(out[userID], func(i, j int) bool { return out[userID][i] < out[userID][j] })
-	}
-
-	return out, nil
-}
-
-// syncUserAllowedGroupsWithClient 在 ent client/事务内同步用户允许分组：
-// 仅操作 user_allowed_groups 联接表，legacy users.allowed_groups 列已弃用。
-func (r *userRepository) syncUserAllowedGroupsWithClient(ctx context.Context, client *dbent.Client, userID int64, groupIDs []int64) error {
-	if client == nil {
-		return nil
-	}
-
-	existingRows, err := client.UserAllowedGroup.Query().
-		Where(userallowedgroup.UserIDEQ(userID)).
-		All(ctx)
-	if err != nil {
-		return err
-	}
-
-	desired := make(map[int64]struct{}, len(groupIDs))
-	for _, id := range groupIDs {
-		if id <= 0 {
-			continue
-		}
-		desired[id] = struct{}{}
-	}
-
-	existing := make(map[int64]struct{}, len(existingRows))
-	removed := make([]int64, 0)
-	for _, row := range existingRows {
-		existing[row.GroupID] = struct{}{}
-		if _, keep := desired[row.GroupID]; !keep {
-			removed = append(removed, row.GroupID)
-		}
-	}
-	if len(removed) > 0 {
-		if _, err := client.UserAllowedGroup.Delete().
-			Where(userallowedgroup.UserIDEQ(userID), userallowedgroup.GroupIDIn(removed...)).
-			Exec(ctx); err != nil {
-			return err
-		}
-	}
-
-	creates := make([]*dbent.UserAllowedGroupCreate, 0, len(desired))
-	for groupID := range desired {
-		if _, present := existing[groupID]; !present {
-			creates = append(creates, client.UserAllowedGroup.Create().SetUserID(userID).SetGroupID(groupID))
-		}
-	}
-	if len(creates) > 0 {
-		if err := client.UserAllowedGroup.
-			CreateBulk(creates...).
-			OnConflictColumns(userallowedgroup.FieldUserID, userallowedgroup.FieldGroupID).
-			DoNothing().
-			Exec(ctx); err != nil {
-			if isSQLNoRowsError(err) {
-				return nil
-			}
-			return err
-		}
-	}
-
-	return nil
+	return userEntityToService(m), nil
 }
 
 func applyUserEntityToService(dst *service.User, src *dbent.User) {

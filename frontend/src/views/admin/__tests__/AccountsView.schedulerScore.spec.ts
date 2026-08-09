@@ -8,13 +8,13 @@ const {
   listWithEtag,
   getBatchTodayStats,
   getAllProxies,
-  getAllGroups
+  listPlatforms
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
   getBatchTodayStats: vi.fn(),
   getAllProxies: vi.fn(),
-  getAllGroups: vi.fn()
+  listPlatforms: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -32,8 +32,8 @@ vi.mock('@/api/admin', () => ({
     proxies: {
       getAll: getAllProxies
     },
-    groups: {
-      getAll: getAllGroups
+    platforms: {
+      list: listPlatforms
     }
   }
 }))
@@ -106,7 +106,6 @@ function mountView() {
         AccountCapacityCell: true,
         AccountStatusIndicator: true,
         AccountTodayStatsCell: true,
-        AccountGroupsCell: true,
         AccountUsageCell: true,
         Icon: true
       }
@@ -137,7 +136,7 @@ describe('admin AccountsView scheduler score column', () => {
     listWithEtag.mockReset()
     getBatchTodayStats.mockReset()
     getAllProxies.mockReset()
-    getAllGroups.mockReset()
+    listPlatforms.mockReset()
 
     listAccounts.mockResolvedValue({
       items: [
@@ -145,7 +144,6 @@ describe('admin AccountsView scheduler score column', () => {
           ...baseAccount,
           id: 1,
           name: 'ungrouped-openai',
-          // 未分组账号：后端只返回基础分（scheduler_score），无分组维度分数
           scheduler_score: {
             base_score: 1.234567,
             sticky_score: 0,
@@ -161,15 +159,6 @@ describe('admin AccountsView scheduler score column', () => {
             sticky_score: 3,
             sticky_weighted_enabled: true
           },
-          scheduler_scores: [
-            {
-              group_id: 5,
-              group_name: 'group-five',
-              base_score: 2,
-              sticky_score: 3,
-              sticky_weighted_enabled: true
-            }
-          ]
         },
         {
           ...baseAccount,
@@ -190,10 +179,10 @@ describe('admin AccountsView scheduler score column', () => {
     })
     getBatchTodayStats.mockResolvedValue({ stats: {} })
     getAllProxies.mockResolvedValue([])
-    getAllGroups.mockResolvedValue([])
+    listPlatforms.mockResolvedValue([])
   })
 
-  it('falls back to the base score for ungrouped accounts instead of showing a dash', async () => {
+  it('renders the platform-pool base score instead of showing a dash', async () => {
     const wrapper = mountView()
     await flushPromises()
 
@@ -204,18 +193,17 @@ describe('admin AccountsView scheduler score column', () => {
     const ungroupedCell = wrapper.find('[data-test="scheduler-score-1"]')
     expect(ungroupedCell.exists()).toBe(true)
     expect(ungroupedCell.text()).toContain('1.234567')
-    expect(ungroupedCell.text()).toContain('admin.accounts.schedulerScore.ungrouped')
     expect(ungroupedCell.text()).not.toBe('-')
   })
 
-  it('renders per-group scores for grouped accounts', async () => {
+  it('renders base and sticky scores for the platform pool', async () => {
     const wrapper = mountView()
     await flushPromises()
 
     const groupedCell = wrapper.find('[data-test="scheduler-score-2"]')
     expect(groupedCell.exists()).toBe(true)
-    expect(groupedCell.text()).toContain('group-five')
     expect(groupedCell.text()).toContain('2')
+    expect(groupedCell.text()).toContain('3')
   })
 
   it('keeps scheduler score hidden for old saved column settings until the admin opts in again', async () => {

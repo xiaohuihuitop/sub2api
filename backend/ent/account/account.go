@@ -80,8 +80,6 @@ const (
 	FieldParentAccountID = "parent_account_id"
 	// FieldQuotaDimension holds the string denoting the quota_dimension field in the database.
 	FieldQuotaDimension = "quota_dimension"
-	// EdgeGroups holds the string denoting the groups edge name in mutations.
-	EdgeGroups = "groups"
 	// EdgePlatformPool holds the string denoting the platform_pool edge name in mutations.
 	EdgePlatformPool = "platform_pool"
 	// EdgeProxy holds the string denoting the proxy edge name in mutations.
@@ -92,15 +90,8 @@ const (
 	EdgeChildren = "children"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
-	// EdgeAccountGroups holds the string denoting the account_groups edge name in mutations.
-	EdgeAccountGroups = "account_groups"
 	// Table holds the table name of the account in the database.
 	Table = "accounts"
-	// GroupsTable is the table that holds the groups relation/edge. The primary key declared below.
-	GroupsTable = "account_groups"
-	// GroupsInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	GroupsInverseTable = "groups"
 	// PlatformPoolTable is the table that holds the platform_pool relation/edge.
 	PlatformPoolTable = "accounts"
 	// PlatformPoolInverseTable is the table name for the Platform entity.
@@ -130,13 +121,6 @@ const (
 	UsageLogsInverseTable = "usage_logs"
 	// UsageLogsColumn is the table column denoting the usage_logs relation/edge.
 	UsageLogsColumn = "account_id"
-	// AccountGroupsTable is the table that holds the account_groups relation/edge.
-	AccountGroupsTable = "account_groups"
-	// AccountGroupsInverseTable is the table name for the AccountGroup entity.
-	// It exists in this package in order to avoid circular dependency with the "accountgroup" package.
-	AccountGroupsInverseTable = "account_groups"
-	// AccountGroupsColumn is the table column denoting the account_groups relation/edge.
-	AccountGroupsColumn = "account_id"
 )
 
 // Columns holds all SQL columns for account fields.
@@ -175,12 +159,6 @@ var Columns = []string{
 	FieldParentAccountID,
 	FieldQuotaDimension,
 }
-
-var (
-	// GroupsPrimaryKey and GroupsColumn2 are the table columns denoting the
-	// primary key for the groups relation (M2M).
-	GroupsPrimaryKey = []string{"account_id", "group_id"}
-)
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
@@ -418,20 +396,6 @@ func ByQuotaDimension(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldQuotaDimension, opts...).ToFunc()
 }
 
-// ByGroupsCount orders the results by groups count.
-func ByGroupsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newGroupsStep(), opts...)
-	}
-}
-
-// ByGroups orders the results by groups terms.
-func ByGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByPlatformPoolField orders the results by platform_pool field.
 func ByPlatformPoolField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -480,27 +444,6 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUsageLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-
-// ByAccountGroupsCount orders the results by account_groups count.
-func ByAccountGroupsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newAccountGroupsStep(), opts...)
-	}
-}
-
-// ByAccountGroups orders the results by account_groups terms.
-func ByAccountGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newAccountGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-func newGroupsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GroupsInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2M, false, GroupsTable, GroupsPrimaryKey...),
-	)
-}
 func newPlatformPoolStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -534,12 +477,5 @@ func newUsageLogsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UsageLogsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, UsageLogsTable, UsageLogsColumn),
-	)
-}
-func newAccountGroupsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(AccountGroupsInverseTable, AccountGroupsColumn),
-		sqlgraph.Edge(sqlgraph.O2M, true, AccountGroupsTable, AccountGroupsColumn),
 	)
 }

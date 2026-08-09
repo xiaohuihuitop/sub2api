@@ -23,8 +23,25 @@ type platformAssetModelResolverStub struct {
 }
 
 type platformAssetSubscriptionRepoStub struct {
-	*stubUserSubscriptionRepo
+	service.UserSubscriptionRepository
 	candidates []service.UserSubscription
+}
+
+type platformAssetAPIKeyRepoStub struct {
+	service.APIKeyRepository
+	getByKey func(context.Context, string) (*service.APIKey, error)
+}
+
+func (s *platformAssetAPIKeyRepoStub) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
+	return s.getByKey(ctx, key)
+}
+
+func (s *platformAssetAPIKeyRepoStub) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
+	return s.getByKey(ctx, key)
+}
+
+func (s *platformAssetAPIKeyRepoStub) UpdateLastUsed(context.Context, int64, time.Time) error {
+	return nil
 }
 
 func (s *platformAssetSubscriptionRepoStub) ListActiveByUserIDAndPlanIDs(
@@ -59,7 +76,7 @@ func TestPlatformAssetAuthorizationBuildsExplicitPlatformRouteAndPreservesBody(t
 		AllowedPlatformIDs: []int64{3},
 		AllowBalance:       true,
 	}
-	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+	apiKeyService := service.NewAPIKeyService(&platformAssetAPIKeyRepoStub{
 		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 			if key != apiKey.Key {
 				return nil, service.ErrAPIKeyNotFound
@@ -67,7 +84,7 @@ func TestPlatformAssetAuthorizationBuildsExplicitPlatformRouteAndPreservesBody(t
 			clone := *apiKey
 			return &clone, nil
 		},
-	}, nil, nil, nil, nil, nil, cfg)
+	}, nil, nil, nil, cfg)
 	resolver := platformAssetModelResolverStub{resolved: &service.ResolvedPlatformModel{
 		PlatformID:           3,
 		PlatformCode:         "gpt",
@@ -110,8 +127,7 @@ func TestPlatformAssetAuthorizationRejectsKeyWithoutPlatformGrant(t *testing.T) 
 		ID: 10, UserID: user.ID, Key: "legacy-key", Status: service.StatusActive,
 		User: user, AllowBalance: true,
 	}
-	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
-		preservePlatformGrant: true,
+	apiKeyService := service.NewAPIKeyService(&platformAssetAPIKeyRepoStub{
 		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 			if key != apiKey.Key {
 				return nil, service.ErrAPIKeyNotFound
@@ -119,7 +135,7 @@ func TestPlatformAssetAuthorizationRejectsKeyWithoutPlatformGrant(t *testing.T) 
 			clone := *apiKey
 			return &clone, nil
 		},
-	}, nil, nil, nil, nil, nil, cfg)
+	}, nil, nil, nil, cfg)
 	resolver := platformAssetModelResolverStub{resolved: &service.ResolvedPlatformModel{
 		PlatformID: 3, AccountPlatform: service.PlatformOpenAI,
 		EndpointCapabilities: []string{string(service.OpenAIEndpointCapabilityChatCompletions)},
@@ -159,7 +175,7 @@ func TestPlatformAssetAuthorizationUsesAuthorizedSubscriptionWithoutLegacyBalanc
 		AllowedSubscriptionPlanIDs: []int64{planID},
 		AllowBalance:               false,
 	}
-	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+	apiKeyService := service.NewAPIKeyService(&platformAssetAPIKeyRepoStub{
 		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 			if key != apiKey.Key {
 				return nil, service.ErrAPIKeyNotFound
@@ -167,10 +183,9 @@ func TestPlatformAssetAuthorizationUsesAuthorizedSubscriptionWithoutLegacyBalanc
 			clone := *apiKey
 			return &clone, nil
 		},
-	}, nil, nil, nil, nil, nil, cfg)
+	}, nil, nil, nil, cfg)
 	now := time.Now()
-	subscriptionService := service.NewSubscriptionService(nil, &platformAssetSubscriptionRepoStub{
-		stubUserSubscriptionRepo: &stubUserSubscriptionRepo{},
+	subscriptionService := service.NewSubscriptionService(&platformAssetSubscriptionRepoStub{
 		candidates: []service.UserSubscription{{
 			ID:                 21,
 			UserID:             user.ID,
@@ -222,7 +237,7 @@ func TestGooglePlatformAssetAuthorizationResolvesModelFromPath(t *testing.T) {
 		AllowedPlatformIDs: []int64{4},
 		AllowBalance:       true,
 	}
-	apiKeyService := service.NewAPIKeyService(&stubApiKeyRepo{
+	apiKeyService := service.NewAPIKeyService(&platformAssetAPIKeyRepoStub{
 		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 			if key != apiKey.Key {
 				return nil, service.ErrAPIKeyNotFound
@@ -230,7 +245,7 @@ func TestGooglePlatformAssetAuthorizationResolvesModelFromPath(t *testing.T) {
 			clone := *apiKey
 			return &clone, nil
 		},
-	}, nil, nil, nil, nil, nil, cfg)
+	}, nil, nil, nil, cfg)
 	resolver := platformAssetModelResolverStub{resolved: &service.ResolvedPlatformModel{
 		PlatformID:      4,
 		PlatformCode:    "glm",

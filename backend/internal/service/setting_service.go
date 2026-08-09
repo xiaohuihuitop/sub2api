@@ -14,16 +14,8 @@ import (
 )
 
 var (
-	ErrRegistrationDisabled   = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
-	ErrSettingNotFound        = infraerrors.NotFound("SETTING_NOT_FOUND", "setting not found")
-	ErrDefaultSubGroupInvalid = infraerrors.BadRequest(
-		"DEFAULT_SUBSCRIPTION_GROUP_INVALID",
-		"default subscription group must exist and be subscription type",
-	)
-	ErrDefaultSubGroupDuplicate = infraerrors.BadRequest(
-		"DEFAULT_SUBSCRIPTION_GROUP_DUPLICATE",
-		"default subscription group cannot be duplicated",
-	)
+	ErrRegistrationDisabled    = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
+	ErrSettingNotFound         = infraerrors.NotFound("SETTING_NOT_FOUND", "setting not found")
 	ErrDefaultSubPlanDuplicate = infraerrors.BadRequest(
 		"DEFAULT_SUBSCRIPTION_PLAN_DUPLICATE",
 		"default subscription plan cannot be duplicated",
@@ -44,11 +36,6 @@ type SettingRepository interface {
 	Delete(ctx context.Context, key string) error
 }
 
-// DefaultSubscriptionGroupReader validates group references used by default subscriptions.
-type DefaultSubscriptionGroupReader interface {
-	GetByID(ctx context.Context, id int64) (*Group, error)
-}
-
 // DefaultSubscriptionPlanReader validates plan references used by default subscriptions.
 type DefaultSubscriptionPlanReader interface {
 	GetPlan(ctx context.Context, id int64) (*dbent.SubscriptionPlan, error)
@@ -61,7 +48,6 @@ type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[i
 // SettingService 系统设置服务
 type SettingService struct {
 	settingRepo                 SettingRepository
-	defaultSubGroupReader       DefaultSubscriptionGroupReader
 	defaultSubPlanReader        DefaultSubscriptionPlanReader
 	proxyRepo                   ProxyRepository // for resolving websearch provider proxy URLs
 	cfg                         *config.Config
@@ -225,11 +211,6 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 		settingRepo: settingRepo,
 		cfg:         cfg,
 	}
-}
-
-// SetDefaultSubscriptionGroupReader injects an optional group reader for default subscription validation.
-func (s *SettingService) SetDefaultSubscriptionGroupReader(reader DefaultSubscriptionGroupReader) {
-	s.defaultSubGroupReader = reader
 }
 
 // SetDefaultSubscriptionPlanReader injects an optional plan reader for default subscription validation.

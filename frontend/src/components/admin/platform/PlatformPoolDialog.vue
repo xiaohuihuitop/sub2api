@@ -6,7 +6,7 @@
     @close="emit('close')"
   >
     <form class="space-y-5" @submit.prevent="submit">
-      <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-4 md:grid-cols-2" data-tour="platform-form-identity">
         <label class="space-y-1.5">
           <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('admin.platforms.code') }}</span>
           <input
@@ -73,7 +73,7 @@
         </div>
       </section>
 
-      <section class="space-y-4 border-t border-gray-200 pt-5 dark:border-dark-700">
+      <section class="space-y-4 border-t border-gray-200 pt-5 dark:border-dark-700" data-tour="platform-form-models">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ t('admin.platforms.modelRules') }}</h3>
@@ -146,7 +146,7 @@
     <template #footer>
       <div class="flex justify-end gap-3">
         <button type="button" class="btn btn-secondary" :disabled="submitting" @click="emit('close')">{{ t('common.cancel') }}</button>
-        <button type="button" class="btn btn-primary" :disabled="submitting" data-test="save-platform" @click="submit">
+        <button type="button" class="btn btn-primary" :disabled="submitting" data-test="save-platform" data-tour="platform-form-submit" @click="submit">
           {{ submitting ? t('common.saving') : t('common.save') }}
         </button>
       </div>

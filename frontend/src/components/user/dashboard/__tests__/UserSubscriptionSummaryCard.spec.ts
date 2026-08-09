@@ -14,7 +14,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 
 const subscription = {
   id: 1,
-  group_id: 2,
+  subscription_plan_id: 2,
   status: 'active',
   starts_at: '2026-07-01T00:00:00Z',
   expires_at: '2026-08-01T00:00:00Z',

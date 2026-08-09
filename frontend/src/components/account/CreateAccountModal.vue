@@ -67,7 +67,7 @@
         <p class="input-hint">{{ t('admin.accounts.notesHint') }}</p>
       </div>
 
-      <div>
+      <div data-tour="account-form-platform-pool">
         <label class="input-label">{{ t('admin.accounts.platformPool') }}</label>
         <Select
           v-model="form.platform_id"

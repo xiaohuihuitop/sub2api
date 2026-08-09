@@ -16,13 +16,7 @@ export interface RedeemHistoryItem {
   created_at: string
   // Notes from admin for admin_balance/admin_concurrency types
   notes?: string
-  // Subscription-specific fields
-  group_id?: number
-  validity_days?: number
-  group?: {
-    id: number
-    name: string
-  }
+  subscription_plan_id?: number
 }
 
 /**
@@ -31,20 +25,18 @@ export interface RedeemHistoryItem {
  * @returns Redemption result with updated balance or concurrency
  */
 export async function redeem(code: string): Promise<{
-  message: string
   type: string
   value: number
-  new_balance?: number
-  new_concurrency?: number
+  plan_name_snapshot?: string
+  validity_days?: number
 }> {
   const payload: RedeemCodeRequest = { code }
 
   const { data } = await apiClient.post<{
-    message: string
     type: string
     value: number
-    new_balance?: number
-    new_concurrency?: number
+    plan_name_snapshot?: string
+    validity_days?: number
   }>('/redeem', payload)
 
   return data

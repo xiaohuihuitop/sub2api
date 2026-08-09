@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, CategoryScale, Filler, Legend, LineElement, LinearScale, PointElement, Title, Tooltip } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import type { ChartComponentRef } from 'vue-chartjs'
-import type { OpsThroughputGroupBreakdownItem, OpsThroughputPlatformBreakdownItem, OpsThroughputTrendPoint } from '@/api/admin/ops'
+import type { OpsThroughputPlatformBreakdownItem, OpsThroughputPlatformPoolBreakdownItem, OpsThroughputTrendPoint } from '@/api/admin/ops'
 import type { ChartState } from '../types'
 import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -18,7 +18,7 @@ interface Props {
   loading: boolean
   timeRange: string
   byPlatform?: OpsThroughputPlatformBreakdownItem[]
-  topGroups?: OpsThroughputGroupBreakdownItem[]
+  topPlatforms?: OpsThroughputPlatformPoolBreakdownItem[]
   fullscreen?: boolean
 }
 
@@ -26,7 +26,7 @@ const props = defineProps<Props>()
 const { t } = useI18n()
 const emit = defineEmits<{
   (e: 'selectPlatform', platform: string): void
-  (e: 'selectGroup', groupId: number): void
+  (e: 'selectPlatformPool', platformId: number): void
   (e: 'openDetails'): void
 }>()
 
@@ -224,16 +224,16 @@ function downloadChart() {
     </div>
 
     <!-- Drilldown chips (baseline interaction: click to set global filter) -->
-    <div v-if="(props.topGroups?.length ?? 0) > 0" class="mb-3 flex flex-wrap gap-2">
+    <div v-if="(props.topPlatforms?.length ?? 0) > 0" class="mb-3 flex flex-wrap gap-2">
       <button
-        v-for="g in props.topGroups"
-        :key="g.group_id"
+        v-for="pool in props.topPlatforms"
+        :key="pool.platform_id"
         type="button"
         class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-200 dark:hover:bg-dark-800"
-        @click="emit('selectGroup', g.group_id)"
+        @click="emit('selectPlatformPool', pool.platform_id)"
       >
-        <span class="max-w-[180px] truncate">{{ g.group_name || `#${g.group_id}` }}</span>
-        <span class="text-gray-400 dark:text-gray-500">{{ formatNumber(g.request_count) }}</span>
+        <span class="max-w-[180px] truncate">{{ pool.platform_name || `#${pool.platform_id}` }}</span>
+        <span class="text-gray-400 dark:text-gray-500">{{ formatNumber(pool.request_count) }}</span>
       </button>
     </div>
 

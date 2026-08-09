@@ -116,12 +116,12 @@ func TestDigestSessionStore_DifferentPrefixHash(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestDigestSessionStore_DifferentGroupID(t *testing.T) {
+func TestDigestSessionStore_DifferentPlatformID(t *testing.T) {
 	store := NewDigestSessionStore()
 
 	store.Save(1, "prefix", "u:a-m:b", "uuid-1", 100, "")
 
-	// 不同 groupID 应隔离
+	// 不同 platformID 应隔离
 	_, _, _, found := store.Find(2, "prefix", "u:a-m:b")
 	assert.False(t, found)
 }

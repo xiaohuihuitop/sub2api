@@ -70,7 +70,7 @@ const DataTableStub = {
       <div v-for="row in data" :key="row.request_id">
         <slot name="cell-model" :row="row" :value="row.model" />
         <slot name="cell-platform" :row="row" />
-        <slot name="cell-group" :row="row" />
+        <slot name="cell-billing_source" :row="row" />
         <slot name="cell-billing_mode" :row="row" />
         <slot name="cell-tokens" :row="row" />
         <slot name="cell-cost" :row="row" />
@@ -136,7 +136,7 @@ describe('admin UsageTable tooltip', () => {
         loading: false,
         columns: [
           { key: 'platform', label: 'Platform' },
-          { key: 'group', label: 'Billing source' },
+          { key: 'billing_source', label: 'Billing source' },
         ],
       },
       global: {

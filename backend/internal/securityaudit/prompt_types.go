@@ -67,27 +67,27 @@ const (
 )
 
 type Request struct {
-	RequestID  string
-	UserID     int64
-	Username   string
-	UserEmail  string
-	APIKeyID   int64
-	APIKeyName string
-	GroupID    *int64
-	GroupName  string
-	Provider   string
-	Endpoint   string
-	Protocol   string
-	Model      string
-	Body       []byte
-	Stage      string
+	RequestID    string
+	UserID       int64
+	Username     string
+	UserEmail    string
+	APIKeyID     int64
+	APIKeyName   string
+	PlatformID   *int64
+	PlatformName string
+	Provider     string
+	Endpoint     string
+	Protocol     string
+	Model        string
+	Body         []byte
+	Stage        string
 }
 
 func (r Request) Clone() Request {
 	r.Body = append([]byte(nil), r.Body...)
-	if r.GroupID != nil {
-		id := *r.GroupID
-		r.GroupID = &id
+	if r.PlatformID != nil {
+		id := *r.PlatformID
+		r.PlatformID = &id
 	}
 	return r
 }
@@ -99,8 +99,8 @@ type PromptSnapshot struct {
 	UserEmailSnapshot  string `json:"user_email"`
 	APIKeyID           int64  `json:"api_key_id"`
 	APIKeyNameSnapshot string `json:"api_key_name"`
-	GroupID            *int64 `json:"group_id,omitempty"`
-	GroupName          string `json:"group_name"`
+	PlatformID         *int64 `json:"platform_id,omitempty"`
+	PlatformName       string `json:"platform_name"`
 	Provider           string `json:"provider"`
 	Endpoint           string `json:"endpoint"`
 	Protocol           string `json:"protocol"`

@@ -15,7 +15,6 @@ func TestUserSubscriptionEntityToServiceKeepsPlanSnapshot(t *testing.T) {
 	entity := &dbent.UserSubscription{
 		ID:                      100,
 		UserID:                  9,
-		GroupID:                 3,
 		SubscriptionPlanID:      &planID,
 		PlanNameSnapshot:        "Growth",
 		DailyLimitUsdSnapshot:   &dailyLimit,

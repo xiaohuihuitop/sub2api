@@ -7,8 +7,7 @@ import (
 
 const PlatformStatusActive = "active"
 
-// Platform owns one provider-specific account pool. LegacyGroupID is retained
-// only for historical read paths; new routing and billing must not consult it.
+// Platform owns one provider-specific account pool.
 type Platform struct {
 	ID                   int64
 	Code                 string
@@ -17,7 +16,6 @@ type Platform struct {
 	Status               string
 	EndpointCapabilities []string
 	SchedulingConfig     map[string]any
-	LegacyGroupID        *int64
 	ModelRules           []PlatformModelRule
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
@@ -34,7 +32,6 @@ type PlatformModelRule struct {
 	PlatformID           int64
 	PlatformCode         string
 	AccountPlatform      string
-	LegacyGroupID        *int64
 	ModelPattern         string
 	UpstreamModel        string
 	EndpointCapabilities []string
@@ -59,6 +56,5 @@ type ResolvedPlatformModel struct {
 	UpstreamModel        string
 	EndpointCapabilities []string
 	MatchPriority        int
-	LegacyGroupID        *int64
 	RuleID               int64
 }

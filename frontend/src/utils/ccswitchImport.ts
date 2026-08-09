@@ -1,4 +1,4 @@
-import type { GroupPlatform } from '@/types'
+import type { AccountPlatform } from '@/types'
 
 export const OPENAI_CC_SWITCH_CODEX_MODEL = 'gpt-5.5'
 export const GROK_CC_SWITCH_MODEL = 'grok-4.5'
@@ -13,7 +13,7 @@ export interface CcSwitchImportConfig {
 
 export interface CcSwitchImportDeeplinkInput {
   baseUrl: string
-  platform?: GroupPlatform | null
+  platform?: AccountPlatform | null
   clientType: CcSwitchClientType
   providerName: string
   apiKey: string
@@ -26,7 +26,7 @@ function withV1Endpoint(baseUrl: string): string {
 }
 
 export function resolveCcSwitchImportConfig(
-  platform: GroupPlatform | undefined | null,
+  platform: AccountPlatform | undefined | null,
   clientType: CcSwitchClientType,
   baseUrl: string
 ): CcSwitchImportConfig {

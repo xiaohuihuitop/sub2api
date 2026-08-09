@@ -338,7 +338,7 @@ func (m *ConfigManager) buildNextStorage(current storageConfig, req UpdateConfig
 		Enabled: req.Enabled, BlockingEnabled: req.BlockingEnabled, BlockingLatestTurnOnly: req.BlockingLatestTurnOnly, StorePassEvents: req.StorePassEvents,
 		Strategy: strings.TrimSpace(req.Strategy), WorkerCount: req.WorkerCount,
 		QueueCapacity: req.QueueCapacity, Scanners: append([]string(nil), req.Scanners...),
-		AllGroups: req.AllGroups, GroupIDs: append([]int64(nil), req.GroupIDs...),
+		AllPlatforms: req.AllPlatforms, PlatformIDs: append([]int64(nil), req.PlatformIDs...),
 		ConfigVersion: current.ConfigVersion, UpdatedBy: actorID,
 		Endpoints: make([]StorageEndpoint, 0, len(req.Endpoints)),
 	}
@@ -499,14 +499,14 @@ func (m *ConfigManager) clearLoadError() {
 
 func cloneStorageConfig(cfg storageConfig) storageConfig {
 	cfg.Scanners = append([]string(nil), cfg.Scanners...)
-	cfg.GroupIDs = append([]int64(nil), cfg.GroupIDs...)
+	cfg.PlatformIDs = append([]int64(nil), cfg.PlatformIDs...)
 	cfg.Endpoints = append([]StorageEndpoint(nil), cfg.Endpoints...)
 	return cfg
 }
 
 func cloneActiveConfig(cfg ActiveConfig) ActiveConfig {
 	cfg.Scanners = append([]string(nil), cfg.Scanners...)
-	cfg.GroupIDs = append([]int64(nil), cfg.GroupIDs...)
+	cfg.PlatformIDs = append([]int64(nil), cfg.PlatformIDs...)
 	cfg.Endpoints = append([]ActiveEndpoint(nil), cfg.Endpoints...)
 	return cfg
 }

@@ -15,7 +15,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 )
 
-func TestListModelAvailabilityCandidates_GroupQueryIgnoresTransientState(t *testing.T) {
+func TestListModelAvailabilityCandidates_PlatformQueryIgnoresTransientState(t *testing.T) {
 	var capturedSQL string
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(captureEntQueryMatcher{actual: &capturedSQL}))
 	require.NoError(t, err)
@@ -28,12 +28,10 @@ func TestListModelAvailabilityCandidates_GroupQueryIgnoresTransientState(t *test
 
 	mock.ExpectQuery("model availability candidates").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	groupID := int64(42)
 	accounts, err := repo.ListModelAvailabilityCandidates(
 		context.Background(),
-		&groupID,
-		[]string{service.PlatformAnthropic},
-		false,
+		42,
+		service.PlatformAnthropic,
 	)
 	require.NoError(t, err)
 	require.Empty(t, accounts)
@@ -43,7 +41,7 @@ func TestListModelAvailabilityCandidates_GroupQueryIgnoresTransientState(t *test
 	_, whereClause, found := strings.Cut(normalized, " WHERE ")
 	require.True(t, found, "expected WHERE clause in query: %s", normalized)
 	whereClause, _, _ = strings.Cut(whereClause, " ORDER BY ")
-	for _, configuredPredicate := range []string{"group_id", "status", "schedulable", "platform"} {
+	for _, configuredPredicate := range []string{"platform_id", "status", "schedulable", "platform"} {
 		require.Contains(t, whereClause, configuredPredicate)
 	}
 	for _, transientPredicate := range []string{

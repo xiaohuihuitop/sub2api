@@ -32,7 +32,6 @@ type APIKey struct {
 	UserID      int64
 	Key         string
 	Name        string
-	GroupID     *int64
 	Status      string
 	IPWhitelist []string
 	IPBlacklist []string
@@ -44,9 +43,6 @@ type APIKey struct {
 	CreatedAt                  time.Time
 	UpdatedAt                  time.Time
 	User                       *User
-	Group                      *Group
-	AllowedGroupIDs            []int64
-	AllowedGroups              []Group
 	AllowedPlatformIDs         []int64
 	AllowedPlatforms           []Platform
 	AllowedSubscriptionPlanIDs []int64
@@ -145,7 +141,6 @@ func (k *APIKey) EffectiveUsage7d() float64 {
 
 // APIKeyListFilters holds optional filtering parameters for listing API keys.
 type APIKeyListFilters struct {
-	Search  string
-	Status  string
-	GroupID *int64 // nil=不筛选, 0=无分组, >0=指定分组
+	Search string
+	Status string
 }

@@ -273,18 +273,6 @@ func (r *contentModerationTestUserRepo) ExistsByEmailAlias(ctx context.Context, 
 	panic("unexpected ExistsByEmailAlias call")
 }
 
-func (r *contentModerationTestUserRepo) RemoveGroupFromAllowedGroups(ctx context.Context, groupID int64) (int64, error) {
-	panic("unexpected RemoveGroupFromAllowedGroups call")
-}
-
-func (r *contentModerationTestUserRepo) AddGroupToAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
-	panic("unexpected AddGroupToAllowedGroups call")
-}
-
-func (r *contentModerationTestUserRepo) RemoveGroupFromUserAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
-	panic("unexpected RemoveGroupFromUserAllowedGroups call")
-}
-
 func (r *contentModerationTestUserRepo) ListUserAuthIdentities(ctx context.Context, userID int64) ([]UserAuthIdentityRecord, error) {
 	panic("unexpected ListUserAuthIdentities call")
 }
@@ -320,7 +308,7 @@ func (i *contentModerationTestAuthCacheInvalidator) InvalidateAuthCacheByUserID(
 	i.userIDs = append(i.userIDs, userID)
 }
 
-func (i *contentModerationTestAuthCacheInvalidator) InvalidateAuthCacheByGroupID(ctx context.Context, groupID int64) {
+func (i *contentModerationTestAuthCacheInvalidator) InvalidateAuthCacheByPlatformID(ctx context.Context, platformID int64) {
 }
 
 func (c *contentModerationTestHashCache) RecordFlaggedInputHash(ctx context.Context, inputHash string) error {
@@ -1785,7 +1773,7 @@ func TestBuildContentModerationAccountDisabledEmailBody_ContainsBanDetails(t *te
 	body := buildContentModerationAccountDisabledEmailBody("Sub2API <Admin>", &ContentModerationLog{
 		UserID:          &userID,
 		UserEmail:       "user@example.com",
-		GroupName:       "vip_2",
+		PlatformName:    "vip_2",
 		HighestCategory: "sexual",
 		HighestScore:    0.926,
 		ViolationCount:  10,

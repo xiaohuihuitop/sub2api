@@ -151,7 +151,7 @@ func (s *OpsService) CreateAlertSilence(ctx context.Context, input *OpsAlertSile
 	return created, nil
 }
 
-func (s *OpsService) IsAlertSilenced(ctx context.Context, ruleID int64, platform string, groupID *int64, region *string, now time.Time) (bool, error) {
+func (s *OpsService) IsAlertSilenced(ctx context.Context, ruleID int64, platform string, platformID *int64, region *string, now time.Time) (bool, error) {
 	if err := s.RequireMonitoringEnabled(ctx); err != nil {
 		return false, err
 	}
@@ -164,7 +164,7 @@ func (s *OpsService) IsAlertSilenced(ctx context.Context, ruleID int64, platform
 	if strings.TrimSpace(platform) == "" {
 		return false, nil
 	}
-	return s.opsRepo.IsAlertSilenced(ctx, ruleID, platform, groupID, region, now)
+	return s.opsRepo.IsAlertSilenced(ctx, ruleID, platform, platformID, region, now)
 }
 
 func (s *OpsService) GetLatestAlertEvent(ctx context.Context, ruleID int64) (*OpsAlertEvent, error) {

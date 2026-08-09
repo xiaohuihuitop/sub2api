@@ -96,7 +96,7 @@ func TestParseOpsOpenAITokenStatsFilter_Defaults(t *testing.T) {
 	require.Equal(t, 1, filter.Page)
 	require.Equal(t, 20, filter.PageSize)
 	require.Equal(t, 0, filter.TopN)
-	require.Nil(t, filter.GroupID)
+	require.Nil(t, filter.PlatformID)
 	require.Equal(t, "", filter.Platform)
 	require.True(t, filter.StartTime.Before(filter.EndTime))
 	require.WithinDuration(t, before.Add(-30*24*time.Hour), filter.StartTime, 2*time.Second)
@@ -109,7 +109,7 @@ func TestParseOpsOpenAITokenStatsFilter_WithTopN(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(
 		http.MethodGet,
-		"/?time_range=1h&platform=openai&group_id=12&top_n=50",
+		"/?time_range=1h&platform=openai&platform_id=12&top_n=50",
 		nil,
 	)
 
@@ -117,8 +117,8 @@ func TestParseOpsOpenAITokenStatsFilter_WithTopN(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "1h", filter.TimeRange)
 	require.Equal(t, "openai", filter.Platform)
-	require.NotNil(t, filter.GroupID)
-	require.Equal(t, int64(12), *filter.GroupID)
+	require.NotNil(t, filter.PlatformID)
+	require.Equal(t, int64(12), *filter.PlatformID)
 	require.Equal(t, 50, filter.TopN)
 	require.Equal(t, 0, filter.Page)
 	require.Equal(t, 0, filter.PageSize)
@@ -127,8 +127,8 @@ func TestParseOpsOpenAITokenStatsFilter_WithTopN(t *testing.T) {
 func TestParseOpsOpenAITokenStatsFilter_InvalidParams(t *testing.T) {
 	tests := []string{
 		"/?time_range=7d",
-		"/?group_id=0",
-		"/?group_id=abc",
+		"/?platform_id=0",
+		"/?platform_id=abc",
 		"/?top_n=0",
 		"/?top_n=101",
 		"/?top_n=10&page=1",

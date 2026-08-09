@@ -55,15 +55,12 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	requireColumn(t, tx, "accounts", "session_window_status", "character varying", 20, true)
 	requireIndex(t, tx, "accounts", "idx_accounts_autopause_expiry_due")
 
-	// groups: OpenAI Live 默认关闭，管理员显式开启后才可访问。
-	requireColumn(t, tx, "groups", "allow_live", "boolean", 0, false)
-
 	// api_keys: key length should be 128
 	requireColumn(t, tx, "api_keys", "key", "character varying", 128, false)
 
-	// redeem_codes: subscription fields
-	requireColumn(t, tx, "redeem_codes", "group_id", "bigint", 0, true)
-	requireColumn(t, tx, "redeem_codes", "validity_days", "integer", 0, false)
+	// Subscription assets reference plans only.
+	requireColumn(t, tx, "redeem_codes", "subscription_plan_id", "bigint", 0, true)
+	requireColumn(t, tx, "user_subscriptions", "subscription_plan_id", "bigint", 0, true)
 
 	// usage_logs: billing_type used by filters/stats
 	requireColumn(t, tx, "usage_logs", "billing_type", "smallint", 0, false)
@@ -142,24 +139,32 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	requireIndex(t, tx, "ops_ingress_reject_aggregates", "idx_ops_ingress_reject_aggregates_bucket")
 	requireIndex(t, tx, "ops_ingress_reject_aggregates", "idx_ops_ingress_reject_aggregates_ip_bucket")
 
-	// user_allowed_groups table should exist
-	var uagRegclass sql.NullString
-	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.user_allowed_groups')").Scan(&uagRegclass))
-	require.True(t, uagRegclass.Valid, "expected user_allowed_groups table to exist")
-
 	// user_subscriptions: deleted_at for soft delete support (migration 012)
 	requireColumn(t, tx, "user_subscriptions", "deleted_at", "timestamp with time zone", 0, true)
 
-	// orphan_allowed_groups_audit table should exist (migration 013)
-	var orphanAuditRegclass sql.NullString
-	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.orphan_allowed_groups_audit')").Scan(&orphanAuditRegclass))
-	require.True(t, orphanAuditRegclass.Valid, "expected orphan_allowed_groups_audit table to exist")
-
-	// account_groups: created_at should be timestamptz
-	requireColumn(t, tx, "account_groups", "created_at", "timestamp with time zone", 0, false)
-
-	// user_allowed_groups: created_at should be timestamptz
-	requireColumn(t, tx, "user_allowed_groups", "created_at", "timestamp with time zone", 0, false)
+	for _, table := range []string{
+		"groups",
+		"account_groups",
+		"user_allowed_groups",
+		"api_key_allowed_groups",
+		"billing_profiles",
+		"composite_model_routes",
+		"channels",
+	} {
+		requireTableAbsent(t, tx, table)
+	}
+	for _, item := range []struct{ table, column string }{
+		{"api_keys", "group_id"},
+		{"subscription_plans", "group_id"},
+		{"user_subscriptions", "group_id"},
+		{"redeem_codes", "group_id"},
+		{"payment_orders", "subscription_group_id"},
+		{"usage_logs", "group_id"},
+		{"usage_logs", "channel_id"},
+		{"users", "allowed_groups"},
+	} {
+		requireColumnAbsent(t, tx, item.table, item.column)
+	}
 }
 
 func TestMigrationsRunner_AuthIdentityAndPaymentSchemaStayAligned(t *testing.T) {
@@ -189,6 +194,32 @@ func TestMigrationsRunner_AuthIdentityAndPaymentSchemaStayAligned(t *testing.T) 
 	requireIndex(t, tx, "payment_orders", "paymentorder_out_trade_no")
 	requirePartialUniqueIndexDefinition(t, tx, "payment_orders", "paymentorder_out_trade_no", "out_trade_no", "WHERE")
 	requireIndexAbsent(t, tx, "payment_orders", "paymentorder_out_trade_no_unique")
+}
+
+func requireTableAbsent(t *testing.T, tx *sql.Tx, table string) {
+	t.Helper()
+
+	var regclass sql.NullString
+	err := tx.QueryRowContext(context.Background(), "SELECT to_regclass($1)", "public."+table).Scan(&regclass)
+	require.NoError(t, err, "query table %s", table)
+	require.False(t, regclass.Valid, "expected table %s to be absent", table)
+}
+
+func requireColumnAbsent(t *testing.T, tx *sql.Tx, table, column string) {
+	t.Helper()
+
+	var exists bool
+	err := tx.QueryRowContext(context.Background(), `
+SELECT EXISTS (
+	SELECT 1
+	FROM information_schema.columns
+	WHERE table_schema = 'public'
+	  AND table_name = $1
+	  AND column_name = $2
+)
+`, table, column).Scan(&exists)
+	require.NoError(t, err, "query column %s.%s", table, column)
+	require.False(t, exists, "expected column %s.%s to be absent", table, column)
 }
 
 func requireIndex(t *testing.T, tx *sql.Tx, table, index string) {

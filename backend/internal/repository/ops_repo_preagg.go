@@ -23,7 +23,7 @@ func (r *opsRepository) UpsertHourlyMetrics(ctx context.Context, startTime, endT
 	// - We emit three dimension granularities via GROUPING SETS:
 	//   1) overall: (bucket_start)
 	//   2) platform: (bucket_start, platform)
-	//   3) group: (bucket_start, platform, group_id)
+	//   3) group: (bucket_start, platform, platform_id)
 	//
 	// IMPORTANT: Postgres UNIQUE treats NULLs as distinct, so the table uses a COALESCE-based
 	// unique index; our ON CONFLICT target must match that expression set.
@@ -32,19 +32,19 @@ WITH usage_base AS (
   SELECT
     date_trunc('hour', ul.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS bucket_start,
     g.platform AS platform,
-    ul.group_id AS group_id,
+    ul.platform_id AS platform_id,
     ul.duration_ms AS duration_ms,
     ul.first_token_ms AS first_token_ms,
     (ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens) AS tokens
   FROM usage_logs ul
-  JOIN groups g ON g.id = ul.group_id
+  JOIN platforms g ON g.id = ul.platform_id
   WHERE ul.created_at >= $1 AND ul.created_at < $2
 ),
 usage_agg AS (
   SELECT
     bucket_start,
     CASE WHEN GROUPING(platform) = 1 THEN NULL ELSE platform END AS platform,
-    CASE WHEN GROUPING(group_id) = 1 THEN NULL ELSE group_id END AS group_id,
+    CASE WHEN GROUPING(platform_id) = 1 THEN NULL ELSE platform_id END AS platform_id,
     COUNT(*) AS success_count,
     COUNT(*) FILTER (WHERE first_token_ms IS NOT NULL) AS ttft_sample_count,
     COALESCE(SUM(tokens), 0) AS token_consumed,
@@ -66,7 +66,7 @@ usage_agg AS (
   GROUP BY GROUPING SETS (
     (bucket_start),
     (bucket_start, platform),
-    (bucket_start, platform, group_id)
+    (bucket_start, platform, platform_id)
   )
 ),
 error_base AS (
@@ -75,7 +75,7 @@ error_base AS (
     -- platform is NULL for some early-phase errors (e.g. before routing); map to a sentinel
     -- value so platform-level GROUPING SETS don't collide with the overall (platform=NULL) row.
     COALESCE(platform, 'unknown') AS platform,
-    group_id AS group_id,
+    platform_id AS platform_id,
     is_business_limited AS is_business_limited,
     error_owner AS error_owner,
     status_code AS client_status_code,
@@ -89,7 +89,7 @@ error_agg AS (
   SELECT
     bucket_start,
     CASE WHEN GROUPING(platform) = 1 THEN NULL ELSE platform END AS platform,
-    CASE WHEN GROUPING(group_id) = 1 THEN NULL ELSE group_id END AS group_id,
+    CASE WHEN GROUPING(platform_id) = 1 THEN NULL ELSE platform_id END AS platform_id,
     COUNT(*) FILTER (WHERE COALESCE(client_status_code, 0) >= 400) AS error_count_total,
     COUNT(*) FILTER (WHERE COALESCE(client_status_code, 0) >= 400 AND is_business_limited) AS business_limited_count,
     COUNT(*) FILTER (WHERE COALESCE(client_status_code, 0) >= 400 AND NOT is_business_limited) AS error_count_sla,
@@ -100,15 +100,15 @@ error_agg AS (
   GROUP BY GROUPING SETS (
     (bucket_start),
     (bucket_start, platform),
-    (bucket_start, platform, group_id)
+    (bucket_start, platform, platform_id)
   )
-  HAVING GROUPING(group_id) = 1 OR group_id IS NOT NULL
+  HAVING GROUPING(platform_id) = 1 OR platform_id IS NOT NULL
 ),
 combined AS (
   SELECT
     COALESCE(u.bucket_start, e.bucket_start) AS bucket_start,
     COALESCE(u.platform, e.platform) AS platform,
-    COALESCE(u.group_id, e.group_id) AS group_id,
+    COALESCE(u.platform_id, e.platform_id) AS platform_id,
 
     COALESCE(u.success_count, 0) AS success_count,
     COALESCE(u.ttft_sample_count, 0) AS ttft_sample_count,
@@ -138,12 +138,12 @@ combined AS (
   FULL OUTER JOIN error_agg e
     ON u.bucket_start = e.bucket_start
    AND COALESCE(u.platform, '') = COALESCE(e.platform, '')
-   AND COALESCE(u.group_id, 0) = COALESCE(e.group_id, 0)
+   AND COALESCE(u.platform_id, 0) = COALESCE(e.platform_id, 0)
 )
 INSERT INTO ops_metrics_hourly (
   bucket_start,
   platform,
-  group_id,
+  platform_id,
   success_count,
   ttft_sample_count,
   error_count_total,
@@ -170,7 +170,7 @@ INSERT INTO ops_metrics_hourly (
 SELECT
   bucket_start,
   NULLIF(platform, '') AS platform,
-  group_id,
+  platform_id,
   success_count,
   ttft_sample_count,
   error_count_total,
@@ -196,7 +196,7 @@ SELECT
 FROM combined
 WHERE bucket_start IS NOT NULL
   AND (platform IS NULL OR platform <> '')
-ON CONFLICT (bucket_start, COALESCE(platform, ''), COALESCE(group_id, 0)) DO UPDATE SET
+ON CONFLICT (bucket_start, COALESCE(platform, ''), COALESCE(platform_id, 0)) DO UPDATE SET
   success_count = EXCLUDED.success_count,
   ttft_sample_count = EXCLUDED.ttft_sample_count,
   error_count_total = EXCLUDED.error_count_total,
@@ -243,7 +243,7 @@ func (r *opsRepository) UpsertDailyMetrics(ctx context.Context, startTime, endTi
 INSERT INTO ops_metrics_daily (
   bucket_date,
   platform,
-  group_id,
+  platform_id,
   success_count,
   ttft_sample_count,
   error_count_total,
@@ -270,7 +270,7 @@ INSERT INTO ops_metrics_daily (
 SELECT
   (bucket_start AT TIME ZONE 'UTC')::date AS bucket_date,
   platform,
-  group_id,
+  platform_id,
 
   COALESCE(SUM(success_count), 0) AS success_count,
   COALESCE(SUM(ttft_sample_count), 0) AS ttft_sample_count,
@@ -309,7 +309,7 @@ SELECT
 FROM ops_metrics_hourly
 WHERE bucket_start >= $1 AND bucket_start < $2
 GROUP BY 1, 2, 3
-ON CONFLICT (bucket_date, COALESCE(platform, ''), COALESCE(group_id, 0)) DO UPDATE SET
+ON CONFLICT (bucket_date, COALESCE(platform, ''), COALESCE(platform_id, 0)) DO UPDATE SET
   success_count = EXCLUDED.success_count,
   ttft_sample_count = EXCLUDED.ttft_sample_count,
   error_count_total = EXCLUDED.error_count_total,

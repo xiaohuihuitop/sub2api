@@ -871,8 +871,8 @@ func TestComputeTokenBreakdown_GptImage2ImageEditIssue4386(t *testing.T) {
 
 	cost := svc.computeTokenBreakdown(pricing, tokens, 1.0, "", false)
 
-	wantTextInput := float64(19) * 5e-6    // 0.000095
-	wantImageInput := float64(352) * 8e-6  // 0.002816
+	wantTextInput := float64(19) * 5e-6     // 0.000095
+	wantImageInput := float64(352) * 8e-6   // 0.002816
 	wantImageOutput := float64(439) * 30e-6 // 0.013170
 	require.InDelta(t, wantTextInput, cost.InputCost, 1e-15, "InputCost 仅含文本输入")
 	require.InDelta(t, wantImageInput, cost.ImageInputCost, 1e-15, "图片输入按 $8/1M 独立计费")
@@ -1484,13 +1484,13 @@ func TestGetModelPricing_MapsDynamicPriorityFieldsIntoBillingPricing(t *testing.
 }
 
 // ---------------------------------------------------------------------------
-// GetModelPricingWithChannel
+// GetModelPricingWithOverride
 // ---------------------------------------------------------------------------
 
-func TestGetModelPricingWithChannel_NilChannelPricing_ReturnsOriginal(t *testing.T) {
+func TestGetModelPricingWithOverride_NilChannelPricing_ReturnsOriginal(t *testing.T) {
 	svc := newTestBillingService()
 
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", nil)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", nil)
 	require.NoError(t, err)
 	require.NotNil(t, pricing)
 
@@ -1503,13 +1503,13 @@ func TestGetModelPricingWithChannel_NilChannelPricing_ReturnsOriginal(t *testing
 	require.InDelta(t, original.CacheReadPricePerToken, pricing.CacheReadPricePerToken, 1e-12)
 }
 
-func TestGetModelPricingWithChannel_OverrideInputPriceOnly(t *testing.T) {
+func TestGetModelPricingWithOverride_OverrideInputPriceOnly(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		InputPrice: testPtrFloat64(99e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", pricingOverride)
 	require.NoError(t, err)
 
 	// InputPrice overridden (both normal and priority)
@@ -1520,13 +1520,13 @@ func TestGetModelPricingWithChannel_OverrideInputPriceOnly(t *testing.T) {
 	require.InDelta(t, 15e-6, pricing.OutputPricePerToken, 1e-12)
 }
 
-func TestGetModelPricingWithChannel_OverrideOutputPriceOnly(t *testing.T) {
+func TestGetModelPricingWithOverride_OverrideOutputPriceOnly(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		OutputPrice: testPtrFloat64(88e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", pricingOverride)
 	require.NoError(t, err)
 
 	// OutputPrice overridden
@@ -1537,17 +1537,17 @@ func TestGetModelPricingWithChannel_OverrideOutputPriceOnly(t *testing.T) {
 	require.InDelta(t, 3e-6, pricing.InputPricePerToken, 1e-12)
 }
 
-func TestGetModelPricingWithChannel_OverrideAllFields(t *testing.T) {
+func TestGetModelPricingWithOverride_OverrideAllFields(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		InputPrice:       testPtrFloat64(10e-6),
 		OutputPrice:      testPtrFloat64(20e-6),
 		CacheWritePrice:  testPtrFloat64(5e-6),
 		CacheReadPrice:   testPtrFloat64(1e-6),
 		ImageOutputPrice: testPtrFloat64(50e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", pricingOverride)
 	require.NoError(t, err)
 
 	require.InDelta(t, 10e-6, pricing.InputPricePerToken, 1e-12)
@@ -1562,13 +1562,13 @@ func TestGetModelPricingWithChannel_OverrideAllFields(t *testing.T) {
 	require.InDelta(t, 50e-6, pricing.ImageOutputPricePerToken, 1e-12)
 }
 
-func TestGetModelPricingWithChannel_CacheWritePriceAffects5mAnd1h(t *testing.T) {
+func TestGetModelPricingWithOverride_CacheWritePriceAffects5mAnd1h(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		CacheWritePrice: testPtrFloat64(7e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", pricingOverride)
 	require.NoError(t, err)
 
 	// CacheWritePrice should set all three: CacheCreationPricePerToken, 5m, and 1h
@@ -1577,13 +1577,13 @@ func TestGetModelPricingWithChannel_CacheWritePriceAffects5mAnd1h(t *testing.T) 
 	require.InDelta(t, 7e-6, pricing.CacheCreation1hPrice, 1e-12)
 }
 
-func TestGetModelPricingWithChannel_CacheReadPriceAffectsPriority(t *testing.T) {
+func TestGetModelPricingWithOverride_CacheReadPriceAffectsPriority(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		CacheReadPrice: testPtrFloat64(2e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", pricingOverride)
 	require.NoError(t, err)
 
 	// CacheReadPrice should set both normal and priority
@@ -1591,27 +1591,27 @@ func TestGetModelPricingWithChannel_CacheReadPriceAffectsPriority(t *testing.T) 
 	require.InDelta(t, 2e-6, pricing.CacheReadPricePerTokenPriority, 1e-12)
 }
 
-func TestGetModelPricingWithChannel_UnknownModelReturnsError(t *testing.T) {
+func TestGetModelPricingWithOverride_UnknownModelReturnsError(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		InputPrice: testPtrFloat64(1e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel("totally-unknown-model", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("totally-unknown-model", pricingOverride)
 	require.Error(t, err)
 	require.Nil(t, pricing)
 	require.Contains(t, err.Error(), "pricing not found")
 }
 
-func TestGetModelPricingWithChannel_NilImageOutputPriceZerosAndMarksExplicit(t *testing.T) {
+func TestGetModelPricingWithOverride_NilImageOutputPriceZerosAndMarksExplicit(t *testing.T) {
 	svc := newTestBillingService()
 
-	chPricing := &ChannelModelPricing{
+	pricingOverride := &ModelPricingOverrideInput{
 		InputPrice:  testPtrFloat64(10e-6),
 		OutputPrice: testPtrFloat64(20e-6),
 		// ImageOutputPrice intentionally nil
 	}
-	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithOverride("claude-sonnet-4", pricingOverride)
 	require.NoError(t, err)
 
 	require.Equal(t, 0.0, pricing.ImageOutputPricePerToken)

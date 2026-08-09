@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Responses handles OpenAI Responses API endpoint for Anthropic platform groups.
+// Responses handles the OpenAI Responses API endpoint for Anthropic platform accounts.
 // POST /v1/responses
 // This converts Responses API requests to Anthropic format, forwards to Anthropic
 // upstream, and converts responses back to Responses format.
@@ -40,7 +40,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		"handler.gateway.responses",
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
 
 	// Read request body
@@ -75,9 +75,9 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
-	ensureCompositeTargetPlatform(c, apiKey, reqModel)
-	if !compositeTargetPlatformResolved(c, apiKey, reqModel) {
-		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by composite groups")
+	ensureModelTargetPlatform(c, reqModel)
+	if !modelTargetPlatformResolved(c, reqModel) {
+		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by any authorized platform")
 		return
 	}
 	reqStream, ok := parseOpenAICompatibleStream(body)
@@ -95,19 +95,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(requestCtx, apiKey.GroupID, reqModel)
-
-	// Claude Code only restriction:
-	// /v1/responses is never a Claude Code endpoint.
-	// When claude_code_only is enabled, this endpoint is rejected.
-	// The existing service-layer checkClaudeCodeRestriction handles degradation
-	// to fallback groups when the Forward path calls SelectAccountForModelWithExclusions.
-	// Here we just reject at handler level since /v1/responses clients can't be Claude Code.
-	if apiKey.Group != nil && apiKey.Group.ClaudeCodeOnly {
-		h.responsesErrorResponse(c, http.StatusForbidden, "permission_error",
-			"This group is restricted to Claude Code clients (/v1/messages only)")
-		return
-	}
+	modelMapping := h.gatewayService.ResolvePlatformModelMapping(requestCtx, reqModel)
 
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.responsesSecurityAuditError(c, decision)
@@ -135,7 +123,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing
-	if err := h.billingCacheService.CheckBillingEligibility(requestCtx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(requestCtx, apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(requestCtx, apiKey.User, apiKey, subscription, service.QuotaPlatform(requestCtx, apiKey)); err != nil {
 		reqLog.Info("gateway.responses.billing_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -165,7 +153,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		if requestCtx.Err() != nil {
 			return
 		}
-		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(requestCtx, apiKey.GroupID, sessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
+		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(requestCtx, service.PlatformSchedulingID(requestCtx), sessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, effectiveAPIKeyPlatform(c, apiKey))
@@ -225,8 +213,8 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		// 5. Forward request
 		writerSizeBeforeForward := c.Writer.Size()
 		forwardBody := body
-		if channelMapping.Mapped {
-			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
+		if modelMapping.Mapped {
+			forwardBody = h.gatewayService.ReplaceModelInBody(body, modelMapping.MappedModel)
 		}
 		var result *service.ForwardResult
 		setActualUpstreamEndpoint(c, "")
@@ -293,20 +281,20 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		sessionID := service.ExtractClientSessionID(c)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-				Result:             result,
-				QuotaPlatform:      quotaPlatform,
-				APIKey:             apiKey,
-				User:               apiKey.User,
-				Account:            account,
-				Subscription:       subscription,
-				InboundEndpoint:    inboundEndpoint,
-				UpstreamEndpoint:   upstreamEndpoint,
-				UserAgent:          userAgent,
-				IPAddress:          clientIP,
-				RequestPayloadHash: requestPayloadHash,
-				APIKeyService:      h.apiKeyService,
-				SessionID:          sessionID,
-				ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel),
+				Result:                  result,
+				QuotaPlatform:           quotaPlatform,
+				APIKey:                  apiKey,
+				User:                    apiKey.User,
+				Account:                 account,
+				Subscription:            subscription,
+				InboundEndpoint:         inboundEndpoint,
+				UpstreamEndpoint:        upstreamEndpoint,
+				UserAgent:               userAgent,
+				IPAddress:               clientIP,
+				RequestPayloadHash:      requestPayloadHash,
+				APIKeyService:           h.apiKeyService,
+				SessionID:               sessionID,
+				ModelRoutingUsageFields: clientRequestedUsageFields(c, modelMapping, reqModel, result.UpstreamModel),
 			}); err != nil {
 				reqLog.Error("gateway.responses.record_usage_failed",
 					zap.Int64("account_id", account.ID),

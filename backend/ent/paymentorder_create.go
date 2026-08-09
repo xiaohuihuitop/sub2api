@@ -183,20 +183,6 @@ func (_c *PaymentOrderCreate) SetNillablePlanID(v *int64) *PaymentOrderCreate {
 	return _c
 }
 
-// SetSubscriptionGroupID sets the "subscription_group_id" field.
-func (_c *PaymentOrderCreate) SetSubscriptionGroupID(v int64) *PaymentOrderCreate {
-	_c.mutation.SetSubscriptionGroupID(v)
-	return _c
-}
-
-// SetNillableSubscriptionGroupID sets the "subscription_group_id" field if the given value is not nil.
-func (_c *PaymentOrderCreate) SetNillableSubscriptionGroupID(v *int64) *PaymentOrderCreate {
-	if v != nil {
-		_c.SetSubscriptionGroupID(*v)
-	}
-	return _c
-}
-
 // SetSubscriptionDays sets the "subscription_days" field.
 func (_c *PaymentOrderCreate) SetSubscriptionDays(v int) *PaymentOrderCreate {
 	_c.mutation.SetSubscriptionDays(v)
@@ -761,10 +747,6 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 		_spec.SetField(paymentorder.FieldPlanID, field.TypeInt64, value)
 		_node.PlanID = &value
 	}
-	if value, ok := _c.mutation.SubscriptionGroupID(); ok {
-		_spec.SetField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
-		_node.SubscriptionGroupID = &value
-	}
 	if value, ok := _c.mutation.SubscriptionDays(); ok {
 		_spec.SetField(paymentorder.FieldSubscriptionDays, field.TypeInt, value)
 		_node.SubscriptionDays = &value
@@ -1165,30 +1147,6 @@ func (u *PaymentOrderUpsert) AddPlanID(v int64) *PaymentOrderUpsert {
 // ClearPlanID clears the value of the "plan_id" field.
 func (u *PaymentOrderUpsert) ClearPlanID() *PaymentOrderUpsert {
 	u.SetNull(paymentorder.FieldPlanID)
-	return u
-}
-
-// SetSubscriptionGroupID sets the "subscription_group_id" field.
-func (u *PaymentOrderUpsert) SetSubscriptionGroupID(v int64) *PaymentOrderUpsert {
-	u.Set(paymentorder.FieldSubscriptionGroupID, v)
-	return u
-}
-
-// UpdateSubscriptionGroupID sets the "subscription_group_id" field to the value that was provided on create.
-func (u *PaymentOrderUpsert) UpdateSubscriptionGroupID() *PaymentOrderUpsert {
-	u.SetExcluded(paymentorder.FieldSubscriptionGroupID)
-	return u
-}
-
-// AddSubscriptionGroupID adds v to the "subscription_group_id" field.
-func (u *PaymentOrderUpsert) AddSubscriptionGroupID(v int64) *PaymentOrderUpsert {
-	u.Add(paymentorder.FieldSubscriptionGroupID, v)
-	return u
-}
-
-// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
-func (u *PaymentOrderUpsert) ClearSubscriptionGroupID() *PaymentOrderUpsert {
-	u.SetNull(paymentorder.FieldSubscriptionGroupID)
 	return u
 }
 
@@ -1869,34 +1827,6 @@ func (u *PaymentOrderUpsertOne) UpdatePlanID() *PaymentOrderUpsertOne {
 func (u *PaymentOrderUpsertOne) ClearPlanID() *PaymentOrderUpsertOne {
 	return u.Update(func(s *PaymentOrderUpsert) {
 		s.ClearPlanID()
-	})
-}
-
-// SetSubscriptionGroupID sets the "subscription_group_id" field.
-func (u *PaymentOrderUpsertOne) SetSubscriptionGroupID(v int64) *PaymentOrderUpsertOne {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.SetSubscriptionGroupID(v)
-	})
-}
-
-// AddSubscriptionGroupID adds v to the "subscription_group_id" field.
-func (u *PaymentOrderUpsertOne) AddSubscriptionGroupID(v int64) *PaymentOrderUpsertOne {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.AddSubscriptionGroupID(v)
-	})
-}
-
-// UpdateSubscriptionGroupID sets the "subscription_group_id" field to the value that was provided on create.
-func (u *PaymentOrderUpsertOne) UpdateSubscriptionGroupID() *PaymentOrderUpsertOne {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.UpdateSubscriptionGroupID()
-	})
-}
-
-// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
-func (u *PaymentOrderUpsertOne) ClearSubscriptionGroupID() *PaymentOrderUpsertOne {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.ClearSubscriptionGroupID()
 	})
 }
 
@@ -2801,34 +2731,6 @@ func (u *PaymentOrderUpsertBulk) UpdatePlanID() *PaymentOrderUpsertBulk {
 func (u *PaymentOrderUpsertBulk) ClearPlanID() *PaymentOrderUpsertBulk {
 	return u.Update(func(s *PaymentOrderUpsert) {
 		s.ClearPlanID()
-	})
-}
-
-// SetSubscriptionGroupID sets the "subscription_group_id" field.
-func (u *PaymentOrderUpsertBulk) SetSubscriptionGroupID(v int64) *PaymentOrderUpsertBulk {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.SetSubscriptionGroupID(v)
-	})
-}
-
-// AddSubscriptionGroupID adds v to the "subscription_group_id" field.
-func (u *PaymentOrderUpsertBulk) AddSubscriptionGroupID(v int64) *PaymentOrderUpsertBulk {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.AddSubscriptionGroupID(v)
-	})
-}
-
-// UpdateSubscriptionGroupID sets the "subscription_group_id" field to the value that was provided on create.
-func (u *PaymentOrderUpsertBulk) UpdateSubscriptionGroupID() *PaymentOrderUpsertBulk {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.UpdateSubscriptionGroupID()
-	})
-}
-
-// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
-func (u *PaymentOrderUpsertBulk) ClearSubscriptionGroupID() *PaymentOrderUpsertBulk {
-	return u.Update(func(s *PaymentOrderUpsert) {
-		s.ClearSubscriptionGroupID()
 	})
 }
 

@@ -224,18 +224,6 @@ func (s *stubUserRepo) ExistsByEmailAlias(ctx context.Context, email string) (bo
 	panic("unexpected ExistsByEmailAlias call")
 }
 
-func (s *stubUserRepo) RemoveGroupFromAllowedGroups(ctx context.Context, groupID int64) (int64, error) {
-	panic("unexpected RemoveGroupFromAllowedGroups call")
-}
-
-func (s *stubUserRepo) RemoveGroupFromUserAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
-	panic("unexpected RemoveGroupFromUserAllowedGroups call")
-}
-
-func (s *stubUserRepo) AddGroupToAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
-	panic("unexpected AddGroupToAllowedGroups call")
-}
-
 func (s *stubUserRepo) ListUserAuthIdentities(ctx context.Context, userID int64) ([]service.UserAuthIdentityRecord, error) {
 	panic("unexpected ListUserAuthIdentities call")
 }

@@ -30,13 +30,13 @@ import (
 type ForwardGeminiOption func(*forwardGeminiOptions)
 
 type forwardGeminiOptions struct {
-	groupID     int64
+	platformID  int64
 	sessionHash string
 }
 
-func WithForwardGeminiSession(groupID int64, sessionHash string) ForwardGeminiOption {
+func WithForwardGeminiSession(platformID int64, sessionHash string) ForwardGeminiOption {
 	return func(opts *forwardGeminiOptions) {
-		opts.groupID = groupID
+		opts.platformID = platformID
 		opts.sessionHash = sessionHash
 	}
 }
@@ -156,7 +156,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		handleError:     s.handleUpstreamError,
 		requestedModel:  originalModel,
 		isStickySession: isStickySession, // ForwardGemini 由上层判断粘性会话
-		groupID:         forwardOpts.groupID,
+		platformID:      forwardOpts.platformID,
 		sessionHash:     forwardOpts.sessionHash,
 	})
 	if err != nil {
@@ -255,7 +255,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 					handleError:     s.handleUpstreamError,
 					requestedModel:  originalModel,
 					isStickySession: isStickySession,
-					groupID:         forwardOpts.groupID,
+					platformID:      forwardOpts.platformID,
 					sessionHash:     forwardOpts.sessionHash,
 				})
 				if retryErr == nil {
@@ -332,7 +332,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		if unwrapErr != nil || len(unwrappedForOps) == 0 {
 			unwrappedForOps = respBody
 		}
-		s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody, originalModel, forwardOpts.groupID, forwardOpts.sessionHash, isStickySession)
+		s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody, originalModel, forwardOpts.platformID, forwardOpts.sessionHash, isStickySession)
 		upstreamMsg := strings.TrimSpace(extractAntigravityErrorMessage(unwrappedForOps))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 		upstreamDetail := s.getUpstreamErrorDetail(unwrappedForOps)

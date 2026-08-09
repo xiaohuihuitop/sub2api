@@ -48,30 +48,6 @@
               />
             </div>
 
-            <!-- Group Filter (visible when enabled) -->
-            <div v-if="visibleFilters.has('group')" class="w-full sm:w-44">
-              <Select
-                v-model="filters.group"
-                :options="groupFilterOptions"
-                searchable
-                creatable
-                :creatable-prefix="t('admin.users.fuzzySearch')"
-                :search-placeholder="t('admin.users.searchAuthorizedGroups')"
-                @change="applyFilter"
-              />
-            </div>
-
-            <!-- API Key Group Filter (visible when enabled) -->
-            <div v-if="visibleFilters.has('apiKeyGroup')" class="w-full sm:w-44">
-              <Select
-                v-model="filters.apiKeyGroup"
-                :options="apiKeyGroupFilterOptions"
-                searchable
-                :search-placeholder="t('admin.users.searchApiKeyGroups')"
-                @change="applyFilter"
-              />
-            </div>
-
             <!-- Dynamic Attribute Filters -->
             <template v-for="(value, attrId) in activeAttributeFilters" :key="attrId">
               <div
@@ -330,87 +306,19 @@
               {{ t('admin.users.roles.' + value) }}
             </span>
           </template>
-
-          <template #cell-groups="{ row }">
-            <div v-if="allGroups.length > 0" class="flex flex-col gap-1">
-              <!-- 专属分组行 -->
-              <span
-                v-if="getUserGroups(row).exclusive.length > 0"
-                class="group/ex relative inline-flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs"
-                @click.stop="toggleExpandedGroup(row.id)"
-              >
-                <Icon name="shield" size="xs" class="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
-                <span class="font-medium text-purple-600 dark:text-purple-400">{{ getUserGroups(row).exclusive.length }}</span>
-                <span class="text-gray-500 dark:text-dark-400">{{ t('admin.users.exclusiveLabel') }}</span>
-                <!-- Hover tooltip（操作菜单未打开时显示） -->
-                <div
-                  v-if="expandedGroupUserId !== row.id"
-                  class="pointer-events-none absolute left-0 top-full z-50 mt-1.5 rounded bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover/ex:opacity-100 dark:bg-dark-600"
-                >
-                  <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
-                  <div class="flex flex-col gap-0.5 whitespace-nowrap">
-                    <span v-for="g in getUserGroups(row).exclusive" :key="g.id">{{ g.name }}</span>
-                  </div>
-                </div>
-                <!-- 点击展开分组操作菜单 -->
-                <div
-                  v-if="expandedGroupUserId === row.id"
-                  class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-xs shadow-xl dark:border-dark-600 dark:bg-dark-700"
-                >
-                  <div class="border-b border-gray-100 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:border-dark-600 dark:text-dark-400">
-                    {{ t('admin.users.clickToReplace') }}
-                  </div>
-                  <div
-                    v-for="g in getUserGroups(row).exclusive"
-                    :key="g.id"
-                    class="flex cursor-pointer items-center gap-2 px-3 py-2 text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:text-dark-200 dark:hover:bg-primary-900/30 dark:hover:text-primary-400"
-                    @click.stop="openGroupReplace(row, g)"
-                  >
-                    <Icon name="swap" size="xs" class="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
-                    <span class="flex-1">{{ g.name }}</span>
-                  </div>
-                </div>
-              </span>
-              <!-- 公开分组行 -->
-              <span
-                v-if="getUserGroups(row).publicGroups.length > 0"
-                class="group/pub relative inline-flex cursor-default items-center gap-1 whitespace-nowrap text-xs"
-              >
-                <Icon name="globe" size="xs" class="h-3.5 w-3.5 text-gray-400 dark:text-dark-500" />
-                <span class="font-medium text-gray-600 dark:text-dark-300">{{ getUserGroups(row).publicGroups.length }}</span>
-                <span class="text-gray-400 dark:text-dark-500">{{ t('admin.users.publicLabel') }}</span>
-                <!-- Tooltip: 向下弹出 -->
-                <div class="pointer-events-none absolute left-0 top-full z-50 mt-1.5 rounded bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover/pub:opacity-100 dark:bg-dark-600">
-                  <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
-                  <div class="flex flex-col gap-0.5 whitespace-nowrap">
-                    <span v-for="g in getUserGroups(row).publicGroups" :key="g.id">{{ g.name }}</span>
-                  </div>
-                </div>
-              </span>
-              <!-- 都没有 -->
-              <span
-                v-if="getUserGroups(row).exclusive.length === 0 && getUserGroups(row).publicGroups.length === 0"
-                class="text-xs text-gray-400 dark:text-dark-500"
-              >-</span>
-            </div>
-            <span v-else class="text-xs text-gray-400 dark:text-dark-500">-</span>
-          </template>
-
           <template #cell-subscriptions="{ row }">
             <div
               v-if="row.subscriptions && row.subscriptions.length > 0"
               class="flex flex-wrap gap-1.5"
             >
-              <GroupBadge
+              <span
                 v-for="sub in row.subscriptions"
                 :key="sub.id"
-                :name="sub.group?.name || ''"
-                :platform="sub.group?.platform"
-                :subscription-type="sub.group?.subscription_type"
-                :rate-multiplier="sub.group?.rate_multiplier"
-                :days-remaining="sub.expires_at ? getDaysRemaining(sub.expires_at) : null"
+                class="inline-flex items-center rounded-md bg-primary-50 px-2 py-1 text-xs text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
                 :title="sub.expires_at ? formatDateTime(sub.expires_at) : ''"
-              />
+              >
+                {{ sub.plan_name_snapshot || t('admin.users.subscription') }}
+              </span>
             </div>
             <span
               v-else
@@ -681,15 +589,6 @@
                 {{ t('admin.users.apiKeys') }}
               </button>
 
-              <!-- Allowed Groups -->
-              <button
-                @click="handleAllowedGroups(user); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <Icon name="users" size="sm" class="text-gray-400" :stroke-width="2" />
-                {{ t('admin.users.groups') }}
-              </button>
-
               <div class="my-1 border-t border-gray-100 dark:border-dark-700"></div>
 
               <!-- Deposit -->
@@ -763,10 +662,8 @@
       @success="loadUsers"
     />
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
-    <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
     <UserBalanceModal :show="showBalanceModal" :user="balanceUser" :operation="balanceOperation" @close="closeBalanceModal" @success="loadUsers" />
     <UserBalanceHistoryModal :show="showBalanceHistoryModal" :user="balanceHistoryUser" @close="closeBalanceHistoryModal" @deposit="handleDepositFromHistory" @withdraw="handleWithdrawFromHistory" />
-    <GroupReplaceModal :show="showGroupReplaceModal" :user="groupReplaceUser" :old-group="groupReplaceOldGroup" :all-groups="allGroups" @close="closeGroupReplaceModal" @success="loadUsers" />
     <UserAttributesConfigModal :show="showAttributesModal" @close="handleAttributesModalClose" />
   </AppLayout>
 </template>
@@ -782,20 +679,17 @@ import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, AdminGroup, UserAttributeDefinition } from '@/types'
+import type { AdminUser, UserAttributeDefinition } from '@/types'
 import type { BatchUserUsageStats } from '@/api/admin/dashboard'
 import type { PlatformQuotaItem } from '@/api/admin/users'
 import type { Column } from '@/components/common/types'
-import type { SelectOption } from '@/components/common/Select.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
 import Select from '@/components/common/Select.vue'
-import { buildApiKeyGroupFilterOptions } from './apiKeyGroupFilterOptions'
 import UserAttributesConfigModal from '@/components/user/UserAttributesConfigModal.vue'
 import UserConcurrencyCell from '@/components/user/UserConcurrencyCell.vue'
 import PlatformUsageBreakdown from '@/components/user/PlatformUsageBreakdown.vue'
@@ -806,10 +700,8 @@ import UserEditModal from '@/components/admin/user/UserEditModal.vue'
 import BulkEditUserModal from '@/components/admin/user/BulkEditUserModal.vue'
 import UserPlatformQuotaModal from '@/components/admin/user/UserPlatformQuotaModal.vue'
 import UserApiKeysModal from '@/components/admin/user/UserApiKeysModal.vue'
-import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsModal.vue'
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
-import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
 
@@ -868,7 +760,6 @@ const allColumns = computed<Column[]>(() => [
   // Dynamic attribute columns
   ...attributeColumns.value,
   { key: 'role', label: t('admin.users.columns.role'), sortable: true },
-  { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
   { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
   { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
   { key: 'balance_platform_quota', label: t('admin.users.columns.balancePlatformQuota'), sortable: false },
@@ -896,7 +787,7 @@ const hiddenColumns = reactive<Set<string>>(new Set())
 
 // Default hidden columns (columns hidden by default on first load)
 const DEFAULT_HIDDEN_COLUMNS = [
-  'notes', 'groups', 'subscriptions', 'usage', 'concurrency',
+  'notes', 'subscriptions', 'usage', 'concurrency',
   'usage_anthropic', 'usage_openai', 'usage_gemini', 'usage_antigravity',
   'balance_platform_quota'
 ]
@@ -983,9 +874,6 @@ const toggleColumn = (key: string) => {
   if (key === 'subscriptions') {
     loadUsers()
   }
-  if (wasHidden && key === 'groups') {
-    loadAllGroups()
-  }
 }
 
 // Check if column is visible (not in hidden set)
@@ -1006,7 +894,6 @@ const PLATFORM_USAGE_COLUMNS = USAGE_COLUMN_KEYS.filter((k) => k !== 'usage')
 const hasVisibleUsageColumn = computed(
   () => !hiddenColumns.has('usage') || PLATFORM_USAGE_COLUMNS.some((k) => !hiddenColumns.has(k))
 )
-const hasVisibleGroupsColumn = computed(() => !hiddenColumns.has('groups'))
 const hasVisiblePlatformQuotaColumn = computed(() => !hiddenColumns.has('balance_platform_quota'))
 const hasVisibleAttributeColumns = computed(() =>
   attributeDefinitions.value.some((def) => def.enabled && !hiddenColumns.has(`attr_${def.id}`))
@@ -1042,74 +929,10 @@ const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' }
 }
 const sortState = reactive(loadInitialSortState())
 
-// Groups data for the groups column and the existing "authorised group" filter (active only)
-const allGroups = ref<AdminGroup[]>([])
-const loadAllGroups = async () => {
-  if (allGroups.value.length > 0) return
-  try {
-    allGroups.value = await adminAPI.groups.getAll()
-  } catch (e) {
-    console.error('Failed to load groups:', e)
-  }
-}
-
-// Groups for the API Key group filter — includes disabled groups so admins can
-// filter users whose keys are still bound to a now-disabled group.
-const allGroupsForApiKeyFilter = ref<AdminGroup[]>([])
-const loadAllGroupsForApiKeyFilter = async () => {
-  if (allGroupsForApiKeyFilter.value.length > 0) return
-  try {
-    allGroupsForApiKeyFilter.value = await adminAPI.groups.getAllIncludingInactive()
-  } catch (e) {
-    console.error('Failed to load groups for API key filter:', e)
-  }
-}
-// Resolve user's accessible groups: exclusive groups first, then public groups
-const getUserGroups = (user: AdminUser) => {
-  const exclusive: AdminGroup[] = []
-  const publicGroups: AdminGroup[] = []
-  for (const g of allGroups.value) {
-    if (g.status !== 'active') continue
-    if (g.is_exclusive) {
-      if (user.allowed_groups?.includes(g.id)) {
-        exclusive.push(g)
-      }
-    } else {
-      publicGroups.push(g)
-    }
-  }
-  return { exclusive, publicGroups }
-}
-
-// Group filter options: "All Groups" + active exclusive groups (value = group name for fuzzy match)
-const groupFilterOptions = computed(() => {
-  const options: { value: string; label: string }[] = [
-    { value: '', label: t('admin.users.allAuthorizedGroups') }
-  ]
-  for (const g of allGroups.value) {
-    if (g.status !== 'active' || !g.is_exclusive) continue
-    options.push({ value: g.name, label: g.name })
-  }
-  return options
-})
-
-// API Key group filter options: "All" + groups partitioned by type (value = group id).
-// Uses allGroupsForApiKeyFilter which includes disabled groups.
-const apiKeyGroupFilterOptions = computed(() =>
-  buildApiKeyGroupFilterOptions(allGroupsForApiKeyFilter.value, {
-    all: t('admin.users.allApiKeyGroups'),
-    exclusive: t('admin.users.apiKeyGroupExclusive'),
-    public: t('admin.users.apiKeyGroupPublic'),
-    disabled: t('admin.users.apiKeyGroupDisabled'),
-  }) as SelectOption[]
-)
-
 // Filter values (role, status, and custom attributes)
 const filters = reactive({
   role: '',
-  status: '',
-  group: '',  // group name for fuzzy match, '' = all
-  apiKeyGroup: null as number | null  // group id bound to the user's API keys, null = all
+  status: ''
 })
 const activeAttributeFilters = reactive<Record<number, string>>({})
 
@@ -1138,8 +961,6 @@ const filterableAttributes = computed(() =>
 const builtInFilters = computed(() => [
   { key: 'role', name: t('admin.users.columns.role'), type: 'select' as const },
   { key: 'status', name: t('admin.users.columns.status'), type: 'select' as const },
-  { key: 'group', name: t('admin.users.authorizedGroupFilter'), type: 'select' as const },
-  { key: 'apiKeyGroup', name: t('admin.users.apiKeyGroupFilter'), type: 'select' as const }
 ])
 
 // Load saved filters from localStorage
@@ -1157,8 +978,6 @@ const loadSavedFilters = () => {
       const parsed = JSON.parse(savedValues)
       if (parsed.role) filters.role = parsed.role
       if (parsed.status) filters.status = parsed.status
-      if (parsed.group) filters.group = parsed.group
-      if (typeof parsed.apiKeyGroup === 'number') filters.apiKeyGroup = parsed.apiKeyGroup
       if (parsed.attributes) {
         Object.assign(activeAttributeFilters, parsed.attributes)
       }
@@ -1177,8 +996,6 @@ const saveFiltersToStorage = () => {
     const values = {
       role: filters.role,
       status: filters.status,
-      group: filters.group,
-      apiKeyGroup: filters.apiKeyGroup,
       attributes: activeAttributeFilters
     }
     localStorage.setItem(FILTER_VALUES_KEY, JSON.stringify(values))
@@ -1505,26 +1322,7 @@ const handleClickOutside = (event: MouseEvent) => {
   if (openUsageSortMenu.value !== null && !target.closest('.usage-sort-trigger')) {
     openUsageSortMenu.value = null
   }
-  // Close expanded group dropdown when clicking outside
-  if (expandedGroupUserId.value !== null) {
-    expandedGroupUserId.value = null
-  }
 }
-
-// Allowed groups modal state
-const showAllowedGroupsModal = ref(false)
-const allowedGroupsUser = ref<AdminUser | null>(null)
-
-// Expanded group dropdown state (click to show exclusive groups list)
-const expandedGroupUserId = ref<number | null>(null)
-const toggleExpandedGroup = (userId: number) => {
-  expandedGroupUserId.value = expandedGroupUserId.value === userId ? null : userId
-}
-
-// Group replace modal state
-const showGroupReplaceModal = ref(false)
-const groupReplaceUser = ref<AdminUser | null>(null)
-const groupReplaceOldGroup = ref<{ id: number; name: string } | null>(null)
 
 // Balance (Deposit/Withdraw) modal state
 const showBalanceModal = ref(false)
@@ -1536,13 +1334,6 @@ const showBalanceHistoryModal = ref(false)
 const balanceHistoryUser = ref<AdminUser | null>(null)
 
 // 计算剩余天数
-const getDaysRemaining = (expiresAt: string): number => {
-  const now = new Date()
-  const expires = new Date(expiresAt)
-  const diffMs = expires.getTime() - now.getTime()
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-}
-
 const loadAttributeDefinitions = async () => {
   try {
     attributeDefinitions.value = await adminAPI.userAttributes.listEnabledDefinitions()
@@ -1580,8 +1371,6 @@ const loadUsers = async () => {
         role: filters.role as any,
         status: filters.status as any,
         search: searchQuery.value || undefined,
-        group_name: filters.group || undefined,
-        api_key_group_id: filters.apiKeyGroup ?? undefined,
         attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
         // 始终请求 subscriptions：列隐藏时仍需用于 UserPlatformQuotaModal 的 active-subscription 警示 banner
         include_subscriptions: true,
@@ -1671,12 +1460,8 @@ const toggleBuiltInFilter = (key: string) => {
     visibleFilters.delete(key)
     if (key === 'role') filters.role = ''
     if (key === 'status') filters.status = ''
-    if (key === 'group') filters.group = ''
-    if (key === 'apiKeyGroup') filters.apiKeyGroup = null
   } else {
     visibleFilters.add(key)
-    if (key === 'group') loadAllGroups()
-    if (key === 'apiKeyGroup') loadAllGroupsForApiKeyFilter()
   }
   saveFiltersToStorage()
   pagination.page = 1
@@ -1740,29 +1525,6 @@ const handleViewApiKeys = (user: AdminUser) => {
 const closeApiKeysModal = () => {
   showApiKeysModal.value = false
   viewingUser.value = null
-}
-
-const handleAllowedGroups = (user: AdminUser) => {
-  allowedGroupsUser.value = user
-  showAllowedGroupsModal.value = true
-}
-
-const closeAllowedGroupsModal = () => {
-  showAllowedGroupsModal.value = false
-  allowedGroupsUser.value = null
-}
-
-const openGroupReplace = (user: AdminUser, group: { id: number; name: string }) => {
-  expandedGroupUserId.value = null
-  groupReplaceUser.value = user
-  groupReplaceOldGroup.value = group
-  showGroupReplaceModal.value = true
-}
-
-const closeGroupReplaceModal = () => {
-  showGroupReplaceModal.value = false
-  groupReplaceUser.value = null
-  groupReplaceOldGroup.value = null
 }
 
 const handleDelete = (user: AdminUser) => {
@@ -1835,12 +1597,6 @@ onMounted(async () => {
   loadSavedFilters()
   loadSavedColumns()
   loadUsers()
-  if (hasVisibleGroupsColumn.value || visibleFilters.has('group')) {
-    loadAllGroups()
-  }
-  if (visibleFilters.has('apiKeyGroup')) {
-    loadAllGroupsForApiKeyFilter()
-  }
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('scroll', handleScroll, true)
 })

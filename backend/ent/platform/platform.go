@@ -28,10 +28,6 @@ const (
 	FieldStatus = "status"
 	// FieldEndpointCapabilities holds the string denoting the endpoint_capabilities field in the database.
 	FieldEndpointCapabilities = "endpoint_capabilities"
-	// FieldLegacyGroupID holds the string denoting the legacy_group_id field in the database.
-	FieldLegacyGroupID = "legacy_group_id"
-	// EdgeLegacyGroup holds the string denoting the legacy_group edge name in mutations.
-	EdgeLegacyGroup = "legacy_group"
 	// EdgeModelRules holds the string denoting the model_rules edge name in mutations.
 	EdgeModelRules = "model_rules"
 	// EdgeAccounts holds the string denoting the accounts edge name in mutations.
@@ -42,13 +38,6 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// Table holds the table name of the platform in the database.
 	Table = "platforms"
-	// LegacyGroupTable is the table that holds the legacy_group relation/edge.
-	LegacyGroupTable = "platforms"
-	// LegacyGroupInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	LegacyGroupInverseTable = "groups"
-	// LegacyGroupColumn is the table column denoting the legacy_group relation/edge.
-	LegacyGroupColumn = "legacy_group_id"
 	// ModelRulesTable is the table that holds the model_rules relation/edge.
 	ModelRulesTable = "platform_model_rules"
 	// ModelRulesInverseTable is the table name for the PlatformModelRule entity.
@@ -87,7 +76,6 @@ var Columns = []string{
 	FieldAccountPlatform,
 	FieldStatus,
 	FieldEndpointCapabilities,
-	FieldLegacyGroupID,
 }
 
 var (
@@ -165,18 +153,6 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
-// ByLegacyGroupID orders the results by the legacy_group_id field.
-func ByLegacyGroupID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLegacyGroupID, opts...).ToFunc()
-}
-
-// ByLegacyGroupField orders the results by legacy_group field.
-func ByLegacyGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newLegacyGroupStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByModelRulesCount orders the results by model_rules count.
 func ByModelRulesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -231,13 +207,6 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newUsageLogsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
-}
-func newLegacyGroupStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(LegacyGroupInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, LegacyGroupTable, LegacyGroupColumn),
-	)
 }
 func newModelRulesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

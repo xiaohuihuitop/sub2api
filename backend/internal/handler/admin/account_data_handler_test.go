@@ -223,7 +223,7 @@ func TestExportDataPassesAccountFiltersAndSort(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/api/v1/admin/accounts/data?platform=openai&type=oauth&status=active&group=12&privacy_mode=blocked&search=keyword&sort_by=priority&sort_order=desc",
+		"/api/v1/admin/accounts/data?platform=openai&type=oauth&status=active&platform_id=12&privacy_mode=blocked&search=keyword&sort_by=priority&sort_order=desc",
 		nil,
 	)
 	router.ServeHTTP(rec, req)
@@ -233,7 +233,7 @@ func TestExportDataPassesAccountFiltersAndSort(t *testing.T) {
 	require.Equal(t, "openai", adminSvc.lastListAccounts.platform)
 	require.Equal(t, "oauth", adminSvc.lastListAccounts.accountType)
 	require.Equal(t, "active", adminSvc.lastListAccounts.status)
-	require.Equal(t, int64(12), adminSvc.lastListAccounts.groupID)
+	require.Equal(t, int64(12), adminSvc.lastListAccounts.platformID)
 	require.Equal(t, "blocked", adminSvc.lastListAccounts.privacyMode)
 	require.Equal(t, "keyword", adminSvc.lastListAccounts.search)
 	require.Equal(t, "priority", adminSvc.lastListAccounts.sortBy)
@@ -259,7 +259,7 @@ func TestExportDataSelectedIDsOverrideFilters(t *testing.T) {
 	require.Equal(t, 0, adminSvc.lastListAccounts.calls)
 }
 
-func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
+func TestImportDataReusesProxy(t *testing.T) {
 	router, adminSvc := setupAccountDataRouter()
 
 	adminSvc.proxies = []service.Proxy{
@@ -304,7 +304,6 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 				},
 			},
 		},
-		"skip_default_group_bind": true,
 	}
 
 	body, _ := json.Marshal(dataPayload)
@@ -316,5 +315,4 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 
 	require.Len(t, adminSvc.createdProxies, 0)
 	require.Len(t, adminSvc.createdAccounts, 1)
-	require.True(t, adminSvc.createdAccounts[0].SkipDefaultGroupBind)
 }

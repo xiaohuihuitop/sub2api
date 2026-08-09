@@ -58,10 +58,6 @@
  *
  * ```ts
  * import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
- *
- * const flagAvailableChannels = makeSidebarFlag(FeatureFlags.availableChannels)
- * // ...
- * { path: '/available-channels', label: ..., featureFlag: flagAvailableChannels }
  * ```
  *
  * `isFeatureFlagEnabled(flag)` returns the resolved boolean (`true` = show).
@@ -98,11 +94,6 @@ export const FeatureFlags = {
     key: 'channel_monitor_enabled',
     mode: 'opt-out',
     label: 'Channel Monitor',
-  }),
-  availableChannels: defineFlag({
-    key: 'available_channels_enabled',
-    mode: 'opt-in',
-    label: 'Available Channels',
   }),
   modelPlaza: defineFlag({
     key: 'model_plaza_enabled',

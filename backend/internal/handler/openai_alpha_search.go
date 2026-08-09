@@ -26,12 +26,12 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 	requestStart := time.Now()
 
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
-	if !ok || apiKey.Group == nil {
+	if !ok || apiKey == nil {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
 	}
-	if apiKey.Group.Platform != service.PlatformOpenAI {
-		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Codex alpha search is only available for OpenAI groups")
+	if effectiveAPIKeyPlatform(c, apiKey) != service.PlatformOpenAI {
+		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Codex alpha search is only available for OpenAI platforms")
 		return
 	}
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
@@ -44,7 +44,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		"handler.openai_gateway.alpha_search",
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
 	if !h.ensureResponsesDependencies(c, reqLog) {
 		return
@@ -83,8 +83,8 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		return
 	}
 
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, requestedModel)
-	forwardBody := openAIModelMappedBody(body, channelMapping.Mapped, channelMapping.MappedModel, h.gatewayService.ReplaceModelInBody)
+	modelMapping := h.gatewayService.ResolvePlatformModelMapping(c.Request.Context(), requestedModel)
+	forwardBody := openAIModelMappedBody(body, modelMapping.Mapped, modelMapping.MappedModel, h.gatewayService.ReplaceModelInBody)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 
@@ -96,7 +96,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		defer userRelease()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -116,7 +116,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 	for {
 		selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 			c.Request.Context(),
-			apiKey.GroupID,
+			service.PlatformSchedulingID(c.Request.Context()),
 			"",
 			sessionHash,
 			requestedModel,
@@ -151,7 +151,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 
 		account := selection.Account
 		setOpsSelectedAccount(c, account.ID, account.Platform)
-		accountRelease, acquired := h.acquireResponsesAccountSlot(c, apiKey.GroupID, sessionHash, selection, false, &streamStarted, reqLog)
+		accountRelease, acquired := h.acquireResponsesAccountSlot(c, service.PlatformSchedulingID(c.Request.Context()), sessionHash, selection, false, &streamStarted, reqLog)
 		if !acquired {
 			return
 		}
@@ -170,7 +170,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		if err == nil {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(requestedModel), true, nil)
 			if result != nil {
-				h.recordAlphaSearchUsage(c, apiKey, account, subscription, channelMapping, requestedModel, body, result, subject.UserID)
+				h.recordAlphaSearchUsage(c, apiKey, account, subscription, modelMapping, requestedModel, body, result, subject.UserID)
 			}
 			return
 		}
@@ -225,7 +225,7 @@ func (h *OpenAIGatewayHandler) recordAlphaSearchUsage(
 	apiKey *service.APIKey,
 	account *service.Account,
 	subscription *service.UserSubscription,
-	channelMapping service.ChannelMappingResult,
+	modelMapping service.ModelMappingResult,
 	requestedModel string,
 	body []byte,
 	result *service.OpenAIForwardResult,
@@ -241,26 +241,26 @@ func (h *OpenAIGatewayHandler) recordAlphaSearchUsage(
 
 	h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
-			Result:             result,
-			APIKey:             apiKey,
-			User:               apiKey.User,
-			Account:            account,
-			Subscription:       subscription,
-			InboundEndpoint:    inboundEndpoint,
-			UpstreamEndpoint:   upstreamEndpoint,
-			UserAgent:          userAgent,
-			IPAddress:          clientIP,
-			RequestPayloadHash: requestPayloadHash,
-			APIKeyService:      h.apiKeyService,
-			QuotaPlatform:      quotaPlatform,
-			SessionID:          sessionID,
-			ChannelUsageFields: channelMapping.ToUsageFields(requestedModel, result.UpstreamModel),
+			Result:                  result,
+			APIKey:                  apiKey,
+			User:                    apiKey.User,
+			Account:                 account,
+			Subscription:            subscription,
+			InboundEndpoint:         inboundEndpoint,
+			UpstreamEndpoint:        upstreamEndpoint,
+			UserAgent:               userAgent,
+			IPAddress:               clientIP,
+			RequestPayloadHash:      requestPayloadHash,
+			APIKeyService:           h.apiKeyService,
+			QuotaPlatform:           quotaPlatform,
+			SessionID:               sessionID,
+			ModelRoutingUsageFields: modelMapping.ToUsageFields(requestedModel, result.UpstreamModel),
 		}); err != nil {
 			logger.L().With(
 				zap.String("component", "handler.openai_gateway.alpha_search"),
 				zap.Int64("user_id", userID),
 				zap.Int64("api_key_id", apiKey.ID),
-				zap.Any("group_id", apiKey.GroupID),
+				zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 				zap.String("model", requestedModel),
 				zap.Int64("account_id", account.ID),
 			).Error("openai_alpha_search.record_usage_failed", zap.Error(err))

@@ -16,20 +16,20 @@ func TestOpsRepositoryGetOpenAITokenStats_PaginationMode(t *testing.T) {
 
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(24 * time.Hour)
-	groupID := int64(9)
+	platformID := int64(9)
 
 	filter := &service.OpsOpenAITokenStatsFilter{
-		TimeRange: "1d",
-		StartTime: start,
-		EndTime:   end,
-		Platform:  " OpenAI ",
-		GroupID:   &groupID,
-		Page:      2,
-		PageSize:  10,
+		TimeRange:  "1d",
+		StartTime:  start,
+		EndTime:    end,
+		Platform:   " OpenAI ",
+		PlatformID: &platformID,
+		Page:       2,
+		PageSize:   10,
 	}
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM stats`).
-		WithArgs(start, end, groupID, "openai").
+		WithArgs(start, end, platformID, "openai").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(3)))
 
 	rows := sqlmock.NewRows([]string{
@@ -45,7 +45,7 @@ func TestOpsRepositoryGetOpenAITokenStats_PaginationMode(t *testing.T) {
 		AddRow("gpt-4.1", int64(20), 10.2, 240.0, int64(2500), int64(900), int64(20))
 
 	mock.ExpectQuery(`ORDER BY request_count DESC, model ASC\s+LIMIT \$5 OFFSET \$6`).
-		WithArgs(start, end, groupID, "openai", 10, 10).
+		WithArgs(start, end, platformID, "openai", 10, 10).
 		WillReturnRows(rows)
 
 	resp, err := repo.GetOpenAITokenStats(context.Background(), filter)
@@ -56,8 +56,8 @@ func TestOpsRepositoryGetOpenAITokenStats_PaginationMode(t *testing.T) {
 	require.Equal(t, 10, resp.PageSize)
 	require.Nil(t, resp.TopN)
 	require.Equal(t, "openai", resp.Platform)
-	require.NotNil(t, resp.GroupID)
-	require.Equal(t, groupID, *resp.GroupID)
+	require.NotNil(t, resp.PlatformID)
+	require.Equal(t, platformID, *resp.PlatformID)
 	require.Len(t, resp.Items, 2)
 	require.Equal(t, "gpt-4o-mini", resp.Items[0].Model)
 	require.NotNil(t, resp.Items[0].AvgTokensPerSec)

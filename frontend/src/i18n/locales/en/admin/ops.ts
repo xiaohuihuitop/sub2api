@@ -246,7 +246,7 @@ export default {
         context: 'Context',
         platform: 'Platform',
         model: 'Model',
-        group: 'Group',
+        routingPlatform: 'Routing Platform',
         user: 'User',
         userId: 'User ID',
         apiKey: 'API Key',
@@ -343,7 +343,7 @@ export default {
         basicInfo: 'Basic Info',
         platform: 'Platform',
         model: 'Model',
-        group: 'Group',
+        routingPlatform: 'Routing Platform',
         user: 'User',
         account: 'Account',
         latency: 'Request Duration',
@@ -478,7 +478,6 @@ export default {
         deleteConfirmMessage: 'This will remove the rule and its related events. Continue?',
         metricGroups: {
           system: 'System Metrics',
-          group: 'Group-level Metrics (requires group_id)',
           account: 'Account-level Metrics'
         },
         metrics: {
@@ -490,9 +489,6 @@ export default {
           cpu: 'CPU Usage (%)',
           memory: 'Memory Usage (%)',
           queueDepth: 'Concurrency Queue Depth',
-          groupAvailableAccounts: 'Group Available Accounts',
-          groupAvailableRatio: 'Group Available Ratio (%)',
-          groupRateLimitRatio: 'Group Rate Limit Ratio (%)',
           accountRateLimitedCount: 'Rate-limited Accounts',
           accountErrorCount: 'Error Accounts (excluding temporarily unschedulable)',
           accountErrorRatio: 'Error Account Ratio (%)',
@@ -508,9 +504,6 @@ export default {
           cpu: 'Current instance CPU usage (0-100).',
           memory: 'Current instance memory usage (0-100).',
           queueDepth: 'Concurrency queue depth within the window (queued requests).',
-          groupAvailableAccounts: 'Number of available accounts in the selected group (requires group_id).',
-          groupAvailableRatio: 'Available account ratio in the selected group (0-100, requires group_id).',
-          groupRateLimitRatio: 'Rate-limited account ratio in the selected group (0-100, requires group_id).',
           accountRateLimitedCount: 'Number of rate-limited accounts within the window.',
           accountErrorCount: 'Number of error accounts within the window (excluding temporarily unschedulable).',
           accountErrorRatio: 'Error account ratio within the window (0-100).',
@@ -518,9 +511,7 @@ export default {
           overloadAccountCount: 'Number of overloaded accounts within the window.'
         },
         hints: {
-          recommended: 'Recommended: operator {operator}, threshold {threshold}{unit}',
-          groupRequired: 'This is a group-level metric; selecting a group (group_id) is required.',
-          groupOptional: 'Optional: limit the rule to a specific group via group_id.'
+          recommended: 'Recommended: operator {operator}, threshold {threshold}{unit}'
         },
         table: {
           name: 'Name',
@@ -534,9 +525,6 @@ export default {
           description: 'Description',
           metric: 'Metric',
           operator: 'Operator',
-          groupId: 'Group (group_id)',
-          groupPlaceholder: 'Select a group',
-          allGroups: 'All groups',
           threshold: 'Threshold',
           severity: 'Severity',
           window: 'Window (minutes)',
@@ -550,7 +538,6 @@ export default {
           invalid: 'Invalid rule',
           nameRequired: 'Name is required',
           metricRequired: 'Metric is required',
-          groupIdRequired: 'group_id is required for group-level metrics',
           operatorRequired: 'Operator is required',
           thresholdRequired: 'Threshold must be a number',
           windowRange: 'Window must be one of: 1, 5, 60 minutes',
@@ -567,7 +554,6 @@ export default {
         saveSuccess: 'Runtime settings saved',
         saveFailed: 'Failed to save runtime settings',
         alertTitle: 'Alert Evaluator',
-        groupAvailabilityTitle: 'Group Availability Monitor',
         evalIntervalSeconds: 'Evaluation Interval (seconds)',
         silencing: {
           title: 'Alert Silencing (Maintenance Mode)',
@@ -739,7 +725,7 @@ export default {
       concurrency: {
         title: 'Concurrency / Queue',
         byPlatform: 'By Platform',
-        byGroup: 'By Group',
+        byPlatformPool: 'By Platform Pool',
         byAccount: 'By Account',
         byUser: 'By User',
         showByUserTooltip: 'Switch to user view to see concurrency usage per user',

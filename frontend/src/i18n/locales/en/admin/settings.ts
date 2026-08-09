@@ -23,13 +23,6 @@ export default {
           defaultInterval: 'Default check interval (seconds)',
           defaultIntervalHint: 'Pre-fills the interval when creating a new monitor; each monitor can override it. Range 15 – 3600.',
         },
-        availableChannels: {
-          title: 'Available Channels',
-          description: 'Show logged-in users an aggregate view of the channels, models and pricing they can access. Disabled by default.',
-          configureLink: 'Configure model pricing in Channel Management > Channel Pricing',
-          enabled: 'Enable Available Channels',
-          enabledHint: 'When off, the sidebar entry is hidden and the endpoint returns an empty list.',
-        },
         modelPlaza: {
           title: 'Model Plaza',
           description: 'A public page showcasing available models and pricing by group. Disabled by default.',
@@ -328,9 +321,6 @@ export default {
         defaultSubscriptionsEmpty: 'No default subscriptions configured.',
         defaultSubscriptionsDuplicate: 'Duplicate default subscription: {reference}.',
         subscriptionPlan: 'Subscription Plan',
-        legacySubscription: 'Legacy configuration: group #{groupId}, {days} days',
-        subscriptionGroup: 'Subscription Group',
-        subscriptionValidityDays: 'Validity (days)',
         defaultPlatformQuotas: 'Default Platform Quotas (on signup)',
         defaultPlatformQuotasHint: 'Automatically assigned to new users on signup; existing users are not affected. Leave blank = unlimited.',
         platformQuotaNotice: 'Monthly quota uses a 30-day rolling window, not a calendar month.',
@@ -356,9 +346,7 @@ export default {
       },
       scheduling: {
         title: 'Gateway Scheduling Settings',
-        description: 'Control API Key scheduling behavior',
-        allowUngroupedKey: 'Allow Ungrouped Key Scheduling',
-        allowUngroupedKeyHint: 'When disabled, API Keys not assigned to any group cannot make requests (403 Forbidden). Keep disabled to ensure all Keys belong to a specific group.'
+        description: 'Control API Key scheduling behavior'
       },
       upstreamBillingProbe: {
         title: 'Upstream Rate Auto Detection',

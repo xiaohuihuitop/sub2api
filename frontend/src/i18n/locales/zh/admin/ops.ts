@@ -246,7 +246,7 @@ export default {
         context: '上下文',
         platform: '平台',
         model: '模型',
-        group: '分组',
+        routingPlatform: '路由平台',
         user: '用户',
         userId: '用户 ID',
         apiKey: 'API Key',
@@ -343,7 +343,7 @@ export default {
         basicInfo: '基本信息',
         platform: '平台',
         model: '模型',
-        group: '分组',
+        routingPlatform: '路由平台',
         user: '用户',
         account: '账号',
         latency: '请求时长',
@@ -478,7 +478,6 @@ export default {
         manage: '预警规则',
         metricGroups: {
           system: '系统指标',
-          group: '分组级别指标（需 group_id）',
           account: '账号级别指标'
         },
         metrics: {
@@ -490,9 +489,6 @@ export default {
           cpu: 'CPU 使用率 (%)',
           memory: '内存使用率 (%)',
           queueDepth: '并发排队深度',
-          groupAvailableAccounts: '分组可用账号数',
-          groupAvailableRatio: '分组可用比例 (%)',
-          groupRateLimitRatio: '分组限流比例 (%)',
           accountRateLimitedCount: '限流账号数',
           accountErrorCount: '错误账号数（不含临时不可调度）',
           accountErrorRatio: '错误账号比例 (%)',
@@ -508,9 +504,6 @@ export default {
           cpu: '当前实例 CPU 使用率（0~100）。',
           memory: '当前实例内存使用率（0~100）。',
           queueDepth: '统计窗口内并发队列排队深度（等待中的请求数）。',
-          groupAvailableAccounts: '指定分组中当前可用账号数量（需要 group_id 过滤）。',
-          groupAvailableRatio: '指定分组中可用账号占比（0~100，需要 group_id 过滤）。',
-          groupRateLimitRatio: '指定分组中账号被限流的比例（0~100，需要 group_id 过滤）。',
           accountRateLimitedCount: '统计窗口内被限流的账号数量。',
           accountErrorCount: '统计窗口内产生错误的账号数量（不含临时不可调度）。',
           accountErrorRatio: '统计窗口内错误账号占比（0~100）。',
@@ -518,9 +511,7 @@ export default {
           overloadAccountCount: '统计窗口内过载账号数量。'
         },
         hints: {
-          recommended: '推荐：运算符 {operator}，阈值 {threshold}{unit}',
-          groupRequired: '该指标为分组级别指标，必须选择分组（group_id）。',
-          groupOptional: '可选：通过 group_id 将规则限定到某个分组。'
+          recommended: '推荐：运算符 {operator}，阈值 {threshold}{unit}'
         },
         table: {
           name: '名称',
@@ -534,9 +525,6 @@ export default {
           description: '描述',
           metric: '指标',
           operator: '运算符',
-          groupId: '分组（group_id）',
-          groupPlaceholder: '请选择分组',
-          allGroups: '全部分组',
           threshold: '阈值',
           severity: '级别',
           window: '统计窗口（分钟）',
@@ -550,7 +538,6 @@ export default {
           invalid: '规则不合法',
           nameRequired: '名称不能为空',
           metricRequired: '指标不能为空',
-          groupIdRequired: '分组级别指标必须指定 group_id',
           operatorRequired: '运算符不能为空',
           thresholdRequired: '阈值必须为数字',
           windowRange: '统计窗口必须为 1 / 5 / 60 分钟之一',
@@ -567,7 +554,6 @@ export default {
         saveSuccess: '运行设置已保存',
         saveFailed: '保存运行设置失败',
         alertTitle: '告警评估器',
-        groupAvailabilityTitle: '分组可用性监控',
         evalIntervalSeconds: '评估间隔（秒）',
         silencing: {
           title: '告警静默（维护模式）',
@@ -740,7 +726,7 @@ export default {
       concurrency: {
         title: '并发 / 排队',
         byPlatform: '按平台',
-        byGroup: '按分组',
+        byPlatformPool: '按平台池',
         byAccount: '按账号',
         byUser: '按用户',
         showByUserTooltip: '切换用户视图，显示每个用户的并发使用情况',

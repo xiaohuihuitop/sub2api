@@ -135,11 +135,6 @@ func PlanID(v int64) predicate.PaymentOrder {
 	return predicate.PaymentOrder(sql.FieldEQ(FieldPlanID, v))
 }
 
-// SubscriptionGroupID applies equality check predicate on the "subscription_group_id" field. It's identical to SubscriptionGroupIDEQ.
-func SubscriptionGroupID(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldEQ(FieldSubscriptionGroupID, v))
-}
-
 // SubscriptionDays applies equality check predicate on the "subscription_days" field. It's identical to SubscriptionDaysEQ.
 func SubscriptionDays(v int) predicate.PaymentOrder {
 	return predicate.PaymentOrder(sql.FieldEQ(FieldSubscriptionDays, v))
@@ -1188,56 +1183,6 @@ func PlanIDIsNil() predicate.PaymentOrder {
 // PlanIDNotNil applies the NotNil predicate on the "plan_id" field.
 func PlanIDNotNil() predicate.PaymentOrder {
 	return predicate.PaymentOrder(sql.FieldNotNull(FieldPlanID))
-}
-
-// SubscriptionGroupIDEQ applies the EQ predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDEQ(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldEQ(FieldSubscriptionGroupID, v))
-}
-
-// SubscriptionGroupIDNEQ applies the NEQ predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDNEQ(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldNEQ(FieldSubscriptionGroupID, v))
-}
-
-// SubscriptionGroupIDIn applies the In predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDIn(vs ...int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldIn(FieldSubscriptionGroupID, vs...))
-}
-
-// SubscriptionGroupIDNotIn applies the NotIn predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDNotIn(vs ...int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldNotIn(FieldSubscriptionGroupID, vs...))
-}
-
-// SubscriptionGroupIDGT applies the GT predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDGT(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldGT(FieldSubscriptionGroupID, v))
-}
-
-// SubscriptionGroupIDGTE applies the GTE predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDGTE(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldGTE(FieldSubscriptionGroupID, v))
-}
-
-// SubscriptionGroupIDLT applies the LT predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDLT(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldLT(FieldSubscriptionGroupID, v))
-}
-
-// SubscriptionGroupIDLTE applies the LTE predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDLTE(v int64) predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldLTE(FieldSubscriptionGroupID, v))
-}
-
-// SubscriptionGroupIDIsNil applies the IsNil predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDIsNil() predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldIsNull(FieldSubscriptionGroupID))
-}
-
-// SubscriptionGroupIDNotNil applies the NotNil predicate on the "subscription_group_id" field.
-func SubscriptionGroupIDNotNil() predicate.PaymentOrder {
-	return predicate.PaymentOrder(sql.FieldNotNull(FieldSubscriptionGroupID))
 }
 
 // SubscriptionDaysEQ applies the EQ predicate on the "subscription_days" field.

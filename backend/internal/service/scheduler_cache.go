@@ -16,10 +16,10 @@ const (
 )
 
 var (
-	ErrSchedulerBucketRetired              = errors.New("scheduler bucket retired")
-	ErrSchedulerBucketWriteFenced          = errors.New("scheduler bucket write fenced")
-	ErrSchedulerGroupLifecycleLeaseInvalid = errors.New("scheduler group lifecycle lease invalid")
-	ErrSchedulerGroupLifecycleLeaseLost    = errors.New("scheduler group lifecycle lease lost")
+	ErrSchedulerBucketRetired                 = errors.New("scheduler bucket retired")
+	ErrSchedulerBucketWriteFenced             = errors.New("scheduler bucket write fenced")
+	ErrSchedulerPlatformLifecycleLeaseInvalid = errors.New("scheduler platform lifecycle lease invalid")
+	ErrSchedulerPlatformLifecycleLeaseLost    = errors.New("scheduler platform lifecycle lease lost")
 )
 
 // SchedulerBucketWriteToken fences a snapshot writer to one bucket epoch.
@@ -33,25 +33,25 @@ func (t SchedulerBucketWriteToken) ValidFor(bucket SchedulerBucket) bool {
 	return t.Epoch > 0 && t.Bucket == bucket
 }
 
-// SchedulerGroupLifecycleLease identifies one owner of a group's short-lived
+// SchedulerPlatformLifecycleLease identifies one owner of a group's short-lived
 // retirement/reopen critical section.
-type SchedulerGroupLifecycleLease struct {
-	GroupID    int64
+type SchedulerPlatformLifecycleLease struct {
+	PlatformID int64
 	OwnerToken string
 }
 
-func (l SchedulerGroupLifecycleLease) ValidFor(groupID int64) bool {
-	return groupID > 0 && l.GroupID == groupID && l.OwnerToken != ""
+func (l SchedulerPlatformLifecycleLease) ValidFor(platformID int64) bool {
+	return platformID > 0 && l.PlatformID == platformID && l.OwnerToken != ""
 }
 
 type SchedulerBucket struct {
-	GroupID  int64
-	Platform string
-	Mode     string
+	PlatformID int64
+	Platform   string
+	Mode       string
 }
 
 func (b SchedulerBucket) String() string {
-	return fmt.Sprintf("%d:%s:%s", b.GroupID, b.Platform, b.Mode)
+	return fmt.Sprintf("%d:%s:%s", b.PlatformID, b.Platform, b.Mode)
 }
 
 func ParseSchedulerBucket(raw string) (SchedulerBucket, bool) {
@@ -59,7 +59,7 @@ func ParseSchedulerBucket(raw string) (SchedulerBucket, bool) {
 	if len(parts) != 3 {
 		return SchedulerBucket{}, false
 	}
-	groupID, err := strconv.ParseInt(parts[0], 10, 64)
+	platformID, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
 		return SchedulerBucket{}, false
 	}
@@ -67,9 +67,9 @@ func ParseSchedulerBucket(raw string) (SchedulerBucket, bool) {
 		return SchedulerBucket{}, false
 	}
 	return SchedulerBucket{
-		GroupID:  groupID,
-		Platform: parts[1],
-		Mode:     parts[2],
+		PlatformID: platformID,
+		Platform:   parts[1],
+		Mode:       parts[2],
 	}, true
 }
 
@@ -89,17 +89,17 @@ type SchedulerCache interface {
 	// ReopenBucket is the only operation allowed to clear a tombstone. It returns
 	// the retirement generation established by RetireBucket; repeated calls for
 	// the same generation are idempotent. Callers must serialize a fresh authority
-	// check through ReopenBucket with RetireBucket under the same group lifecycle
+	// check through ReopenBucket with RetireBucket under the same platform lifecycle
 	// lease; ordinary rebuild paths never call ReopenBucket.
 	ReopenBucket(ctx context.Context, bucket SchedulerBucket) (SchedulerBucketWriteToken, error)
-	// TryAcquireGroupLifecycleLease serializes authoritative retirement/reopen
+	// TryAcquirePlatformLifecycleLease serializes authoritative retirement/reopen
 	// decisions for one non-zero group across instances.
-	TryAcquireGroupLifecycleLease(ctx context.Context, groupID int64, ttl time.Duration) (SchedulerGroupLifecycleLease, bool, error)
-	// ReleaseGroupLifecycleLease releases the lease only if its owner token still
+	TryAcquirePlatformLifecycleLease(ctx context.Context, platformID int64, ttl time.Duration) (SchedulerPlatformLifecycleLease, bool, error)
+	// ReleasePlatformLifecycleLease releases the lease only if its owner token still
 	// matches, so an expired holder cannot delete a successor's lease. Missing,
 	// expired, mismatched, and already released leases return
-	// ErrSchedulerGroupLifecycleLeaseLost.
-	ReleaseGroupLifecycleLease(ctx context.Context, lease SchedulerGroupLifecycleLease) error
+	// ErrSchedulerPlatformLifecycleLeaseLost.
+	ReleasePlatformLifecycleLease(ctx context.Context, lease SchedulerPlatformLifecycleLease) error
 	// GetAccount 获取单账号快照。
 	GetAccount(ctx context.Context, accountID int64) (*Account, error)
 	// SetAccount 写入单账号快照（包含不可调度状态）。

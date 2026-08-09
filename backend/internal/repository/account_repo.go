@@ -22,8 +22,6 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
-	dbaccountgroup "github.com/Wei-Shaw/sub2api/ent/accountgroup"
-	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
 	dbplatform "github.com/Wei-Shaw/sub2api/ent/platform"
 	dbpredicate "github.com/Wei-Shaw/sub2api/ent/predicate"
 	dbproxy "github.com/Wei-Shaw/sub2api/ent/proxy"
@@ -93,7 +91,7 @@ func (r *accountRepository) Create(ctx context.Context, account *service.Account
 	if err := createAccountRecord(ctx, r.client, account); err != nil {
 		return err
 	}
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerGroupPayload(account.GroupIDs)); err != nil {
+	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerPlatformPayload(account.PlatformID)); err != nil {
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue account create failed: account=%d err=%v", account.ID, err)
 	}
 	return nil
@@ -173,59 +171,6 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 	return nil
 }
 
-// CreateWithAccountGroups atomically persists an account, its exact per-group priorities,
-// and the scheduler outbox event used to publish the new routing snapshot.
-func (r *accountRepository) CreateWithAccountGroups(ctx context.Context, account *service.Account, groups []service.AccountGroup) error {
-	if account == nil {
-		return service.ErrAccountNilInput
-	}
-	tx, err := r.client.Tx(ctx)
-	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
-		return err
-	}
-
-	var txClient *dbent.Client
-	if err == nil {
-		defer func() { _ = tx.Rollback() }()
-		txClient = tx.Client()
-	} else {
-		// Reuse a caller-owned transaction when this repository is already transactional.
-		txClient = r.client
-	}
-
-	if err := createAccountRecord(ctx, txClient, account); err != nil {
-		return err
-	}
-	groupIDs := make([]int64, 0, len(groups))
-	if len(groups) > 0 {
-		builders := make([]*dbent.AccountGroupCreate, 0, len(groups))
-		for i := range groups {
-			groups[i].AccountID = account.ID
-			groupIDs = append(groupIDs, groups[i].GroupID)
-			builders = append(builders, txClient.AccountGroup.Create().
-				SetAccountID(account.ID).
-				SetGroupID(groups[i].GroupID).
-				SetPriority(groups[i].Priority),
-			)
-		}
-		if _, err := txClient.AccountGroup.CreateBulk(builders...).Save(ctx); err != nil {
-			return err
-		}
-	}
-	account.GroupIDs = groupIDs
-	account.AccountGroups = append([]service.AccountGroup(nil), groups...)
-	if err := enqueueSchedulerOutbox(ctx, txClient, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerGroupPayload(groupIDs)); err != nil {
-		return err
-	}
-
-	if tx != nil {
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (r *accountRepository) GetByID(ctx context.Context, id int64) (*service.Account, error) {
 	m, err := r.client.Account.Query().Where(dbaccount.IDEQ(id)).Only(ctx)
 	if err != nil {
@@ -276,16 +221,9 @@ func (r *accountRepository) GetByIDs(ctx context.Context, ids []int64) ([]*servi
 		return []*service.Account{}, nil
 	}
 
-	accountIDs := make([]int64, 0, len(entAccounts))
 	entByID := make(map[int64]*dbent.Account, len(entAccounts))
 	for _, acc := range entAccounts {
 		entByID[acc.ID] = acc
-		accountIDs = append(accountIDs, acc.ID)
-	}
-
-	groupsByAccount, groupIDsByAccount, accountGroupsByAccount, err := r.loadAccountGroups(ctx, accountIDs)
-	if err != nil {
-		return nil, err
 	}
 
 	outByID := make(map[int64]*service.Account, len(entAccounts))
@@ -300,15 +238,6 @@ func (r *accountRepository) GetByIDs(ctx context.Context, ids []int64) ([]*servi
 			out.Proxy = proxyEntityToService(entAcc.Edges.Proxy)
 		}
 
-		if groups, ok := groupsByAccount[entAcc.ID]; ok {
-			out.Groups = groups
-		}
-		if groupIDs, ok := groupIDsByAccount[entAcc.ID]; ok {
-			out.GroupIDs = groupIDs
-		}
-		if ags, ok := accountGroupsByAccount[entAcc.ID]; ok {
-			out.AccountGroups = ags
-		}
 		outByID[entAcc.ID] = out
 	}
 
@@ -440,7 +369,7 @@ func (r *accountRepository) updateAccount(ctx context.Context, account *service.
 	if err != nil {
 		return translatePersistenceError(err, service.ErrAccountNotFound, nil)
 	}
-	if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerGroupPayload(account.GroupIDs)); err != nil {
+	if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &account.ID, nil, buildSchedulerPlatformPayload(account.PlatformID)); err != nil {
 		return err
 	}
 	if tx != nil {
@@ -774,42 +703,14 @@ func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, cre
 }
 
 func (r *accountRepository) Delete(ctx context.Context, id int64) error {
-	groupIDs, err := r.loadAccountGroupIDs(ctx, id)
-	if err != nil {
+	if _, err := r.client.ExecContext(ctx, "DELETE FROM scheduled_test_plans WHERE account_id = $1", id); err != nil {
 		return err
 	}
-	// 使用事务保证账号与关联分组的删除原子性
-	tx, err := r.client.Tx(ctx)
-	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+	if _, err := r.client.Account.Delete().Where(dbaccount.IDEQ(id)).Exec(ctx); err != nil {
 		return err
-	}
-
-	var txClient *dbent.Client
-	if err == nil {
-		defer func() { _ = tx.Rollback() }()
-		txClient = tx.Client()
-	} else {
-		// 已处于外部事务中（ErrTxStarted），复用当前 client
-		txClient = r.client
-	}
-
-	if _, err := txClient.AccountGroup.Delete().Where(dbaccountgroup.AccountIDEQ(id)).Exec(ctx); err != nil {
-		return err
-	}
-	if _, err := txClient.ExecContext(ctx, "DELETE FROM scheduled_test_plans WHERE account_id = $1", id); err != nil {
-		return err
-	}
-	if _, err := txClient.Account.Delete().Where(dbaccount.IDEQ(id)).Exec(ctx); err != nil {
-		return err
-	}
-
-	if tx != nil {
-		if err := tx.Commit(); err != nil {
-			return err
-		}
 	}
 	r.deleteSchedulerAccountSnapshot(ctx, id)
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, buildSchedulerGroupPayload(groupIDs)); err != nil {
+	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue account delete failed: account=%d err=%v", id, err)
 	}
 	return nil
@@ -819,7 +720,7 @@ func (r *accountRepository) List(ctx context.Context, params pagination.Paginati
 	return r.ListWithFilters(ctx, params, "", "", "", "", 0, "")
 }
 
-func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, groupID int64, privacyMode string) *dbent.AccountQuery {
+func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, platformID int64, privacyMode string) *dbent.AccountQuery {
 	q := r.client.Account.Query()
 
 	if platform != "" {
@@ -892,10 +793,8 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 	if search != "" {
 		q = q.Where(dbaccount.NameContainsFold(search))
 	}
-	if groupID == service.AccountListGroupUngrouped {
-		q = q.Where(dbaccount.Not(dbaccount.HasAccountGroups()))
-	} else if groupID > 0 {
-		q = q.Where(dbaccount.HasAccountGroupsWith(dbaccountgroup.GroupIDEQ(groupID)))
+	if platformID > 0 {
+		q = q.Where(dbaccount.PlatformIDEQ(platformID))
 	}
 	if privacyMode != "" {
 		q = q.Where(dbpredicate.Account(func(s *entsql.Selector) {
@@ -915,8 +814,8 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 	return q
 }
 
-func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
-	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
+func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, platformID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
+	q := r.accountListFilteredQuery(platform, accountType, status, search, platformID, privacyMode)
 	// Clone before Count so interceptor-appended predicates (SoftDeleteMixin's
 	// deleted_at IS NULL) don't accumulate on the shared builder and pollute the
 	// subsequent list query. Same pattern used in group_repo/promo_code_repo/user_repo
@@ -945,15 +844,15 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 	return outAccounts, paginationResultFromTotal(int64(total), params), nil
 }
 
-func (r *accountRepository) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {
-	accounts, err := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode).All(ctx)
+func (r *accountRepository) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, platformID int64, privacyMode string) ([]service.Account, error) {
+	accounts, err := r.accountListFilteredQuery(platform, accountType, status, search, platformID, privacyMode).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return r.accountsToService(ctx, accounts)
 }
 
-func (r *accountRepository) ListOpsAccountsForStats(ctx context.Context, platformFilter string, groupIDFilter *int64) ([]service.Account, error) {
+func (r *accountRepository) ListOpsAccountsForStats(ctx context.Context, platformFilter string, platformIDFilter *int64) ([]service.Account, error) {
 	if r == nil || r.client == nil {
 		return []service.Account{}, nil
 	}
@@ -962,15 +861,15 @@ func (r *accountRepository) ListOpsAccountsForStats(ctx context.Context, platfor
 	if platformFilter = strings.TrimSpace(platformFilter); platformFilter != "" {
 		q = q.Where(dbaccount.PlatformEQ(platformFilter))
 	}
-	if groupIDFilter != nil && *groupIDFilter > 0 {
-		q = q.Where(dbaccount.HasAccountGroupsWith(dbaccountgroup.GroupIDEQ(*groupIDFilter)))
+	if platformIDFilter != nil && *platformIDFilter > 0 {
+		q = q.Where(dbaccount.PlatformIDEQ(*platformIDFilter))
 	}
-
 	accounts, err := q.
 		Select(
 			dbaccount.FieldID,
 			dbaccount.FieldName,
 			dbaccount.FieldPlatform,
+			dbaccount.FieldPlatformID,
 			dbaccount.FieldConcurrency,
 			dbaccount.FieldLoadFactor,
 			dbaccount.FieldStatus,
@@ -985,7 +884,35 @@ func (r *accountRepository) ListOpsAccountsForStats(ctx context.Context, platfor
 	if err != nil {
 		return nil, err
 	}
-	return r.accountsToService(ctx, accounts)
+	result, err := r.accountsToService(ctx, accounts)
+	if err != nil || len(result) == 0 {
+		return result, err
+	}
+
+	platformIDs := make([]int64, 0, len(result))
+	for _, account := range result {
+		if account.PlatformID != nil && *account.PlatformID > 0 {
+			platformIDs = append(platformIDs, *account.PlatformID)
+		}
+	}
+	platformIDs = uniquePositiveInt64s(platformIDs)
+	if len(platformIDs) == 0 {
+		return result, nil
+	}
+	platforms, err := r.client.Platform.Query().Where(dbplatform.IDIn(platformIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[int64]string, len(platforms))
+	for _, platform := range platforms {
+		names[platform.ID] = platform.Name
+	}
+	for i := range result {
+		if result[i].PlatformID != nil {
+			result[i].PlatformName = names[*result[i].PlatformID]
+		}
+	}
+	return result, nil
 }
 
 func accountListOrder(params pagination.PaginationParams) []func(*entsql.Selector) {
@@ -1078,16 +1005,6 @@ func upstreamBillingRateSortExpression(extra string) string {
 	return "CASE WHEN " + status + " IN ('ok', 'failed') AND (jsonb_typeof(" + resolvedJSON + ") = 'number' OR jsonb_typeof(" + effectiveJSON + ") = 'number') THEN CASE WHEN jsonb_typeof(" +
 		resolvedJSON + ") = 'number' AND jsonb_typeof(" + peakEnabledJSON + ") = 'boolean' THEN CASE WHEN " + billingScope + " = 'token' THEN " + dynamicRate + " ELSE NULL END WHEN " + legacySnapshot +
 		" AND jsonb_typeof(" + effectiveJSON + ") = 'number' THEN (" + effective + ")::numeric END END"
-}
-
-func (r *accountRepository) ListByGroup(ctx context.Context, groupID int64) ([]service.Account, error) {
-	accounts, err := r.queryAccountsByGroup(ctx, groupID, accountGroupQueryOptions{
-		status: service.StatusActive,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return accounts, nil
 }
 
 func (r *accountRepository) ListActive(ctx context.Context) ([]service.Account, error) {
@@ -1315,7 +1232,7 @@ func (r *accountRepository) SetGrokCredentialErrorIfMatch(
 			))
 		RETURNING a.id
 		)
-		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)
 		SELECT $10, updated.id, NULL, NULL FROM updated
 	`, service.StatusError, errorMsg, id, service.StatusActive, service.PlatformGrok, service.AccountTypeOAuth,
 		snapshot.CredentialsJSON, snapshot.ProxyID, string(service.GrokCredentialReasonProxyInvalid),
@@ -1365,7 +1282,7 @@ func (r *accountRepository) SetGrokOAuthErrorIfCredentialsUnchanged(
 			AND NULLIF(BTRIM(a.credentials->>'refresh_token'), '') IS NULL
 		RETURNING a.id
 		)
-		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)
 		SELECT $8, updated.id, NULL, NULL FROM updated
 	`,
 		service.StatusError,
@@ -1427,7 +1344,7 @@ func (r *accountRepository) UpdateGrokOAuthCredentialsIfUnchanged(
 			AND a.proxy_id IS NOT DISTINCT FROM $6
 		RETURNING a.id
 		)
-		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)
 		SELECT $7, updated.id, NULL, NULL FROM updated
 	`,
 		string(credentialsJSON),
@@ -1486,7 +1403,7 @@ func (r *accountRepository) SetGrokOAuthRefreshErrorIfCredentialsUnchanged(
 			AND a.proxy_id IS NOT DISTINCT FROM $8
 		RETURNING a.id
 		)
-		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)
 		SELECT $9, updated.id, NULL, NULL FROM updated
 	`,
 		service.StatusError,
@@ -1547,7 +1464,7 @@ func (r *accountRepository) SetGrokOAuthRefreshTempUnschedulableIfCredentialsUnc
 			AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until < $1)
 		RETURNING a.id
 		)
-		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)
 		SELECT $9, updated.id, NULL, NULL FROM updated
 	`,
 		until,
@@ -1668,112 +1585,6 @@ func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *accountRepository) AddToGroup(ctx context.Context, accountID, groupID int64, priority int) error {
-	_, err := r.client.AccountGroup.Create().
-		SetAccountID(accountID).
-		SetGroupID(groupID).
-		SetPriority(priority).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	payload := buildSchedulerGroupPayload([]int64{groupID})
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountGroupsChanged, &accountID, nil, payload); err != nil {
-		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue add to group failed: account=%d group=%d err=%v", accountID, groupID, err)
-	}
-	return nil
-}
-
-func (r *accountRepository) RemoveFromGroup(ctx context.Context, accountID, groupID int64) error {
-	_, err := r.client.AccountGroup.Delete().
-		Where(
-			dbaccountgroup.AccountIDEQ(accountID),
-			dbaccountgroup.GroupIDEQ(groupID),
-		).
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-	payload := buildSchedulerGroupPayload([]int64{groupID})
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountGroupsChanged, &accountID, nil, payload); err != nil {
-		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue remove from group failed: account=%d group=%d err=%v", accountID, groupID, err)
-	}
-	return nil
-}
-
-func (r *accountRepository) GetGroups(ctx context.Context, accountID int64) ([]service.Group, error) {
-	groups, err := r.client.Group.Query().
-		Where(
-			dbgroup.HasAccountsWith(dbaccount.IDEQ(accountID)),
-		).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	outGroups := make([]service.Group, 0, len(groups))
-	for i := range groups {
-		outGroups = append(outGroups, *groupEntityToService(groups[i]))
-	}
-	return outGroups, nil
-}
-
-func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error {
-	existingGroupIDs, err := r.loadAccountGroupIDs(ctx, accountID)
-	if err != nil {
-		return err
-	}
-	// 使用事务保证删除旧绑定与创建新绑定的原子性
-	tx, err := r.client.Tx(ctx)
-	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
-		return err
-	}
-
-	var txClient *dbent.Client
-	if err == nil {
-		defer func() { _ = tx.Rollback() }()
-		txClient = tx.Client()
-	} else {
-		// 已处于外部事务中（ErrTxStarted），复用当前 client
-		txClient = r.client
-	}
-
-	if _, err := txClient.AccountGroup.Delete().Where(dbaccountgroup.AccountIDEQ(accountID)).Exec(ctx); err != nil {
-		return err
-	}
-
-	if len(groupIDs) == 0 {
-		if tx != nil {
-			return tx.Commit()
-		}
-		return nil
-	}
-
-	builders := make([]*dbent.AccountGroupCreate, 0, len(groupIDs))
-	for i, groupID := range groupIDs {
-		builders = append(builders, txClient.AccountGroup.Create().
-			SetAccountID(accountID).
-			SetGroupID(groupID).
-			SetPriority(i+1),
-		)
-	}
-
-	if _, err := txClient.AccountGroup.CreateBulk(builders...).Save(ctx); err != nil {
-		return err
-	}
-
-	if tx != nil {
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-	}
-	payload := buildSchedulerGroupPayload(mergeGroupIDs(existingGroupIDs, groupIDs))
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountGroupsChanged, &accountID, nil, payload); err != nil {
-		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue bind groups failed: account=%d err=%v", accountID, err)
-	}
-	return nil
-}
-
 func (r *accountRepository) ListSchedulable(ctx context.Context) ([]service.Account, error) {
 	accounts, err := r.schedulableAccountsQuery(time.Now()).All(ctx)
 	if err != nil {
@@ -1822,97 +1633,6 @@ func (r *accountRepository) schedulableAccountsQuery(now time.Time) *dbent.Accou
 		Order(dbent.Asc(dbaccount.FieldPriority))
 }
 
-func (r *accountRepository) ListSchedulableByGroupID(ctx context.Context, groupID int64) ([]service.Account, error) {
-	return r.queryAccountsByGroup(ctx, groupID, accountGroupQueryOptions{
-		status:      service.StatusActive,
-		schedulable: true,
-	})
-}
-
-func (r *accountRepository) ListSchedulableCapacityByGroupIDs(ctx context.Context, groupIDs []int64) ([]service.GroupAccountCapacityRow, error) {
-	groupIDs = uniquePositiveInt64s(groupIDs)
-	if len(groupIDs) == 0 {
-		return []service.GroupAccountCapacityRow{}, nil
-	}
-	if r.sql == nil {
-		rows := make([]service.GroupAccountCapacityRow, 0)
-		for _, groupID := range groupIDs {
-			accounts, err := r.ListSchedulableByGroupID(ctx, groupID)
-			if err != nil {
-				return nil, err
-			}
-			for i := range accounts {
-				acc := &accounts[i]
-				rows = append(rows, service.GroupAccountCapacityRow{
-					GroupID:             groupID,
-					AccountID:           acc.ID,
-					Concurrency:         acc.Concurrency,
-					Extra:               copyJSONMap(acc.Extra),
-					SessionWindowStart:  acc.SessionWindowStart,
-					SessionWindowEnd:    acc.SessionWindowEnd,
-					SessionWindowStatus: acc.SessionWindowStatus,
-				})
-			}
-		}
-		return rows, nil
-	}
-
-	rows, err := r.sql.QueryContext(ctx, `
-		SELECT
-			ag.group_id,
-			a.id AS account_id,
-			a.concurrency,
-			COALESCE(a.extra, '{}'::jsonb)::text AS extra,
-			a.session_window_start,
-			a.session_window_end,
-			COALESCE(a.session_window_status, '') AS session_window_status
-		FROM account_groups ag
-		JOIN accounts a ON a.id = ag.account_id
-		WHERE ag.group_id = ANY($1)
-			AND a.deleted_at IS NULL
-			AND a.status = $2
-			AND a.schedulable = TRUE
-			AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until <= $3)
-			AND (a.expires_at IS NULL OR a.expires_at > $3 OR a.auto_pause_on_expired = FALSE)
-			AND (a.overload_until IS NULL OR a.overload_until <= $3)
-			AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at <= $3)
-		ORDER BY ag.group_id ASC, ag.priority ASC, a.priority ASC, a.id ASC
-	`, pq.Array(groupIDs), service.StatusActive, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	out := make([]service.GroupAccountCapacityRow, 0)
-	for rows.Next() {
-		var row service.GroupAccountCapacityRow
-		var extraRaw string
-		if err := rows.Scan(
-			&row.GroupID,
-			&row.AccountID,
-			&row.Concurrency,
-			&extraRaw,
-			&row.SessionWindowStart,
-			&row.SessionWindowEnd,
-			&row.SessionWindowStatus,
-		); err != nil {
-			return nil, err
-		}
-		if extraRaw != "" && extraRaw != "null" {
-			var extra map[string]any
-			if err := json.Unmarshal([]byte(extraRaw), &extra); err != nil {
-				return nil, err
-			}
-			row.Extra = extra
-		}
-		out = append(out, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (r *accountRepository) ListSchedulableByPlatform(ctx context.Context, platform string) ([]service.Account, error) {
 	now := time.Now()
 	accounts, err := r.client.Account.Query().
@@ -1933,9 +1653,7 @@ func (r *accountRepository) ListSchedulableByPlatform(ctx context.Context, platf
 	return r.accountsToService(ctx, accounts)
 }
 
-// ListSchedulableByPlatformPool is the V2 account-pool query. It deliberately
-// does not inspect account_groups: a platform-owned pool must not inherit old
-// routing membership or accidentally mix with another platform.
+// ListSchedulableByPlatformPool queries one platform-owned account pool.
 func (r *accountRepository) ListSchedulableByPlatformPool(ctx context.Context, platformID int64, platform string) ([]service.Account, error) {
 	if platformID <= 0 || strings.TrimSpace(platform) == "" {
 		return []service.Account{}, nil
@@ -1994,15 +1712,6 @@ func (r *accountRepository) ValidatePlatformAccountBinding(ctx context.Context, 
 	return nil
 }
 
-func (r *accountRepository) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]service.Account, error) {
-	// 单平台查询复用多平台逻辑，保持过滤条件与排序策略一致。
-	return r.queryAccountsByGroup(ctx, groupID, accountGroupQueryOptions{
-		status:      service.StatusActive,
-		schedulable: true,
-		platforms:   []string{platform},
-	})
-}
-
 func (r *accountRepository) ListSchedulableByPlatforms(ctx context.Context, platforms []string) ([]service.Account, error) {
 	if len(platforms) == 0 {
 		return nil, nil
@@ -2028,95 +1737,25 @@ func (r *accountRepository) ListSchedulableByPlatforms(ctx context.Context, plat
 	return r.accountsToService(ctx, accounts)
 }
 
-func (r *accountRepository) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]service.Account, error) {
-	now := time.Now()
-	accounts, err := r.client.Account.Query().
-		Where(
-			dbaccount.PlatformEQ(platform),
-			dbaccount.StatusEQ(service.StatusActive),
-			dbaccount.SchedulableEQ(true),
-			dbaccount.Not(dbaccount.HasAccountGroups()),
-			tempUnschedulablePredicate(),
-			notExpiredPredicate(now),
-			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
-			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
-		).
-		Order(dbent.Asc(dbaccount.FieldPriority)).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return r.accountsToService(ctx, accounts)
-}
-
-func (r *accountRepository) ListSchedulableUngroupedByPlatforms(ctx context.Context, platforms []string) ([]service.Account, error) {
-	if len(platforms) == 0 {
-		return nil, nil
-	}
-	now := time.Now()
-	accounts, err := r.client.Account.Query().
-		Where(
-			dbaccount.PlatformIn(platforms...),
-			dbaccount.StatusEQ(service.StatusActive),
-			dbaccount.SchedulableEQ(true),
-			dbaccount.Not(dbaccount.HasAccountGroups()),
-			tempUnschedulablePredicate(),
-			notExpiredPredicate(now),
-			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
-			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
-		).
-		Order(dbent.Asc(dbaccount.FieldPriority)).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return r.accountsToService(ctx, accounts)
-}
-
-func (r *accountRepository) ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]service.Account, error) {
-	if len(platforms) == 0 {
-		return nil, nil
-	}
-	// 复用按分组查询逻辑，保证分组优先级 + 账号优先级的排序与筛选一致。
-	return r.queryAccountsByGroup(ctx, groupID, accountGroupQueryOptions{
-		status:      service.StatusActive,
-		schedulable: true,
-		platforms:   platforms,
-	})
-}
-
 // ListModelAvailabilityCandidates returns the persistently configured account
 // pool used to decide whether a model is supported. Unlike scheduling queries,
 // it intentionally ignores transient runtime state (rate limits, overload,
 // temporary unschedulability, and expiry windows).
 func (r *accountRepository) ListModelAvailabilityCandidates(
 	ctx context.Context,
-	groupID *int64,
-	platforms []string,
-	includeGrouped bool,
+	platformID int64,
+	accountPlatform string,
 ) ([]service.Account, error) {
-	if len(platforms) == 0 {
+	if platformID <= 0 || strings.TrimSpace(accountPlatform) == "" {
 		return []service.Account{}, nil
 	}
-	if groupID != nil {
-		return r.queryAccountsByGroup(ctx, *groupID, accountGroupQueryOptions{
-			status:               service.StatusActive,
-			schedulable:          true,
-			ignoreTransientState: true,
-			platforms:            platforms,
-		})
-	}
-
-	preds := []dbpredicate.Account{
-		dbaccount.StatusEQ(service.StatusActive),
-		dbaccount.SchedulableEQ(true),
-		dbaccount.PlatformIn(platforms...),
-	}
-	if !includeGrouped {
-		preds = append(preds, dbaccount.Not(dbaccount.HasAccountGroups()))
-	}
 	accounts, err := r.client.Account.Query().
-		Where(preds...).
+		Where(
+			dbaccount.PlatformIDEQ(platformID),
+			dbaccount.PlatformEQ(accountPlatform),
+			dbaccount.StatusEQ(service.StatusActive),
+			dbaccount.SchedulableEQ(true),
+		).
 		Order(dbent.Asc(dbaccount.FieldPriority)).
 		All(ctx)
 	if err != nil {
@@ -2328,7 +1967,7 @@ func (r *accountRepository) SetGrokCredentialTempUnschedulableIfMatch(
 			AND a.proxy_id IS NOT DISTINCT FROM $8
 		RETURNING a.id
 		)
-		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)
 		SELECT $9, updated.id, NULL, NULL FROM updated
 	`, until, reason, id, service.StatusActive, service.PlatformGrok, service.AccountTypeOAuth,
 		snapshot.CredentialsJSON, snapshot.ProxyID, service.SchedulerOutboxEventAccountChanged)
@@ -2986,86 +2625,13 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 	return rows, nil
 }
 
-type accountGroupQueryOptions struct {
-	status               string
-	schedulable          bool
-	ignoreTransientState bool
-	platforms            []string // 允许的多个平台，空切片表示不进行平台过滤
-}
-
-func (r *accountRepository) queryAccountsByGroup(ctx context.Context, groupID int64, opts accountGroupQueryOptions) ([]service.Account, error) {
-	q := r.client.AccountGroup.Query().
-		Where(dbaccountgroup.GroupIDEQ(groupID))
-
-	// 通过 account_groups 中间表查询账号，并按需叠加状态/平台/调度能力过滤。
-	preds := make([]dbpredicate.Account, 0, 6)
-	preds = append(preds, dbaccount.DeletedAtIsNil())
-	if opts.status != "" {
-		preds = append(preds, dbaccount.StatusEQ(opts.status))
-	}
-	if len(opts.platforms) > 0 {
-		preds = append(preds, dbaccount.PlatformIn(opts.platforms...))
-	}
-	if opts.schedulable {
-		preds = append(preds, dbaccount.SchedulableEQ(true))
-		if !opts.ignoreTransientState {
-			now := time.Now()
-			preds = append(preds,
-				tempUnschedulablePredicate(),
-				notExpiredPredicate(now),
-				dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
-				dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
-			)
-		}
-	}
-
-	if len(preds) > 0 {
-		q = q.Where(dbaccountgroup.HasAccountWith(preds...))
-	}
-
-	groups, err := q.
-		Order(
-			dbaccountgroup.ByPriority(),
-			dbaccountgroup.ByAccountField(dbaccount.FieldPriority),
-		).
-		WithAccount().
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	orderedIDs := make([]int64, 0, len(groups))
-	accountMap := make(map[int64]*dbent.Account, len(groups))
-	for _, ag := range groups {
-		if ag.Edges.Account == nil {
-			continue
-		}
-		if _, exists := accountMap[ag.AccountID]; exists {
-			continue
-		}
-		accountMap[ag.AccountID] = ag.Edges.Account
-		orderedIDs = append(orderedIDs, ag.AccountID)
-	}
-
-	accounts := make([]*dbent.Account, 0, len(orderedIDs))
-	for _, id := range orderedIDs {
-		if acc, ok := accountMap[id]; ok {
-			accounts = append(accounts, acc)
-		}
-	}
-
-	return r.accountsToService(ctx, accounts)
-}
-
 func (r *accountRepository) accountsToService(ctx context.Context, accounts []*dbent.Account) ([]service.Account, error) {
 	if len(accounts) == 0 {
 		return []service.Account{}, nil
 	}
 
-	accountIDs := make([]int64, 0, len(accounts))
 	proxyIDs := make([]int64, 0, len(accounts))
 	for _, acc := range accounts {
-		accountIDs = append(accountIDs, acc.ID)
 		if acc.ProxyID != nil {
 			proxyIDs = append(proxyIDs, *acc.ProxyID)
 		}
@@ -3078,11 +2644,6 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 	if err != nil {
 		return nil, err
 	}
-	groupsByAccount, groupIDsByAccount, accountGroupsByAccount, err := r.loadAccountGroups(ctx, accountIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	outAccounts := make([]service.Account, 0, len(accounts))
 	for _, acc := range accounts {
 		out := accountEntityToService(acc)
@@ -3100,15 +2661,6 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 				n := op.Name
 				out.ProxyFallbackOriginName = &n
 			}
-		}
-		if groups, ok := groupsByAccount[acc.ID]; ok {
-			out.Groups = groups
-		}
-		if groupIDs, ok := groupIDsByAccount[acc.ID]; ok {
-			out.GroupIDs = groupIDs
-		}
-		if ags, ok := accountGroupsByAccount[acc.ID]; ok {
-			out.AccountGroups = ags
 		}
 		outAccounts = append(outAccounts, *out)
 	}
@@ -3157,80 +2709,6 @@ func (r *accountRepository) loadProxies(ctx context.Context, proxyIDs []int64) (
 	return proxyMap, nil
 }
 
-func (r *accountRepository) loadAccountGroups(ctx context.Context, accountIDs []int64) (map[int64][]*service.Group, map[int64][]int64, map[int64][]service.AccountGroup, error) {
-	groupsByAccount := make(map[int64][]*service.Group)
-	groupIDsByAccount := make(map[int64][]int64)
-	accountGroupsByAccount := make(map[int64][]service.AccountGroup)
-
-	accountIDs = uniquePositiveInt64s(accountIDs)
-	if len(accountIDs) == 0 {
-		return groupsByAccount, groupIDsByAccount, accountGroupsByAccount, nil
-	}
-
-	for start := 0; start < len(accountIDs); start += postgresParameterBatchSize {
-		end := start + postgresParameterBatchSize
-		if end > len(accountIDs) {
-			end = len(accountIDs)
-		}
-		entries, err := r.client.AccountGroup.Query().
-			Where(dbaccountgroup.AccountIDIn(accountIDs[start:end]...)).
-			Order(dbaccountgroup.ByAccountID(), dbaccountgroup.ByPriority()).
-			All(ctx)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		groupIDs := make([]int64, 0, len(entries))
-		for _, ag := range entries {
-			groupIDs = append(groupIDs, ag.GroupID)
-		}
-		groupMap, err := r.loadGroups(ctx, groupIDs)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		for _, ag := range entries {
-			groupSvc := groupMap[ag.GroupID]
-			agSvc := service.AccountGroup{
-				AccountID: ag.AccountID,
-				GroupID:   ag.GroupID,
-				Priority:  ag.Priority,
-				CreatedAt: ag.CreatedAt,
-				Group:     groupSvc,
-			}
-			accountGroupsByAccount[ag.AccountID] = append(accountGroupsByAccount[ag.AccountID], agSvc)
-			groupIDsByAccount[ag.AccountID] = append(groupIDsByAccount[ag.AccountID], ag.GroupID)
-			if groupSvc != nil {
-				groupsByAccount[ag.AccountID] = append(groupsByAccount[ag.AccountID], groupSvc)
-			}
-		}
-	}
-
-	return groupsByAccount, groupIDsByAccount, accountGroupsByAccount, nil
-}
-
-func (r *accountRepository) loadGroups(ctx context.Context, groupIDs []int64) (map[int64]*service.Group, error) {
-	groupMap := make(map[int64]*service.Group)
-	groupIDs = uniquePositiveInt64s(groupIDs)
-	if len(groupIDs) == 0 {
-		return groupMap, nil
-	}
-
-	for start := 0; start < len(groupIDs); start += postgresParameterBatchSize {
-		end := start + postgresParameterBatchSize
-		if end > len(groupIDs) {
-			end = len(groupIDs)
-		}
-		groups, err := r.client.Group.Query().Where(dbgroup.IDIn(groupIDs[start:end]...)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, g := range groups {
-			groupMap[g.ID] = groupEntityToService(g)
-		}
-	}
-	return groupMap, nil
-}
-
 func uniquePositiveInt64s(ids []int64) []int64 {
 	if len(ids) == 0 {
 		return nil
@@ -3250,56 +2728,11 @@ func uniquePositiveInt64s(ids []int64) []int64 {
 	return out
 }
 
-func (r *accountRepository) loadAccountGroupIDs(ctx context.Context, accountID int64) ([]int64, error) {
-	entries, err := r.client.AccountGroup.
-		Query().
-		Where(dbaccountgroup.AccountIDEQ(accountID)).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]int64, 0, len(entries))
-	for _, entry := range entries {
-		ids = append(ids, entry.GroupID)
-	}
-	return ids, nil
-}
-
-func mergeGroupIDs(a []int64, b []int64) []int64 {
-	seen := make(map[int64]struct{}, len(a)+len(b))
-	out := make([]int64, 0, len(a)+len(b))
-	for _, id := range a {
-		if id <= 0 {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	for _, id := range b {
-		if id <= 0 {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		out = append(out, id)
-	}
-	return out
-}
-
-// buildSchedulerGroupPayload 构造 EventAccountChanged / EventAccountGroupsChanged
-// 事件的 payload。空 groupIDs 必须返回 untyped nil（any 而非 map[string]any(nil)），
-// 否则 enqueueSchedulerOutbox 的 "payload != nil" 接口判空会被 typed-nil 欺骗，
-// 把 payload marshal 成 "null" 写入 dedup_key 哈希，破坏与其他 nil-payload 调用的去重一致性。
-func buildSchedulerGroupPayload(groupIDs []int64) any {
-	if len(groupIDs) == 0 {
+func buildSchedulerPlatformPayload(platformID *int64) any {
+	if platformID == nil || *platformID <= 0 {
 		return nil
 	}
-	return map[string]any{"group_ids": groupIDs}
+	return map[string]any{"platform_id": *platformID}
 }
 
 func accountEntityToService(m *dbent.Account) *service.Account {

@@ -220,7 +220,7 @@ func (s *AntigravityGatewayService) applyErrorPolicy(p antigravityRetryLoopParam
 			return true, statusCode, nil
 		}
 		_ = p.handleError(p.ctx, p.prefix, p.account, statusCode, headers, respBody,
-			p.requestedModel, p.groupID, p.sessionHash, p.isStickySession)
+			p.requestedModel, p.platformID, p.sessionHash, p.isStickySession)
 		return true, statusCode, nil
 	case ErrorPolicyTempUnscheduled:
 		slog.Info("temp_unschedulable_matched",
@@ -249,7 +249,7 @@ func (s *AntigravityGatewayService) handleAntigravityModelRateLimitBeforePolicy(
 	if !s.setAntigravityModelRateLimits(p.ctx, p.accountRepo, p.account, modelName, p.prefix, statusCode, resetAt, false) {
 		return false
 	}
-	s.clearStickySession(p.ctx, p.groupID, p.sessionHash)
+	s.clearStickySession(p.ctx, p.platformID, p.sessionHash)
 	logger.LegacyPrintf("service.antigravity_gateway", "%s status=%d model_rate_limited_before_error_policy model=%s account=%d reset_in=%v",
 		p.prefix, statusCode, modelName, p.account.ID, rateLimitDuration)
 	return true

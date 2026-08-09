@@ -19,31 +19,55 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
 
+// AdminResetAPIKeyRateLimitUsage resets all API key rate-limit usage windows.
+func (s *adminServiceImpl) AdminResetAPIKeyRateLimitUsage(ctx context.Context, keyID int64) (*APIKey, error) {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, keyID)
+	if err != nil {
+		return nil, err
+	}
+	apiKey.Usage5h = 0
+	apiKey.Usage1d = 0
+	apiKey.Usage7d = 0
+	apiKey.Window5hStart = nil
+	apiKey.Window1dStart = nil
+	apiKey.Window7dStart = nil
+	if err := s.apiKeyRepo.Update(ctx, apiKey, APIKeyUpdateFields{RateLimitUsage: true}); err != nil {
+		return nil, fmt.Errorf("reset api key rate limit usage: %w", err)
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+	}
+	if s.billingCacheService != nil {
+		_ = s.billingCacheService.InvalidateAPIKeyRateLimit(ctx, apiKey.ID)
+	}
+	return apiKey, nil
+}
+
 // Account management implementations
-func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode string, sortBy, sortOrder string) ([]Account, int64, error) {
+func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, platformID int64, privacyMode string, sortBy, sortOrder string) ([]Account, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
-	accounts, result, err := s.accountRepo.ListWithFilters(ctx, params, platform, accountType, status, search, groupID, privacyMode)
+	accounts, result, err := s.accountRepo.ListWithFilters(ctx, params, platform, accountType, status, search, platformID, privacyMode)
 	if err != nil {
 		return nil, 0, err
 	}
 	return accounts, result.Total, nil
 }
 
-func (s *adminServiceImpl) ListAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, error) {
+func (s *adminServiceImpl) ListAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, platformID int64, privacyMode string) ([]Account, error) {
 	if s == nil || s.accountRepo == nil {
 		return nil, nil
 	}
-	return s.accountRepo.ListAllWithFilters(ctx, platform, accountType, status, search, groupID, privacyMode)
+	return s.accountRepo.ListAllWithFilters(ctx, platform, accountType, status, search, platformID, privacyMode)
 }
 
-func (s *adminServiceImpl) ListOpenAISchedulableAccountsForSchedulerScore(ctx context.Context, groupID *int64) ([]Account, error) {
+func (s *adminServiceImpl) ListOpenAISchedulableAccountsForSchedulerScore(ctx context.Context, platformID *int64) ([]Account, error) {
 	if s == nil || s.accountRepo == nil {
 		return nil, nil
 	}
-	if groupID != nil {
-		return s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, PlatformOpenAI)
+	if platformID != nil {
+		return s.accountRepo.ListSchedulableByPlatformPool(ctx, *platformID, PlatformOpenAI)
 	}
-	return s.accountRepo.ListSchedulableUngroupedByPlatform(ctx, PlatformOpenAI)
+	return s.accountRepo.ListSchedulableByPlatform(ctx, PlatformOpenAI)
 }
 
 func (s *adminServiceImpl) GetAccount(ctx context.Context, id int64) (*Account, error) {
@@ -166,25 +190,6 @@ func canDuplicateAccountType(accountType string) bool {
 	}
 }
 
-func duplicateAccountGroups(source *Account) ([]AccountGroup, []int64) {
-	if len(source.AccountGroups) > 0 {
-		groups := make([]AccountGroup, 0, len(source.AccountGroups))
-		groupIDs := make([]int64, 0, len(source.AccountGroups))
-		for _, sourceGroup := range source.AccountGroups {
-			groups = append(groups, AccountGroup{GroupID: sourceGroup.GroupID, Priority: sourceGroup.Priority})
-			groupIDs = append(groupIDs, sourceGroup.GroupID)
-		}
-		return groups, groupIDs
-	}
-
-	groups := make([]AccountGroup, 0, len(source.GroupIDs))
-	groupIDs := append([]int64(nil), source.GroupIDs...)
-	for i, groupID := range groupIDs {
-		groups = append(groups, AccountGroup{GroupID: groupID, Priority: i + 1})
-	}
-	return groups, groupIDs
-}
-
 func duplicateAccountOperationID(sourceID int64, actorScope, operationKey string) string {
 	operationKey = strings.TrimSpace(operationKey)
 	if operationKey == "" {
@@ -281,34 +286,26 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		expiresAt = &unix
 	}
 	autoPauseOnExpired := source.AutoPauseOnExpired
-	var groups []AccountGroup
-	var groupIDs []int64
-	if source.PlatformID == nil {
-		groups, groupIDs = duplicateAccountGroups(source)
-	}
 	proxyID := source.ProxyID
 	if source.ProxyFallbackOriginID != nil {
 		// Proxy fallback is transient runtime state; duplicate the configured origin.
 		proxyID = source.ProxyFallbackOriginID
 	}
 	input := &CreateAccountInput{
-		Name:                  duplicateAccountName(source.Name),
-		Notes:                 cloneAccountValuePointer(source.Notes),
-		Platform:              source.Platform,
-		PlatformID:            cloneAccountValuePointer(source.PlatformID),
-		Type:                  source.Type,
-		Credentials:           credentials,
-		Extra:                 extra,
-		ProxyID:               cloneAccountValuePointer(proxyID),
-		Concurrency:           source.Concurrency,
-		Priority:              source.Priority,
-		RateMultiplier:        cloneAccountValuePointer(source.RateMultiplier),
-		LoadFactor:            cloneAccountValuePointer(source.LoadFactor),
-		GroupIDs:              groupIDs,
-		ExpiresAt:             expiresAt,
-		AutoPauseOnExpired:    &autoPauseOnExpired,
-		SkipDefaultGroupBind:  true,
-		SkipMixedChannelCheck: true,
+		Name:               duplicateAccountName(source.Name),
+		Notes:              cloneAccountValuePointer(source.Notes),
+		Platform:           source.Platform,
+		PlatformID:         cloneAccountValuePointer(source.PlatformID),
+		Type:               source.Type,
+		Credentials:        credentials,
+		Extra:              extra,
+		ProxyID:            cloneAccountValuePointer(proxyID),
+		Concurrency:        source.Concurrency,
+		Priority:           source.Priority,
+		RateMultiplier:     cloneAccountValuePointer(source.RateMultiplier),
+		LoadFactor:         cloneAccountValuePointer(source.LoadFactor),
+		ExpiresAt:          expiresAt,
+		AutoPauseOnExpired: &autoPauseOnExpired,
 	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
@@ -323,17 +320,9 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 	}
 	// A copied credential must be reviewed before it can share live traffic with its source.
 	duplicate.Schedulable = false
-	if s.accountDuplicateRepo == nil {
-		return nil, errors.New("account duplicate repository is not configured")
-	}
-	if err := s.accountDuplicateRepo.CreateWithAccountGroups(ctx, duplicate, groups); err != nil {
+	if err := s.accountRepo.Create(ctx, duplicate); err != nil {
 		return nil, fmt.Errorf("create duplicate account: %w", err)
 	}
-	for i := range groups {
-		groups[i].AccountID = duplicate.ID
-	}
-	duplicate.AccountGroups = groups
-	duplicate.GroupIDs = groupIDs
 	return duplicate, nil
 }
 
@@ -534,9 +523,6 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		normalized.Platform = binding.AccountPlatform
 		input = &normalized
 	}
-	if input.PlatformID != nil && len(input.GroupIDs) > 0 {
-		return nil, fmt.Errorf("%w: V2 platform accounts cannot be created with legacy group bindings", ErrPlatformInvalid)
-	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
 		return nil, err
@@ -544,29 +530,6 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	accountExtra, err = normalizeGrokMediaEligibilityExtra(input.Platform, accountExtra)
 	if err != nil {
 		return nil, err
-	}
-
-	// 绑定分组
-	groupIDs := input.GroupIDs
-	// 如果没有指定分组,自动绑定对应平台的默认分组
-	if input.PlatformID == nil && len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
-		defaultGroupName := input.Platform + "-default"
-		groups, err := s.groupRepo.ListActiveByPlatform(ctx, input.Platform)
-		if err == nil {
-			for _, g := range groups {
-				if g.Name == defaultGroupName {
-					groupIDs = []int64{g.ID}
-					break
-				}
-			}
-		}
-	}
-
-	// 检查混合渠道风险（除非用户已确认）
-	if len(groupIDs) > 0 && !input.SkipMixedChannelCheck {
-		if err := s.checkMixedChannelRisk(ctx, 0, input.Platform, groupIDs); err != nil {
-			return nil, err
-		}
 	}
 
 	// 校验并规范化请求头覆写配置（header 名小写化、格式检查）
@@ -583,13 +546,6 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, err
-	}
-
-	// 绑定分组
-	if len(groupIDs) > 0 {
-		if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
-			return nil, err
-		}
 	}
 
 	// OAuth 账号：创建后异步设置隐私。
@@ -656,9 +612,6 @@ type accountProbeEnabledAtomicUpdater interface {
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
-	if input.PlatformID != nil && input.GroupIDs != nil {
-		return nil, fmt.Errorf("%w: V2 platform accounts cannot update legacy group bindings in the same request", ErrPlatformInvalid)
-	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -863,20 +816,6 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		account.AutoPauseOnExpired = *input.AutoPauseOnExpired
 	}
 
-	// 先验证分组是否存在（在任何写操作之前）
-	if input.GroupIDs != nil {
-		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
-			return nil, err
-		}
-
-		// 检查混合渠道风险（除非用户已确认）
-		if !input.SkipMixedChannelCheck {
-			if err := s.checkMixedChannelRisk(ctx, account.ID, account.Platform, *input.GroupIDs); err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	if err := s.validatePlatformAccountBinding(ctx, account); err != nil {
 		return nil, err
 	}
@@ -907,13 +846,6 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	// 影子自身 proxy 不可独立编辑(见上),故对影子的更新不触发传播。
 	if input.ProxyID != nil && !account.IsCredentialShadow() {
 		if err := s.propagateProxyToShadows(ctx, id, account.ProxyID); err != nil {
-			return nil, err
-		}
-	}
-
-	// 绑定分组
-	if input.GroupIDs != nil {
-		if err := s.accountRepo.BindGroups(ctx, account.ID, *input.GroupIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -974,18 +906,11 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if len(input.AccountIDs) == 0 {
 		return result, nil
 	}
-	if input.GroupIDs != nil {
-		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
-			return nil, err
-		}
-	}
-
-	needMixedChannelCheck := input.GroupIDs != nil && !input.SkipMixedChannelCheck
 	_, hasLongContextBillingUpdate := input.Extra[openAILongContextBillingEnabledKey]
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || hasLongContextBillingUpdate || input.ProbeEnabled != nil {
+	if len(input.Credentials) > 0 || input.ProxyID != nil || hasLongContextBillingUpdate || input.ProbeEnabled != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
@@ -1040,29 +965,6 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 			if acc != nil && acc.IsCredentialShadow() {
 				return nil, infraerrors.Newf(http.StatusBadRequest, "SPARK_SHADOW_PROXY_INHERITED",
 					"spark shadow account %d proxy is inherited from its parent and cannot be set in bulk; manage it on the parent account", acc.ID)
-			}
-		}
-	}
-
-	// 预加载账号平台信息（混合渠道检查需要）。
-	platformByID := map[int64]string{}
-	if needMixedChannelCheck {
-		for _, account := range cachedTargets {
-			if account != nil {
-				platformByID[account.ID] = account.Platform
-			}
-		}
-	}
-
-	// 预检查混合渠道风险：在任何写操作之前，若发现风险立即返回错误。
-	if needMixedChannelCheck {
-		for _, accountID := range input.AccountIDs {
-			platform := platformByID[accountID]
-			if platform == "" {
-				continue
-			}
-			if err := s.checkMixedChannelRisk(ctx, accountID, platform, *input.GroupIDs); err != nil {
-				return nil, err
 			}
 		}
 	}
@@ -1147,21 +1049,8 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		}
 	}
 
-	// Handle group bindings per account (requires individual operations).
 	for _, accountID := range input.AccountIDs {
 		entry := BulkUpdateAccountResult{AccountID: accountID}
-
-		if input.GroupIDs != nil {
-			if err := s.accountRepo.BindGroups(ctx, accountID, *input.GroupIDs); err != nil {
-				entry.Success = false
-				entry.Error = err.Error()
-				result.Failed++
-				result.FailedIDs = append(result.FailedIDs, accountID)
-				result.Results = append(result.Results, entry)
-				continue
-			}
-		}
-
 		entry.Success = true
 		result.Success++
 		result.SuccessIDs = append(result.SuccessIDs, accountID)
@@ -1201,19 +1090,6 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 		return nil, nil
 	}
 
-	groupID := int64(0)
-	switch strings.TrimSpace(filters.Group) {
-	case "":
-	case "ungrouped":
-		groupID = AccountListGroupUngrouped
-	default:
-		parsedGroupID, err := strconv.ParseInt(strings.TrimSpace(filters.Group), 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid group filter: %w", err)
-		}
-		groupID = parsedGroupID
-	}
-
 	const pageSize = 500
 	page := 1
 	accountIDs := make([]int64, 0, pageSize)
@@ -1227,7 +1103,7 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 			filters.Type,
 			filters.Status,
 			filters.Search,
-			groupID,
+			filters.PlatformID,
 			filters.PrivacyMode,
 			"",
 			"",
@@ -1426,114 +1302,6 @@ func propagateAccountProxyToShadows(ctx context.Context, repo AccountRepository,
 		}
 	}
 	return nil
-}
-
-// checkMixedChannelRisk 检查分组中是否存在混合渠道（Antigravity + Anthropic）
-// 如果存在混合，返回错误提示用户确认
-func (s *adminServiceImpl) checkMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error {
-	// 判断当前账号的渠道类型（基于 platform 字段，而不是 type 字段）
-	currentPlatform := getAccountPlatform(currentAccountPlatform)
-	if currentPlatform == "" {
-		// 不是 Antigravity 或 Anthropic，无需检查
-		return nil
-	}
-
-	// 检查每个分组中的其他账号
-	for _, groupID := range groupIDs {
-		accounts, err := s.accountRepo.ListByGroup(ctx, groupID)
-		if err != nil {
-			return fmt.Errorf("get accounts in group %d: %w", groupID, err)
-		}
-
-		// 检查是否存在不同渠道的账号
-		for _, account := range accounts {
-			if currentAccountID > 0 && account.ID == currentAccountID {
-				continue // 跳过当前账号
-			}
-
-			otherPlatform := getAccountPlatform(account.Platform)
-			if otherPlatform == "" {
-				continue // 不是 Antigravity 或 Anthropic，跳过
-			}
-
-			// 检测混合渠道
-			if currentPlatform != otherPlatform {
-				group, _ := s.groupRepo.GetByID(ctx, groupID)
-				groupName := fmt.Sprintf("Group %d", groupID)
-				if group != nil {
-					groupName = group.Name
-				}
-
-				return &MixedChannelError{
-					GroupID:         groupID,
-					GroupName:       groupName,
-					CurrentPlatform: currentPlatform,
-					OtherPlatform:   otherPlatform,
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (s *adminServiceImpl) validateGroupIDsExist(ctx context.Context, groupIDs []int64) error {
-	if len(groupIDs) == 0 {
-		return nil
-	}
-	if s.groupRepo == nil {
-		return errors.New("group repository not configured")
-	}
-
-	if batchReader, ok := s.groupRepo.(groupExistenceBatchReader); ok {
-		existsByID, err := batchReader.ExistsByIDs(ctx, groupIDs)
-		if err != nil {
-			return fmt.Errorf("check groups exists: %w", err)
-		}
-		for _, groupID := range groupIDs {
-			if groupID <= 0 || !existsByID[groupID] {
-				return fmt.Errorf("get group: %w", ErrGroupNotFound)
-			}
-		}
-		return nil
-	}
-
-	for _, groupID := range groupIDs {
-		if _, err := s.groupRepo.GetByID(ctx, groupID); err != nil {
-			return fmt.Errorf("get group: %w", err)
-		}
-	}
-	return nil
-}
-
-// CheckMixedChannelRisk checks whether target groups contain mixed channels for the current account platform.
-func (s *adminServiceImpl) CheckMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error {
-	return s.checkMixedChannelRisk(ctx, currentAccountID, currentAccountPlatform, groupIDs)
-}
-
-// getAccountPlatform 根据账号 platform 判断混合渠道检查用的平台标识
-func getAccountPlatform(accountPlatform string) string {
-	switch strings.ToLower(strings.TrimSpace(accountPlatform)) {
-	case PlatformAntigravity:
-		return "Antigravity"
-	case PlatformAnthropic, "claude":
-		return "Anthropic"
-	default:
-		return ""
-	}
-}
-
-// MixedChannelError 混合渠道错误
-type MixedChannelError struct {
-	GroupID         int64
-	GroupName       string
-	CurrentPlatform string
-	OtherPlatform   string
-}
-
-func (e *MixedChannelError) Error() string {
-	return fmt.Sprintf("mixed_channel_warning: Group '%s' contains both %s and %s accounts. Using mixed channels in the same context may cause thinking block signature validation issues, which will fallback to non-thinking mode for historical messages.",
-		e.GroupName, e.CurrentPlatform, e.OtherPlatform)
 }
 
 func (s *adminServiceImpl) ResetAccountQuota(ctx context.Context, id int64) error {

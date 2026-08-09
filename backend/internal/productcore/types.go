@@ -23,7 +23,6 @@ type Platform struct {
 	UpstreamModel        string
 	EndpointCapabilities []string
 	MatchPriority        int
-	LegacyPricingGroupID *int64
 }
 
 type BillingAsset struct {

@@ -5,7 +5,6 @@
 
 import dashboardAPI from './dashboard'
 import usersAPI from './users'
-import groupsAPI from './groups'
 import platformsAPI from './platforms'
 import accountsAPI from './accounts'
 import proxiesAPI from './proxies'
@@ -26,7 +25,6 @@ import dataManagementAPI from './dataManagement'
 import scheduledTestsAPI from './scheduledTests'
 import backupAPI from './backup'
 import tlsFingerprintProfileAPI from './tlsFingerprintProfile'
-import channelsAPI from './channels'
 import channelMonitorAPI from './channelMonitor'
 import channelMonitorTemplateAPI from './channelMonitorTemplate'
 import adminPaymentAPI from './payment'
@@ -34,6 +32,7 @@ import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
+import modelPricingAPI from './modelPricing'
 
 /**
  * Unified admin API object for convenient access
@@ -41,7 +40,6 @@ import auditAPI from './audit'
 export const adminAPI = {
   dashboard: dashboardAPI,
   users: usersAPI,
-  groups: groupsAPI,
   platforms: platformsAPI,
   accounts: accountsAPI,
   proxies: proxiesAPI,
@@ -62,20 +60,19 @@ export const adminAPI = {
   scheduledTests: scheduledTestsAPI,
   backup: backupAPI,
   tlsFingerprintProfiles: tlsFingerprintProfileAPI,
-  channels: channelsAPI,
   channelMonitor: channelMonitorAPI,
   channelMonitorTemplate: channelMonitorTemplateAPI,
   payment: adminPaymentAPI,
   affiliates: affiliatesAPI,
   riskControl: riskControlAPI,
   compliance: adminComplianceAPI,
-  audit: auditAPI
+  audit: auditAPI,
+  modelPricing: modelPricingAPI,
 }
 
 export {
   dashboardAPI,
   usersAPI,
-  groupsAPI,
   platformsAPI,
   accountsAPI,
   proxiesAPI,
@@ -96,14 +93,14 @@ export {
   scheduledTestsAPI,
   backupAPI,
   tlsFingerprintProfileAPI,
-  channelsAPI,
   channelMonitorAPI,
   channelMonitorTemplateAPI,
   adminPaymentAPI,
   affiliatesAPI,
   riskControlAPI,
   adminComplianceAPI,
-  auditAPI
+  auditAPI,
+  modelPricingAPI,
 }
 
 export default adminAPI

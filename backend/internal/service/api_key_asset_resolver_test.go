@@ -29,7 +29,7 @@ func (s *assetSubscriptionResolverStub) ListActiveSubscriptionsByPlanIDs(
 	return cloneUserSubscriptions(s.candidates), nil
 }
 
-func (s *assetSubscriptionResolverStub) ValidateAndCheckLimits(sub *UserSubscription, _ *Group) (bool, error) {
+func (s *assetSubscriptionResolverStub) ValidateAndCheckLimits(sub *UserSubscription) (bool, error) {
 	s.checked = append(s.checked, sub.ID)
 	return false, s.validateErrs[sub.ID]
 }
@@ -110,7 +110,7 @@ func TestProvideAPIKeyServiceUsesConfiguredGlobalBalanceRate(t *testing.T) {
 	configService := &PaymentConfigService{settingRepo: &paymentConfigSettingRepoStub{values: map[string]string{
 		SettingKeyGlobalBalanceRateMultiplier: "1.25",
 	}}}
-	svc := ProvideAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{}, nil, nil, configService)
+	svc := ProvideAPIKeyService(nil, nil, nil, nil, &config.Config{}, nil, nil, configService)
 	apiKey := &APIKey{
 		UserID:       7,
 		AllowBalance: true,

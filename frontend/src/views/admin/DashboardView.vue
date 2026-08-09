@@ -246,17 +246,17 @@
             <button
               type="button"
               class="group flex items-center gap-3 rounded-lg bg-gray-50 p-3 text-left transition-colors hover:bg-emerald-50 dark:bg-dark-800/50 dark:hover:bg-emerald-900/20"
-              @click="router.push('/admin/groups')"
+              @click="router.push('/admin/model-pricing')"
             >
               <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                 <Icon name="grid" size="md" :stroke-width="2" />
               </span>
               <span class="min-w-0 flex-1">
                 <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                  {{ t('admin.dashboard.groupPricing') }}
+                  {{ t('nav.modelPricing') }}
                 </span>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.dashboard.groupPricingDesc') }}
+                  {{ t('admin.modelPricing.description') }}
                 </span>
               </span>
               <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-emerald-500" />
@@ -669,7 +669,6 @@ const loadDashboardSnapshot = async (includeStats: boolean) => {
       include_stats: includeStats,
       include_trend: true,
       include_model_stats: true,
-      include_group_stats: false,
       include_users_trend: false
     })
     if (currentSeq !== chartLoadSeq) return

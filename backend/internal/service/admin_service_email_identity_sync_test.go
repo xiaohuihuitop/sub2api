@@ -125,10 +125,6 @@ func (s *emailSyncRepoStub) SetBalance(ctx context.Context, id int64, value floa
 	panic("unexpected SetBalance call")
 }
 
-func (s *emailSyncRepoStub) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
-	return 0, nil
-}
-
 func (s *emailSyncRepoStub) BatchSetConcurrency(context.Context, []int64, int) (int, error) {
 	return 0, nil
 }
@@ -137,12 +133,6 @@ func (s *emailSyncRepoStub) BatchAddConcurrency(context.Context, []int64, int) (
 }
 func (s *emailSyncRepoStub) BatchUpdateLimits(context.Context, []int64, *int, *int) (int, error) {
 	return 0, nil
-}
-
-func (s *emailSyncRepoStub) AddGroupToAllowedGroups(context.Context, int64, int64) error { return nil }
-
-func (s *emailSyncRepoStub) RemoveGroupFromUserAllowedGroups(context.Context, int64, int64) error {
-	return nil
 }
 
 func (s *emailSyncRepoStub) ListUserAuthIdentities(context.Context, int64) ([]UserAuthIdentityRecord, error) {

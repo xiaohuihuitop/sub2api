@@ -33,7 +33,6 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 		SetNillableExpiresAt(code.ExpiresAt).
 		SetNillableUsedBy(code.UsedBy).
 		SetNillableUsedAt(code.UsedAt).
-		SetNillableGroupID(code.GroupID).
 		SetNillableSubscriptionPlanID(code.SubscriptionPlanID).
 		SetPlanNameSnapshot(code.PlanNameSnapshot).
 		SetNillableDailyLimitUsdSnapshot(code.DailyLimitUSDSnapshot).
@@ -66,7 +65,6 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 			SetNillableExpiresAt(c.ExpiresAt).
 			SetNillableUsedBy(c.UsedBy).
 			SetNillableUsedAt(c.UsedAt).
-			SetNillableGroupID(c.GroupID).
 			SetNillableSubscriptionPlanID(c.SubscriptionPlanID).
 			SetPlanNameSnapshot(c.PlanNameSnapshot).
 			SetNillableDailyLimitUsdSnapshot(c.DailyLimitUSDSnapshot).
@@ -160,7 +158,6 @@ func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagin
 
 	codesQuery := q.
 		WithUser().
-		WithGroup().
 		Offset(params.Offset()).
 		Limit(params.Limit())
 	for _, order := range redeemCodeListOrder(params) {
@@ -225,11 +222,6 @@ func (r *redeemCodeRepository) Update(ctx context.Context, code *service.RedeemC
 		up.SetUsedAt(*code.UsedAt)
 	} else {
 		up.ClearUsedAt()
-	}
-	if code.GroupID != nil {
-		up.SetGroupID(*code.GroupID)
-	} else {
-		up.ClearGroupID()
 	}
 	if code.SubscriptionPlanID != nil {
 		up.SetSubscriptionPlanID(*code.SubscriptionPlanID)
@@ -308,14 +300,6 @@ func (r *redeemCodeRepository) batchUpdate(ctx context.Context, client *dbent.Cl
 			}
 		}
 	}
-	if fields.GroupID.Set {
-		for _, code := range existing {
-			if code.SubscriptionPlanID != nil {
-				return 0, service.ErrRedeemCodeSubscriptionTermsImmutable
-			}
-		}
-	}
-
 	up := client.RedeemCode.Update().Where(redeemcode.IDIn(ids...))
 	if fields.Status != nil {
 		up.SetStatus(*fields.Status)
@@ -330,14 +314,6 @@ func (r *redeemCodeRepository) batchUpdate(ctx context.Context, client *dbent.Cl
 			up.ClearExpiresAt()
 		}
 	}
-	if fields.GroupID.Set {
-		if fields.GroupID.Value != nil {
-			up.SetGroupID(*fields.GroupID.Value)
-		} else {
-			up.ClearGroupID()
-		}
-	}
-
 	affected, err := up.Save(ctx)
 	if err != nil {
 		return 0, err
@@ -373,7 +349,6 @@ func (r *redeemCodeRepository) ListByUser(ctx context.Context, userID int64, lim
 
 	codes, err := r.client.RedeemCode.Query().
 		Where(redeemcode.UsedByEQ(userID)).
-		WithGroup().
 		Order(dbent.Desc(redeemcode.FieldUsedAt)).
 		Limit(limit).
 		All(ctx)
@@ -401,7 +376,6 @@ func (r *redeemCodeRepository) ListByUserPaginated(ctx context.Context, userID i
 	}
 
 	codes, err := q.
-		WithGroup().
 		Offset(params.Offset()).
 		Limit(params.Limit()).
 		Order(dbent.Desc(redeemcode.FieldUsedAt)).
@@ -450,7 +424,6 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		Notes:                   derefString(m.Notes),
 		CreatedAt:               m.CreatedAt,
 		ExpiresAt:               m.ExpiresAt,
-		GroupID:                 m.GroupID,
 		SubscriptionPlanID:      m.SubscriptionPlanID,
 		PlanNameSnapshot:        m.PlanNameSnapshot,
 		DailyLimitUSDSnapshot:   m.DailyLimitUsdSnapshot,
@@ -461,9 +434,6 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
-	}
-	if m.Edges.Group != nil {
-		out.Group = groupEntityToService(m.Edges.Group)
 	}
 	return out
 }

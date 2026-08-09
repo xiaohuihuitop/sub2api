@@ -57,11 +57,11 @@
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
-        <template #cell-group="{ row }">
+        <template #cell-platform_name="{ row }">
           <span
-            v-if="row.group_name"
+            v-if="row.platform_name"
             class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
-          >{{ row.group_name }}</span>
+          >{{ row.platform_name }}</span>
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
@@ -163,16 +163,16 @@ function onSort(key: string, order: 'asc' | 'desc') {
 
 const { t } = useI18n()
 
-// 列序对齐用户端用量明细:Key → 模型 → 端点 → IP → 分组 → 类型 → 平台 → 分类
+// 列序对齐用户端用量明细:Key → 模型 → 端点 → IP → 路由平台 → 类型 → 账号平台 → 分类
 // → 结果(状态→消息)→ 时间 → UA(用量明细 UA 同在时间之后的尾部)
 const allColumns = computed<Column[]>(() => [
   { key: 'key_name', label: t('usage.errors.keyName') },
   { key: 'model', label: t('usage.errors.model'), sortable: true },
   { key: 'endpoint', label: t('usage.errors.endpoint') },
   { key: 'client_ip', label: 'IP' },
-  { key: 'group', label: t('admin.usage.group') },
+  { key: 'platform_name', label: t('usage.errors.routingPlatform') },
   { key: 'type', label: t('usage.type') },
-  { key: 'platform', label: t('usage.errors.platform') },
+  { key: 'platform', label: t('usage.errors.accountPlatform') },
   { key: 'category', label: t('usage.errors.category') },
   { key: 'status', label: t('usage.errors.status'), sortable: true },
   { key: 'message', label: t('usage.errors.message') },

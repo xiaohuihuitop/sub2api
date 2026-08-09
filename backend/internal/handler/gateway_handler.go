@@ -17,7 +17,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	pkgerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -97,7 +96,7 @@ func NewGatewayHandler(
 		}
 	}
 
-	// 初始化用户消息串行队列 helper
+	// 鍒濆鍖栫敤鎴锋秷鎭覆琛岄槦鍒?helper
 	var umqHelper *UserMsgQueueHelper
 	if userMsgQueueService != nil && cfg != nil {
 		umqHelper = NewUserMsgQueueHelper(userMsgQueueService, SSEPingFormatClaude, pingInterval)
@@ -128,7 +127,7 @@ func NewGatewayHandler(
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
 func (h *GatewayHandler) Messages(c *gin.Context) {
-	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
+	// 浠巆ontext鑾峰彇apiKey鍜寀ser锛圓piKeyAuth涓棿浠跺凡璁剧疆锛?
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
@@ -145,11 +144,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		"handler.gateway.messages",
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
 	defer h.maybeLogCompatibilityFallbackMetrics(reqLog)
 
-	// 读取请求体
+	// 璇诲彇璇锋眰浣?
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
@@ -177,41 +176,41 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	body = parsedReq.Body.Bytes()
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
-	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	ensureModelTargetPlatform(c, reqModel)
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
-	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	// 瑙ｆ瀽娓犻亾绾фā鍨嬫槧灏?
+	modelMapping := h.gatewayService.ResolvePlatformModelMapping(c.Request.Context(), reqModel)
 
-	// 设置 max_tokens=1 + haiku 探测请求标识到 context 中
-	// 必须在 SetClaudeCodeClientContext 之前设置，因为 ClaudeCodeValidator 需要读取此标识进行绕过判断
+	// 璁剧疆 max_tokens=1 + haiku 鎺㈡祴璇锋眰鏍囪瘑鍒?context 涓?
+	// 蹇呴』鍦?SetClaudeCodeClientContext 涔嬪墠璁剧疆锛屽洜涓?ClaudeCodeValidator 闇€瑕佽鍙栨鏍囪瘑杩涜缁曡繃鍒ゆ柇
 	if isMaxTokensOneHaikuRequest(reqModel, parsedReq.MaxTokens) {
 		ctx := service.WithIsMaxTokensOneHaikuRequest(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	// 检查是否为 Claude Code 客户端，设置到 context 中（复用已解析请求，避免二次反序列化）。
+	// 妫€鏌ユ槸鍚︿负 Claude Code 瀹㈡埛绔紝璁剧疆鍒?context 涓紙澶嶇敤宸茶В鏋愯姹傦紝閬垮厤浜屾鍙嶅簭鍒楀寲锛夈€?
 	SetClaudeCodeClientContext(c, body, parsedReq)
 	isClaudeCodeClient := service.IsClaudeCodeClient(c.Request.Context())
 
-	// 版本检查：仅对 Claude Code 客户端，拒绝低于最低版本的请求
+	// 鐗堟湰妫€鏌ワ細浠呭 Claude Code 瀹㈡埛绔紝鎷掔粷浣庝簬鏈€浣庣増鏈殑璇锋眰
 	if !h.checkClaudeCodeVersion(c) {
 		return
 	}
 
-	// 在请求上下文中记录 thinking 状态，供 Antigravity 最终模型 key 推导/模型维度限流使用
+	// 鍦ㄨ姹備笂涓嬫枃涓褰?thinking 鐘舵€侊紝渚?Antigravity 鏈€缁堟ā鍨?key 鎺ㄥ/妯″瀷缁村害闄愭祦浣跨敤
 	c.Request = c.Request.WithContext(service.WithThinkingEnabled(c.Request.Context(), parsedReq.ThinkingEnabled, h.metadataBridgeEnabled()))
 
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 
-	// 验证 model 必填
+	// 楠岃瘉 model 蹇呭～
 	if reqModel == "" {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 		return
 	}
-	if !compositeTargetPlatformResolved(c, apiKey, reqModel) {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by composite groups")
+	if !modelTargetPlatformResolved(c, reqModel) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by any authorized platform")
 		return
 	}
 
@@ -223,29 +222,29 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// Track if we've started streaming (for error handling)
 	streamStarted := false
 
-	// 绑定错误透传服务，允许 service 层在非 failover 错误场景复用规则。
+	// 缁戝畾閿欒閫忎紶鏈嶅姟锛屽厑璁?service 灞傚湪闈?failover 閿欒鍦烘櫙澶嶇敤瑙勫垯銆?
 	if h.errorPassthroughService != nil {
 		service.BindErrorPassthroughService(c, h.errorPassthroughService)
 	}
 
-	// 获取订阅信息（可能为nil）- 提前获取用于后续检查
+	// 鑾峰彇璁㈤槄淇℃伅锛堝彲鑳戒负nil锛? 鎻愬墠鑾峰彇鐢ㄤ簬鍚庣画妫€鏌?
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 
-	// 1. 首先获取用户并发槽位
+	// 1. 棣栧厛鑾峰彇鐢ㄦ埛骞跺彂妲戒綅
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
 	if err != nil {
 		reqLog.Warn("gateway.user_slot_acquire_failed", zap.Error(err))
 		h.handleConcurrencyError(c, err, "user", streamStarted)
 		return
 	}
-	// 在请求结束或 Context 取消时确保释放槽位，避免客户端断开造成泄漏
+	// 鍦ㄨ姹傜粨鏉熸垨 Context 鍙栨秷鏃剁‘淇濋噴鏀炬Ы浣嶏紝閬垮厤瀹㈡埛绔柇寮€閫犳垚娉勬紡
 	userReleaseFunc = wrapReleaseOnDone(c.Request.Context(), userReleaseFunc)
 	if userReleaseFunc != nil {
 		defer userReleaseFunc()
 	}
 
-	// 2. 【新增】Wait后二次检查余额/订阅
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	// 2. 銆愭柊澧炪€慦ait鍚庝簩娆℃鏌ヤ綑棰?璁㈤槄
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -255,10 +254,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
-	// 设置请求所属分组 ID（用于渠道级功能判断，如 WebSearch 模拟）
-	parsedReq.GroupID = apiKey.GroupID
+	// 璁剧疆璇锋眰鎵€灞炲垎缁?ID锛堢敤浜庢笭閬撶骇鍔熻兘鍒ゆ柇锛屽 WebSearch 妯℃嫙锛?
+	parsedReq.PlatformID = service.PlatformSchedulingID(c.Request.Context())
 
-	// 计算粘性会话hash
+	// 璁＄畻绮樻€т細璇漢ash
 	parsedReq.SessionContext = &service.SessionContext{
 		ClientIP:  ip.GetClientIP(c),
 		UserAgent: c.GetHeader("User-Agent"),
@@ -266,61 +265,59 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 	sessionHash := h.gatewayService.GenerateSessionHash(parsedReq)
 
-	// [DEBUG-STICKY] 打印会话 hash 生成结果
+	// [DEBUG-STICKY] 鎵撳嵃浼氳瘽 hash 鐢熸垚缁撴灉
 	reqLog.Info("sticky.session_hash_generated",
 		zap.String("session_hash", sessionHash),
 		zap.String("metadata_user_id_raw", parsedReq.MetadataUserID),
 	)
 
-	// 获取平台：优先使用强制平台（/antigravity 路由），其次使用 composite 解析出的目标平台，否则使用分组平台
+	// 鑾峰彇骞冲彴锛氫紭鍏堜娇鐢ㄥ己鍒跺钩鍙帮紙/antigravity 璺敱锛夛紝鍏舵浣跨敤 composite 瑙ｆ瀽鍑虹殑鐩爣骞冲彴锛屽惁鍒欎娇鐢ㄥ垎缁勫钩鍙?
 	platform := ""
 	if forcePlatform, ok := middleware2.GetForcePlatformFromContext(c); ok {
 		platform = forcePlatform
 	} else if resolvedPlatform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok {
 		platform = resolvedPlatform
-	} else if apiKey.Group != nil {
-		platform = apiKey.Group.Platform
 	}
 	sessionKey := sessionHash
 	if platform == service.PlatformGemini && sessionHash != "" {
 		sessionKey = "gemini:" + sessionHash
 	}
 
-	// 查询粘性会话绑定的账号 ID
+	// 鏌ヨ绮樻€т細璇濈粦瀹氱殑璐﹀彿 ID
 	var sessionBoundAccountID int64
 	if sessionKey != "" {
-		sessionBoundAccountID, _ = h.gatewayService.GetCachedSessionAccountID(c.Request.Context(), apiKey.GroupID, sessionKey)
-		// [DEBUG-STICKY] 打印粘性会话查询结果
+		sessionBoundAccountID, _ = h.gatewayService.GetCachedSessionAccountID(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey)
+		// [DEBUG-STICKY] 鎵撳嵃绮樻€т細璇濇煡璇㈢粨鏋?
 		reqLog.Info("sticky.cache_lookup",
 			zap.String("session_key", sessionKey),
 			zap.Int64("bound_account_id", sessionBoundAccountID),
 		)
 		if sessionBoundAccountID > 0 {
-			prefetchedGroupID := int64(0)
-			if apiKey.GroupID != nil {
-				prefetchedGroupID = *apiKey.GroupID
+			prefetchedPlatformNamespaceID := int64(0)
+			if service.PlatformSchedulingID(c.Request.Context()) != nil {
+				prefetchedPlatformNamespaceID = *service.PlatformSchedulingID(c.Request.Context())
 			}
-			ctx := service.WithPrefetchedStickySession(c.Request.Context(), sessionBoundAccountID, prefetchedGroupID, h.metadataBridgeEnabled())
+			ctx := service.WithPrefetchedStickySession(c.Request.Context(), sessionBoundAccountID, prefetchedPlatformNamespaceID, h.metadataBridgeEnabled())
 			c.Request = c.Request.WithContext(ctx)
 		}
 	} else {
 		reqLog.Info("sticky.no_session_key", zap.String("session_hash", sessionHash))
 	}
-	// 判断是否真的绑定了粘性会话：有 sessionKey 且已经绑定到某个账号
+	// 鍒ゆ柇鏄惁鐪熺殑缁戝畾浜嗙矘鎬т細璇濓細鏈?sessionKey 涓斿凡缁忕粦瀹氬埌鏌愪釜璐﹀彿
 	hasBoundSession := sessionKey != "" && sessionBoundAccountID > 0
 
 	if platform == service.PlatformGemini {
 		fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
 
-		// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
-		// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-		if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID) {
+		// 鍗曡处鍙峰垎缁勬彁鍓嶈缃?SingleAccountRetry 鏍囪锛岃 Service 灞傞娆?503 灏变笉璁炬ā鍨嬮檺娴佹爣璁般€?
+		// 閬垮厤鍗曡处鍙峰垎缁勬敹鍒?503 (MODEL_CAPACITY_EXHAUSTED) 鏃惰 29s 闄愭祦锛屽鑷村悗缁姹傝繛缁揩閫熷け璐ャ€?
+		if h.gatewayService.IsSingleAntigravityPlatformAccount(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context())) {
 			ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 			c.Request = c.Request.WithContext(ctx)
 		}
 
 		for {
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, reqModel, fs.FailedAccountIDs, "", int64(0)) // Gemini 涓嶄娇鐢ㄤ細璇濋檺鍒?
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, service.PlatformGemini)
@@ -329,7 +326,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					}
 					reqLog.Warn("gateway.select_account_no_available",
 						zap.String("model", reqModel),
-						zap.Int64p("group_id", apiKey.GroupID),
+						zap.Int64p("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 						zap.String("platform", platform),
 						zap.Bool("model_not_found", cls.ModelNotFound),
 						zap.Error(err),
@@ -362,7 +359,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			account := selection.Account
 			setOpsSelectedAccount(c, account.ID, account.Platform)
 
-			// 检查请求拦截（预热请求、SUGGESTION MODE等）
+			// 妫€鏌ヨ姹傛嫤鎴紙棰勭儹璇锋眰銆丼UGGESTION MODE绛夛級
 			if account.IsInterceptWarmupEnabled() {
 				interceptType := detectInterceptType(body, reqModel, parsedReq.MaxTokens, isClaudeCodeClient)
 				if interceptType != InterceptTypeNone {
@@ -378,7 +375,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 			}
 
-			// 3. 获取账号并发槽位
+			// 3. 鑾峰彇璐﹀彿骞跺彂妲戒綅
 			accountReleaseFunc := selection.ReleaseFunc
 			if !selection.Acquired {
 				if selection.WaitPlan == nil {
@@ -429,20 +426,20 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
-			// 账号槽位/等待计数需要在超时或断开时安全回收
+			// 璐﹀彿妲戒綅/绛夊緟璁℃暟闇€瑕佸湪瓒呮椂鎴栨柇寮€鏃跺畨鍏ㄥ洖鏀?
 			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
-			// 转发请求 - 根据账号平台分流
+			// 杞彂璇锋眰 - 鏍规嵁璐﹀彿骞冲彴鍒嗘祦
 			var result *service.ForwardResult
 			requestCtx := c.Request.Context()
 			if fs.SwitchCount > 0 {
 				requestCtx = service.WithAccountSwitchCount(requestCtx, fs.SwitchCount, h.metadataBridgeEnabled())
 			}
-			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
+			// 璁板綍 Forward 鍓嶅凡鍐欏叆瀛楄妭鏁帮紝Forward 鍚庤嫢澧炲姞鍒欒鏄?SSE 鍐呭宸插彂锛岀姝?failover
 			writerSizeBeforeForward := c.Writer.Size()
 			if account.Platform == service.PlatformAntigravity {
 				result, err = h.antigravityGatewayService.ForwardGemini(
@@ -454,7 +451,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					reqStream,
 					body,
 					hasBoundSession,
-					service.WithForwardGeminiSession(derefGroupID(apiKey.GroupID), sessionKey),
+					service.WithForwardGeminiSession(derefPlatformID(service.PlatformSchedulingID(c.Request.Context())), sessionKey),
 				)
 			} else {
 				result, err = h.geminiCompatService.Forward(requestCtx, c, account, body)
@@ -465,7 +462,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if err != nil {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
+					// 娴佸紡鍐呭宸插啓鍏ュ鎴风锛屾棤娉曟挙閿€锛岀姝?failover 浠ラ槻姝㈡祦鎷兼帴鑵愬寲
 					if c.Writer.Size() != writerSizeBeforeForward {
 						h.handleFailoverExhausted(c, failoverErr, service.PlatformGemini, true)
 						return
@@ -509,16 +506,16 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				return
 			}
 
-			// RPM 计数递增（Forward 成功后）
-			// 注意：TOCTOU 竞态是已知且可接受的设计权衡，与 WindowCost 一致的 soft-limit 模式。
-			// 在高并发下可能短暂超出 RPM 限制，但不会导致请求失败。
+			// RPM 璁℃暟閫掑锛團orward 鎴愬姛鍚庯級
+			// 娉ㄦ剰锛歍OCTOU 绔炴€佹槸宸茬煡涓斿彲鎺ュ彈鐨勮璁℃潈琛★紝涓?WindowCost 涓€鑷寸殑 soft-limit 妯″紡銆?
+			// 鍦ㄩ珮骞跺彂涓嬪彲鑳界煭鏆傝秴鍑?RPM 闄愬埗锛屼絾涓嶄細瀵艰嚧璇锋眰澶辫触銆?
 			if account.IsAnthropicOAuthOrSetupToken() && account.GetBaseRPM() > 0 {
 				if err := h.gatewayService.IncrementAccountRPM(c.Request.Context(), account.ID); err != nil {
 					reqLog.Warn("gateway.rpm_increment_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
 
-			// 捕获请求信息（用于异步记录，避免在 goroutine 中访问 gin.Context）
+			// 鎹曡幏璇锋眰淇℃伅锛堢敤浜庡紓姝ヨ褰曪紝閬垮厤鍦?goroutine 涓闂?gin.Context锛?
 			userAgent := c.GetHeader("User-Agent")
 			clientIP := ip.GetClientIP(c)
 			requestPayloadHash := service.HashUsageRequestPayload(body)
@@ -528,9 +525,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if result.ReasoningEffort == nil {
 				result.ReasoningEffort = service.NormalizeClaudeOutputEffort(parsedReq.OutputEffort)
 			}
-			// 国产模型 thinking-enabled 默认 effort 填充：Kimi/GLM/MiniMax 这些不支持 effort 档位的
-			// passback-required 上游，仅要 thinking 启用且 OutputEffort 未明确传递时，在 usage_log 写 "high"
-			// 避免该字段长期为 NULL（详见 DefaultEffortForThinkingEnabled 文档）。
+			// 鍥戒骇妯″瀷 thinking-enabled 榛樿 effort 濉厖锛欿imi/GLM/MiniMax 杩欎簺涓嶆敮鎸?effort 妗ｄ綅鐨?
+			// passback-required 涓婃父锛屼粎瑕?thinking 鍚敤涓?OutputEffort 鏈槑纭紶閫掓椂锛屽湪 usage_log 鍐?"high"
+			// 閬垮厤璇ュ瓧娈甸暱鏈熶负 NULL锛堣瑙?DefaultEffortForThinkingEnabled 鏂囨。锛夈€?
 			if result.ReasoningEffort == nil && parsedReq.ThinkingEnabled {
 				protocolModel := result.UpstreamModel
 				if protocolModel == "" {
@@ -539,34 +536,34 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				result.ReasoningEffort = service.DefaultEffortForThinkingEnabled(protocolModel)
 			}
 
-			// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
-			// ForceCacheBilling 提前拍成标量，避免 worker 闭包保活 failover 状态里的响应体。
+			// 浣跨敤閲忚褰曢€氳繃鏈夌晫 worker 姹犳彁浜わ紝閬垮厤璇锋眰鐑矾寰勫垱寤烘棤鐣?goroutine銆?
+			// ForceCacheBilling 鎻愬墠鎷嶆垚鏍囬噺锛岄伩鍏?worker 闂寘淇濇椿 failover 鐘舵€侀噷鐨勫搷搴斾綋銆?
 			forceCacheBilling := fs.ForceCacheBilling
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 			sessionID := service.ExtractClientSessionID(c)
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-					Result:             result,
-					QuotaPlatform:      quotaPlatform,
-					APIKey:             apiKey,
-					User:               apiKey.User,
-					Account:            account,
-					Subscription:       subscription,
-					InboundEndpoint:    inboundEndpoint,
-					UpstreamEndpoint:   upstreamEndpoint,
-					UserAgent:          userAgent,
-					IPAddress:          clientIP,
-					SessionID:          sessionID,
-					RequestPayloadHash: requestPayloadHash,
-					ForceCacheBilling:  forceCacheBilling,
-					APIKeyService:      h.apiKeyService,
-					ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel),
+					Result:                  result,
+					QuotaPlatform:           quotaPlatform,
+					APIKey:                  apiKey,
+					User:                    apiKey.User,
+					Account:                 account,
+					Subscription:            subscription,
+					InboundEndpoint:         inboundEndpoint,
+					UpstreamEndpoint:        upstreamEndpoint,
+					UserAgent:               userAgent,
+					IPAddress:               clientIP,
+					SessionID:               sessionID,
+					RequestPayloadHash:      requestPayloadHash,
+					ForceCacheBilling:       forceCacheBilling,
+					APIKeyService:           h.apiKeyService,
+					ModelRoutingUsageFields: clientRequestedUsageFields(c, modelMapping, reqModel, result.UpstreamModel),
 				}); err != nil {
 					logger.L().With(
 						zap.String("component", "handler.gateway.messages"),
 						zap.Int64("user_id", subject.UserID),
 						zap.Int64("api_key_id", apiKey.ID),
-						zap.Any("group_id", apiKey.GroupID),
+						zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 						zap.String("model", reqModel),
 						zap.Int64("account_id", account.ID),
 					).Error("gateway.record_usage_failed", zap.Error(err))
@@ -578,15 +575,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	currentAPIKey := apiKey
 	currentSubscription := subscription
-	var fallbackGroupID *int64
-	if apiKey.Group != nil {
-		fallbackGroupID = apiKey.Group.FallbackGroupIDOnInvalidRequest
-	}
-	fallbackUsed := false
 
-	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
-	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), currentAPIKey.GroupID) {
+	// 鍗曡处鍙峰垎缁勬彁鍓嶈缃?SingleAccountRetry 鏍囪锛岃 Service 灞傞娆?503 灏变笉璁炬ā鍨嬮檺娴佹爣璁般€?
+	// 閬垮厤鍗曡处鍙峰垎缁勬敹鍒?503 (MODEL_CAPACITY_EXHAUSTED) 鏃惰 29s 闄愭祦锛屽鑷村悗缁姹傝繛缁揩閫熷け璐ャ€?
+	if h.gatewayService.IsSingleAntigravityPlatformAccount(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context())) {
 		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
@@ -602,14 +594,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				return
 			}
 
-			// 选择支持该模型的账号
+			// 閫夋嫨鏀寔璇ユā鍨嬬殑璐﹀彿
 			reqLog.Info("sticky.selecting_account",
 				zap.String("session_key", sessionKey),
 				zap.Int64("sticky_bound_account_id", sessionBoundAccountID),
 				zap.Bool("has_bound_session", hasBoundSession),
 				zap.Int("failed_account_count", len(fs.FailedAccountIDs)),
 			)
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), currentAPIKey.GroupID, sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, subject.UserID)
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, reqModel, fs.FailedAccountIDs, parsedReq.MetadataUserID, subject.UserID)
 			if err != nil {
 				if len(fs.FailedAccountIDs) == 0 {
 					cls := classifyNoAccountErrorFromGin(c, h.gatewayService, currentAPIKey, reqModel, reqModel, platform)
@@ -618,9 +610,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					}
 					reqLog.Warn("gateway.select_account_no_available",
 						zap.String("model", reqModel),
-						zap.Int64p("group_id", currentAPIKey.GroupID),
+						zap.Int64p("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 						zap.String("platform", platform),
-						zap.Bool("fallback_used", fallbackUsed),
 						zap.Bool("model_not_found", cls.ModelNotFound),
 						zap.Error(err),
 					)
@@ -652,7 +643,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			account := selection.Account
 			setOpsSelectedAccount(c, account.ID, account.Platform)
 
-			// [DEBUG-STICKY] 打印账号选择结果
+			// [DEBUG-STICKY] 鎵撳嵃璐﹀彿閫夋嫨缁撴灉
 			reqLog.Info("sticky.account_selected",
 				zap.Int64("selected_account_id", account.ID),
 				zap.String("account_name", account.Name),
@@ -662,7 +653,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				zap.Bool("sticky_honored", sessionBoundAccountID > 0 && sessionBoundAccountID == account.ID),
 			)
 
-			// 检查请求拦截（预热请求、SUGGESTION MODE等）
+			// 妫€鏌ヨ姹傛嫤鎴紙棰勭儹璇锋眰銆丼UGGESTION MODE绛夛級
 			if account.IsInterceptWarmupEnabled() {
 				interceptType := detectInterceptType(body, reqModel, parsedReq.MaxTokens, isClaudeCodeClient)
 				if interceptType != InterceptTypeNone {
@@ -678,7 +669,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 			}
 
-			// 3. 获取账号并发槽位
+			// 3. 鑾峰彇璐﹀彿骞跺彂妲戒綅
 			accountReleaseFunc := selection.ReleaseFunc
 			if !selection.Acquired {
 				if selection.WaitPlan == nil {
@@ -733,20 +724,20 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					zap.String("session_key", sessionKey),
 					zap.Int64("account_id", account.ID),
 				)
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
-			// 账号槽位/等待计数需要在超时或断开时安全回收
+			// 璐﹀彿妲戒綅/绛夊緟璁℃暟闇€瑕佸湪瓒呮椂鎴栨柇寮€鏃跺畨鍏ㄥ洖鏀?
 			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
-			// ===== 用户消息串行队列 START =====
+			// ===== 鐢ㄦ埛娑堟伅涓茶闃熷垪 START =====
 			var queueRelease func()
 			umqMode := h.getUserMsgQueueMode(account, attemptParsedReq)
 
 			switch umqMode {
 			case config.UMQModeSerialize:
-				// 串行模式：获取锁 + RPM 延迟 + 释放（当前行为不变）
+				// 涓茶妯″紡锛氳幏鍙栭攣 + RPM 寤惰繜 + 閲婃斁锛堝綋鍓嶈涓轰笉鍙橈級
 				baseRPM := account.GetBaseRPM()
 				release, qErr := h.userMsgQueueHelper.AcquireWithWait(
 					c, account.ID, baseRPM, reqStream, &streamStarted,
@@ -754,7 +745,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					reqLog,
 				)
 				if qErr != nil {
-					// fail-open: 记录 warn，不阻止请求
+					// fail-open: 璁板綍 warn锛屼笉闃绘璇锋眰
 					reqLog.Warn("gateway.umq_acquire_failed",
 						zap.Int64("account_id", account.ID),
 						zap.Error(qErr),
@@ -764,7 +755,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 
 			case config.UMQModeThrottle:
-				// 软性限速：仅施加 RPM 自适应延迟，不阻塞并发
+				// 杞€ч檺閫燂細浠呮柦鍔?RPM 鑷€傚簲寤惰繜锛屼笉闃诲骞跺彂
 				baseRPM := account.GetBaseRPM()
 				if tErr := h.userMsgQueueHelper.ThrottleWithPing(
 					c, account.ID, baseRPM, reqStream, &streamStarted,
@@ -786,28 +777,28 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 			}
 
-			// 用 wrapReleaseOnDone 确保 context 取消时自动释放（仅 serialize 模式有 queueRelease）
+			// 鐢?wrapReleaseOnDone 纭繚 context 鍙栨秷鏃惰嚜鍔ㄩ噴鏀撅紙浠?serialize 妯″紡鏈?queueRelease锛?
 			queueRelease = wrapReleaseOnDone(c.Request.Context(), queueRelease)
-			// 注入回调到 ParsedRequest：使用外层 wrapper 以便提前清理 AfterFunc
+			// 娉ㄥ叆鍥炶皟鍒?ParsedRequest锛氫娇鐢ㄥ灞?wrapper 浠ヤ究鎻愬墠娓呯悊 AfterFunc
 			attemptParsedReq.OnUpstreamAccepted = queueRelease
-			// ===== 用户消息串行队列 END =====
+			// ===== 鐢ㄦ埛娑堟伅涓茶闃熷垪 END =====
 
-			// 渠道模型映射只作用于本次账号尝试，避免 failover 后污染原始 ParsedRequest。
-			if channelMapping.Mapped {
-				attemptParsedReq.Model = channelMapping.MappedModel
-				if err := attemptParsedReq.ReplaceBody(h.gatewayService.ReplaceModelInBody(attemptParsedReq.Body.Bytes(), channelMapping.MappedModel)); err != nil {
+			// 娓犻亾妯″瀷鏄犲皠鍙綔鐢ㄤ簬鏈璐﹀彿灏濊瘯锛岄伩鍏?failover 鍚庢薄鏌撳師濮?ParsedRequest銆?
+			if modelMapping.Mapped {
+				attemptParsedReq.Model = modelMapping.MappedModel
+				if err := attemptParsedReq.ReplaceBody(h.gatewayService.ReplaceModelInBody(attemptParsedReq.Body.Bytes(), modelMapping.MappedModel)); err != nil {
 					h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
 					return
 				}
 			}
-			// Bedrock CC 兼容：清理 body 专有字段 + 过滤 anthropic-beta header，适用于所有转发路径
-			if err := attemptParsedReq.ReplaceBody(h.gatewayService.ApplyBedrockCCCompat(c, attemptParsedReq.Body.Bytes(), attemptParsedReq.Model, account, apiKey.GroupID)); err != nil {
+			// Bedrock CC 鍏煎锛氭竻鐞?body 涓撴湁瀛楁 + 杩囨护 anthropic-beta header锛岄€傜敤浜庢墍鏈夎浆鍙戣矾寰?
+			if err := attemptParsedReq.ReplaceBody(h.gatewayService.ApplyBedrockCCCompat(c, attemptParsedReq.Body.Bytes(), attemptParsedReq.Model, account, service.PlatformSchedulingID(c.Request.Context()))); err != nil {
 				h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
 				return
 			}
 			attemptBody := attemptParsedReq.Body.Bytes()
 
-			// 转发请求 - 根据账号平台分流
+			// 杞彂璇锋眰 - 鏍规嵁璐﹀彿骞冲彴鍒嗘祦
 			c.Set("parsed_request", attemptParsedReq)
 			var result *service.ForwardResult
 			requestCtx := c.Request.Context()
@@ -817,7 +808,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if fs.ForceCacheBilling {
 				requestCtx = service.WithForceCacheBilling(requestCtx)
 			}
-			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
+			// 璁板綍 Forward 鍓嶅凡鍐欏叆瀛楄妭鏁帮紝Forward 鍚庤嫢澧炲姞鍒欒鏄?SSE 鍐呭宸插彂锛岀姝?failover
 			writerSizeBeforeForward := c.Writer.Size()
 			if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 				result, err = h.antigravityGatewayService.Forward(requestCtx, c, account, attemptBody, hasBoundSession)
@@ -825,24 +816,24 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				result, err = h.gatewayService.Forward(requestCtx, c, account, attemptParsedReq)
 			}
 
-			// 兜底释放串行锁（正常情况已通过回调提前释放）
+			// 鍏滃簳閲婃斁涓茶閿侊紙姝ｅ父鎯呭喌宸查€氳繃鍥炶皟鎻愬墠閲婃斁锛?
 			if queueRelease != nil {
 				queueRelease()
 			}
-			// 清理回调引用，防止 failover 重试时旧回调被错误调用
+			// 娓呯悊鍥炶皟寮曠敤锛岄槻姝?failover 閲嶈瘯鏃舵棫鍥炶皟琚敊璇皟鐢?
 			attemptParsedReq.OnUpstreamAccepted = nil
 
 			if accountReleaseFunc != nil {
 				accountReleaseFunc()
 			}
 
-			// 提交 usage 记录。成功路径与"流中断但 Forward 已观测到 usage 的部分结果"
-			// 错误路径共用：后者若不入账，上游已计量的请求会完全漏记漏计费（#5148）。
+			// 鎻愪氦 usage 璁板綍銆傛垚鍔熻矾寰勪笌"娴佷腑鏂絾 Forward 宸茶娴嬪埌 usage 鐨勯儴鍒嗙粨鏋?
+			// 閿欒璺緞鍏辩敤锛氬悗鑰呰嫢涓嶅叆璐︼紝涓婃父宸茶閲忕殑璇锋眰浼氬畬鍏ㄦ紡璁版紡璁¤垂锛?5148锛夈€?
 			submitForwardUsage := func(result *service.ForwardResult) {
-				// 捕获请求信息（用于异步记录，避免在 goroutine 中访问 gin.Context）
+				// 鎹曡幏璇锋眰淇℃伅锛堢敤浜庡紓姝ヨ褰曪紝閬垮厤鍦?goroutine 涓闂?gin.Context锛?
 				userAgent := c.GetHeader("User-Agent")
 				clientIP := ip.GetClientIP(c)
-				// Forward 内部可能继续改写 body，usage 去重指纹必须使用最终上游接受的当前 body。
+				// Forward 鍐呴儴鍙兘缁х画鏀瑰啓 body锛寀sage 鍘婚噸鎸囩汗蹇呴』浣跨敤鏈€缁堜笂娓告帴鍙楃殑褰撳墠 body銆?
 				requestPayloadHash := service.HashUsageRequestPayload(attemptParsedReq.Body.Bytes())
 				inboundEndpoint := GetInboundEndpoint(c)
 				upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
@@ -850,7 +841,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if result.ReasoningEffort == nil {
 					result.ReasoningEffort = service.NormalizeClaudeOutputEffort(attemptParsedReq.OutputEffort)
 				}
-				// 同上（重试路径中的对称填充）。详见非重试路径同名注释。
+				// 鍚屼笂锛堥噸璇曡矾寰勪腑鐨勫绉板～鍏咃級銆傝瑙侀潪閲嶈瘯璺緞鍚屽悕娉ㄩ噴銆?
 				if result.ReasoningEffort == nil && attemptParsedReq.ThinkingEnabled {
 					protocolModel := result.UpstreamModel
 					if protocolModel == "" {
@@ -859,34 +850,34 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					result.ReasoningEffort = service.DefaultEffortForThinkingEnabled(protocolModel)
 				}
 
-				// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
-				// ForceCacheBilling 提前拍成标量，避免 worker 闭包保活 failover 状态里的响应体。
+				// 浣跨敤閲忚褰曢€氳繃鏈夌晫 worker 姹犳彁浜わ紝閬垮厤璇锋眰鐑矾寰勫垱寤烘棤鐣?goroutine銆?
+				// ForceCacheBilling 鎻愬墠鎷嶆垚鏍囬噺锛岄伩鍏?worker 闂寘淇濇椿 failover 鐘舵€侀噷鐨勫搷搴斾綋銆?
 				forceCacheBilling := fs.ForceCacheBilling
 				quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
 				sessionID := service.ExtractClientSessionID(c)
 				h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-						Result:             result,
-						QuotaPlatform:      quotaPlatform,
-						APIKey:             currentAPIKey,
-						User:               currentAPIKey.User,
-						Account:            account,
-						Subscription:       currentSubscription,
-						InboundEndpoint:    inboundEndpoint,
-						UpstreamEndpoint:   upstreamEndpoint,
-						UserAgent:          userAgent,
-						IPAddress:          clientIP,
-						SessionID:          sessionID,
-						RequestPayloadHash: requestPayloadHash,
-						ForceCacheBilling:  forceCacheBilling,
-						APIKeyService:      h.apiKeyService,
-						ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel),
+						Result:                  result,
+						QuotaPlatform:           quotaPlatform,
+						APIKey:                  currentAPIKey,
+						User:                    currentAPIKey.User,
+						Account:                 account,
+						Subscription:            currentSubscription,
+						InboundEndpoint:         inboundEndpoint,
+						UpstreamEndpoint:        upstreamEndpoint,
+						UserAgent:               userAgent,
+						IPAddress:               clientIP,
+						SessionID:               sessionID,
+						RequestPayloadHash:      requestPayloadHash,
+						ForceCacheBilling:       forceCacheBilling,
+						APIKeyService:           h.apiKeyService,
+						ModelRoutingUsageFields: clientRequestedUsageFields(c, modelMapping, reqModel, result.UpstreamModel),
 					}); err != nil {
 						logger.L().With(
 							zap.String("component", "handler.gateway.messages"),
 							zap.Int64("user_id", subject.UserID),
 							zap.Int64("api_key_id", currentAPIKey.ID),
-							zap.Any("group_id", currentAPIKey.GroupID),
+							zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 							zap.String("model", reqModel),
 							zap.Int64("account_id", account.ID),
 						).Error("gateway.record_usage_failed", zap.Error(err))
@@ -906,52 +897,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var promptTooLongErr *service.PromptTooLongError
 				if errors.As(err, &promptTooLongErr) {
 					reqLog.Warn("gateway.prompt_too_long_from_antigravity",
-						zap.Any("current_group_id", currentAPIKey.GroupID),
-						zap.Any("fallback_group_id", fallbackGroupID),
-						zap.Bool("fallback_used", fallbackUsed),
+						zap.Any("platform_scheduling_id", service.PlatformSchedulingID(c.Request.Context())),
 					)
-					if !fallbackUsed && fallbackGroupID != nil && *fallbackGroupID > 0 {
-						fallbackGroup, err := h.gatewayService.ResolveGroupByID(c.Request.Context(), *fallbackGroupID)
-						if err != nil {
-							reqLog.Warn("gateway.resolve_fallback_group_failed", zap.Int64("fallback_group_id", *fallbackGroupID), zap.Error(err))
-							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
-							return
-						}
-						if fallbackGroup.Platform != service.PlatformAnthropic ||
-							fallbackGroup.SubscriptionType == service.SubscriptionTypeSubscription ||
-							fallbackGroup.FallbackGroupIDOnInvalidRequest != nil {
-							reqLog.Warn("gateway.fallback_group_invalid",
-								zap.Int64("fallback_group_id", fallbackGroup.ID),
-								zap.String("fallback_platform", fallbackGroup.Platform),
-								zap.String("fallback_subscription_type", fallbackGroup.SubscriptionType),
-							)
-							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
-							return
-						}
-						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
-						if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil, service.PlatformFromAPIKey(fallbackAPIKey)); err != nil {
-							status, code, message, retryAfter := billingErrorDetails(err)
-							if retryAfter > 0 {
-								c.Header("Retry-After", strconv.Itoa(retryAfter))
-							}
-							h.handleStreamingAwareError(c, status, code, message, streamStarted)
-							return
-						}
-						// 兜底重试按"直接请求兜底分组"处理：清除强制平台，允许按分组平台调度
-						ctx := context.WithValue(c.Request.Context(), ctxkey.ForcePlatform, "")
-						c.Request = c.Request.WithContext(ctx)
-						currentAPIKey = fallbackAPIKey
-						currentSubscription = nil
-						fallbackUsed = true
-						retryWithFallback = true
-						break
-					}
 					_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
 					return
 				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
+					// 娴佸紡鍐呭宸插啓鍏ュ鎴风锛屾棤娉曟挙閿€锛岀姝?failover 浠ラ槻姝㈡祦鎷兼帴鑵愬寲
 					if c.Writer.Size() != writerSizeBeforeForward {
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
@@ -992,31 +945,31 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					forwardFailedFields = append(forwardFailedFields, zap.Int64p("proxy_id", account.ProxyID))
 				}
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
-				// Forward 与错误一起返回的部分结果：流中断前上游已计量的 usage 照常入账，
-				// 避免上游已产生消耗的请求完全漏记（#5148）。failover 错误恒定 result=nil，
-				// 不会走到这里重复计费。
+				// Forward 涓庨敊璇竴璧疯繑鍥炵殑閮ㄥ垎缁撴灉锛氭祦涓柇鍓嶄笂娓稿凡璁￠噺鐨?usage 鐓у父鍏ヨ处锛?
+				// 閬垮厤涓婃父宸蹭骇鐢熸秷鑰楃殑璇锋眰瀹屽叏婕忚锛?5148锛夈€俧ailover 閿欒鎭掑畾 result=nil锛?
+				// 涓嶄細璧板埌杩欓噷閲嶅璁¤垂銆?
 				if result != nil {
 					submitForwardUsage(result)
 				}
 				return
 			}
 
-			// RPM 计数递增（Forward 成功后）
-			// 注意：TOCTOU 竞态是已知且可接受的设计权衡，与 WindowCost 一致的 soft-limit 模式。
-			// 在高并发下可能短暂超出 RPM 限制，但不会导致请求失败。
+			// RPM 璁℃暟閫掑锛團orward 鎴愬姛鍚庯級
+			// 娉ㄦ剰锛歍OCTOU 绔炴€佹槸宸茬煡涓斿彲鎺ュ彈鐨勮璁℃潈琛★紝涓?WindowCost 涓€鑷寸殑 soft-limit 妯″紡銆?
+			// 鍦ㄩ珮骞跺彂涓嬪彲鑳界煭鏆傝秴鍑?RPM 闄愬埗锛屼絾涓嶄細瀵艰嚧璇锋眰澶辫触銆?
 			if account.IsAnthropicOAuthOrSetupToken() && account.GetBaseRPM() > 0 {
 				if err := h.gatewayService.IncrementAccountRPM(c.Request.Context(), account.ID); err != nil {
 					reqLog.Warn("gateway.rpm_increment_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
 
-			// 绑定粘性会话（成功转发后绑定/刷新）
-			// - 无现有绑定（首次请求）：创建绑定
-			// - 选中账号与粘性账号一致：刷新 TTL
-			// - 粘性账号因负载/RPM 被跳过、选中了其他账号：不覆盖原绑定，
-			//   下次请求粘性账号恢复后仍可命中
+			// 缁戝畾绮樻€т細璇濓紙鎴愬姛杞彂鍚庣粦瀹?鍒锋柊锛?
+			// - 鏃犵幇鏈夌粦瀹氾紙棣栨璇锋眰锛夛細鍒涘缓缁戝畾
+			// - 閫変腑璐﹀彿涓庣矘鎬ц处鍙蜂竴鑷达細鍒锋柊 TTL
+			// - 绮樻€ц处鍙峰洜璐熻浇/RPM 琚烦杩囥€侀€変腑浜嗗叾浠栬处鍙凤細涓嶈鐩栧師缁戝畾锛?
+			//   涓嬫璇锋眰绮樻€ц处鍙锋仮澶嶅悗浠嶅彲鍛戒腑
 			if sessionKey != "" && (sessionBoundAccountID == 0 || sessionBoundAccountID == account.ID) {
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, account.ID); err != nil {
 					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
@@ -1035,117 +988,22 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 // Returns models based on account configurations (model_mapping whitelist)
 // Falls back to default models if no whitelist is configured
 func (h *GatewayHandler) Models(c *gin.Context) {
-	apiKey, _ := middleware2.GetAPIKeyFromContext(c)
-	if service.UsesPlatformAssetPermissions(apiKey) {
-		if h.platformModels == nil {
-			response.ErrorFrom(c, service.ErrAPIKeyPlatformForbidden)
-			return
-		}
-		models, err := h.platformModels.ListAuthorizedModels(c.Request.Context(), apiKey.AllowedPlatformIDs)
-		if err != nil {
-			response.ErrorFrom(c, err)
-			return
-		}
-		writeModelsList(c, "", models)
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
+	if !ok || apiKey == nil {
+		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "API key required")
 		return
 	}
-
-	var groupID *int64
-	var platform string
-
-	if apiKey != nil && apiKey.Group != nil {
-		groupID = &apiKey.Group.ID
-		platform = apiKey.Group.Platform
-	}
-	if forcedPlatform, ok := middleware2.GetForcePlatformFromContext(c); ok && strings.TrimSpace(forcedPlatform) != "" {
-		platform = forcedPlatform
-	}
-
-	if platform == service.PlatformComposite {
-		availableModels := h.compositeAvailableModels(c.Request.Context(), groupID)
-		if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
-			availableModels = filterModelsByCustomList(availableModels, defaultModelIDsForPlatform(service.PlatformComposite), apiKey.Group.ModelsListConfig.Models)
-			writeCustomModelsList(c, service.PlatformComposite, availableModels)
-			return
-		}
-		if len(availableModels) > 0 {
-			writeModelsList(c, service.PlatformComposite, availableModels)
-			return
-		}
-		writeModelsList(c, service.PlatformComposite, defaultModelIDsForPlatform(service.PlatformComposite))
+	if h.platformModels == nil {
+		response.ErrorFrom(c, service.ErrAPIKeyPlatformForbidden)
 		return
 	}
-
-	// Get available models from account configurations for the selected group platform.
-	availableModels := h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, platform)
-	if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
-		fallbackModels := defaultModelIDsForPlatform(platform)
-		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
-		writeCustomModelsList(c, platform, availableModels)
+	models, err := h.platformModels.ListAuthorizedModels(c.Request.Context(), apiKey.AllowedPlatformIDs)
+	if err != nil {
+		response.ErrorFrom(c, err)
 		return
 	}
-
-	if len(availableModels) > 0 {
-		writeModelsList(c, platform, availableModels)
-		return
-	}
-
-	// Fallback to default models
-	if platform == service.PlatformOpenAI {
-		c.JSON(http.StatusOK, gin.H{
-			"object": "list",
-			"data":   openai.DefaultModels,
-		})
-		return
-	}
-
-	if platform == service.PlatformGemini {
-		c.JSON(http.StatusOK, gin.H{
-			"object": "list",
-			"data":   geminicli.DefaultModels,
-		})
-		return
-	}
-	if platform == service.PlatformGrok {
-		writeGrokModelsList(c, xai.DefaultModelIDs())
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"object": "list",
-		"data":   claude.DefaultModels,
-	})
+	writeModelsList(c, "", models)
 }
-
-func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *int64) []string {
-	if h == nil || h.gatewayService == nil {
-		return nil
-	}
-	seen := make(map[string]struct{})
-	models := make([]string, 0)
-	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
-	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok} {
-		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
-		if len(platformModels) == 0 {
-			if _, ok := schedulablePlatforms[platform]; ok {
-				platformModels = defaultModelIDsForPlatform(platform)
-			}
-		}
-		for _, model := range platformModels {
-			model = strings.TrimSpace(model)
-			if model == "" {
-				continue
-			}
-			if _, ok := seen[model]; ok {
-				continue
-			}
-			seen[model] = struct{}{}
-			models = append(models, model)
-		}
-	}
-	return models
-}
-
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
 	if platform == service.PlatformGrok {
 		writeGrokModelsList(c, modelIDs)
@@ -1387,24 +1245,12 @@ func mergeModelIDs(primary, secondary []string) []string {
 	return merged
 }
 
-// AntigravityModels 返回 Antigravity 支持的全部模型
-// GET /antigravity/models
+// AntigravityModels 杩斿洖 Antigravity 鏀寔鐨勫叏閮ㄦā鍨?// GET /antigravity/models
 func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"object": "list",
 		"data":   antigravity.DefaultModels(),
 	})
-}
-
-func cloneAPIKeyWithGroup(apiKey *service.APIKey, group *service.Group) *service.APIKey {
-	if apiKey == nil || group == nil {
-		return apiKey
-	}
-	cloned := *apiKey
-	groupID := group.ID
-	cloned.GroupID = &groupID
-	cloned.Group = group
-	return &cloned
 }
 
 // Usage handles getting account balance and usage statistics for CC Switch integration
@@ -1428,7 +1274,7 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// 解析可选的日期范围参数（用于 model_stats 查询）
+	// 瑙ｆ瀽鍙€夌殑鏃ユ湡鑼冨洿鍙傛暟锛堢敤浜?model_stats 鏌ヨ锛?
 	startTime, endTime := h.parseUsageDateRange(c)
 	days, ok := parseAPIKeyDailyUsageDays(c.DefaultQuery("days", ""))
 	if !ok {
@@ -1436,11 +1282,11 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 		return
 	}
 
-	// Best-effort: 获取用量统计（按当前 API Key 过滤），失败不影响基础响应
+	// Best-effort: 鑾峰彇鐢ㄩ噺缁熻锛堟寜褰撳墠 API Key 杩囨护锛夛紝澶辫触涓嶅奖鍝嶅熀纭€鍝嶅簲
 	usageData := h.buildUsageData(ctx, apiKey.ID)
 	dailyUsage := h.buildAPIKeyDailyUsage(c, subject.UserID, apiKey.ID, days)
 
-	// Best-effort: 获取模型统计
+	// Best-effort: 鑾峰彇妯″瀷缁熻
 	var modelStats any
 	if h.usageService != nil {
 		if stats, err := h.usageService.GetAPIKeyModelStats(ctx, apiKey.ID, startTime, endTime); err == nil && len(stats) > 0 {
@@ -1448,7 +1294,7 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 		}
 	}
 
-	// 判断模式: key 有总额度或速率限制 → quota_limited，否则 → unrestricted
+	// 鍒ゆ柇妯″紡: key 鏈夋€婚搴︽垨閫熺巼闄愬埗 鈫?quota_limited锛屽惁鍒?鈫?unrestricted
 	isQuotaLimited := apiKey.Quota > 0 || apiKey.HasRateLimits()
 
 	if isQuotaLimited {
@@ -1459,7 +1305,7 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 	h.usageUnrestricted(c, ctx, apiKey, subject, usageData, dailyUsage, modelStats)
 }
 
-// parseUsageDateRange 解析 start_date / end_date query params，默认返回近 30 天范围
+// parseUsageDateRange 瑙ｆ瀽 start_date / end_date query params锛岄粯璁よ繑鍥炶繎 30 澶╄寖鍥?
 func (h *GatewayHandler) parseUsageDateRange(c *gin.Context) (time.Time, time.Time) {
 	now := timezone.Now()
 	endTime := now
@@ -1478,7 +1324,7 @@ func (h *GatewayHandler) parseUsageDateRange(c *gin.Context) (time.Time, time.Ti
 	return startTime, endTime
 }
 
-// buildUsageData 构建 today/total 用量摘要
+// buildUsageData 鏋勫缓 today/total 鐢ㄩ噺鎽樿
 func (h *GatewayHandler) buildUsageData(ctx context.Context, apiKeyID int64) gin.H {
 	if h.usageService == nil {
 		return nil
@@ -1526,7 +1372,7 @@ func (h *GatewayHandler) buildAPIKeyDailyUsage(c *gin.Context, userID, apiKeyID 
 	return stats
 }
 
-// usageQuotaLimited 处理 quota_limited 模式的响应
+// usageQuotaLimited 澶勭悊 quota_limited 妯″紡鐨勫搷搴?
 func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, apiKey *service.APIKey, usageData gin.H, dailyUsage any, modelStats any) {
 	resp := gin.H{
 		"mode":    "quota_limited",
@@ -1534,7 +1380,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 		"status":  apiKey.Status,
 	}
 
-	// 总额度信息
+	// 鎬婚搴︿俊鎭?
 	if apiKey.Quota > 0 {
 		remaining := apiKey.GetQuotaRemaining()
 		resp["quota"] = gin.H{
@@ -1547,7 +1393,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 		resp["unit"] = "USD"
 	}
 
-	// 速率限制信息（从 DB 获取实时用量）
+	// 閫熺巼闄愬埗淇℃伅锛堜粠 DB 鑾峰彇瀹炴椂鐢ㄩ噺锛?
 	if apiKey.HasRateLimits() && h.apiKeyService != nil {
 		rateLimitData, err := h.apiKeyService.GetRateLimitData(ctx, apiKey.ID)
 		if err == nil && rateLimitData != nil {
@@ -1600,7 +1446,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 		}
 	}
 
-	// 过期时间
+	// 杩囨湡鏃堕棿
 	if apiKey.ExpiresAt != nil {
 		resp["expires_at"] = apiKey.ExpiresAt
 		resp["days_until_expiry"] = apiKey.GetDaysUntilExpiry()
@@ -1619,32 +1465,28 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 	c.JSON(http.StatusOK, resp)
 }
 
-// usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
+// usageUnrestricted 澶勭悊 unrestricted 妯″紡鐨勫搷搴旓紙鍚戝悗鍏煎锛?
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
-	// 订阅模式
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+	// 璁㈤槄妯″紡
+	if subscription, ok := middleware2.GetSubscriptionFromContext(c); ok && subscription != nil {
 		resp := gin.H{
 			"mode":     "unrestricted",
 			"isValid":  true,
-			"planName": apiKey.Group.Name,
+			"planName": subscription.PlanNameSnapshot,
 			"unit":     "USD",
 		}
 
-		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
-		subscription, ok := middleware2.GetSubscriptionFromContext(c)
-		if ok {
-			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
-			resp["remaining"] = remaining
-			resp["subscription"] = gin.H{
-				"daily_usage_usd":     subscription.DailyUsageUSD,
-				"weekly_usage_usd":    subscription.WeeklyUsageUSD,
-				"monthly_usage_usd":   subscription.MonthlyUsageUSD,
-				"daily_limit_usd":     subscription.DailyLimitUSD(apiKey.Group),
-				"weekly_limit_usd":    subscription.WeeklyLimitUSD(apiKey.Group),
-				"monthly_limit_usd":   subscription.MonthlyLimitUSD(apiKey.Group),
-				"weekly_window_start": subscription.WeeklyWindowStart,
-				"expires_at":          subscription.ExpiresAt,
-			}
+		remaining := h.calculateSubscriptionRemaining(subscription)
+		resp["remaining"] = remaining
+		resp["subscription"] = gin.H{
+			"daily_usage_usd":     subscription.DailyUsageUSD,
+			"weekly_usage_usd":    subscription.WeeklyUsageUSD,
+			"monthly_usage_usd":   subscription.MonthlyUsageUSD,
+			"daily_limit_usd":     subscription.DailyLimitUSD(),
+			"weekly_limit_usd":    subscription.WeeklyLimitUSD(),
+			"monthly_limit_usd":   subscription.MonthlyLimitUSD(),
+			"weekly_window_start": subscription.WeeklyWindowStart,
+			"expires_at":          subscription.ExpiresAt,
 		}
 
 		if usageData != nil {
@@ -1660,7 +1502,7 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 		return
 	}
 
-	// 余额模式
+	// 浣欓妯″紡
 	latestUser, err := h.userService.GetByID(ctx, subject.UserID)
 	if err != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get user info")
@@ -1670,7 +1512,7 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 	resp := gin.H{
 		"mode":      "unrestricted",
 		"isValid":   true,
-		"planName":  "钱包余额",
+		"planName":  "閽卞寘浣欓",
 		"remaining": latestUser.Balance,
 		"unit":      "USD",
 		"balance":   latestUser.Balance,
@@ -1687,18 +1529,17 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 	c.JSON(http.StatusOK, resp)
 }
 
-// calculateSubscriptionRemaining 计算订阅剩余可用额度
-// 逻辑：
-// 1. 如果日/周/月任一限额达到100%，返回0
-// 2. 否则返回所有已配置周期中剩余额度的最小值
-func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, sub *service.UserSubscription) float64 {
+// calculateSubscriptionRemaining 璁＄畻璁㈤槄鍓╀綑鍙敤棰濆害
+// 閫昏緫锛?// 1. 濡傛灉鏃?鍛?鏈堜换涓€闄愰杈惧埌100%锛岃繑鍥?
+// 2. 鍚﹀垯杩斿洖鎵€鏈夊凡閰嶇疆鍛ㄦ湡涓墿浣欓搴︾殑鏈€灏忓€?
+func (h *GatewayHandler) calculateSubscriptionRemaining(sub *service.UserSubscription) float64 {
 	var remainingValues []float64
 	if sub == nil {
 		return 0
 	}
 
-	// 检查日限额
-	if limit := sub.DailyLimitUSD(group); limit != nil && *limit > 0 {
+	// 妫€鏌ユ棩闄愰
+	if limit := sub.DailyLimitUSD(); limit != nil && *limit > 0 {
 		remaining := *limit - sub.DailyUsageUSD
 		if remaining <= 0 {
 			return 0
@@ -1706,8 +1547,8 @@ func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, su
 		remainingValues = append(remainingValues, remaining)
 	}
 
-	// 检查周限额
-	if limit := sub.WeeklyLimitUSD(group); limit != nil && *limit > 0 {
+	// 妫€鏌ュ懆闄愰
+	if limit := sub.WeeklyLimitUSD(); limit != nil && *limit > 0 {
 		remaining := *limit - sub.WeeklyUsageUSD
 		if remaining <= 0 {
 			return 0
@@ -1715,8 +1556,8 @@ func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, su
 		remainingValues = append(remainingValues, remaining)
 	}
 
-	// 检查月限额
-	if limit := sub.MonthlyLimitUSD(group); limit != nil && *limit > 0 {
+	// 妫€鏌ユ湀闄愰
+	if limit := sub.MonthlyLimitUSD(); limit != nil && *limit > 0 {
 		remaining := *limit - sub.MonthlyUsageUSD
 		if remaining <= 0 {
 			return 0
@@ -1724,12 +1565,12 @@ func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, su
 		remainingValues = append(remainingValues, remaining)
 	}
 
-	// 如果没有配置任何限额，返回-1表示无限制
+	// 濡傛灉娌℃湁閰嶇疆浠讳綍闄愰锛岃繑鍥?1琛ㄧず鏃犻檺鍒?
 	if len(remainingValues) == 0 {
 		return -1
 	}
 
-	// 返回最小值
+	// 杩斿洖鏈€灏忓€?
 	min := remainingValues[0]
 	for _, v := range remainingValues[1:] {
 		if v < min {
@@ -1754,16 +1595,16 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 		return
 	}
 
-	// 先检查透传规则
+	// 鍏堟鏌ラ€忎紶瑙勫垯
 	if h.errorPassthroughService != nil && len(responseBody) > 0 {
 		if rule := h.errorPassthroughService.MatchRule(platform, statusCode, responseBody); rule != nil {
-			// 确定响应状态码
+			// 纭畾鍝嶅簲鐘舵€佺爜
 			respCode := statusCode
 			if !rule.PassthroughCode && rule.ResponseCode != nil {
 				respCode = *rule.ResponseCode
 			}
 
-			// 确定响应消息
+			// 纭畾鍝嶅簲娑堟伅
 			msg := service.ExtractUpstreamErrorMessage(responseBody)
 			if !rule.PassthroughBody && rule.CustomMessage != nil {
 				msg = *rule.CustomMessage
@@ -1778,16 +1619,16 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 		}
 	}
 
-	// 记录原始上游状态码，以便 ops 错误日志捕获真实的上游错误
+	// 璁板綍鍘熷涓婃父鐘舵€佺爜锛屼互渚?ops 閿欒鏃ュ織鎹曡幏鐪熷疄鐨勪笂娓搁敊璇?
 	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
-	// 使用默认的错误映射
+	// 浣跨敤榛樿鐨勯敊璇槧灏?
 	status, errType, errMsg := h.mapUpstreamError(statusCode)
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
 }
 
-// handleFailoverExhaustedSimple 简化版本，用于没有响应体的情况
+// handleFailoverExhaustedSimple 绠€鍖栫増鏈紝鐢ㄤ簬娌℃湁鍝嶅簲浣撶殑鎯呭喌
 func (h *GatewayHandler) handleFailoverExhaustedSimple(c *gin.Context, statusCode int, streamStarted bool) {
 	status, errType, errMsg := h.mapUpstreamError(statusCode)
 	service.SetOpsUpstreamError(c, statusCode, errMsg, "")
@@ -1814,14 +1655,14 @@ func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) 
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
 	if streamStarted {
-		// 响应状态码已固化为 200（ping/部分数据已 flush），错误只能就地以 SSE 帧回传。
-		// 标记本次流内错误，供 ops_error_logger 补记——否则该中间件按 status>=400 采集，
-		// 这类挂在 200 流上的失败（如并发限流回退）不会进错误看板。
+		// 鍝嶅簲鐘舵€佺爜宸插浐鍖栦负 200锛坧ing/閮ㄥ垎鏁版嵁宸?flush锛夛紝閿欒鍙兘灏卞湴浠?SSE 甯у洖浼犮€?
+		// 鏍囪鏈娴佸唴閿欒锛屼緵 ops_error_logger 琛ヨ鈥斺€斿惁鍒欒涓棿浠舵寜 status>=400 閲囬泦锛?
+		// 杩欑被鎸傚湪 200 娴佷笂鐨勫け璐ワ紙濡傚苟鍙戦檺娴佸洖閫€锛変笉浼氳繘閿欒鐪嬫澘銆?
 		service.MarkOpsStreamError(c, errType, message, status)
 
-		// /v1/responses 的严格 SDK（Codex CLI）要求终止事件必须属于
-		// response.completed/failed/incomplete/cancelled 集合。
-		// Anthropic-backed Responses 路径同样会因为通用 error 帧被拒。
+		// /v1/responses 鐨勪弗鏍?SDK锛圕odex CLI锛夎姹傜粓姝簨浠跺繀椤诲睘浜?
+		// response.completed/failed/incomplete/cancelled 闆嗗悎銆?
+		// Anthropic-backed Responses 璺緞鍚屾牱浼氬洜涓洪€氱敤 error 甯ц鎷掋€?
 		if inboundIsResponses(c) {
 			if writeResponsesFailedSSE(c, errType, message) {
 				return
@@ -1830,7 +1671,7 @@ func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, e
 		// Stream already started, send error as SSE event then close
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
-			// SSE 错误事件固定 schema，使用 Quote 直拼可避免额外 Marshal 分配。
+			// SSE 閿欒浜嬩欢鍥哄畾 schema锛屼娇鐢?Quote 鐩存嫾鍙伩鍏嶉澶?Marshal 鍒嗛厤銆?
 			errorEvent := `data: {"type":"error","error":{"type":` + strconv.Quote(errType) + `,"message":` + strconv.Quote(message) + `}}` + "\n\n"
 			if _, err := fmt.Fprint(c.Writer, errorEvent); err != nil {
 				_ = c.Error(err)
@@ -1844,10 +1685,7 @@ func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, e
 	h.errorResponse(c, status, errType, message)
 }
 
-// ensureForwardErrorResponse 在 Forward 返回错误但尚未写响应时补写统一错误响应。
-// Writer 已被写过时（ping 已 flush）走 streamStarted 分支，
-// 让 handleStreamingAwareError 通过 SSE 发协议合规的终止事件，
-// 否则下游收到的就是 silent EOF。
+// ensureForwardErrorResponse 鍦?Forward 杩斿洖閿欒浣嗗皻鏈啓鍝嶅簲鏃惰ˉ鍐欑粺涓€閿欒鍝嶅簲銆?// Writer 宸茶鍐欒繃鏃讹紙ping 宸?flush锛夎蛋 streamStarted 鍒嗘敮锛?// 璁?handleStreamingAwareError 閫氳繃 SSE 鍙戝崗璁悎瑙勭殑缁堟浜嬩欢锛?// 鍚﹀垯涓嬫父鏀跺埌鐨勫氨鏄?silent EOF銆?
 func (h *GatewayHandler) ensureForwardErrorResponse(c *gin.Context, streamStarted bool) bool {
 	if c == nil || c.Writer == nil {
 		return false
@@ -1887,22 +1725,21 @@ func gatewayForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForw
 	return !strings.Contains(contentType, "text/event-stream")
 }
 
-// checkClaudeCodeVersion 检查 Claude Code 客户端版本是否满足版本要求
-// 仅对已识别的 Claude Code 客户端执行，count_tokens 路径除外
+// checkClaudeCodeVersion 妫€鏌?Claude Code 瀹㈡埛绔増鏈槸鍚︽弧瓒崇増鏈姹?// 浠呭宸茶瘑鍒殑 Claude Code 瀹㈡埛绔墽琛岋紝count_tokens 璺緞闄ゅ
 func (h *GatewayHandler) checkClaudeCodeVersion(c *gin.Context) bool {
 	ctx := c.Request.Context()
 	if !service.IsClaudeCodeClient(ctx) {
 		return true
 	}
 
-	// 排除 count_tokens 子路径
+	// 鎺掗櫎 count_tokens 瀛愯矾寰?
 	if strings.HasSuffix(c.Request.URL.Path, "/count_tokens") {
 		return true
 	}
 
 	minVersion, maxVersion := h.settingService.GetClaudeCodeVersionBounds(ctx)
 	if minVersion == "" && maxVersion == "" {
-		return true // 未设置，不检查
+		return true
 	}
 
 	clientVersion := service.GetClaudeCodeVersion(ctx)
@@ -1931,7 +1768,7 @@ func (h *GatewayHandler) checkClaudeCodeVersion(c *gin.Context) bool {
 	return true
 }
 
-// errorResponse 返回Claude API格式的错误响应
+// errorResponse 杩斿洖Claude API鏍煎紡鐨勯敊璇搷搴?
 func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
 	c.JSON(status, gin.H{
 		"type": "error",
@@ -1944,9 +1781,9 @@ func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, mess
 
 // CountTokens handles token counting endpoint
 // POST /v1/messages/count_tokens
-// 特点：校验订阅/余额，但不计算并发、不记录使用量
+// 鐗圭偣锛氭牎楠岃闃?浣欓锛屼絾涓嶈绠楀苟鍙戙€佷笉璁板綍浣跨敤閲?
 func (h *GatewayHandler) CountTokens(c *gin.Context) {
-	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
+	// 浠巆ontext鑾峰彇apiKey鍜寀ser锛圓piKeyAuth涓棿浠跺凡璁剧疆锛?
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
@@ -1962,11 +1799,11 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		c,
 		"handler.gateway.count_tokens",
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
 	defer h.maybeLogCompatibilityFallbackMetrics(reqLog)
 
-	// 读取请求体
+	// 璇诲彇璇锋眰浣?
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
@@ -1992,32 +1829,32 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 	body = parsedReq.Body.Bytes()
-	// count_tokens 走 messages 严格校验时，复用已解析请求，避免二次反序列化。
+	// count_tokens 璧?messages 涓ユ牸鏍￠獙鏃讹紝澶嶇敤宸茶В鏋愯姹傦紝閬垮厤浜屾鍙嶅簭鍒楀寲銆?
 	SetClaudeCodeClientContext(c, body, parsedReq)
-	ensureCompositeTargetPlatform(c, apiKey, parsedReq.Model)
+	ensureModelTargetPlatform(c, parsedReq.Model)
 	reqLog = reqLog.With(zap.String("model", parsedReq.Model), zap.Bool("stream", parsedReq.Stream))
-	// 在请求上下文中记录 thinking 状态，供 Antigravity 最终模型 key 推导/模型维度限流使用
+	// 鍦ㄨ姹備笂涓嬫枃涓褰?thinking 鐘舵€侊紝渚?Antigravity 鏈€缁堟ā鍨?key 鎺ㄥ/妯″瀷缁村害闄愭祦浣跨敤
 	c.Request = c.Request.WithContext(service.WithThinkingEnabled(c.Request.Context(), parsedReq.ThinkingEnabled, h.metadataBridgeEnabled()))
 
-	// 验证 model 必填
+	// 楠岃瘉 model 蹇呭～
 	if parsedReq.Model == "" {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 		return
 	}
-	if !compositeTargetPlatformResolved(c, apiKey, parsedReq.Model) {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by composite groups")
+	if !modelTargetPlatformResolved(c, parsedReq.Model) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by any authorized platform")
 		return
 	}
 
 	setOpsRequestContext(c, parsedReq.Model, parsedReq.Stream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(parsedReq.Stream, false)))
 
-	// 获取订阅信息（可能为nil）
+	// 鑾峰彇璁㈤槄淇℃伅锛堝彲鑳戒负nil锛?
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 
-	// 校验 billing eligibility（订阅/余额）
-	// 【注意】不计算并发，但需要校验订阅/余额
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	// 鏍￠獙 billing eligibility锛堣闃?浣欓锛?
+	// 銆愭敞鎰忋€戜笉璁＄畻骞跺彂锛屼絾闇€瑕佹牎楠岃闃?浣欓
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -2026,7 +1863,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 
-	// 计算粘性会话 hash
+	// 璁＄畻绮樻€т細璇?hash
 	parsedReq.SessionContext = &service.SessionContext{
 		ClientIP:  ip.GetClientIP(c),
 		UserAgent: c.GetHeader("User-Agent"),
@@ -2034,8 +1871,8 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	}
 	sessionHash := h.gatewayService.GenerateSessionHash(parsedReq)
 
-	// 选择支持该模型的账号
-	account, err := h.gatewayService.SelectAccountForModel(c.Request.Context(), apiKey.GroupID, sessionHash, parsedReq.Model)
+	// 閫夋嫨鏀寔璇ユā鍨嬬殑璐﹀彿
+	account, err := h.gatewayService.SelectAccountForModel(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionHash, parsedReq.Model)
 	if err != nil {
 		reqLog.Warn("gateway.count_tokens_select_account_failed", zap.Error(err))
 		cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, parsedReq.Model, parsedReq.Model, service.PlatformAnthropic)
@@ -2047,49 +1884,43 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	}
 	setOpsSelectedAccount(c, account.ID, account.Platform)
 
-	// 转发请求（不记录使用量）
+	// 杞彂璇锋眰锛堜笉璁板綍浣跨敤閲忥級
 	if err := h.gatewayService.ForwardCountTokens(c.Request.Context(), c, account, parsedReq); err != nil {
 		reqLog.Error("gateway.count_tokens_forward_failed", zap.Int64("account_id", account.ID), zap.Error(err))
-		// 错误响应已在 ForwardCountTokens 中处理
+		// 閿欒鍝嶅簲宸插湪 ForwardCountTokens 涓鐞?
 		return
 	}
 }
 
-// InterceptType 表示请求拦截类型
+// InterceptType 琛ㄧず璇锋眰鎷︽埅绫诲瀷
 type InterceptType int
 
 const (
-	InterceptTypeNone              InterceptType = iota
-	InterceptTypeWarmup                          // 预热请求（返回 "New Conversation"）
-	InterceptTypeSuggestionMode                  // SUGGESTION MODE（返回空字符串）
-	InterceptTypeMaxTokensOneHaiku               // max_tokens=1 + haiku 探测请求（返回 "#"）
+	InterceptTypeNone InterceptType = iota
+	InterceptTypeWarmup
+	InterceptTypeSuggestionMode
+	InterceptTypeMaxTokensOneHaiku
 )
 
-// isHaikuModel 检查模型名称是否包含 "haiku"（大小写不敏感）
+// isHaikuModel 妫€鏌ユā鍨嬪悕绉版槸鍚﹀寘鍚?"haiku"锛堝ぇ灏忓啓涓嶆晱鎰燂級
 func isHaikuModel(model string) bool {
 	return strings.Contains(strings.ToLower(model), "haiku")
 }
 
-// isMaxTokensOneHaikuRequest 检查是否为 max_tokens=1 + haiku 模型的探测请求
-// 这类请求用于 Claude Code 验证 API 连通性（流式/非流式均会出现，如 cc-switch v3.9.0 起的健康检查探测为流式）
-// 条件：max_tokens == 1 且 model 包含 "haiku"
+// isMaxTokensOneHaikuRequest 妫€鏌ユ槸鍚︿负 max_tokens=1 + haiku 妯″瀷鐨勬帰娴嬭姹?// 杩欑被璇锋眰鐢ㄤ簬 Claude Code 楠岃瘉 API 杩為€氭€э紙娴佸紡/闈炴祦寮忓潎浼氬嚭鐜帮紝濡?cc-switch v3.9.0 璧风殑鍋ュ悍妫€鏌ユ帰娴嬩负娴佸紡锛?// 鏉′欢锛歮ax_tokens == 1 涓?model 鍖呭惈 "haiku"
 func isMaxTokensOneHaikuRequest(model string, maxTokens int) bool {
 	return maxTokens == 1 && isHaikuModel(model)
 }
 
-// detectInterceptType 检测请求是否需要拦截，返回拦截类型
-// 参数说明：
-//   - body: 请求体字节
-//   - model: 请求的模型名称
-//   - maxTokens: max_tokens 值
-//   - isClaudeCodeClient: 是否已通过 Claude Code 客户端校验
+// detectInterceptType 妫€娴嬭姹傛槸鍚﹂渶瑕佹嫤鎴紝杩斿洖鎷︽埅绫诲瀷
+// 鍙傛暟璇存槑锛?//   - body: 璇锋眰浣撳瓧鑺?//   - model: 璇锋眰鐨勬ā鍨嬪悕绉?//   - maxTokens: max_tokens 鍊?//   - isClaudeCodeClient: 鏄惁宸查€氳繃 Claude Code 瀹㈡埛绔牎楠?
 func detectInterceptType(body []byte, model string, maxTokens int, isClaudeCodeClient bool) InterceptType {
-	// 优先检查 max_tokens=1 + haiku 探测请求（流式/非流式均适用）
+	// 浼樺厛妫€鏌?max_tokens=1 + haiku 鎺㈡祴璇锋眰锛堟祦寮?闈炴祦寮忓潎閫傜敤锛?
 	if isClaudeCodeClient && isMaxTokensOneHaikuRequest(model, maxTokens) {
 		return InterceptTypeMaxTokensOneHaiku
 	}
 
-	// 快速检查：如果不包含任何关键字，直接返回
+	// 蹇€熸鏌ワ細濡傛灉涓嶅寘鍚换浣曞叧閿瓧锛岀洿鎺ヨ繑鍥?
 	bodyStr := string(body)
 	hasSuggestionMode := strings.Contains(bodyStr, "[SUGGESTION MODE:")
 	hasWarmupKeyword := strings.Contains(bodyStr, "title") || strings.Contains(bodyStr, "Warmup")
@@ -2098,7 +1929,7 @@ func detectInterceptType(body []byte, model string, maxTokens int, isClaudeCodeC
 		return InterceptTypeNone
 	}
 
-	// 解析请求（只解析一次）
+	// 瑙ｆ瀽璇锋眰锛堝彧瑙ｆ瀽涓€娆★級
 	var req struct {
 		Messages []struct {
 			Role    string `json:"role"`
@@ -2115,7 +1946,7 @@ func detectInterceptType(body []byte, model string, maxTokens int, isClaudeCodeC
 		return InterceptTypeNone
 	}
 
-	// 检查 SUGGESTION MODE（最后一条 user 消息）
+	// 妫€鏌?SUGGESTION MODE锛堟渶鍚庝竴鏉?user 娑堟伅锛?
 	if hasSuggestionMode && len(req.Messages) > 0 {
 		lastMsg := req.Messages[len(req.Messages)-1]
 		if lastMsg.Role == "user" && len(lastMsg.Content) > 0 &&
@@ -2125,9 +1956,9 @@ func detectInterceptType(body []byte, model string, maxTokens int, isClaudeCodeC
 		}
 	}
 
-	// 检查 Warmup 请求
+	// 妫€鏌?Warmup 璇锋眰
 	if hasWarmupKeyword {
-		// 检查 messages 中的标题提示模式
+		// 妫€鏌?messages 涓殑鏍囬鎻愮ず妯″紡
 		for _, msg := range req.Messages {
 			for _, content := range msg.Content {
 				if content.Type == "text" {
@@ -2138,7 +1969,7 @@ func detectInterceptType(body []byte, model string, maxTokens int, isClaudeCodeC
 				}
 			}
 		}
-		// 检查 system 中的标题提取模式
+		// 妫€鏌?system 涓殑鏍囬鎻愬彇妯″紡
 		for _, sys := range req.System {
 			if strings.Contains(sys.Text, "nalyze if this message indicates a new conversation topic. If it does, extract a 2-3 word title") {
 				return InterceptTypeWarmup
@@ -2149,14 +1980,14 @@ func detectInterceptType(body []byte, model string, maxTokens int, isClaudeCodeC
 	return InterceptTypeNone
 }
 
-// sendMockInterceptStream 发送流式 mock 响应（用于请求拦截）
+// sendMockInterceptStream 鍙戦€佹祦寮?mock 鍝嶅簲锛堢敤浜庤姹傛嫤鎴級
 func sendMockInterceptStream(c *gin.Context, model string, interceptType InterceptType) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 
-	// 根据拦截类型决定响应内容
+	// 鏍规嵁鎷︽埅绫诲瀷鍐冲畾鍝嶅簲鍐呭
 	var msgID string
 	var outputTokens int
 	var textDeltas []string
@@ -2165,14 +1996,13 @@ func sendMockInterceptStream(c *gin.Context, model string, interceptType Interce
 	case InterceptTypeSuggestionMode:
 		msgID = generateRealisticMsgID()
 		outputTokens = 1
-		textDeltas = []string{""} // 空内容
-	default: // InterceptTypeWarmup
+		textDeltas = []string{""} // 绌哄唴瀹?	default: // InterceptTypeWarmup
 		msgID = generateRealisticMsgID()
 		outputTokens = 2
 		textDeltas = []string{"New", " Conversation"}
 	}
 
-	// Build message_start event — field order matches real Anthropic API response.
+	// Build message_start event 鈥?field order matches real Anthropic API response.
 	messageStartJSON := `{"type":"message_start","message":{"model":` + strconv.Quote(model) + `,"id":` + strconv.Quote(msgID) + `,"type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":10,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":0}}}`
 
 	// Build events
@@ -2203,8 +2033,7 @@ func sendMockInterceptStream(c *gin.Context, model string, interceptType Interce
 	}
 }
 
-// generateRealisticMsgID 生成仿真的消息 ID（msg_01XXXXXXX 格式）
-// 格式与 Anthropic API 官方响应一致：msg_01 + 22 位 Base62 随机字符
+// generateRealisticMsgID 鐢熸垚浠跨湡鐨勬秷鎭?ID锛坢sg_01XXXXXXX 鏍煎紡锛?// 鏍煎紡涓?Anthropic API 瀹樻柟鍝嶅簲涓€鑷达細msg_01 + 22 浣?Base62 闅忔満瀛楃
 func generateRealisticMsgID() string {
 	const charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	const idLen = 22
@@ -2219,7 +2048,7 @@ func generateRealisticMsgID() string {
 	return "msg_01" + string(b)
 }
 
-// sendMockInterceptResponse 发送非流式 mock 响应（用于请求拦截）
+// sendMockInterceptResponse 鍙戦€侀潪娴佸紡 mock 鍝嶅簲锛堢敤浜庤姹傛嫤鎴級
 func sendMockInterceptResponse(c *gin.Context, model string, interceptType InterceptType) {
 	var msgID, text, stopReason string
 	var outputTokens int
@@ -2234,7 +2063,7 @@ func sendMockInterceptResponse(c *gin.Context, model string, interceptType Inter
 		msgID = generateRealisticMsgID()
 		text = "#"
 		outputTokens = 1
-		stopReason = "max_tokens" // max_tokens=1 探测请求的 stop_reason 应为 max_tokens
+		stopReason = "max_tokens" // max_tokens=1 鎺㈡祴璇锋眰鐨?stop_reason 搴斾负 max_tokens
 	default: // InterceptTypeWarmup
 		msgID = generateRealisticMsgID()
 		text = "New Conversation"
@@ -2242,7 +2071,7 @@ func sendMockInterceptResponse(c *gin.Context, model string, interceptType Inter
 		stopReason = "end_turn"
 	}
 
-	// 构建完整的响应格式（与 Anthropic API 官方响应格式一致）
+	// 鏋勫缓瀹屾暣鐨勫搷搴旀牸寮忥紙涓?Anthropic API 瀹樻柟鍝嶅簲鏍煎紡涓€鑷达級
 	response := gin.H{
 		"model":         model,
 		"id":            msgID,
@@ -2267,8 +2096,7 @@ func sendMockInterceptResponse(c *gin.Context, model string, interceptType Inter
 	c.JSON(http.StatusOK, response)
 }
 
-// extractQuotaResetSeconds 从 quota 错误的 metadata 中提取 window_resets_at 并计算
-// 距重置剩余秒数。fallback 路径必须返回 ≥1 秒，避免客户端立即重试无限循环。
+// extractQuotaResetSeconds 浠?quota 閿欒鐨?metadata 涓彁鍙?window_resets_at 骞惰绠?// 璺濋噸缃墿浣欑鏁般€俧allback 璺緞蹇呴』杩斿洖 鈮? 绉掞紝閬垮厤瀹㈡埛绔珛鍗抽噸璇曟棤闄愬惊鐜€?
 func extractQuotaResetSeconds(err error) int {
 	const fallback = 60
 	appErr := pkgerrors.FromError(err)
@@ -2290,8 +2118,8 @@ func extractQuotaResetSeconds(err error) int {
 	}
 	secs := time.Until(resetAt).Seconds()
 	if secs <= 0 {
-		// reset 时间已过：cache 与 DB 应该正在自愈，返回 fallback 让客户端按常规节奏退避，
-		// 避免返回 1 秒导致客户端立即重试仍触发限额的退避循环。
+		// reset 鏃堕棿宸茶繃锛歝ache 涓?DB 搴旇姝ｅ湪鑷剤锛岃繑鍥?fallback 璁╁鎴风鎸夊父瑙勮妭濂忛€€閬匡紝
+		// 閬垮厤杩斿洖 1 绉掑鑷村鎴风绔嬪嵆閲嶈瘯浠嶈Е鍙戦檺棰濈殑閫€閬垮惊鐜€?
 		return fallback
 	}
 	return int(math.Ceil(secs))
@@ -2317,9 +2145,9 @@ func billingErrorDetails(err error) (status int, code, message string, retryAfte
 		msg := pkgerrors.Message(err)
 		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, 0
 	}
-	// 用户/分组 RPM 超限统一映射为 HTTP 429；保留与其它 rate_limit 一致的错误码便于客户端分类。
-	// 返回 Retry-After 秒数（当前分钟剩余秒数），让 SDK 自动退避。
-	if errors.Is(err, service.ErrGroupRPMExceeded) || errors.Is(err, service.ErrUserRPMExceeded) {
+	// 鐢ㄦ埛 RPM 瓒呴檺缁熶竴鏄犲皠涓?HTTP 429锛涗繚鐣欎笌鍏跺畠 rate_limit 涓€鑷寸殑閿欒鐮佷究浜庡鎴风鍒嗙被銆?
+	// 杩斿洖 Retry-After 绉掓暟锛堝綋鍓嶅垎閽熷墿浣欑鏁帮級锛岃 SDK 鑷姩閫€閬裤€?
+	if errors.Is(err, service.ErrUserRPMExceeded) {
 		msg := pkgerrors.Message(err)
 		retrySeconds := 60 - int(time.Now().Unix()%60)
 		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, retrySeconds
@@ -2327,8 +2155,8 @@ func billingErrorDetails(err error) (status int, code, message string, retryAfte
 	if errors.Is(err, service.ErrUserPlatformDailyQuotaExhausted) ||
 		errors.Is(err, service.ErrUserPlatformWeeklyQuotaExhausted) ||
 		errors.Is(err, service.ErrUserPlatformMonthlyQuotaExhausted) {
-		// 与 RPM 超限一致映射 429 + Retry-After，让 SDK 自动退避（而非 403 直接失败）。
-		// 错误码用 rate_limit_exceeded 与 OpenAI 兼容客户端一致；细分类型由 ErrCode + window_resets_at metadata 区分。
+		// 涓?RPM 瓒呴檺涓€鑷存槧灏?429 + Retry-After锛岃 SDK 鑷姩閫€閬匡紙鑰岄潪 403 鐩存帴澶辫触锛夈€?
+		// 閿欒鐮佺敤 rate_limit_exceeded 涓?OpenAI 鍏煎瀹㈡埛绔竴鑷达紱缁嗗垎绫诲瀷鐢?ErrCode + window_resets_at metadata 鍖哄垎銆?
 		msg := pkgerrors.Message(err)
 		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, extractQuotaResetSeconds(err)
 	}
@@ -2376,13 +2204,13 @@ func (h *GatewayHandler) submitUsageRecordTask(parent context.Context, task serv
 		if mode := h.usageRecordWorkerPool.Submit(task); mode != service.UsageRecordSubmitModeDroppedStopped {
 			return
 		}
-		// 池已停止（进程关停窗口）：计费任务不能静默丢失，降级为内联同步执行。
-		// 显式配置的 drop/sample 溢出丢弃仍按配置语义保留。
+		// 姹犲凡鍋滄锛堣繘绋嬪叧鍋滅獥鍙ｏ級锛氳璐逛换鍔′笉鑳介潤榛樹涪澶憋紝闄嶇骇涓哄唴鑱斿悓姝ユ墽琛屻€?
+		// 鏄惧紡閰嶇疆鐨?drop/sample 婧㈠嚭涓㈠純浠嶆寜閰嶇疆璇箟淇濈暀銆?
 		logger.L().With(
 			zap.String("component", "handler.gateway.messages"),
 		).Warn("gateway.usage_record_task_stopped_sync_fallback")
 	}
-	// 回退路径：worker 池未注入或已停止时同步执行，避免退回到无界 goroutine 模式。
+	// 鍥為€€璺緞锛歸orker 姹犳湭娉ㄥ叆鎴栧凡鍋滄鏃跺悓姝ユ墽琛岋紝閬垮厤閫€鍥炲埌鏃犵晫 goroutine 妯″紡銆?
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	defer func() {
@@ -2396,20 +2224,20 @@ func (h *GatewayHandler) submitUsageRecordTask(parent context.Context, task serv
 	task(ctx)
 }
 
-// getUserMsgQueueMode 获取当前请求的 UMQ 模式
-// 返回 "serialize" | "throttle" | ""
+// getUserMsgQueueMode 鑾峰彇褰撳墠璇锋眰鐨?UMQ 妯″紡
+// 杩斿洖 "serialize" | "throttle" | ""
 func (h *GatewayHandler) getUserMsgQueueMode(account *service.Account, parsed *service.ParsedRequest) string {
 	if h.userMsgQueueHelper == nil {
 		return ""
 	}
-	// 仅适用于 Anthropic OAuth/SetupToken 账号
+	// 浠呴€傜敤浜?Anthropic OAuth/SetupToken 璐﹀彿
 	if !account.IsAnthropicOAuthOrSetupToken() {
 		return ""
 	}
 	if !service.IsRealUserMessage(parsed) {
 		return ""
 	}
-	// 账号级模式优先，fallback 到全局配置
+	// 璐﹀彿绾фā寮忎紭鍏堬紝fallback 鍒板叏灞€閰嶇疆
 	mode := account.GetUserMsgQueueMode()
 	if mode == "" {
 		mode = h.cfg.Gateway.UserMessageQueue.GetEffectiveMode()

@@ -23,8 +23,6 @@ const (
 	FieldDeletedAt = "deleted_at"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
-	// FieldGroupID holds the string denoting the group_id field in the database.
-	FieldGroupID = "group_id"
 	// FieldSubscriptionPlanID holds the string denoting the subscription_plan_id field in the database.
 	FieldSubscriptionPlanID = "subscription_plan_id"
 	// FieldPlanNameSnapshot holds the string denoting the plan_name_snapshot field in the database.
@@ -63,8 +61,6 @@ const (
 	FieldNotes = "notes"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
-	// EdgeGroup holds the string denoting the group edge name in mutations.
-	EdgeGroup = "group"
 	// EdgeSubscriptionPlan holds the string denoting the subscription_plan edge name in mutations.
 	EdgeSubscriptionPlan = "subscription_plan"
 	// EdgeAssignedByUser holds the string denoting the assigned_by_user edge name in mutations.
@@ -80,13 +76,6 @@ const (
 	UserInverseTable = "users"
 	// UserColumn is the table column denoting the user relation/edge.
 	UserColumn = "user_id"
-	// GroupTable is the table that holds the group relation/edge.
-	GroupTable = "user_subscriptions"
-	// GroupInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	GroupInverseTable = "groups"
-	// GroupColumn is the table column denoting the group relation/edge.
-	GroupColumn = "group_id"
 	// SubscriptionPlanTable is the table that holds the subscription_plan relation/edge.
 	SubscriptionPlanTable = "user_subscriptions"
 	// SubscriptionPlanInverseTable is the table name for the SubscriptionPlan entity.
@@ -117,7 +106,6 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldDeletedAt,
 	FieldUserID,
-	FieldGroupID,
 	FieldSubscriptionPlanID,
 	FieldPlanNameSnapshot,
 	FieldDailyLimitUsdSnapshot,
@@ -208,11 +196,6 @@ func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUserID orders the results by the user_id field.
 func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserID, opts...).ToFunc()
-}
-
-// ByGroupID orders the results by the group_id field.
-func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
 }
 
 // BySubscriptionPlanID orders the results by the subscription_plan_id field.
@@ -312,13 +295,6 @@ func ByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByGroupField orders the results by group field.
-func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGroupStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // BySubscriptionPlanField orders the results by subscription_plan field.
 func BySubscriptionPlanField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -351,13 +327,6 @@ func newUserStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UserInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UserTable, UserColumn),
-	)
-}
-func newGroupStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GroupInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
 	)
 }
 func newSubscriptionPlanStep() *sqlgraph.Step {

@@ -50,6 +50,13 @@ func ProvideBatchImageModelPricingResolver(resolver *ModelPricingResolver) *Batc
 	return &BatchImageModelPricingResolver{Resolver: resolver}
 }
 
+// ProvidePlatformCatalogService keeps user-facing platform catalog reads on
+// the Platform repository and the adapter/model pricing resolver. It does not
+// accept a Group or Channel dependency.
+func ProvidePlatformCatalogService(platformService *PlatformService, pricing *ModelPricingResolver) *PlatformCatalogService {
+	return NewPlatformCatalogService(platformService, pricing)
+}
+
 func ProvideBatchImageCleanupService(repo BatchImageRepository, accountRepo AccountRepository, cfg *config.Config) *BatchImageCleanupService {
 	svc := NewBatchImageCleanupService(repo, accountRepo, cfg)
 	svc.Start()
@@ -335,10 +342,10 @@ func ProvideSchedulerSnapshotService(
 	cache SchedulerCache,
 	outboxRepo SchedulerOutboxRepository,
 	accountRepo AccountRepository,
-	groupRepo GroupRepository,
+	platformRepo PlatformRepository,
 	cfg *config.Config,
 ) *SchedulerSnapshotService {
-	svc := NewSchedulerSnapshotService(cache, outboxRepo, accountRepo, groupRepo, cfg)
+	svc := NewSchedulerSnapshotService(cache, outboxRepo, accountRepo, platformRepo, cfg)
 	svc.Start()
 	return svc
 }
@@ -625,13 +632,11 @@ func ProvideOpsIngressRejectAggregator(opsRepo OpsRepository, opsService *OpsSer
 // ProvideSettingService wires SettingService with subscription readers and proxy repo.
 func ProvideSettingService(
 	settingRepo SettingRepository,
-	groupRepo GroupRepository,
 	proxyRepo ProxyRepository,
 	paymentConfigService *PaymentConfigService,
 	cfg *config.Config,
 ) *SettingService {
 	svc := NewSettingService(settingRepo, cfg)
-	svc.SetDefaultSubscriptionGroupReader(groupRepo)
 	svc.SetDefaultSubscriptionPlanReader(paymentConfigService)
 	svc.SetProxyRepository(proxyRepo)
 	if err := svc.LoadForwardedClientIPSettings(context.Background()); err != nil {
@@ -654,27 +659,24 @@ func ProvideBillingCacheService(
 	subRepo UserSubscriptionRepository,
 	apiKeyRepo APIKeyRepository,
 	rpmCache UserRPMCache,
-	rateRepo UserGroupRateRepository,
 	cfg *config.Config,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *BillingCacheService {
-	return NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, rpmCache, rateRepo, cfg, userPlatformQuotaRepo)
+	return NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, rpmCache, cfg, userPlatformQuotaRepo)
 }
 
 // ProvideAPIKeyService wires APIKeyService and connects rate-limit cache invalidation.
 func ProvideAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
-	groupRepo GroupRepository,
 	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 	billingCacheService *BillingCacheService,
 	concurrencyService *ConcurrencyService,
 	paymentConfigService *PaymentConfigService,
 ) *APIKeyService {
-	svc := NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, userGroupRateRepo, cache, cfg)
+	svc := NewAPIKeyService(apiKeyRepo, userRepo, userSubRepo, cache, cfg)
 	svc.SetRateLimitCacheInvalidator(billingCacheService)
 	svc.SetConcurrencyService(concurrencyService)
 	svc.SetGlobalBalanceRateProvider(paymentConfigService)
@@ -690,9 +692,8 @@ var ProviderSet = wire.NewSet(
 	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
 	ProvideAuthCacheInvalidationWorker,
-	NewGroupService,
-	NewCompositeRouteResolver,
 	NewPlatformService,
+	ProvidePlatformCatalogService,
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,
@@ -785,9 +786,8 @@ var ProviderSet = wire.NewSet(
 	ProvideIdempotencyCleanupService,
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,
-	NewGroupCapacityService,
-	NewChannelService,
-	NewModelPricingResolver,
+	NewModelPricingCatalog,
+	NewModelPricingResolverWithCatalog,
 	NewContentModerationService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,
@@ -821,8 +821,8 @@ func ProvideBalanceNotifyService(emailService *EmailService, settingRepo Setting
 }
 
 // ProvidePaymentService creates PaymentService and attaches notification email delivery.
-func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository, affiliateService *AffiliateService, notificationEmailService *NotificationEmailService) *PaymentService {
-	svc := NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, groupRepo, affiliateService)
+func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, affiliateService *AffiliateService, notificationEmailService *NotificationEmailService) *PaymentService {
+	svc := NewPaymentService(entClient, registry, loadBalancer, redeemService, subscriptionSvc, configService, userRepo, affiliateService)
 	svc.SetNotificationEmailService(notificationEmailService)
 	return svc
 }

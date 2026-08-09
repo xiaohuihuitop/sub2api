@@ -34,7 +34,7 @@ func TestComputeGroupAvailableRatio(t *testing.T) {
 	t.Run("正常情况: 10个账号, 8个可用 = 80%", func(t *testing.T) {
 		t.Parallel()
 
-		got := computeGroupAvailableRatio(&GroupAvailability{
+		got := computePlatformAvailableRatio(&PlatformIDAvailability{
 			TotalAccounts:  10,
 			AvailableCount: 8,
 		})
@@ -44,7 +44,7 @@ func TestComputeGroupAvailableRatio(t *testing.T) {
 	t.Run("边界情况: TotalAccounts = 0 应返回 0", func(t *testing.T) {
 		t.Parallel()
 
-		got := computeGroupAvailableRatio(&GroupAvailability{
+		got := computePlatformAvailableRatio(&PlatformIDAvailability{
 			TotalAccounts:  0,
 			AvailableCount: 8,
 		})
@@ -54,7 +54,7 @@ func TestComputeGroupAvailableRatio(t *testing.T) {
 	t.Run("边界情况: AvailableCount = 0 应返回 0%", func(t *testing.T) {
 		t.Parallel()
 
-		got := computeGroupAvailableRatio(&GroupAvailability{
+		got := computePlatformAvailableRatio(&PlatformIDAvailability{
 			TotalAccounts:  10,
 			AvailableCount: 0,
 		})
@@ -151,12 +151,12 @@ func TestComputeRuleMetric_AccountTempUnscheduledCount(t *testing.T) {
 func TestComputeRuleMetricNewIndicators(t *testing.T) {
 	t.Parallel()
 
-	groupID := int64(101)
+	platformID := int64(101)
 	platform := "openai"
 
 	availability := &OpsAccountAvailability{
-		Group: &GroupAvailability{
-			GroupID:        groupID,
+		PlatformPool: &PlatformIDAvailability{
+			PlatformID:     platformID,
 			TotalAccounts:  10,
 			AvailableCount: 8,
 		},
@@ -187,49 +187,49 @@ func TestComputeRuleMetricNewIndicators(t *testing.T) {
 	tests := []struct {
 		name       string
 		metricType string
-		groupID    *int64
+		platformID *int64
 		wantValue  float64
 		wantOK     bool
 	}{
 		{
-			name:       "group_available_accounts",
-			metricType: "group_available_accounts",
-			groupID:    &groupID,
+			name:       "platform_pool_available_accounts",
+			metricType: "platform_pool_available_accounts",
+			platformID: &platformID,
 			wantValue:  8,
 			wantOK:     true,
 		},
 		{
-			name:       "group_available_ratio",
-			metricType: "group_available_ratio",
-			groupID:    &groupID,
+			name:       "platform_pool_available_ratio",
+			metricType: "platform_pool_available_ratio",
+			platformID: &platformID,
 			wantValue:  80.0,
 			wantOK:     true,
 		},
 		{
 			name:       "account_rate_limited_count",
 			metricType: "account_rate_limited_count",
-			groupID:    nil,
+			platformID: nil,
 			wantValue:  2,
 			wantOK:     true,
 		},
 		{
 			name:       "account_error_count",
 			metricType: "account_error_count",
-			groupID:    nil,
+			platformID: nil,
 			wantValue:  1,
 			wantOK:     true,
 		},
 		{
-			name:       "group_available_accounts without group_id returns false",
-			metricType: "group_available_accounts",
-			groupID:    nil,
+			name:       "platform_pool_available_accounts without platform_id returns false",
+			metricType: "platform_pool_available_accounts",
+			platformID: nil,
 			wantValue:  0,
 			wantOK:     false,
 		},
 		{
-			name:       "group_available_ratio without group_id returns false",
-			metricType: "group_available_ratio",
-			groupID:    nil,
+			name:       "platform_pool_available_ratio without platform_id returns false",
+			metricType: "platform_pool_available_ratio",
+			platformID: nil,
 			wantValue:  0,
 			wantOK:     false,
 		},
@@ -243,7 +243,7 @@ func TestComputeRuleMetricNewIndicators(t *testing.T) {
 			rule := &OpsAlertRule{
 				MetricType: tt.metricType,
 			}
-			gotValue, gotOK := svc.computeRuleMetric(ctx, rule, nil, start, end, platform, tt.groupID)
+			gotValue, gotOK := svc.computeRuleMetric(ctx, rule, nil, start, end, platform, tt.platformID)
 			require.Equal(t, tt.wantOK, gotOK)
 			if !tt.wantOK {
 				return

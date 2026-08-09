@@ -27,8 +27,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// geminiCLITmpDirRegex 用于从 Gemini CLI 请求体中提取 tmp 目录的哈希值
-// 匹配格式: /Users/xxx/.gemini/tmp/[64位十六进制哈希]
+// geminiCLITmpDirRegex 鐢ㄤ簬浠?Gemini CLI 璇锋眰浣撲腑鎻愬彇 tmp 鐩綍鐨勫搱甯屽€?// 鍖归厤鏍煎紡: /Users/xxx/.gemini/tmp/[64浣嶅崄鍏繘鍒跺搱甯宂
 var geminiCLITmpDirRegex = regexp.MustCompile(`/\.gemini/tmp/([A-Fa-f0-9]{64})`)
 
 // GeminiV1BetaListModels proxies:
@@ -39,25 +38,25 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
-	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
+	// 妫€鏌ュ钩鍙帮細浼樺厛浣跨敤寮哄埗骞冲彴锛?antigravity 璺敱锛夛紝鍚﹀垯瑕佹眰 gemini 鍒嗙粍
 	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
 	if !hasForcePlatform && effectiveAPIKeyPlatform(c, apiKey) != service.PlatformGemini {
-		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
+		googleError(c, http.StatusBadRequest, "API key is not authorized for a Gemini platform")
 		return
 	}
 
-	// 强制 antigravity 模式：返回 antigravity 支持的模型列表
+	// 寮哄埗 antigravity 妯″紡锛氳繑鍥?antigravity 鏀寔鐨勬ā鍨嬪垪琛?
 	if forcePlatform == service.PlatformAntigravity {
 		c.JSON(http.StatusOK, antigravity.FallbackGeminiModelsList())
 		return
 	}
 
-	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), apiKey.GroupID)
+	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()))
 	if err != nil {
-		// 没有 gemini 账户，检查是否有 antigravity 账户可用
-		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
+		// 娌℃湁 gemini 璐︽埛锛屾鏌ユ槸鍚︽湁 antigravity 璐︽埛鍙敤
+		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()))
 		if hasAntigravity {
-			// antigravity 账户使用静态模型列表
+			// antigravity 璐︽埛浣跨敤闈欐€佹ā鍨嬪垪琛?
 			c.JSON(http.StatusOK, gemini.FallbackModelsList())
 			return
 		}
@@ -86,10 +85,10 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
-	// 检查平台：优先使用强制平台（/antigravity 路由），否则要求 gemini 分组
+	// 妫€鏌ュ钩鍙帮細浼樺厛浣跨敤寮哄埗骞冲彴锛?antigravity 璺敱锛夛紝鍚﹀垯瑕佹眰 gemini 鍒嗙粍
 	forcePlatform, hasForcePlatform := middleware.GetForcePlatformFromContext(c)
 	if !hasForcePlatform && effectiveAPIKeyPlatform(c, apiKey) != service.PlatformGemini {
-		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
+		googleError(c, http.StatusBadRequest, "API key is not authorized for a Gemini platform")
 		return
 	}
 
@@ -98,8 +97,8 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		googleError(c, http.StatusBadRequest, "Missing model in URL")
 		return
 	}
-	// 模型名会被拼进上游 URL 的 path，先在入口校验片段合规性，
-	// 见 service/upstream_path_guard.go。
+	// 妯″瀷鍚嶄細琚嫾杩涗笂娓?URL 鐨?path锛屽厛鍦ㄥ叆鍙ｆ牎楠岀墖娈靛悎瑙勬€э紝
+	// 瑙?service/upstream_path_guard.go銆?
 	if !service.IsSafeGeminiModelPathSegment(modelName) {
 		googleError(c, http.StatusBadRequest, "Invalid model in URL")
 		return
@@ -108,18 +107,18 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 		modelName = strings.TrimSpace(resolvedModel)
 	}
 
-	// 强制 antigravity 模式：返回 antigravity 模型信息
+	// 寮哄埗 antigravity 妯″紡锛氳繑鍥?antigravity 妯″瀷淇℃伅
 	if forcePlatform == service.PlatformAntigravity {
 		c.JSON(http.StatusOK, antigravity.FallbackGeminiModel(modelName))
 		return
 	}
 
-	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), apiKey.GroupID)
+	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()))
 	if err != nil {
-		// 没有 gemini 账户，检查是否有 antigravity 账户可用
-		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
+		// 娌℃湁 gemini 璐︽埛锛屾鏌ユ槸鍚︽湁 antigravity 璐︽埛鍙敤
+		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()))
 		if hasAntigravity {
-			// antigravity 账户使用静态模型信息
+			// antigravity 璐︽埛浣跨敤闈欐€佹ā鍨嬩俊鎭?
 			c.JSON(http.StatusOK, gemini.FallbackModel(modelName))
 			return
 		}
@@ -159,13 +158,13 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		"handler.gemini_v1beta.models",
 		zap.Int64("user_id", authSubject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
 
-	// 检查平台：优先使用强制平台（/antigravity 路由，中间件已设置 request.Context），否则要求 gemini 分组
+	// 妫€鏌ュ钩鍙帮細浼樺厛浣跨敤寮哄埗骞冲彴锛?antigravity 璺敱锛屼腑闂翠欢宸茶缃?request.Context锛夛紝鍚﹀垯瑕佹眰 gemini 鍒嗙粍
 	if !middleware.HasForcePlatform(c) {
 		if effectiveAPIKeyPlatform(c, apiKey) != service.PlatformGemini {
-			googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
+			googleError(c, http.StatusBadRequest, "API key is not authorized for a Gemini platform")
 			return
 		}
 	}
@@ -175,8 +174,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		googleError(c, http.StatusNotFound, err.Error())
 		return
 	}
-	// URL 里的模型名最终会被拼进上游 /v1beta/models/{model}:{action}，
-	// 先在入口校验片段合规性，见 service/upstream_path_guard.go。
+	// URL 閲岀殑妯″瀷鍚嶆渶缁堜細琚嫾杩涗笂娓?/v1beta/models/{model}:{action}锛?
+	// 鍏堝湪鍏ュ彛鏍￠獙鐗囨鍚堣鎬э紝瑙?service/upstream_path_guard.go銆?
 	if !service.IsSafeGeminiModelPathSegment(modelName) {
 		googleError(c, http.StatusBadRequest, "Invalid model in URL")
 		return
@@ -210,11 +209,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		return
 	}
 
-	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, modelName)
-	reqModel := modelName // 保存映射前的原始模型名
-	if channelMapping.Mapped {
-		modelName = channelMapping.MappedModel
+	// 瑙ｆ瀽娓犻亾绾фā鍨嬫槧灏?
+	modelMapping := h.gatewayService.ResolvePlatformModelMapping(c.Request.Context(), modelName)
+	reqModel := modelName
+	if modelMapping.Mapped {
+		modelName = modelMapping.MappedModel
 	}
 
 	// Get subscription (may be nil)
@@ -234,14 +233,14 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		googleError(c, http.StatusTooManyRequests, err.Error())
 		return
 	}
-	// 确保请求取消时也会释放槽位，避免长连接被动中断造成泄漏
+	// 纭繚璇锋眰鍙栨秷鏃朵篃浼氶噴鏀炬Ы浣嶏紝閬垮厤闀胯繛鎺ヨ鍔ㄤ腑鏂€犳垚娉勬紡
 	userReleaseFunc = wrapReleaseOnDone(c.Request.Context(), userReleaseFunc)
 	if userReleaseFunc != nil {
 		defer userReleaseFunc()
 	}
 
 	// 2) billing eligibility check (after wait)
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("gemini.billing_eligibility_check_failed", zap.Error(err))
 		status, _, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -252,10 +251,10 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	}
 
 	// 3) select account (sticky session based on request body)
-	// 优先使用 Gemini CLI 的会话标识（privileged-user-id + tmp 目录哈希）
+	// 浼樺厛浣跨敤 Gemini CLI 鐨勪細璇濇爣璇嗭紙privileged-user-id + tmp 鐩綍鍝堝笇锛?
 	sessionHash := extractGeminiCLISessionHash(c, body)
 	if sessionHash == "" {
-		// Fallback: 使用通用的会话哈希生成逻辑（适用于其他客户端）
+		// Fallback: 浣跨敤閫氱敤鐨勪細璇濆搱甯岀敓鎴愰€昏緫锛堥€傜敤浜庡叾浠栧鎴风锛?
 		parsedReq, _ := service.ParseGatewayRequest(service.NewRequestBodyRef(body), domain.PlatformGemini)
 		if parsedReq != nil {
 			parsedReq.SessionContext = &service.SessionContext{
@@ -271,22 +270,22 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		sessionKey = "gemini:" + sessionHash
 	}
 
-	// 查询粘性会话绑定的账号 ID（用于检测账号切换）
+	// 鏌ヨ绮樻€т細璇濈粦瀹氱殑璐﹀彿 ID锛堢敤浜庢娴嬭处鍙峰垏鎹級
 	var sessionBoundAccountID int64
 	if sessionKey != "" {
-		sessionBoundAccountID, _ = h.gatewayService.GetCachedSessionAccountID(c.Request.Context(), apiKey.GroupID, sessionKey)
+		sessionBoundAccountID, _ = h.gatewayService.GetCachedSessionAccountID(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey)
 		if sessionBoundAccountID > 0 {
-			prefetchedGroupID := int64(0)
-			if apiKey.GroupID != nil {
-				prefetchedGroupID = *apiKey.GroupID
+			prefetchedPlatformNamespaceID := int64(0)
+			if service.PlatformSchedulingID(c.Request.Context()) != nil {
+				prefetchedPlatformNamespaceID = *service.PlatformSchedulingID(c.Request.Context())
 			}
-			ctx := service.WithPrefetchedStickySession(c.Request.Context(), sessionBoundAccountID, prefetchedGroupID, h.metadataBridgeEnabled())
+			ctx := service.WithPrefetchedStickySession(c.Request.Context(), sessionBoundAccountID, prefetchedPlatformNamespaceID, h.metadataBridgeEnabled())
 			c.Request = c.Request.WithContext(ctx)
 		}
 	}
 
-	// === Gemini 内容摘要会话 Fallback 逻辑 ===
-	// 当原有会话标识无效时（sessionBoundAccountID == 0），尝试基于内容摘要链匹配
+	// === Gemini 鍐呭鎽樿浼氳瘽 Fallback 閫昏緫 ===
+	// 褰撳師鏈変細璇濇爣璇嗘棤鏁堟椂锛坰essionBoundAccountID == 0锛夛紝灏濊瘯鍩轰簬鍐呭鎽樿閾惧尮閰?
 	var geminiDigestChain string
 	var geminiPrefixHash string
 	var geminiSessionUUID string
@@ -294,19 +293,16 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	useDigestFallback := sessionBoundAccountID == 0
 
 	if useDigestFallback {
-		// 解析 Gemini 请求体
+		// 瑙ｆ瀽 Gemini 璇锋眰浣?
 		var geminiReq antigravity.GeminiRequest
 		if err := json.Unmarshal(body, &geminiReq); err == nil && len(geminiReq.Contents) > 0 {
-			// 生成摘要链
+			// 鐢熸垚鎽樿閾?
 			geminiDigestChain = service.BuildGeminiDigestChain(&geminiReq)
 			if geminiDigestChain != "" {
-				// 生成前缀 hash
+				// 鐢熸垚鍓嶇紑 hash
 				userAgent := c.GetHeader("User-Agent")
 				clientIP := ip.GetClientIP(c)
-				platform := ""
-				if apiKey.Group != nil {
-					platform = apiKey.Group.Platform
-				}
+				platform := effectiveAPIKeyPlatform(c, apiKey)
 				geminiPrefixHash = service.GenerateGeminiPrefixHash(
 					authSubject.UserID,
 					apiKey.ID,
@@ -316,10 +312,10 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 					modelName,
 				)
 
-				// 查找会话
+				// 鏌ユ壘浼氳瘽
 				foundUUID, foundAccountID, foundMatchedChain, found := h.gatewayService.FindGeminiSession(
 					c.Request.Context(),
-					derefGroupID(apiKey.GroupID),
+					derefPlatformID(service.PlatformSchedulingID(c.Request.Context())),
 					geminiPrefixHash,
 					geminiDigestChain,
 				)
@@ -333,16 +329,16 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 						zap.String("digest_chain", truncateDigestChain(geminiDigestChain)),
 					)
 
-					// 关键：如果原 sessionKey 为空，使用 prefixHash + uuid 作为 sessionKey
-					// 这样 SelectAccountWithLoadAwareness 的粘性会话逻辑会优先使用匹配到的账号
+					// 鍏抽敭锛氬鏋滃師 sessionKey 涓虹┖锛屼娇鐢?prefixHash + uuid 浣滀负 sessionKey
+					// 杩欐牱 SelectAccountWithLoadAwareness 鐨勭矘鎬т細璇濋€昏緫浼氫紭鍏堜娇鐢ㄥ尮閰嶅埌鐨勮处鍙?
 					if sessionKey == "" {
 						sessionKey = service.GenerateGeminiDigestSessionKey(geminiPrefixHash, foundUUID)
 					}
-					_ = h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, foundAccountID)
+					_ = h.gatewayService.BindStickySession(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, foundAccountID)
 				} else {
-					// 生成新的会话 UUID
+					// 鐢熸垚鏂扮殑浼氳瘽 UUID
 					geminiSessionUUID = uuid.New().String()
-					// 为新会话也生成 sessionKey（用于后续请求的粘性会话）
+					// 涓烘柊浼氳瘽涔熺敓鎴?sessionKey锛堢敤浜庡悗缁姹傜殑绮樻€т細璇濓級
 					if sessionKey == "" {
 						sessionKey = service.GenerateGeminiDigestSessionKey(geminiPrefixHash, geminiSessionUUID)
 					}
@@ -351,21 +347,21 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		}
 	}
 
-	// 判断是否真的绑定了粘性会话：有 sessionKey 且已经绑定到某个账号
+	// 鍒ゆ柇鏄惁鐪熺殑缁戝畾浜嗙矘鎬т細璇濓細鏈?sessionKey 涓斿凡缁忕粦瀹氬埌鏌愪釜璐﹀彿
 	hasBoundSession := sessionKey != "" && sessionBoundAccountID > 0
 	cleanedForUnknownBinding := false
 
 	fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
 
-	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
-	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID) {
+	// 鍗曡处鍙峰垎缁勬彁鍓嶈缃?SingleAccountRetry 鏍囪锛岃 Service 灞傞娆?503 灏变笉璁炬ā鍨嬮檺娴佹爣璁般€?
+	// 閬垮厤鍗曡处鍙峰垎缁勬敹鍒?503 (MODEL_CAPACITY_EXHAUSTED) 鏃惰 29s 闄愭祦锛屽鑷村悗缁姹傝繛缁揩閫熷け璐ャ€?
+	if h.gatewayService.IsSingleAntigravityPlatformAccount(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context())) {
 		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
 
 	for {
-		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
+		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 涓嶄娇鐢ㄤ細璇濋檺鍒?
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, modelName, modelName, service.PlatformGemini)
@@ -396,8 +392,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		account := selection.Account
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
-		// 检测账号切换：如果粘性会话绑定的账号与当前选择的账号不同，清除 thoughtSignature
-		// 注意：Gemini 原生 API 的 thoughtSignature 与具体上游账号强相关；跨账号透传会导致 400。
+		// 妫€娴嬭处鍙峰垏鎹細濡傛灉绮樻€т細璇濈粦瀹氱殑璐﹀彿涓庡綋鍓嶉€夋嫨鐨勮处鍙蜂笉鍚岋紝娓呴櫎 thoughtSignature
+		// 娉ㄦ剰锛欸emini 鍘熺敓 API 鐨?thoughtSignature 涓庡叿浣撲笂娓歌处鍙峰己鐩稿叧锛涜法璐﹀彿閫忎紶浼氬鑷?400銆?
 		if sessionBoundAccountID > 0 && sessionBoundAccountID != account.ID {
 			reqLog.Info("gemini.sticky_session_account_switched",
 				zap.Int64("from_account_id", sessionBoundAccountID),
@@ -407,8 +403,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			body = service.CleanGeminiNativeThoughtSignatures(body)
 			sessionBoundAccountID = account.ID
 		} else if sessionKey != "" && sessionBoundAccountID == 0 && !cleanedForUnknownBinding && bytes.Contains(body, []byte(`"thoughtSignature"`)) {
-			// 无缓存绑定但请求里已有 thoughtSignature：常见于缓存丢失/TTL 过期后，客户端继续携带旧签名。
-			// 为避免第一次转发就 400，这里做一次确定性清理，让新账号重新生成签名链路。
+			// 鏃犵紦瀛樼粦瀹氫絾璇锋眰閲屽凡鏈?thoughtSignature锛氬父瑙佷簬缂撳瓨涓㈠け/TTL 杩囨湡鍚庯紝瀹㈡埛绔户缁惡甯︽棫绛惧悕銆?
+			// 涓洪伩鍏嶇涓€娆¤浆鍙戝氨 400锛岃繖閲屽仛涓€娆＄‘瀹氭€ф竻鐞嗭紝璁╂柊璐﹀彿閲嶆柊鐢熸垚绛惧悕閾捐矾銆?
 			reqLog.Info("gemini.sticky_session_binding_missing",
 				zap.Bool("clean_thought_signature", true),
 			)
@@ -416,7 +412,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			cleanedForUnknownBinding = true
 			sessionBoundAccountID = account.ID
 		} else if sessionBoundAccountID == 0 {
-			// 记录本次请求中首次选择到的账号，便于同一请求内 failover 时检测切换。
+			// 璁板綍鏈璇锋眰涓娆￠€夋嫨鍒扮殑璐﹀彿锛屼究浜庡悓涓€璇锋眰鍐?failover 鏃舵娴嬪垏鎹€?
 			sessionBoundAccountID = account.ID
 		}
 
@@ -466,20 +462,20 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				geminiConcurrency.DecrementAccountWaitCount(c.Request.Context(), account.ID)
 				accountWaitCounted = false
 			}
-			if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
+			if err := h.gatewayService.BindStickySession(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), sessionKey, account.ID); err != nil {
 				reqLog.Warn("gemini.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 			}
 		}
-		// 账号槽位/等待计数需要在超时或断开时安全回收
+		// 璐﹀彿妲戒綅/绛夊緟璁℃暟闇€瑕佸湪瓒呮椂鎴栨柇寮€鏃跺畨鍏ㄥ洖鏀?
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
-		// 5) forward (根据平台分流)
+		// 5) forward (鏍规嵁骞冲彴鍒嗘祦)
 		var result *service.ForwardResult
 		requestCtx := c.Request.Context()
 		if fs.SwitchCount > 0 {
 			requestCtx = service.WithAccountSwitchCount(requestCtx, fs.SwitchCount, h.metadataBridgeEnabled())
 		}
-		sessionGroupID := derefGroupID(apiKey.GroupID)
+		sessionPlatformID := derefPlatformID(service.PlatformSchedulingID(c.Request.Context()))
 		if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 			result, err = h.antigravityGatewayService.ForwardGemini(
 				requestCtx,
@@ -490,7 +486,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				stream,
 				body,
 				hasBoundSession,
-				service.WithForwardGeminiSession(sessionGroupID, sessionKey),
+				service.WithForwardGeminiSession(sessionPlatformID, sessionKey),
 			)
 		} else {
 			result, err = h.geminiCompatService.ForwardNative(requestCtx, c, account, modelName, action, stream, body)
@@ -518,15 +514,15 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			return
 		}
 
-		// 捕获请求信息（用于异步记录，避免在 goroutine 中访问 gin.Context）
+		// 鎹曡幏璇锋眰淇℃伅锛堢敤浜庡紓姝ヨ褰曪紝閬垮厤鍦?goroutine 涓闂?gin.Context锛?
 		userAgent := c.GetHeader("User-Agent")
 		clientIP := ip.GetClientIP(c)
 
-		// 保存 Gemini 内容摘要会话（用于 Fallback 匹配）
+		// 淇濆瓨 Gemini 鍐呭鎽樿浼氳瘽锛堢敤浜?Fallback 鍖归厤锛?
 		if useDigestFallback && geminiDigestChain != "" && geminiPrefixHash != "" {
 			if err := h.gatewayService.SaveGeminiSession(
 				c.Request.Context(),
-				derefGroupID(apiKey.GroupID),
+				derefPlatformID(service.PlatformSchedulingID(c.Request.Context())),
 				geminiPrefixHash,
 				geminiDigestChain,
 				geminiSessionUUID,
@@ -537,39 +533,39 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			}
 		}
 
-		// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
+		// 浣跨敤閲忚褰曢€氳繃鏈夌晫 worker 姹犳彁浜わ紝閬垮厤璇锋眰鐑矾寰勫垱寤烘棤鐣?goroutine銆?
 		requestPayloadHash := service.HashUsageRequestPayload(body)
 		inboundEndpoint := GetInboundEndpoint(c)
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-		// ForceCacheBilling 提前拍成标量，避免 worker 闭包保活 failover 状态里的响应体。
+		// ForceCacheBilling 鎻愬墠鎷嶆垚鏍囬噺锛岄伩鍏?worker 闂寘淇濇椿 failover 鐘舵€侀噷鐨勫搷搴斾綋銆?
 		forceCacheBilling := fs.ForceCacheBilling
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 		sessionID := service.ExtractClientSessionID(c)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsageWithLongContext(ctx, &service.RecordUsageLongContextInput{
-				Result:                result,
-				QuotaPlatform:         quotaPlatform,
-				APIKey:                apiKey,
-				User:                  apiKey.User,
-				Account:               account,
-				Subscription:          subscription,
-				InboundEndpoint:       inboundEndpoint,
-				UpstreamEndpoint:      upstreamEndpoint,
-				UserAgent:             userAgent,
-				IPAddress:             clientIP,
-				RequestPayloadHash:    requestPayloadHash,
-				LongContextThreshold:  200000, // Gemini 200K 阈值
-				LongContextMultiplier: 2.0,    // 超出部分双倍计费
-				ForceCacheBilling:     forceCacheBilling,
-				APIKeyService:         h.apiKeyService,
-				SessionID:             sessionID,
-				ChannelUsageFields:    clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel),
+				Result:                  result,
+				QuotaPlatform:           quotaPlatform,
+				APIKey:                  apiKey,
+				User:                    apiKey.User,
+				Account:                 account,
+				Subscription:            subscription,
+				InboundEndpoint:         inboundEndpoint,
+				UpstreamEndpoint:        upstreamEndpoint,
+				UserAgent:               userAgent,
+				IPAddress:               clientIP,
+				RequestPayloadHash:      requestPayloadHash,
+				LongContextThreshold:    200000,
+				LongContextMultiplier:   2.0,
+				ForceCacheBilling:       forceCacheBilling,
+				APIKeyService:           h.apiKeyService,
+				SessionID:               sessionID,
+				ModelRoutingUsageFields: clientRequestedUsageFields(c, modelMapping, reqModel, result.UpstreamModel),
 			}); err != nil {
 				logger.L().With(
 					zap.String("component", "handler.gemini_v1beta.models"),
 					zap.Int64("user_id", authSubject.UserID),
 					zap.Int64("api_key_id", apiKey.ID),
-					zap.Any("group_id", apiKey.GroupID),
+					zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 					zap.String("model", modelName),
 					zap.Int64("account_id", account.ID),
 				).Error("gemini.record_usage_failed", zap.Error(err))
@@ -611,16 +607,16 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
 
-	// 先检查透传规则
+	// 鍏堟鏌ラ€忎紶瑙勫垯
 	if h.errorPassthroughService != nil && len(responseBody) > 0 {
 		if rule := h.errorPassthroughService.MatchRule(service.PlatformGemini, statusCode, responseBody); rule != nil {
-			// 确定响应状态码
+			// 纭畾鍝嶅簲鐘舵€佺爜
 			respCode := statusCode
 			if !rule.PassthroughCode && rule.ResponseCode != nil {
 				respCode = *rule.ResponseCode
 			}
 
-			// 确定响应消息
+			// 纭畾鍝嶅簲娑堟伅
 			msg := service.ExtractUpstreamErrorMessage(responseBody)
 			if !rule.PassthroughBody && rule.CustomMessage != nil {
 				msg = *rule.CustomMessage
@@ -635,11 +631,11 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 		}
 	}
 
-	// 记录原始上游状态码，以便 ops 错误日志捕获真实的上游错误
+	// 璁板綍鍘熷涓婃父鐘舵€佺爜锛屼互渚?ops 閿欒鏃ュ織鎹曡幏鐪熷疄鐨勪笂娓搁敊璇?
 	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
-	// 使用默认的错误映射
+	// 浣跨敤榛樿鐨勯敊璇槧灏?
 	status, message := mapGeminiUpstreamError(statusCode)
 	googleError(c, status, message)
 }
@@ -725,42 +721,36 @@ func shouldFallbackGeminiModel(modelName string, res *service.UpstreamHTTPResult
 	return gemini.HasFallbackModel(modelName)
 }
 
-// extractGeminiCLISessionHash 从 Gemini CLI 请求中提取会话标识。
-// 组合 x-gemini-api-privileged-user-id header 和请求体中的 tmp 目录哈希。
+// extractGeminiCLISessionHash 浠?Gemini CLI 璇锋眰涓彁鍙栦細璇濇爣璇嗐€?// 缁勫悎 x-gemini-api-privileged-user-id header 鍜岃姹備綋涓殑 tmp 鐩綍鍝堝笇銆?//
+// 浼氳瘽鏍囪瘑鐢熸垚绛栫暐锛?//  1. 浠庤姹備綋涓彁鍙?tmp 鐩綍鍝堝笇锛?4浣嶅崄鍏繘鍒讹級
+//  2. 浠?header 涓彁鍙?privileged-user-id锛圲UID锛?//  3. 缁勫悎涓よ€呯敓鎴?SHA256 鍝堝笇浣滀负鏈€缁堢殑浼氳瘽鏍囪瘑
 //
-// 会话标识生成策略：
-//  1. 从请求体中提取 tmp 目录哈希（64位十六进制）
-//  2. 从 header 中提取 privileged-user-id（UUID）
-//  3. 组合两者生成 SHA256 哈希作为最终的会话标识
-//
-// 如果找不到 tmp 目录哈希，返回空字符串（不使用粘性会话）。
-//
+// 濡傛灉鎵句笉鍒?tmp 鐩綍鍝堝笇锛岃繑鍥炵┖瀛楃涓诧紙涓嶄娇鐢ㄧ矘鎬т細璇濓級銆?//
 // extractGeminiCLISessionHash extracts session identifier from Gemini CLI requests.
 // Combines x-gemini-api-privileged-user-id header with tmp directory hash from request body.
 func extractGeminiCLISessionHash(c *gin.Context, body []byte) string {
-	// 1. 从请求体中提取 tmp 目录哈希
+	// 1. 浠庤姹備綋涓彁鍙?tmp 鐩綍鍝堝笇
 	match := geminiCLITmpDirRegex.FindSubmatch(body)
 	if len(match) < 2 {
-		return "" // 没有找到 tmp 目录，不使用粘性会话
+		return ""
 	}
 	tmpDirHash := string(match[1])
 
-	// 2. 提取 privileged-user-id
+	// 2. 鎻愬彇 privileged-user-id
 	privilegedUserID := strings.TrimSpace(c.GetHeader("x-gemini-api-privileged-user-id"))
 
-	// 3. 组合生成最终的 session hash
+	// 3. 缁勫悎鐢熸垚鏈€缁堢殑 session hash
 	if privilegedUserID != "" {
-		// 组合两个标识符：privileged-user-id + tmp 目录哈希
+		// 缁勫悎涓や釜鏍囪瘑绗︼細privileged-user-id + tmp 鐩綍鍝堝笇
 		combined := privilegedUserID + ":" + tmpDirHash
 		hash := sha256.Sum256([]byte(combined))
 		return hex.EncodeToString(hash[:])
 	}
 
-	// 如果没有 privileged-user-id，直接使用 tmp 目录哈希
+	// 濡傛灉娌℃湁 privileged-user-id锛岀洿鎺ヤ娇鐢?tmp 鐩綍鍝堝笇
 	return tmpDirHash
 }
 
-// truncateDigestChain 截断摘要链用于日志显示
 func truncateDigestChain(chain string) string {
 	if len(chain) <= 50 {
 		return chain
@@ -768,8 +758,6 @@ func truncateDigestChain(chain string) string {
 	return chain[:50] + "..."
 }
 
-// safeShortPrefix 返回字符串前 n 个字符；长度不足时返回原字符串。
-// 用于日志展示，避免切片越界。
 func safeShortPrefix(value string, n int) string {
 	if n <= 0 || len(value) <= n {
 		return value
@@ -777,10 +765,10 @@ func safeShortPrefix(value string, n int) string {
 	return value[:n]
 }
 
-// derefGroupID 安全解引用 *int64，nil 返回 0
-func derefGroupID(groupID *int64) int64 {
-	if groupID == nil {
+// derefPlatformID 瀹夊叏瑙ｅ紩鐢?*int64锛宯il 杩斿洖 0
+func derefPlatformID(platformID *int64) int64 {
+	if platformID == nil {
 		return 0
 	}
-	return *groupID
+	return *platformID
 }

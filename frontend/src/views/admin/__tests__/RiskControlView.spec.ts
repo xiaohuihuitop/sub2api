@@ -11,7 +11,7 @@ const {
   updateConfig,
   getStatus,
   listLogs,
-  getGroups,
+  getPlatforms,
   getProxies,
   showError,
   showSuccess,
@@ -20,7 +20,7 @@ const {
   updateConfig: vi.fn(),
   getStatus: vi.fn(),
   listLogs: vi.fn(),
-  getGroups: vi.fn(),
+  getPlatforms: vi.fn(),
   getProxies: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -38,8 +38,8 @@ vi.mock('@/api/admin', () => ({
       clearFlaggedHashes: vi.fn(),
       unbanUser: vi.fn(),
     },
-    groups: {
-      getAll: getGroups,
+    platforms: {
+      list: getPlatforms,
     },
     proxies: {
       getAll: getProxies,
@@ -86,8 +86,8 @@ const baseConfig = (): ContentModerationConfig => ({
   api_key_statuses: [],
   timeout_ms: 3000,
   sample_rate: 100,
-  all_groups: true,
-  group_ids: [],
+  all_platforms: true,
+  platform_ids: [],
   record_non_hits: false,
   worker_count: 4,
   queue_size: 32768,
@@ -196,14 +196,14 @@ describe('admin RiskControlView', () => {
     updateConfig.mockReset()
     getStatus.mockReset()
     listLogs.mockReset()
-    getGroups.mockReset()
+    getPlatforms.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
 
     getConfig.mockResolvedValue(baseConfig())
     getStatus.mockResolvedValue(runtimeStatus())
     listLogs.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 1 })
-    getGroups.mockResolvedValue([])
+    getPlatforms.mockResolvedValue([])
     getProxies.mockResolvedValue([])
     updateConfig.mockImplementation(async (payload: UpdateContentModerationConfig) => ({
       ...baseConfig(),

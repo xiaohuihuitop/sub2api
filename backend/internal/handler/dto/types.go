@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -18,7 +17,6 @@ type User struct {
 	FrozenBalance float64    `json:"frozen_balance"`
 	Concurrency   int        `json:"concurrency"`
 	Status        string     `json:"status"`
-	AllowedGroups []int64    `json:"allowed_groups"`
 	LastActiveAt  *time.Time `json:"last_active_at,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
@@ -83,121 +81,6 @@ type APIKey struct {
 	Reset7dAt     *time.Time `json:"reset_7d_at,omitempty"`
 
 	User *User `json:"user,omitempty"`
-}
-
-type Group struct {
-	ID             int64   `json:"id"`
-	Name           string  `json:"name"`
-	Description    string  `json:"description"`
-	Platform       string  `json:"platform"`
-	RateMultiplier float64 `json:"rate_multiplier"`
-	SortOrder      int     `json:"sort_order"`
-	IsExclusive    bool    `json:"is_exclusive"`
-	Status         string  `json:"status"`
-
-	SubscriptionType string   `json:"subscription_type"`
-	DailyLimitUSD    *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD   *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD  *float64 `json:"monthly_limit_usd"`
-
-	// 图片生成计费配置（仅 antigravity 平台使用）
-	AllowImageGeneration         bool    `json:"allow_image_generation"`
-	AllowBatchImageGeneration    bool    `json:"allow_batch_image_generation"`
-	ImageRateIndependent         bool    `json:"image_rate_independent"`
-	ImageRateMultiplier          float64 `json:"image_rate_multiplier"`
-	BatchImageDiscountMultiplier float64 `json:"batch_image_discount_multiplier"`
-	BatchImageHoldMultiplier     float64 `json:"batch_image_hold_multiplier"`
-	VideoRateIndependent         bool    `json:"video_rate_independent"`
-	VideoRateMultiplier          float64 `json:"video_rate_multiplier"`
-	// 高峰时段倍率配置
-	PeakRateEnabled    bool     `json:"peak_rate_enabled"`
-	PeakStart          string   `json:"peak_start"`
-	PeakEnd            string   `json:"peak_end"`
-	PeakRateMultiplier float64  `json:"peak_rate_multiplier"`
-	ImagePrice1K       *float64 `json:"image_price_1k"`
-	ImagePrice2K       *float64 `json:"image_price_2k"`
-	ImagePrice4K       *float64 `json:"image_price_4k"`
-	VideoPrice480P     *float64 `json:"video_price_480p"`
-	VideoPrice720P     *float64 `json:"video_price_720p"`
-	VideoPrice1080P    *float64 `json:"video_price_1080p"`
-	// Codex alpha/search 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
-	WebSearchPricePerCall *float64 `json:"web_search_price_per_call"`
-
-	// Claude Code 客户端限制
-	ClaudeCodeOnly  bool   `json:"claude_code_only"`
-	FallbackGroupID *int64 `json:"fallback_group_id"`
-	// 无效请求兜底分组
-	FallbackGroupIDOnInvalidRequest *int64 `json:"fallback_group_id_on_invalid_request"`
-
-	// OpenAI Messages 调度开关（用户侧需要此字段判断是否展示 Claude Code 教程）
-	AllowMessagesDispatch bool `json:"allow_messages_dispatch"`
-	// OpenAI Live 接口开关
-	AllowLive bool `json:"allow_live"`
-
-	// 账号过滤控制（仅 OpenAI/Antigravity 平台有效）
-	RequireOAuthOnly  bool `json:"require_oauth_only"`
-	RequirePrivacySet bool `json:"require_privacy_set"`
-
-	// RPMLimit 分组级每分钟请求数上限（0 = 不限制），设置后覆盖用户级 rpm_limit。
-	RPMLimit int `json:"rpm_limit"`
-	// MaxReasoningEffort OpenAI/Codex 请求的推理强度上限，空字符串表示不限制。
-	MaxReasoningEffort string `json:"max_reasoning_effort"`
-	// ReasoningEffortMappings OpenAI/Codex 推理强度精确映射。
-	ReasoningEffortMappings []domain.ReasoningEffortMapping `json:"reasoning_effort_mappings"`
-
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// BillingProfile is the balance billing configuration attached to one routing
-// group. Subscription price and limits are intentionally not present here.
-type BillingProfile struct {
-	GroupID                      int64    `json:"group_id"`
-	BalanceRateMultiplier        float64  `json:"balance_rate_multiplier"`
-	PeakRateEnabled              bool     `json:"peak_rate_enabled"`
-	PeakStart                    string   `json:"peak_start"`
-	PeakEnd                      string   `json:"peak_end"`
-	PeakRateMultiplier           float64  `json:"peak_rate_multiplier"`
-	ImageRateIndependent         bool     `json:"image_rate_independent"`
-	ImageRateMultiplier          float64  `json:"image_rate_multiplier"`
-	ImagePrice1K                 *float64 `json:"image_price_1k"`
-	ImagePrice2K                 *float64 `json:"image_price_2k"`
-	ImagePrice4K                 *float64 `json:"image_price_4k"`
-	BatchImageDiscountMultiplier float64  `json:"batch_image_discount_multiplier"`
-	BatchImageHoldMultiplier     float64  `json:"batch_image_hold_multiplier"`
-	VideoRateIndependent         bool     `json:"video_rate_independent"`
-	VideoRateMultiplier          float64  `json:"video_rate_multiplier"`
-	VideoPrice480P               *float64 `json:"video_price_480p"`
-	VideoPrice720P               *float64 `json:"video_price_720p"`
-	VideoPrice1080P              *float64 `json:"video_price_1080p"`
-	WebSearchPricePerCall        *float64 `json:"web_search_price_per_call"`
-}
-
-// AdminGroup 是管理员接口使用的 group DTO（包含敏感/内部字段）。
-// 注意：普通用户接口不得返回 model_routing/account_count/account_groups 等内部信息。
-type AdminGroup struct {
-	Group
-
-	// 模型路由配置（仅 anthropic 平台使用）
-	ModelRouting        map[string][]int64 `json:"model_routing"`
-	ModelRoutingEnabled bool               `json:"model_routing_enabled"`
-
-	// MCP XML 协议注入（仅 antigravity 平台使用）
-	MCPXMLInject bool `json:"mcp_xml_inject"`
-
-	// OpenAI Messages 调度配置（仅 openai 平台使用）
-	DefaultMappedModel          string                                   `json:"default_mapped_model"`
-	MessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
-	ModelsListConfig            domain.GroupModelsListConfig             `json:"models_list_config"`
-
-	// 支持的模型系列（仅 antigravity 平台使用）
-	SupportedModelScopes    []string       `json:"supported_model_scopes"`
-	AccountGroups           []AccountGroup `json:"account_groups,omitempty"`
-	AccountCount            int64          `json:"account_count,omitempty"`
-	ActiveAccountCount      int64          `json:"active_account_count,omitempty"`
-	RateLimitedAccountCount int64          `json:"rate_limited_account_count,omitempty"`
-
-	// 分组排序
 }
 
 type Account struct {
@@ -314,21 +197,7 @@ type Account struct {
 	ParentSubscriptionExpiresAt string `json:"parent_subscription_expires_at,omitempty"`
 	ParentChatGPTAccountID      string `json:"parent_chatgpt_account_id,omitempty"`
 
-	Proxy         *Proxy         `json:"proxy,omitempty"`
-	AccountGroups []AccountGroup `json:"account_groups,omitempty"`
-
-	GroupIDs []int64  `json:"group_ids,omitempty"`
-	Groups   []*Group `json:"groups,omitempty"`
-}
-
-type AccountGroup struct {
-	AccountID int64     `json:"account_id"`
-	GroupID   int64     `json:"group_id"`
-	Priority  int       `json:"priority"`
-	CreatedAt time.Time `json:"created_at"`
-
-	Account *Account `json:"account,omitempty"`
-	Group   *Group   `json:"group,omitempty"`
+	Proxy *Proxy `json:"proxy,omitempty"`
 }
 
 type Proxy struct {
@@ -412,7 +281,6 @@ type RedeemCode struct {
 	CreatedAt time.Time  `json:"created_at"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 
-	GroupID                 *int64   `json:"group_id"`
 	SubscriptionPlanID      *int64   `json:"subscription_plan_id,omitempty"`
 	PlanNameSnapshot        string   `json:"plan_name_snapshot,omitempty"`
 	DailyLimitUSDSnapshot   *float64 `json:"daily_limit_usd_snapshot,omitempty"`
@@ -425,8 +293,7 @@ type RedeemCode struct {
 	// so users can see why they were charged or credited
 	Notes *string `json:"notes,omitempty"`
 
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
+	User *User `json:"user,omitempty"`
 }
 
 // AdminRedeemCode 是管理员接口使用的 redeem code DTO（包含 notes 等字段）。
@@ -476,10 +343,9 @@ func (f *NullableInt64Field) UnmarshalJSON(data []byte) error {
 }
 
 type BatchUpdateRedeemCodeFields struct {
-	Status    *string            `json:"status,omitempty"`
-	ExpiresAt NullableTimeField  `json:"expires_at,omitempty"`
-	Notes     *string            `json:"notes,omitempty"`
-	GroupID   NullableInt64Field `json:"group_id,omitempty"`
+	Status    *string           `json:"status,omitempty"`
+	ExpiresAt NullableTimeField `json:"expires_at,omitempty"`
+	Notes     *string           `json:"notes,omitempty"`
 
 	Type  *string  `json:"type,omitempty"`
 	Value *float64 `json:"value,omitempty"`
@@ -508,13 +374,12 @@ type UsageLog struct {
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string `json:"upstream_endpoint,omitempty"`
 
-	GroupID        *int64 `json:"group_id"`
 	SubscriptionID *int64 `json:"subscription_id"`
 	PlatformID     *int64 `json:"platform_id,omitempty"`
 	PlatformCode   string `json:"platform_code,omitempty"`
 	PlatformName   string `json:"platform_name,omitempty"`
 	// BillingSourceType is "subscription" or "balance" for V2 records.
-	// Empty preserves the legacy group-only record format.
+	// Empty is used only for historical rows created before asset attribution.
 	BillingSourceType string `json:"billing_source_type,omitempty"`
 	SubscriptionName  string `json:"subscription_name,omitempty"`
 
@@ -573,7 +438,6 @@ type UsageLog struct {
 
 	User         *User             `json:"user,omitempty"`
 	APIKey       *APIKey           `json:"api_key,omitempty"`
-	Group        *Group            `json:"group,omitempty"`
 	Subscription *UserSubscription `json:"subscription,omitempty"`
 }
 
@@ -585,8 +449,6 @@ type AdminUsageLog struct {
 	// Omitted when no mapping was applied (requested model was used as-is).
 	UpstreamModel *string `json:"upstream_model,omitempty"`
 
-	// ChannelID 渠道 ID
-	ChannelID *int64 `json:"channel_id,omitempty"`
 	// ModelMappingChain 模型映射链，如 "a→b→c"
 	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
 	// BillingTier 计费层级标签（per_request/image 模式）
@@ -610,7 +472,7 @@ type UsageCleanupFilters struct {
 	UserID      *int64    `json:"user_id,omitempty"`
 	APIKeyID    *int64    `json:"api_key_id,omitempty"`
 	AccountID   *int64    `json:"account_id,omitempty"`
-	GroupID     *int64    `json:"group_id,omitempty"`
+	PlatformID  *int64    `json:"platform_id,omitempty"`
 	Model       *string   `json:"model,omitempty"`
 	RequestType *string   `json:"request_type,omitempty"`
 	Stream      *bool     `json:"stream,omitempty"`
@@ -647,9 +509,8 @@ type Setting struct {
 }
 
 type UserSubscription struct {
-	ID      int64  `json:"id"`
-	UserID  int64  `json:"user_id"`
-	GroupID *int64 `json:"group_id,omitempty"`
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
 
 	SubscriptionPlanID      *int64   `json:"subscription_plan_id,omitempty"`
 	PlanNameSnapshot        string   `json:"plan_name_snapshot,omitempty"`
@@ -674,8 +535,7 @@ type UserSubscription struct {
 	UpdatedAt time.Time  `json:"updated_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
+	User *User `json:"user,omitempty"`
 }
 
 // AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。

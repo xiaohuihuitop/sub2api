@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
@@ -171,26 +170,6 @@ func (_u *RedeemCodeUpdate) SetNillableExpiresAt(v *time.Time) *RedeemCodeUpdate
 // ClearExpiresAt clears the value of the "expires_at" field.
 func (_u *RedeemCodeUpdate) ClearExpiresAt() *RedeemCodeUpdate {
 	_u.mutation.ClearExpiresAt()
-	return _u
-}
-
-// SetGroupID sets the "group_id" field.
-func (_u *RedeemCodeUpdate) SetGroupID(v int64) *RedeemCodeUpdate {
-	_u.mutation.SetGroupID(v)
-	return _u
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (_u *RedeemCodeUpdate) SetNillableGroupID(v *int64) *RedeemCodeUpdate {
-	if v != nil {
-		_u.SetGroupID(*v)
-	}
-	return _u
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (_u *RedeemCodeUpdate) ClearGroupID() *RedeemCodeUpdate {
-	_u.mutation.ClearGroupID()
 	return _u
 }
 
@@ -370,11 +349,6 @@ func (_u *RedeemCodeUpdate) SetUser(v *User) *RedeemCodeUpdate {
 	return _u.SetUserID(v.ID)
 }
 
-// SetGroup sets the "group" edge to the Group entity.
-func (_u *RedeemCodeUpdate) SetGroup(v *Group) *RedeemCodeUpdate {
-	return _u.SetGroupID(v.ID)
-}
-
 // SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
 func (_u *RedeemCodeUpdate) SetSubscriptionPlan(v *SubscriptionPlan) *RedeemCodeUpdate {
 	return _u.SetSubscriptionPlanID(v.ID)
@@ -388,12 +362,6 @@ func (_u *RedeemCodeUpdate) Mutation() *RedeemCodeMutation {
 // ClearUser clears the "user" edge to the User entity.
 func (_u *RedeemCodeUpdate) ClearUser() *RedeemCodeUpdate {
 	_u.mutation.ClearUser()
-	return _u
-}
-
-// ClearGroup clears the "group" edge to the Group entity.
-func (_u *RedeemCodeUpdate) ClearGroup() *RedeemCodeUpdate {
-	_u.mutation.ClearGroup()
 	return _u
 }
 
@@ -564,35 +532,6 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GroupCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   redeemcode.GroupTable,
-			Columns: []string{redeemcode.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   redeemcode.GroupTable,
-			Columns: []string{redeemcode.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -792,26 +731,6 @@ func (_u *RedeemCodeUpdateOne) ClearExpiresAt() *RedeemCodeUpdateOne {
 	return _u
 }
 
-// SetGroupID sets the "group_id" field.
-func (_u *RedeemCodeUpdateOne) SetGroupID(v int64) *RedeemCodeUpdateOne {
-	_u.mutation.SetGroupID(v)
-	return _u
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (_u *RedeemCodeUpdateOne) SetNillableGroupID(v *int64) *RedeemCodeUpdateOne {
-	if v != nil {
-		_u.SetGroupID(*v)
-	}
-	return _u
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (_u *RedeemCodeUpdateOne) ClearGroupID() *RedeemCodeUpdateOne {
-	_u.mutation.ClearGroupID()
-	return _u
-}
-
 // SetSubscriptionPlanID sets the "subscription_plan_id" field.
 func (_u *RedeemCodeUpdateOne) SetSubscriptionPlanID(v int64) *RedeemCodeUpdateOne {
 	_u.mutation.SetSubscriptionPlanID(v)
@@ -988,11 +907,6 @@ func (_u *RedeemCodeUpdateOne) SetUser(v *User) *RedeemCodeUpdateOne {
 	return _u.SetUserID(v.ID)
 }
 
-// SetGroup sets the "group" edge to the Group entity.
-func (_u *RedeemCodeUpdateOne) SetGroup(v *Group) *RedeemCodeUpdateOne {
-	return _u.SetGroupID(v.ID)
-}
-
 // SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
 func (_u *RedeemCodeUpdateOne) SetSubscriptionPlan(v *SubscriptionPlan) *RedeemCodeUpdateOne {
 	return _u.SetSubscriptionPlanID(v.ID)
@@ -1006,12 +920,6 @@ func (_u *RedeemCodeUpdateOne) Mutation() *RedeemCodeMutation {
 // ClearUser clears the "user" edge to the User entity.
 func (_u *RedeemCodeUpdateOne) ClearUser() *RedeemCodeUpdateOne {
 	_u.mutation.ClearUser()
-	return _u
-}
-
-// ClearGroup clears the "group" edge to the Group entity.
-func (_u *RedeemCodeUpdateOne) ClearGroup() *RedeemCodeUpdateOne {
-	_u.mutation.ClearGroup()
 	return _u
 }
 
@@ -1212,35 +1120,6 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.GroupCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   redeemcode.GroupTable,
-			Columns: []string{redeemcode.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   redeemcode.GroupTable,
-			Columns: []string{redeemcode.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

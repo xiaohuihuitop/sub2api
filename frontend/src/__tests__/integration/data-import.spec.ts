@@ -129,8 +129,7 @@ describe('ImportDataModal', () => {
     expect(adminAPI.accounts.importData).toHaveBeenCalledWith({
       data: expect.objectContaining({
         accounts: [{ name: 'a' }]
-      }),
-      skip_default_group_bind: true
+      })
     })
   })
 
@@ -169,8 +168,7 @@ describe('ImportDataModal', () => {
       data: expect.objectContaining({
         proxies: [{ proxy_key: 'p' }],
         accounts: [{ name: 'a' }, { name: 'b' }]
-      }),
-      skip_default_group_bind: true
+      })
     })
     expect(showSuccess).toHaveBeenCalledWith('admin.accounts.dataImportSuccess')
   })

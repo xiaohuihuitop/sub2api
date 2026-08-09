@@ -14,16 +14,16 @@ func TestOpenAIWSStateStore_BindGetDeleteResponseAccount(t *testing.T) {
 	cache := &stubGatewayCache{}
 	store := NewOpenAIWSStateStore(cache)
 	ctx := context.Background()
-	groupID := int64(7)
+	platformID := int64(7)
 
-	require.NoError(t, store.BindResponseAccount(ctx, groupID, "resp_abc", 101, time.Minute))
+	require.NoError(t, store.BindResponseAccount(ctx, platformID, "resp_abc", 101, time.Minute))
 
-	accountID, err := store.GetResponseAccount(ctx, groupID, "resp_abc")
+	accountID, err := store.GetResponseAccount(ctx, platformID, "resp_abc")
 	require.NoError(t, err)
 	require.Equal(t, int64(101), accountID)
 
-	require.NoError(t, store.DeleteResponseAccount(ctx, groupID, "resp_abc"))
-	accountID, err = store.GetResponseAccount(ctx, groupID, "resp_abc")
+	require.NoError(t, store.DeleteResponseAccount(ctx, platformID, "resp_abc"))
+	accountID, err = store.GetResponseAccount(ctx, platformID, "resp_abc")
 	require.NoError(t, err)
 	require.Zero(t, accountID)
 }
@@ -79,17 +79,17 @@ func TestOpenAIWSStateStore_GetResponseAccount_NoStaleAfterCacheMiss(t *testing.
 	cache := &stubGatewayCache{sessionBindings: map[string]int64{}}
 	store := NewOpenAIWSStateStore(cache)
 	ctx := context.Background()
-	groupID := int64(17)
+	platformID := int64(17)
 	responseID := "resp_cache_stale"
 	cacheKey := openAIWSResponseAccountCacheKey(responseID)
 
 	cache.sessionBindings[cacheKey] = 501
-	accountID, err := store.GetResponseAccount(ctx, groupID, responseID)
+	accountID, err := store.GetResponseAccount(ctx, platformID, responseID)
 	require.NoError(t, err)
 	require.Equal(t, int64(501), accountID)
 
 	delete(cache.sessionBindings, cacheKey)
-	accountID, err = store.GetResponseAccount(ctx, groupID, responseID)
+	accountID, err = store.GetResponseAccount(ctx, platformID, responseID)
 	require.NoError(t, err)
 	require.Zero(t, accountID, "上游缓存失效后不应继续命中本地陈旧映射")
 }
@@ -197,16 +197,16 @@ func TestOpenAIWSStateStore_RedisOpsUseShortTimeout(t *testing.T) {
 	probe := &openAIWSStateStoreTimeoutProbeCache{}
 	store := NewOpenAIWSStateStore(probe)
 	ctx := context.Background()
-	groupID := int64(5)
+	platformID := int64(5)
 
-	err := store.BindResponseAccount(ctx, groupID, "resp_timeout_probe", 11, time.Minute)
+	err := store.BindResponseAccount(ctx, platformID, "resp_timeout_probe", 11, time.Minute)
 	require.Error(t, err)
 
-	accountID, getErr := store.GetResponseAccount(ctx, groupID, "resp_timeout_probe")
+	accountID, getErr := store.GetResponseAccount(ctx, platformID, "resp_timeout_probe")
 	require.NoError(t, getErr)
 	require.Equal(t, int64(11), accountID, "本地缓存命中应优先返回已绑定账号")
 
-	require.NoError(t, store.DeleteResponseAccount(ctx, groupID, "resp_timeout_probe"))
+	require.NoError(t, store.DeleteResponseAccount(ctx, platformID, "resp_timeout_probe"))
 
 	require.True(t, probe.setHasDeadline, "SetSessionAccountID 应携带独立超时上下文")
 	require.True(t, probe.deleteHasDeadline, "DeleteSessionAccountID 应携带独立超时上下文")
@@ -218,7 +218,7 @@ func TestOpenAIWSStateStore_RedisOpsUseShortTimeout(t *testing.T) {
 
 	probe2 := &openAIWSStateStoreTimeoutProbeCache{}
 	store2 := NewOpenAIWSStateStore(probe2)
-	accountID2, err2 := store2.GetResponseAccount(ctx, groupID, "resp_cache_only")
+	accountID2, err2 := store2.GetResponseAccount(ctx, platformID, "resp_cache_only")
 	require.NoError(t, err2)
 	require.Equal(t, int64(123), accountID2)
 	require.True(t, probe2.getHasDeadline, "GetSessionAccountID 在缓存未命中时应携带独立超时上下文")

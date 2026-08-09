@@ -230,8 +230,8 @@ func configAuditFields(request UpdateConfigRequest, saved *PublicConfig) map[str
 		"enabled": request.Enabled, "blocking_enabled": request.BlockingEnabled,
 		"blocking_latest_turn_only": request.BlockingLatestTurnOnly,
 		"config_version":            version, "endpoint_count": len(request.Endpoints),
-		"scanner_count": len(request.Scanners), "all_groups": request.AllGroups,
-		"group_count": len(request.GroupIDs),
+		"scanner_count": len(request.Scanners), "all_platforms": request.AllPlatforms,
+		"platform_count": len(request.PlatformIDs),
 	}
 }
 
@@ -256,7 +256,7 @@ func adminID(c *gin.Context) int64 {
 }
 
 func eventFilterFromQuery(c *gin.Context) (EventFilter, error) {
-	groupID, err := optionalPositiveInt64Query(c, "group_id")
+	platformID, err := optionalPositiveInt64Query(c, "platform_id")
 	if err != nil {
 		return EventFilter{}, err
 	}
@@ -270,7 +270,7 @@ func eventFilterFromQuery(c *gin.Context) (EventFilter, error) {
 	}
 	filter := EventFilter{
 		Decision: c.Query("decision"), RiskLevel: c.Query("risk_level"), Endpoint: c.Query("endpoint"),
-		GroupID: groupID, UserID: userID, APIKeyID: apiKeyID, RequestID: c.Query("request_id"),
+		PlatformID: platformID, UserID: userID, APIKeyID: apiKeyID, RequestID: c.Query("request_id"),
 		PromptHash: c.Query("prompt_hash"), Keyword: c.Query("keyword"),
 	}
 	if value := strings.TrimSpace(c.Query("start_at")); value != "" {

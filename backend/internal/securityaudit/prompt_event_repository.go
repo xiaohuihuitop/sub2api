@@ -18,7 +18,7 @@ type EventFilter struct {
 	Decision   string     `json:"decision,omitempty"`
 	RiskLevel  string     `json:"risk_level,omitempty"`
 	Endpoint   string     `json:"endpoint,omitempty"`
-	GroupID    *int64     `json:"group_id,omitempty"`
+	PlatformID *int64     `json:"platform_id,omitempty"`
 	UserID     *int64     `json:"user_id,omitempty"`
 	APIKeyID   *int64     `json:"api_key_id,omitempty"`
 	RequestID  string     `json:"request_id,omitempty"`
@@ -279,8 +279,8 @@ func buildEventWhere(filter EventFilter, firstIndex int) (string, []any) {
 	if filter.Endpoint != "" {
 		add(" AND e.endpoint=$%d", filter.Endpoint)
 	}
-	if filter.GroupID != nil {
-		add(" AND e.group_id=$%d", *filter.GroupID)
+	if filter.PlatformID != nil {
+		add(" AND e.platform_id=$%d", *filter.PlatformID)
 	}
 	if filter.UserID != nil {
 		add(" AND e.user_id=$%d", *filter.UserID)
@@ -312,7 +312,7 @@ func buildEventWhere(filter EventFilter, firstIndex int) (string, []any) {
 
 func eventColumns(alias string) string {
 	return fmt.Sprintf(`%[1]s.id,%[1]s.job_id,%[1]s.request_id,%[1]s.user_id,%[1]s.username_snapshot,
-		%[1]s.user_email_snapshot,%[1]s.api_key_id,%[1]s.api_key_name_snapshot,%[1]s.group_id,%[1]s.group_name,
+		%[1]s.user_email_snapshot,%[1]s.api_key_id,%[1]s.api_key_name_snapshot,%[1]s.platform_id,%[1]s.platform_name,
 		%[1]s.provider,%[1]s.endpoint,%[1]s.protocol,%[1]s.model,%[1]s.prompt_hash,%[1]s.redacted_preview,
 		%[1]s.stage,%[1]s.decision,%[1]s.risk_level,%[1]s.action,%[1]s.categories,%[1]s.matched_scanners,
 		%[1]s.scanner_scores,%[1]s.scanner_evidence,%[1]s.scanner_backend,%[1]s.scanner_version,
@@ -328,11 +328,11 @@ func eventDetailColumns(alias string) string {
 
 func scanEvent(row rowScanner, withFullPrompt ...bool) (*Event, error) {
 	event := &Event{}
-	var userID, apiKeyID, groupID sql.NullInt64
+	var userID, apiKeyID, platformID sql.NullInt64
 	var categories, matched, scores, evidence []byte
 	dest := []any{&event.ID, &event.JobID, &event.Snapshot.RequestID, &userID,
 		&event.Snapshot.UsernameSnapshot, &event.Snapshot.UserEmailSnapshot, &apiKeyID,
-		&event.Snapshot.APIKeyNameSnapshot, &groupID, &event.Snapshot.GroupName,
+		&event.Snapshot.APIKeyNameSnapshot, &platformID, &event.Snapshot.PlatformName,
 		&event.Snapshot.Provider, &event.Snapshot.Endpoint, &event.Snapshot.Protocol, &event.Snapshot.Model,
 		&event.Snapshot.PromptHash, &event.Snapshot.RedactedPreview, &event.Snapshot.Stage, &event.Decision,
 		&event.RiskLevel, &event.Action, &categories, &matched, &scores, &evidence, &event.ScannerBackend,
@@ -347,7 +347,7 @@ func scanEvent(row rowScanner, withFullPrompt ...bool) (*Event, error) {
 	}
 	event.Snapshot.UserID = nullableInt64Value(userID)
 	event.Snapshot.APIKeyID = nullableInt64Value(apiKeyID)
-	event.Snapshot.GroupID = nullableInt64Ptr(groupID)
+	event.Snapshot.PlatformID = nullableInt64Ptr(platformID)
 	_ = json.Unmarshal(categories, &event.Categories)
 	_ = json.Unmarshal(matched, &event.MatchedScanners)
 	_ = json.Unmarshal(scores, &event.ScannerScores)

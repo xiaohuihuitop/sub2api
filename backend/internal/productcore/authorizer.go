@@ -109,7 +109,6 @@ func supportsEndpoint(configured []string, requested string) bool {
 
 func clonePlatform(value Platform) Platform {
 	value.EndpointCapabilities = append([]string(nil), value.EndpointCapabilities...)
-	value.LegacyPricingGroupID = cloneInt64(value.LegacyPricingGroupID)
 	return value
 }
 

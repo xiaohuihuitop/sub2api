@@ -33,18 +33,6 @@ func (f AccountFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountMutation", m)
 }
 
-// The AccountGroupFunc type is an adapter to allow the use of ordinary
-// function as AccountGroup mutator.
-type AccountGroupFunc func(context.Context, *ent.AccountGroupMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f AccountGroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.AccountGroupMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccountGroupMutation", m)
-}
-
 // The AnnouncementFunc type is an adapter to allow the use of ordinary
 // function as Announcement mutator.
 type AnnouncementFunc func(context.Context, *ent.AnnouncementMutation) (ent.Value, error)
@@ -129,18 +117,6 @@ func (f BatchImageJobFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BatchImageJobMutation", m)
 }
 
-// The BillingProfileFunc type is an adapter to allow the use of ordinary
-// function as BillingProfile mutator.
-type BillingProfileFunc func(context.Context, *ent.BillingProfileMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f BillingProfileFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.BillingProfileMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BillingProfileMutation", m)
-}
-
 // The ChannelMonitorFunc type is an adapter to allow the use of ordinary
 // function as ChannelMonitor mutator.
 type ChannelMonitorFunc func(context.Context, *ent.ChannelMonitorMutation) (ent.Value, error)
@@ -189,18 +165,6 @@ func (f ChannelMonitorRequestTemplateFunc) Mutate(ctx context.Context, m ent.Mut
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ChannelMonitorRequestTemplateMutation", m)
 }
 
-// The CompositeModelRouteFunc type is an adapter to allow the use of ordinary
-// function as CompositeModelRoute mutator.
-type CompositeModelRouteFunc func(context.Context, *ent.CompositeModelRouteMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f CompositeModelRouteFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.CompositeModelRouteMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CompositeModelRouteMutation", m)
-}
-
 // The ErrorPassthroughRuleFunc type is an adapter to allow the use of ordinary
 // function as ErrorPassthroughRule mutator.
 type ErrorPassthroughRuleFunc func(context.Context, *ent.ErrorPassthroughRuleMutation) (ent.Value, error)
@@ -211,18 +175,6 @@ func (f ErrorPassthroughRuleFunc) Mutate(ctx context.Context, m ent.Mutation) (e
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ErrorPassthroughRuleMutation", m)
-}
-
-// The GroupFunc type is an adapter to allow the use of ordinary
-// function as Group mutator.
-type GroupFunc func(context.Context, *ent.GroupMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f GroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.GroupMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GroupMutation", m)
 }
 
 // The IdempotencyRecordFunc type is an adapter to allow the use of ordinary
@@ -247,6 +199,18 @@ func (f IdentityAdoptionDecisionFunc) Mutate(ctx context.Context, m ent.Mutation
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.IdentityAdoptionDecisionMutation", m)
+}
+
+// The ModelPricingOverrideFunc type is an adapter to allow the use of ordinary
+// function as ModelPricingOverride mutator.
+type ModelPricingOverrideFunc func(context.Context, *ent.ModelPricingOverrideMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ModelPricingOverrideFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ModelPricingOverrideMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ModelPricingOverrideMutation", m)
 }
 
 // The PaymentAuditLogFunc type is an adapter to allow the use of ordinary
@@ -451,18 +415,6 @@ func (f UserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserMutation", m)
-}
-
-// The UserAllowedGroupFunc type is an adapter to allow the use of ordinary
-// function as UserAllowedGroup mutator.
-type UserAllowedGroupFunc func(context.Context, *ent.UserAllowedGroupMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f UserAllowedGroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.UserAllowedGroupMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserAllowedGroupMutation", m)
 }
 
 // The UserAttributeDefinitionFunc type is an adapter to allow the use of ordinary

@@ -38,8 +38,6 @@ type GenerateRedeemCodesRequest struct {
 	Type               string     `json:"type" binding:"required,oneof=balance concurrency subscription invitation"`
 	Value              float64    `json:"value"`
 	SubscriptionPlanID *int64     `json:"subscription_plan_id"`
-	GroupID            *int64     `json:"group_id"`      // 旧订阅码兼容字段
-	ValidityDays       int        `json:"validity_days"` // 旧订阅码兼容字段
 	ExpiresAt          *time.Time `json:"expires_at"`
 	ExpiresInDays      *int       `json:"expires_in_days" binding:"omitempty,min=1,max=3650"`
 }
@@ -52,8 +50,6 @@ type CreateAndRedeemCodeRequest struct {
 	Value              float64    `json:"value" binding:"required"`
 	UserID             int64      `json:"user_id" binding:"required,gt=0"`
 	SubscriptionPlanID *int64     `json:"subscription_plan_id"`
-	GroupID            *int64     `json:"group_id"`      // 旧订阅码兼容字段
-	ValidityDays       int        `json:"validity_days"` // 旧订阅码兼容字段
 	Notes              string     `json:"notes"`
 	ExpiresAt          *time.Time `json:"expires_at"`
 	ExpiresInDays      *int       `json:"expires_in_days" binding:"omitempty,min=1,max=3650"`
@@ -150,8 +146,6 @@ func (h *RedeemHandler) Generate(c *gin.Context) {
 			Type:               req.Type,
 			Value:              req.Value,
 			SubscriptionPlanID: req.SubscriptionPlanID,
-			GroupID:            req.GroupID,
-			ValidityDays:       req.ValidityDays,
 			ExpiresAt:          expiresAt,
 		})
 		if execErr != nil {
@@ -187,12 +181,8 @@ func (h *RedeemHandler) CreateAndRedeem(c *gin.Context) {
 	}
 
 	if req.Type == "subscription" {
-		if req.SubscriptionPlanID == nil && req.GroupID == nil {
-			response.BadRequest(c, "subscription_plan_id or group_id is required for subscription type")
-			return
-		}
-		if req.SubscriptionPlanID == nil && req.ValidityDays == 0 {
-			response.BadRequest(c, "validity_days must not be zero for subscription type")
+		if req.SubscriptionPlanID == nil || *req.SubscriptionPlanID <= 0 {
+			response.BadRequest(c, "subscription_plan_id is required for subscription type")
 			return
 		}
 	}
@@ -219,8 +209,6 @@ func (h *RedeemHandler) CreateAndRedeem(c *gin.Context) {
 			Status:             service.StatusUnused,
 			Notes:              req.Notes,
 			SubscriptionPlanID: req.SubscriptionPlanID,
-			GroupID:            req.GroupID,
-			ValidityDays:       req.ValidityDays,
 			ExpiresAt:          expiresAt,
 		})
 		if createErr != nil {
@@ -349,9 +337,6 @@ func redeemBatchUpdateFieldsFromDTO(in dto.BatchUpdateRedeemCodeFields) service.
 	}
 	if in.ExpiresAt.Set {
 		out.ExpiresAt = service.NullableTimeUpdate{Set: true, Value: in.ExpiresAt.Value}
-	}
-	if in.GroupID.Set {
-		out.GroupID = service.NullableInt64Update{Set: true, Value: in.GroupID.Value}
 	}
 	return out
 }

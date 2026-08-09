@@ -103,13 +103,12 @@ func TestSanitizeAdminPaymentOrderForResponseAddsCurrency(t *testing.T) {
 	}
 }
 
-func TestAdminSubscriptionPlansForResponseKeepsLegacyGroupIDWithoutRoutingMetadata(t *testing.T) {
+func TestAdminSubscriptionPlansForResponseKeepsPlanBillingFields(t *testing.T) {
 	planWeekly := 88.0
 	now := time.Now()
 	plans := []*dbent.SubscriptionPlan{
 		{
 			ID:             11,
-			GroupID:        7,
 			Name:           "All models",
 			Description:    "Composite access",
 			Price:          19.99,
@@ -130,9 +129,6 @@ func TestAdminSubscriptionPlansForResponseKeepsLegacyGroupIDWithoutRoutingMetada
 
 	if len(got) != 1 {
 		t.Fatalf("expected one plan, got %d", len(got))
-	}
-	if got[0].GroupID == nil || *got[0].GroupID != 7 {
-		t.Fatalf("expected legacy group id to remain readable, got %#v", got[0].GroupID)
 	}
 	if got[0].RateMultiplier != 0.75 {
 		t.Fatalf("expected plan rate multiplier to be included, got %v", got[0].RateMultiplier)
@@ -158,10 +154,8 @@ func TestAdminSubscriptionPlansForResponseKeepsLegacyGroupIDWithoutRoutingMetada
 }
 
 func TestAdminSubscriptionPlanResponsePreservesZeroRateMultiplier(t *testing.T) {
-	groupID := int64(2)
 	result := AdminSubscriptionPlanResult{
 		ID:             1,
-		GroupID:        &groupID,
 		Name:           "Free trial",
 		Description:    "zero multiplier is valid",
 		Price:          0.01,

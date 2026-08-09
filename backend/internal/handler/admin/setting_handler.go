@@ -110,9 +110,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	defaultSubscriptions := make([]dto.DefaultSubscriptionSetting, 0, len(settings.DefaultSubscriptions))
 	for _, sub := range settings.DefaultSubscriptions {
 		defaultSubscriptions = append(defaultSubscriptions, dto.DefaultSubscriptionSetting{
-			PlanID:       sub.PlanID,
-			GroupID:      sub.GroupID,
-			ValidityDays: sub.ValidityDays,
+			PlanID: sub.PlanID,
 		})
 	}
 
@@ -267,7 +265,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		OpsMetricsIntervalSeconds:                              settings.OpsMetricsIntervalSeconds,
 		MinClaudeCodeVersion:                                   settings.MinClaudeCodeVersion,
 		MaxClaudeCodeVersion:                                   settings.MaxClaudeCodeVersion,
-		AllowUngroupedKeyScheduling:                            settings.AllowUngroupedKeyScheduling,
 		BackendModeEnabled:                                     settings.BackendModeEnabled,
 		EnableFingerprintUnification:                           settings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:                              settings.EnableMetadataPassthrough,
@@ -350,8 +347,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 
 		ChannelMonitorEnabled:                settings.ChannelMonitorEnabled,
 		ChannelMonitorDefaultIntervalSeconds: settings.ChannelMonitorDefaultIntervalSeconds,
-
-		AvailableChannelsEnabled: settings.AvailableChannelsEnabled,
 
 		ModelPlazaEnabled:     settings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth: settings.ModelPlazaRequireAuth,

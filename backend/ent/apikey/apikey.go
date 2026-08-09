@@ -27,8 +27,6 @@ const (
 	FieldKey = "key"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
-	// FieldGroupID holds the string denoting the group_id field in the database.
-	FieldGroupID = "group_id"
 	// FieldAllowBalance holds the string denoting the allow_balance field in the database.
 	FieldAllowBalance = "allow_balance"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -65,8 +63,6 @@ const (
 	FieldWindow7dStart = "window_7d_start"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
-	// EdgeGroup holds the string denoting the group edge name in mutations.
-	EdgeGroup = "group"
 	// EdgePlatforms holds the string denoting the platforms edge name in mutations.
 	EdgePlatforms = "platforms"
 	// EdgeSubscriptionPlans holds the string denoting the subscription_plans edge name in mutations.
@@ -82,13 +78,6 @@ const (
 	UserInverseTable = "users"
 	// UserColumn is the table column denoting the user relation/edge.
 	UserColumn = "user_id"
-	// GroupTable is the table that holds the group relation/edge.
-	GroupTable = "api_keys"
-	// GroupInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	GroupInverseTable = "groups"
-	// GroupColumn is the table column denoting the group relation/edge.
-	GroupColumn = "group_id"
 	// PlatformsTable is the table that holds the platforms relation/edge. The primary key declared below.
 	PlatformsTable = "api_key_platforms"
 	// PlatformsInverseTable is the table name for the Platform entity.
@@ -117,7 +106,6 @@ var Columns = []string{
 	FieldUserID,
 	FieldKey,
 	FieldName,
-	FieldGroupID,
 	FieldAllowBalance,
 	FieldStatus,
 	FieldLastUsedAt,
@@ -236,11 +224,6 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
-// ByGroupID orders the results by the group_id field.
-func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
-}
-
 // ByAllowBalance orders the results by the allow_balance field.
 func ByAllowBalance(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAllowBalance, opts...).ToFunc()
@@ -323,13 +306,6 @@ func ByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByGroupField orders the results by group field.
-func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGroupStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByPlatformsCount orders the results by platforms count.
 func ByPlatformsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -376,13 +352,6 @@ func newUserStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UserInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UserTable, UserColumn),
-	)
-}
-func newGroupStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GroupInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
 	)
 }
 func newPlatformsStep() *sqlgraph.Step {

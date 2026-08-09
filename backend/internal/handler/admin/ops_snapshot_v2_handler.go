@@ -27,7 +27,7 @@ type opsDashboardSnapshotV2CacheKey struct {
 	StartTime    string               `json:"start_time"`
 	EndTime      string               `json:"end_time"`
 	Platform     string               `json:"platform"`
-	GroupID      *int64               `json:"group_id"`
+	PlatformID   *int64               `json:"platform_id"`
 	QueryMode    service.OpsQueryMode `json:"mode"`
 	BucketSecond int                  `json:"bucket_second"`
 }
@@ -56,13 +56,13 @@ func (h *OpsHandler) GetDashboardSnapshotV2(c *gin.Context) {
 		Platform:  strings.TrimSpace(c.Query("platform")),
 		QueryMode: parseOpsQueryMode(c),
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 	bucketSeconds := pickThroughputBucketSeconds(endTime.Sub(startTime))
 
@@ -70,7 +70,7 @@ func (h *OpsHandler) GetDashboardSnapshotV2(c *gin.Context) {
 		StartTime:    startTime.UTC().Format(time.RFC3339),
 		EndTime:      endTime.UTC().Format(time.RFC3339),
 		Platform:     filter.Platform,
-		GroupID:      filter.GroupID,
+		PlatformID:   filter.PlatformID,
 		QueryMode:    filter.QueryMode,
 		BucketSecond: bucketSeconds,
 	})

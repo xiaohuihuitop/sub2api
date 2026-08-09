@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"strings"
-
-	"github.com/Wei-Shaw/sub2api/internal/config"
 )
 
 // DiagnoseModelAvailabilityForPlatform reports whether the requested model
@@ -19,7 +17,6 @@ import (
 // nil service), so callers stay on the 503 fallback branch.
 func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
 	ctx context.Context,
-	groupID *int64,
 	requestedModel string,
 	platform string,
 ) ModelAvailabilityDiagnosis {
@@ -35,17 +32,14 @@ func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
 	}
 
 	platform = normalizeOpenAICompatiblePlatform(platform)
-	queryGroupID := groupID
-	includeGrouped := false
-	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		queryGroupID = nil
-		includeGrouped = true
+	scope, ok := PlatformSchedulingScopeFromContext(ctx)
+	if !ok || scope.AccountPlatform != platform {
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}
 	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(
 		ctx,
-		queryGroupID,
-		[]string{platform},
-		includeGrouped,
+		scope.PlatformID,
+		scope.AccountPlatform,
 	)
 	if err != nil {
 		// Conservative fallback so the caller keeps returning 503; we do not
@@ -53,17 +47,6 @@ func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}
 
-	diag := ModelAvailabilityDiagnosis{}
-	for i := range accounts {
-		diag.HasAccountsInPool = true
-		// Mirrors the per-candidate filter used during account selection
-		// (openai_account_scheduler.isAccountRequestCompatible): empty
-		// model_mapping accepts everything; otherwise the explicit / wildcard
-		// mapping must match.
-		if platformRouteOwnsModelPolicy(ctx) || accounts[i].IsModelSupported(requestedModel) {
-			diag.HasModelSupport = true
-			return diag
-		}
-	}
-	return diag
+	available := len(accounts) > 0
+	return ModelAvailabilityDiagnosis{HasAccountsInPool: available, HasModelSupport: available}
 }

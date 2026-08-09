@@ -100,31 +100,6 @@ func (s *UserRepoSuite) TestUpdate_DoesNotRevertConcurrentLimitChanges() {
 	s.Require().Equal(90, got.RPMLimit, "rpm limit must not be reverted")
 }
 
-// AllowedGroups 只在显式声明时才同步，否则并发授予的分组权限会被旧快照删掉。
-func (s *UserRepoSuite) TestUpdate_DoesNotRevertConcurrentAllowedGroupGrant() {
-	group := s.mustCreateGroup("lost-update-group")
-	user := s.mustCreateUser(&service.User{
-		Email:    "lost-update-groups@example.com",
-		Username: "before",
-	})
-
-	stale, err := s.repo.GetByID(s.ctx, user.ID)
-	s.Require().NoError(err, "GetByID")
-	s.Require().Empty(stale.AllowedGroups)
-
-	s.Require().NoError(s.repo.AddGroupToAllowedGroups(s.ctx, user.ID, group.ID), "AddGroupToAllowedGroups")
-
-	stale.Username = "after"
-	s.Require().NoError(
-		s.repo.Update(s.ctx, stale, service.UserUpdateFields{Username: true}),
-		"stale profile save",
-	)
-
-	got, err := s.repo.GetByID(s.ctx, user.ID)
-	s.Require().NoError(err, "GetByID after update")
-	s.Require().Equal([]int64{group.ID}, got.AllowedGroups, "granted group must not be reverted")
-}
-
 func (s *UserRepoSuite) TestAdjustBalance_AppliesDeltaAndReportsChange() {
 	user := s.mustCreateUser(&service.User{Email: "adjust-balance@example.com", Balance: 10})
 

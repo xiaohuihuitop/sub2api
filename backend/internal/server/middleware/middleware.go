@@ -2,11 +2,9 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
-	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,9 +23,9 @@ const (
 	// ContextKeyForcePlatform 强制平台（用于 /antigravity 路由）
 	ContextKeyForcePlatform ContextKey = "force_platform"
 	// ContextKeyOpsFallbackAPIKey 运维错误日志专用回退键。
-	// 鉴权早退（分组停用/删除、Key 停用/过期/额度、用户停用、IP 限制等）时，
+	// 鉴权早退（Key 停用/过期/额度、用户停用、IP 限制等）时，
 	// apiKey 已加载但尚未写入 ContextKeyAPIKey；该键让 Ops 错误日志仍能取到
-	// user/group/platform。仅供 Ops 错误日志读取，不代表请求已通过鉴权。
+	// user/platform。仅供 Ops 错误日志读取，不代表请求已通过鉴权。
 	ContextKeyOpsFallbackAPIKey ContextKey = "ops_fallback_api_key"
 )
 
@@ -44,7 +42,7 @@ func ForcePlatform(platform string) gin.HandlerFunc {
 	}
 }
 
-// HasForcePlatform 检查是否有强制平台（用于 Handler 跳过分组检查）
+// HasForcePlatform 检查路由是否强制指定了账号平台。
 func HasForcePlatform(c *gin.Context) bool {
 	_, exists := c.Get(string(ContextKeyForcePlatform))
 	return exists
@@ -94,7 +92,6 @@ func abortWithOpenAIQuotaError(c *gin.Context, statusCode int, message string) {
 }
 
 // ──────────────────────────────────────────────────────────
-// RequireGroupAssignment — 未分组 Key 拦截中间件
 // ──────────────────────────────────────────────────────────
 
 // GatewayErrorWriter 定义网关错误响应格式（不同协议使用不同格式）
@@ -117,25 +114,4 @@ func GoogleErrorWriter(c *gin.Context, status int, message string) {
 			"status":  googleapi.HTTPStatusToGoogleStatus(status),
 		},
 	})
-}
-
-// RequireGroupAssignment 检查 API Key 是否已分配到分组，
-// 如果未分组且系统设置不允许未分组 Key 调度则返回 403。
-func RequireGroupAssignment(settingService *service.SettingService, writeError GatewayErrorWriter) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		apiKey, ok := GetAPIKeyFromContext(c)
-		if !ok || apiKey.GroupID != nil || service.UsesPlatformAssetPermissions(apiKey) {
-			c.Next()
-			return
-		}
-		// 未分组 Key — 检查系统设置
-		if settingService.IsUngroupedKeySchedulingAllowed(c.Request.Context()) {
-			c.Next()
-			return
-		}
-		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnassigned)
-		MarkIngressRejected(c, IngressRejectGroupUnassigned)
-		writeError(c, http.StatusForbidden, "API Key is not assigned to any group and cannot be used. Please contact the administrator to assign it to a group.")
-		c.Abort()
-	}
 }

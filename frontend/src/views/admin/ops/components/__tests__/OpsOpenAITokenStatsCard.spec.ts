@@ -52,7 +52,7 @@ const sampleResponse = {
   start_time: '2026-01-01T00:00:00Z',
   end_time: '2026-01-31T00:00:00Z',
   platform: 'openai',
-  group_id: 7,
+  platform_id: 7,
   items: [
     {
       model: 'gpt-4o-mini',
@@ -81,7 +81,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     const wrapper = mount(OpsOpenAITokenStatsCard, {
       props: {
         platformFilter: 'openai',
-        groupIdFilter: 7,
+        platformIdFilter: 7,
         refreshToken: 0,
       },
       global: {
@@ -97,7 +97,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       expect.objectContaining({
         time_range: '30d',
         platform: 'openai',
-        group_id: 7,
+        platform_id: 7,
         top_n: 20,
       })
     )
@@ -110,7 +110,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       expect.objectContaining({
         time_range: '1h',
         platform: 'openai',
-        group_id: 7,
+        platform_id: 7,
       })
     )
   })

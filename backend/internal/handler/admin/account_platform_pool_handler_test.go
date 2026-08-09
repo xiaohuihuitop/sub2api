@@ -49,7 +49,6 @@ func TestAccountHandlerCreatePassesPlatformPoolID(t *testing.T) {
 		"name":        "gpt-primary",
 		"platform":    service.PlatformOpenAI,
 		"platform_id": 42,
-		"group_ids":   []int64{7, 8},
 		"type":        service.AccountTypeAPIKey,
 		"credentials": map[string]any{"api_key": "test"},
 	})
@@ -64,8 +63,6 @@ func TestAccountHandlerCreatePassesPlatformPoolID(t *testing.T) {
 	require.NotNil(t, stub.created)
 	require.NotNil(t, stub.created.PlatformID)
 	require.Equal(t, int64(42), *stub.created.PlatformID)
-	require.Empty(t, stub.created.GroupIDs)
-	require.True(t, stub.created.SkipDefaultGroupBind)
 }
 
 func TestAccountHandlerCreateRequiresPlatformPoolID(t *testing.T) {
@@ -103,38 +100,6 @@ func TestAccountHandlerUpdatePassesPlatformPoolID(t *testing.T) {
 	require.NotNil(t, stub.updated)
 	require.NotNil(t, stub.updated.PlatformID)
 	require.Equal(t, int64(42), *stub.updated.PlatformID)
-}
-
-func TestAccountHandlerBulkUpdateRejectsLegacyGroupBindings(t *testing.T) {
-	stub := &platformPoolAccountHandlerStub{AdminService: newStubAdminService()}
-	router := setupPlatformPoolAccountHandlerRouter(stub)
-	body := []byte(`{"account_ids":[71],"group_ids":[7]}`)
-
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/bulk-update", bytes.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(recorder, request)
-
-	require.Equal(t, http.StatusBadRequest, recorder.Code)
-	require.Contains(t, recorder.Body.String(), "legacy account group bindings")
-}
-
-func TestCodexSessionImportRequiresPlatformPoolEvenWhenLegacyGroupsAreProvided(t *testing.T) {
-	stub := &platformPoolAccountHandlerStub{AdminService: newStubAdminService()}
-	router := setupPlatformPoolAccountHandlerRouter(stub)
-	body, err := json.Marshal(map[string]any{
-		"content":   "access-token",
-		"group_ids": []int64{7, 8},
-	})
-	require.NoError(t, err)
-
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/import-codex-session", bytes.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(recorder, request)
-
-	require.Equal(t, http.StatusBadRequest, recorder.Code)
-	require.Nil(t, stub.created)
 }
 
 func TestFilterAccountsByPlatformPoolKeepsOnlyMatchingAccounts(t *testing.T) {

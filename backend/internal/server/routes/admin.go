@@ -36,9 +36,8 @@ func RegisterAdminRoutes(
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
 
-		// 分组管理
-		registerGroupRoutes(admin, h)
 		registerPlatformRoutes(admin, h)
+		registerModelPricingRoutes(admin, h)
 
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
@@ -99,9 +98,6 @@ func RegisterAdminRoutes(
 
 		// 定时测试计划
 		registerScheduledTestRoutes(admin, h)
-
-		// 渠道管理
-		registerChannelRoutes(admin, h)
 
 		// 渠道监控
 		registerChannelMonitorRoutes(admin, h)
@@ -266,7 +262,6 @@ func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		dashboard.GET("/realtime", h.Admin.Dashboard.GetRealtimeMetrics)
 		dashboard.GET("/trend", h.Admin.Dashboard.GetUsageTrend)
 		dashboard.GET("/models", h.Admin.Dashboard.GetModelStats)
-		dashboard.GET("/groups", h.Admin.Dashboard.GetGroupStats)
 		dashboard.GET("/api-keys-trend", h.Admin.Dashboard.GetAPIKeyUsageTrend)
 		dashboard.GET("/users-trend", h.Admin.Dashboard.GetUserUsageTrend)
 		dashboard.GET("/users-ranking", h.Admin.Dashboard.GetUserSpendingRanking)
@@ -290,7 +285,6 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		users.GET("/:id/api-keys", h.Admin.User.GetUserAPIKeys)
 		users.GET("/:id/usage", h.Admin.User.GetUserUsage)
 		users.GET("/:id/balance-history", h.Admin.User.GetBalanceHistory)
-		users.POST("/:id/replace-group", h.Admin.User.ReplaceGroup)
 		users.GET("/:id/rpm-status", h.Admin.User.GetUserRPMStatus)
 		users.POST("/batch-concurrency", h.Admin.User.BatchUpdateConcurrency)
 		users.POST("/batch-limits", h.Admin.User.BatchUpdateLimits)
@@ -304,36 +298,6 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
-	groups := admin.Group("/groups")
-	{
-		groups.GET("", h.Admin.Group.List)
-		groups.GET("/all", h.Admin.Group.GetAll)
-		groups.GET("/usage-summary", h.Admin.Group.GetUsageSummary)
-		groups.GET("/capacity-summary", h.Admin.Group.GetCapacitySummary)
-		groups.GET("/live-capability", h.Admin.Group.GetLiveCapability)
-		groups.PUT("/sort-order", h.Admin.Group.UpdateSortOrder)
-		groups.GET("/:id/models-list-candidates", h.Admin.Group.GetModelsListCandidates)
-		groups.GET("/:id/composite-routes", h.Admin.Group.ListCompositeRoutes)
-		groups.POST("/:id/composite-routes", h.Admin.Group.CreateCompositeRoute)
-		groups.POST("/:id/composite-routes/preview", h.Admin.Group.PreviewCompositeRoute)
-		groups.PUT("/:id/composite-routes/:route_id", h.Admin.Group.UpdateCompositeRoute)
-		groups.DELETE("/:id/composite-routes/:route_id", h.Admin.Group.DeleteCompositeRoute)
-		groups.GET("/:id/billing-profile", h.Admin.Group.GetBillingProfile)
-		groups.GET("/:id", h.Admin.Group.GetByID)
-		groups.POST("", h.Admin.Group.Create)
-		groups.POST("/:id/duplicate", h.Admin.Group.Duplicate)
-		groups.PUT("/:id/billing-profile", h.Admin.Group.UpdateBillingProfile)
-		groups.PUT("/:id", h.Admin.Group.Update)
-		groups.DELETE("/:id", h.Admin.Group.Delete)
-		groups.GET("/:id/stats", h.Admin.Group.GetStats)
-		groups.GET("/:id/rpm-overrides", h.Admin.Group.GetGroupRPMOverrides)
-		groups.PUT("/:id/rpm-overrides", h.Admin.Group.BatchSetGroupRPMOverrides)
-		groups.DELETE("/:id/rpm-overrides", h.Admin.Group.ClearGroupRPMOverrides)
-		groups.GET("/:id/api-keys", h.Admin.Group.GetGroupAPIKeys)
-	}
-}
-
 func registerPlatformRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	platforms := admin.Group("/platforms")
 	{
@@ -341,6 +305,17 @@ func registerPlatformRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		platforms.GET("/:id", h.Admin.Platform.GetByID)
 		platforms.POST("", h.Admin.Platform.Create)
 		platforms.PUT("/:id", h.Admin.Platform.Update)
+	}
+}
+
+func registerModelPricingRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	pricing := admin.Group("/model-pricing")
+	{
+		pricing.GET("", h.Admin.ModelPricing.List)
+		pricing.GET("/:id", h.Admin.ModelPricing.Get)
+		pricing.POST("", h.Admin.ModelPricing.Create)
+		pricing.PUT("/:id", h.Admin.ModelPricing.Update)
+		pricing.DELETE("/:id", h.Admin.ModelPricing.Delete)
 	}
 }
 
@@ -356,7 +331,6 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/:id", h.Admin.Account.GetByID)
 		accounts.POST("", h.Admin.Account.Create)
 		accounts.POST("/:id/duplicate", h.Admin.Account.Duplicate)
-		accounts.POST("/check-mixed-channel", h.Admin.Account.CheckMixedChannel)
 		accounts.POST("/import/codex-session", h.Admin.Account.ImportCodexSession)
 		accounts.POST("/sync/crs", h.Admin.Account.SyncFromCRS)
 		accounts.POST("/sync/crs/preview", h.Admin.Account.PreviewFromCRS)
@@ -650,9 +624,6 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		subscriptions.DELETE("/:id", h.Admin.Subscription.Revoke)
 	}
 
-	// 分组下的订阅列表
-	admin.GET("/groups/:id/subscriptions", h.Admin.Subscription.ListByGroup)
-
 	// 用户下的订阅列表
 	admin.GET("/users/:id/subscriptions", h.Admin.Subscription.ListByUser)
 }
@@ -713,19 +684,6 @@ func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Hand
 		profiles.POST("", h.Admin.TLSFingerprintProfile.Create)
 		profiles.PUT("/:id", h.Admin.TLSFingerprintProfile.Update)
 		profiles.DELETE("/:id", h.Admin.TLSFingerprintProfile.Delete)
-	}
-}
-
-func registerChannelRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
-	channels := admin.Group("/channels")
-	{
-		channels.GET("", h.Admin.Channel.List)
-		channels.GET("/model-pricing", h.Admin.Channel.GetModelDefaultPricing)
-		channels.GET("/pricing/sync-models", h.Admin.Channel.SyncPricingModels)
-		channels.GET("/:id", h.Admin.Channel.GetByID)
-		channels.POST("", h.Admin.Channel.Create)
-		channels.PUT("/:id", h.Admin.Channel.Update)
-		channels.DELETE("/:id", h.Admin.Channel.Delete)
 	}
 }
 

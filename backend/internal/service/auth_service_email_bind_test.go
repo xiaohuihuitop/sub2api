@@ -25,30 +25,30 @@ import (
 )
 
 type emailBindDefaultSubAssignerStub struct {
-	calls []*service.AssignSubscriptionInput
+	calls []*service.AssignSubscriptionFromPlanInput
 }
 
-func (s *emailBindDefaultSubAssignerStub) AssignOrExtendSubscription(
+func (s *emailBindDefaultSubAssignerStub) AssignSubscriptionFromPlan(
 	_ context.Context,
-	input *service.AssignSubscriptionInput,
-) (*service.UserSubscription, bool, error) {
+	input *service.AssignSubscriptionFromPlanInput,
+) (*service.UserSubscription, error) {
 	cloned := *input
 	s.calls = append(s.calls, &cloned)
-	return &service.UserSubscription{UserID: input.UserID, GroupID: input.GroupID}, false, nil
+	return &service.UserSubscription{UserID: input.UserID, SubscriptionPlanID: &input.PlanID}, nil
 }
 
 type flakyEmailBindDefaultSubAssignerStub struct {
 	err   error
-	calls []*service.AssignSubscriptionInput
+	calls []*service.AssignSubscriptionFromPlanInput
 }
 
-func (s *flakyEmailBindDefaultSubAssignerStub) AssignOrExtendSubscription(
+func (s *flakyEmailBindDefaultSubAssignerStub) AssignSubscriptionFromPlan(
 	_ context.Context,
-	input *service.AssignSubscriptionInput,
-) (*service.UserSubscription, bool, error) {
+	input *service.AssignSubscriptionFromPlanInput,
+) (*service.UserSubscription, error) {
 	cloned := *input
 	s.calls = append(s.calls, &cloned)
-	return nil, false, s.err
+	return nil, s.err
 }
 
 func newAuthServiceForEmailBind(
@@ -126,7 +126,7 @@ func TestAuthServiceBindEmailIdentity_UpdatesEmailAndAppliesFirstBindDefaults(t 
 	svc, _, client := newAuthServiceForEmailBind(t, map[string]string{
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "4",
-		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"group_id":11,"validity_days":30}]`,
+		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"plan_id":11}]`,
 		service.SettingKeyAuthSourceDefaultEmailGrantOnFirstBind: "true",
 	}, cache, assigner)
 
@@ -167,8 +167,7 @@ func TestAuthServiceBindEmailIdentity_UpdatesEmailAndAppliesFirstBindDefaults(t 
 
 	require.Len(t, assigner.calls, 1)
 	require.Equal(t, user.ID, assigner.calls[0].UserID)
-	require.Equal(t, int64(11), assigner.calls[0].GroupID)
-	require.Equal(t, 30, assigner.calls[0].ValidityDays)
+	require.Equal(t, int64(11), assigner.calls[0].PlanID)
 	require.Equal(t, 1, countProviderGrantRecords(t, client, user.ID, "email", "first_bind"))
 }
 
@@ -226,7 +225,7 @@ func TestAuthServiceBindEmailIdentity_RollsBackWhenFirstBindDefaultsFail(t *test
 	svc, _, client := newAuthServiceForEmailBind(t, map[string]string{
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "4",
-		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"group_id":11,"validity_days":30}]`,
+		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"plan_id":11}]`,
 		service.SettingKeyAuthSourceDefaultEmailGrantOnFirstBind: "true",
 	}, cache, assigner)
 
@@ -309,7 +308,7 @@ func TestAuthServiceBindEmailIdentity_ReplacesBoundEmailAndSkipsFirstBindDefault
 	svc, _, client := newAuthServiceForEmailBind(t, map[string]string{
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "4",
-		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"group_id":11,"validity_days":30}]`,
+		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"plan_id":11}]`,
 		service.SettingKeyAuthSourceDefaultEmailGrantOnFirstBind: "true",
 	}, cache, assigner)
 
@@ -989,18 +988,6 @@ func (s *emailBindUserRepoStub) BatchAddConcurrency(context.Context, []int64, in
 }
 func (s *emailBindUserRepoStub) BatchUpdateLimits(context.Context, []int64, *int, *int) (int, error) {
 	return 0, nil
-}
-
-func (s *emailBindUserRepoStub) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
-	return 0, nil
-}
-
-func (s *emailBindUserRepoStub) AddGroupToAllowedGroups(context.Context, int64, int64) error {
-	return nil
-}
-
-func (s *emailBindUserRepoStub) RemoveGroupFromUserAllowedGroups(context.Context, int64, int64) error {
-	return nil
 }
 
 func (s *emailBindUserRepoStub) ListUserAuthIdentities(context.Context, int64) ([]service.UserAuthIdentityRecord, error) {

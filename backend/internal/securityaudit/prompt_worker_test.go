@@ -234,7 +234,7 @@ func (s *fakePayloadStore) Ping(context.Context) error { return s.pingErr }
 func asyncConfig() ActiveConfig {
 	return ActiveConfig{
 		RiskControlEnabled: true, Enabled: true, BlockingEnabled: false, Strategy: "priority",
-		WorkerCount: 1, QueueCapacity: 8, Scanners: []string{"pii"}, AllGroups: true, ConfigVersion: 7,
+		WorkerCount: 1, QueueCapacity: 8, Scanners: []string{"pii"}, AllPlatforms: true, ConfigVersion: 7,
 		Endpoints: []ActiveEndpoint{{ID: "guard", Enabled: true, TimeoutMS: 1000, InputLimit: 3}},
 	}
 }
@@ -298,8 +298,8 @@ func TestEnqueuerSkipsOffOutOfScopeAndNoText(t *testing.T) {
 		{name: "off", cfg: ActiveConfig{}, req: asyncRequest()},
 		{name: "out of scope", cfg: func() ActiveConfig {
 			cfg := asyncConfig()
-			cfg.AllGroups = false
-			cfg.GroupIDs = []int64{9}
+			cfg.AllPlatforms = false
+			cfg.PlatformIDs = []int64{9}
 			return cfg
 		}(), req: asyncRequest()},
 		{name: "no user text", cfg: asyncConfig(), req: Request{Protocol: "openai_chat_completions", Body: []byte(`{"messages":[{"role":"function","content":"not audited"}]}`)}},
@@ -584,12 +584,12 @@ func TestPromptAuditSyntheticAsyncBaseline(t *testing.T) {
 }
 
 func TestRequestCloneOwnsMutableInputs(t *testing.T) {
-	groupID := int64(7)
-	req := Request{Body: []byte("original"), GroupID: &groupID}
+	platformID := int64(7)
+	req := Request{Body: []byte("original"), PlatformID: &platformID}
 	clone := req.Clone()
 	clone.Body[0] = 'X'
-	*clone.GroupID = 8
+	*clone.PlatformID = 8
 	require.Equal(t, []byte("original"), req.Body)
-	require.Equal(t, int64(7), *req.GroupID)
+	require.Equal(t, int64(7), *req.PlatformID)
 	require.False(t, reflect.ValueOf(req.Body).Pointer() == reflect.ValueOf(clone.Body).Pointer())
 }

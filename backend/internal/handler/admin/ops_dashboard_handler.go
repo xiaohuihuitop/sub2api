@@ -36,13 +36,13 @@ func (h *OpsHandler) GetDashboardOverview(c *gin.Context) {
 		Platform:  strings.TrimSpace(c.Query("platform")),
 		QueryMode: parseOpsQueryMode(c),
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 
 	data, err := h.opsService.GetDashboardOverview(c.Request.Context(), filter)
@@ -77,13 +77,13 @@ func (h *OpsHandler) GetDashboardThroughputTrend(c *gin.Context) {
 		Platform:  strings.TrimSpace(c.Query("platform")),
 		QueryMode: parseOpsQueryMode(c),
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 
 	bucketSeconds := pickThroughputBucketSeconds(endTime.Sub(startTime))
@@ -119,13 +119,13 @@ func (h *OpsHandler) GetDashboardLatencyHistogram(c *gin.Context) {
 		Platform:  strings.TrimSpace(c.Query("platform")),
 		QueryMode: parseOpsQueryMode(c),
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 
 	data, err := h.opsService.GetLatencyHistogram(c.Request.Context(), filter)
@@ -160,13 +160,13 @@ func (h *OpsHandler) GetDashboardErrorTrend(c *gin.Context) {
 		Platform:  strings.TrimSpace(c.Query("platform")),
 		QueryMode: parseOpsQueryMode(c),
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 
 	bucketSeconds := pickThroughputBucketSeconds(endTime.Sub(startTime))
@@ -202,13 +202,13 @@ func (h *OpsHandler) GetDashboardErrorDistribution(c *gin.Context) {
 		Platform:  strings.TrimSpace(c.Query("platform")),
 		QueryMode: parseOpsQueryMode(c),
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 
 	data, err := h.opsService.GetErrorDistribution(c.Request.Context(), filter)
@@ -268,12 +268,12 @@ func parseOpsOpenAITokenStatsFilter(c *gin.Context) (*service.OpsOpenAITokenStat
 		Platform:  strings.TrimSpace(c.Query("platform")),
 	}
 
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			return nil, fmt.Errorf("invalid group_id")
+			return nil, fmt.Errorf("invalid platform_id")
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 
 	topNRaw := strings.TrimSpace(c.Query("top_n"))

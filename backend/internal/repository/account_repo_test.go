@@ -156,7 +156,7 @@ func columnsForParameterLimitQuery(query string) []string {
 	if query == "" {
 		return nil
 	}
-	return []string{"account_id", "group_id", "priority", "created_at"}
+	return []string{"id"}
 }
 
 type parameterLimitRows struct {

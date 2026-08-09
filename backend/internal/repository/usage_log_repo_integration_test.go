@@ -707,7 +707,13 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 		UpdatedAt: todayStart.Add(-24 * time.Hour),
 	})
 
-	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-ul"})
+	platform, err := s.client.Platform.Create().
+		SetCode(uniqueTestValue(s.T(), "dashboard-platform")).
+		SetName("Dashboard platform").
+		SetAccountPlatform(service.PlatformAnthropic).
+		SetStatus(service.StatusActive).
+		Save(s.ctx)
+	s.Require().NoError(err, "create platform")
 	apiKey1 := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: userToday.ID, Key: "sk-ul-1", Name: "ul1"})
 	mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: userOld.ID, Key: "sk-ul-2", Name: "ul2", Status: service.StatusDisabled})
 
@@ -723,7 +729,7 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 		APIKeyID:            apiKey1.ID,
 		AccountID:           accNormal.ID,
 		Model:               "claude-3",
-		GroupID:             &group.ID,
+		PlatformID:          &platform.ID,
 		InputTokens:         10,
 		OutputTokens:        20,
 		CacheCreationTokens: 3,

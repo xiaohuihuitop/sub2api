@@ -13,7 +13,8 @@ export interface SubscriptionSummary {
   active_count: number
   subscriptions: Array<{
     id: number
-    group_name: string
+    plan_id?: number
+    plan_name: string
     status: string
     daily_progress: number | null
     weekly_progress: number | null

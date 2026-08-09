@@ -34,10 +34,10 @@ type antigravityRetryLoopParams struct {
 	httpUpstream    HTTPUpstream
 	settingService  *SettingService
 	accountRepo     AccountRepository // 用于智能重试的模型级别限流
-	handleError     func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult
+	handleError     func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult
 	requestedModel  string // 用于限流检查的原始请求模型
 	isStickySession bool   // 是否为粘性会话（用于账号切换时的缓存计费判断）
-	groupID         int64  // 用于模型级限流时清除粘性会话
+	platformID      int64  // 用于模型级限流时清除粘性会话
 	sessionHash     string // 用于模型级限流时清除粘性会话
 }
 
@@ -137,10 +137,10 @@ func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParam
 
 		resetAt := time.Now().Add(rateLimitDuration)
 		if !s.setAntigravityModelRateLimits(p.ctx, p.accountRepo, p.account, modelName, p.prefix, resp.StatusCode, resetAt, false) {
-			p.handleError(p.ctx, p.prefix, p.account, resp.StatusCode, resp.Header, respBody, p.requestedModel, p.groupID, p.sessionHash, p.isStickySession)
+			p.handleError(p.ctx, p.prefix, p.account, resp.StatusCode, resp.Header, respBody, p.requestedModel, p.platformID, p.sessionHash, p.isStickySession)
 			logger.LegacyPrintf("service.antigravity_gateway", "%s status=%d rate_limited account=%d (no model mapping)", p.prefix, resp.StatusCode, p.account.ID)
 		}
-		s.clearStickySession(p.ctx, p.groupID, p.sessionHash)
+		s.clearStickySession(p.ctx, p.platformID, p.sessionHash)
 
 		// 返回账号切换信号，让上层切换账号重试
 		return &smartRetryResult{
@@ -201,7 +201,7 @@ func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParam
 			retryReq, err := antigravity.NewAPIRequestWithURL(p.ctx, baseURL, p.action, p.accessToken, p.body)
 			if err != nil {
 				logger.LegacyPrintf("service.antigravity_gateway", "%s status=smart_retry_request_build_failed error=%v", p.prefix, err)
-				p.handleError(p.ctx, p.prefix, p.account, resp.StatusCode, resp.Header, respBody, p.requestedModel, p.groupID, p.sessionHash, p.isStickySession)
+				p.handleError(p.ctx, p.prefix, p.account, resp.StatusCode, resp.Header, respBody, p.requestedModel, p.platformID, p.sessionHash, p.isStickySession)
 				return &smartRetryResult{
 					action: smartRetryActionBreakWithResp,
 					resp: &http.Response{
@@ -302,7 +302,7 @@ func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParam
 		s.setAntigravityModelRateLimits(p.ctx, p.accountRepo, p.account, modelName, p.prefix, resp.StatusCode, resetAt, true)
 
 		// 清除粘性会话绑定，避免下次请求仍命中限流账号
-		s.clearStickySession(p.ctx, p.groupID, p.sessionHash)
+		s.clearStickySession(p.ctx, p.platformID, p.sessionHash)
 
 		// 返回账号切换信号，让上层切换账号重试
 		return &smartRetryResult{
@@ -628,7 +628,7 @@ urlFallbackLoop:
 					}
 
 					// 重试用尽，标记账户限流
-					p.handleError(p.ctx, p.prefix, p.account, resp.StatusCode, resp.Header, respBody, p.requestedModel, p.groupID, p.sessionHash, p.isStickySession)
+					p.handleError(p.ctx, p.prefix, p.account, resp.StatusCode, resp.Header, respBody, p.requestedModel, p.platformID, p.sessionHash, p.isStickySession)
 					logger.LegacyPrintf("service.antigravity_gateway", "%s status=%d rate_limited base_url=%s body=%s", p.prefix, resp.StatusCode, baseURL, truncateForLog(respBody, 200))
 					resp = &http.Response{
 						StatusCode: resp.StatusCode,
@@ -878,12 +878,12 @@ func (s *AntigravityGatewayService) setAntigravityModelRateLimits(ctx context.Co
 	return success
 }
 
-func (s *AntigravityGatewayService) clearStickySession(ctx context.Context, groupID int64, sessionHash string) {
+func (s *AntigravityGatewayService) clearStickySession(ctx context.Context, platformID int64, sessionHash string) {
 	if s == nil || s.cache == nil || strings.TrimSpace(sessionHash) == "" {
 		return
 	}
-	if err := s.cache.DeleteSessionAccountID(ctx, groupID, sessionHash); err != nil {
-		logger.LegacyPrintf("service.antigravity_gateway", "[antigravity-Forward] sticky_session_clear_failed group_id=%d session=%s err=%v", groupID, shortSessionHash(sessionHash), err)
+	if err := s.cache.DeleteSessionAccountID(ctx, platformID, sessionHash); err != nil {
+		logger.LegacyPrintf("service.antigravity_gateway", "[antigravity-Forward] sticky_session_clear_failed platform_namespace_id=%d session=%s err=%v", platformID, shortSessionHash(sessionHash), err)
 	}
 }
 
@@ -1071,7 +1071,7 @@ type handleModelRateLimitParams struct {
 	statusCode      int
 	body            []byte
 	cache           GatewayCache
-	groupID         int64
+	platformID      int64
 	sessionHash     string
 	isStickySession bool
 }
@@ -1143,7 +1143,7 @@ func (s *AntigravityGatewayService) setModelRateLimitAndClearSession(p *handleMo
 
 	// 清除粘性会话绑定
 	if p.cache != nil && p.sessionHash != "" {
-		_ = p.cache.DeleteSessionAccountID(p.ctx, p.groupID, p.sessionHash)
+		_ = p.cache.DeleteSessionAccountID(p.ctx, p.platformID, p.sessionHash)
 	}
 }
 
@@ -1179,7 +1179,7 @@ func (s *AntigravityGatewayService) handleUpstreamError(
 	ctx context.Context, prefix string, account *Account,
 	statusCode int, headers http.Header, body []byte,
 	requestedModel string,
-	groupID int64, sessionHash string, isStickySession bool,
+	platformID int64, sessionHash string, isStickySession bool,
 ) *handleModelRateLimitResult {
 	// 遵守自定义错误码策略：未命中则跳过所有限流处理
 	if !account.ShouldHandleErrorCode(statusCode) {
@@ -1193,7 +1193,7 @@ func (s *AntigravityGatewayService) handleUpstreamError(
 		statusCode:      statusCode,
 		body:            body,
 		cache:           s.cache,
-		groupID:         groupID,
+		platformID:      platformID,
 		sessionHash:     sessionHash,
 		isStickySession: isStickySession,
 	})

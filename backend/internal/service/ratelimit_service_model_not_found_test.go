@@ -23,8 +23,14 @@ type modelNotFoundRateLimitCall struct {
 type modelNotFoundAccountRepoStub struct {
 	mockAccountRepoForGemini
 	tempCalls           int
+	rateLimitedCalls    int
 	modelRateLimitCalls []modelNotFoundRateLimitCall
 	modelRateLimitErr   error
+}
+
+func (r *modelNotFoundAccountRepoStub) SetRateLimited(_ context.Context, _ int64, _ time.Time) error {
+	r.rateLimitedCalls++
+	return nil
 }
 
 func (r *modelNotFoundAccountRepoStub) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {

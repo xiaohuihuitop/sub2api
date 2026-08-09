@@ -121,11 +121,10 @@ func TestAdminServiceCreateAccountDefaultsOpenAILongContextBillingDisabled(t *te
 	svc := &adminServiceImpl{accountRepo: repo}
 
 	account, err := svc.CreateAccount(context.Background(), &CreateAccountInput{
-		Name:                 "openai-account",
-		Platform:             PlatformOpenAI,
-		Type:                 AccountTypeAPIKey,
-		Credentials:          map[string]any{"api_key": "test"},
-		SkipDefaultGroupBind: true,
+		Name:        "openai-account",
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "test"},
 	})
 
 	require.NoError(t, err)

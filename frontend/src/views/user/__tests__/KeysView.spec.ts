@@ -40,7 +40,6 @@ const messages: Record<string, string> = {
   'common.refresh': 'Refresh',
   'common.status': 'Status',
   'keys.apiKey': 'API Key',
-  'keys.allGroups': 'All Groups',
   'keys.allStatus': 'All Status',
   'keys.columnSettings': 'Column Settings',
   'keys.createKey': 'Create API Key',

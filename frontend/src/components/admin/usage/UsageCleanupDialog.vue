@@ -305,9 +305,6 @@ const buildPayload = (): CreateUsageCleanupTaskRequest | null => {
   if (localFilters.value.account_id && localFilters.value.account_id > 0) {
     payload.account_id = localFilters.value.account_id
   }
-  if (localFilters.value.group_id && localFilters.value.group_id > 0) {
-    payload.group_id = localFilters.value.group_id
-  }
   if (localFilters.value.model) {
     payload.model = localFilters.value.model
   }

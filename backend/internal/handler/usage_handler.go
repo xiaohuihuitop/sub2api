@@ -35,13 +35,14 @@ type userModelStat struct {
 	ActualCost          float64 `json:"actual_cost"`
 }
 
-type userGroupStat struct {
-	GroupID     int64   `json:"group_id"`
-	GroupName   string  `json:"group_name"`
-	Requests    int64   `json:"requests"`
-	TotalTokens int64   `json:"total_tokens"`
-	Cost        float64 `json:"cost"`
-	ActualCost  float64 `json:"actual_cost"`
+type userPlatformStat struct {
+	PlatformID   int64   `json:"platform_id"`
+	PlatformCode string  `json:"platform_code"`
+	PlatformName string  `json:"platform_name"`
+	Requests     int64   `json:"requests"`
+	TotalTokens  int64   `json:"total_tokens"`
+	Cost         float64 `json:"cost"`
+	ActualCost   float64 `json:"actual_cost"`
 }
 
 // UsageHandler handles usage-related requests
@@ -97,14 +98,14 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 		apiKeyID = id
 	}
 
-	var groupID int64
-	if groupIDStr := strings.TrimSpace(c.Query("group_id")); groupIDStr != "" {
-		id, err := strconv.ParseInt(groupIDStr, 10, 64)
+	var platformID int64
+	if platformIDStr := strings.TrimSpace(c.Query("platform_id")); platformIDStr != "" {
+		id, err := strconv.ParseInt(platformIDStr, 10, 64)
 		if err != nil {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return nil, false
 		}
-		groupID = id
+		platformID = id
 	}
 
 	var requestType *int16
@@ -197,7 +198,7 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 		Filters: usagestats.UsageLogFilters{
 			UserID:            subject.UserID,
 			APIKeyID:          apiKeyID,
-			GroupID:           groupID,
+			PlatformID:        platformID,
 			Model:             strings.TrimSpace(c.Query("model")),
 			ModelFilterSource: usagestats.ModelSourceRequested,
 			RequestType:       requestType,
@@ -523,7 +524,7 @@ func (h *UsageHandler) DashboardSnapshotV2(c *gin.Context) {
 	if !ok {
 		return
 	}
-	includeGroups, ok := parseBoolQueryWithDefault(c, "include_group_stats", false)
+	includePlatforms, ok := parseBoolQueryWithDefault(c, "include_platform_stats", false)
 	if !ok {
 		return
 	}
@@ -551,13 +552,13 @@ func (h *UsageHandler) DashboardSnapshotV2(c *gin.Context) {
 		}
 		resp["models"] = userModelStatsFromUsageStats(models)
 	}
-	if includeGroups {
-		groups, err := h.usageService.GetGroupStatsWithFilters(c.Request.Context(), parsed.StartTime, parsed.EndTime, parsed.Filters)
+	if includePlatforms {
+		platforms, err := h.usageService.GetPlatformStatsWithFilters(c.Request.Context(), parsed.StartTime, parsed.EndTime, parsed.Filters)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
 		}
-		resp["groups"] = userGroupStatsFromUsageStats(groups)
+		resp["platforms"] = userPlatformStatsFromUsageStats(platforms)
 	}
 
 	response.Success(c, resp)
@@ -581,16 +582,17 @@ func userModelStatsFromUsageStats(stats []usagestats.ModelStat) []userModelStat 
 	return out
 }
 
-func userGroupStatsFromUsageStats(stats []usagestats.GroupStat) []userGroupStat {
-	out := make([]userGroupStat, 0, len(stats))
+func userPlatformStatsFromUsageStats(stats []usagestats.PlatformStat) []userPlatformStat {
+	out := make([]userPlatformStat, 0, len(stats))
 	for _, stat := range stats {
-		out = append(out, userGroupStat{
-			GroupID:     stat.GroupID,
-			GroupName:   stat.GroupName,
-			Requests:    stat.Requests,
-			TotalTokens: stat.TotalTokens,
-			Cost:        stat.Cost,
-			ActualCost:  stat.ActualCost,
+		out = append(out, userPlatformStat{
+			PlatformID:   stat.PlatformID,
+			PlatformCode: stat.PlatformCode,
+			PlatformName: stat.PlatformName,
+			Requests:     stat.Requests,
+			TotalTokens:  stat.TotalTokens,
+			Cost:         stat.Cost,
+			ActualCost:   stat.ActualCost,
 		})
 	}
 	return out

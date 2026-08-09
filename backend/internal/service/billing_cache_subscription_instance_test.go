@@ -39,7 +39,7 @@ func (s *subscriptionInstanceCacheStub) UpdateSubscriptionUsage(
 	return nil
 }
 
-func TestCheckBillingEligibilityUsesSubscriptionInstanceForStandardGroup(t *testing.T) {
+func TestCheckBillingEligibilityUsesSubscriptionInstance(t *testing.T) {
 	limit := 10.0
 	expiresAt := time.Now().Add(time.Hour)
 	cache := &subscriptionInstanceCacheStub{data: &SubscriptionCacheData{
@@ -57,13 +57,10 @@ func TestCheckBillingEligibilityUsesSubscriptionInstanceForStandardGroup(t *test
 		ExpiresAt:             expiresAt,
 		DailyLimitUSDSnapshot: &limit,
 	}
-	group := &Group{ID: 10, SubscriptionType: SubscriptionTypeStandard, Status: StatusActive}
-
 	err := svc.CheckBillingEligibility(
 		context.Background(),
 		&User{ID: 7},
 		nil,
-		group,
 		subscription,
 		PlatformOpenAI,
 	)
@@ -74,10 +71,10 @@ func TestCheckBillingEligibilityUsesSubscriptionInstanceForStandardGroup(t *test
 
 func TestQueueUpdateSubscriptionUsageUpdatesConcreteSubscriptionInstance(t *testing.T) {
 	cache := &subscriptionInstanceCacheStub{}
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, &config.Config{}, nil)
 	t.Cleanup(svc.Stop)
 
-	svc.QueueUpdateSubscriptionUsage(7, 10, 101, 0.25)
+	svc.QueueUpdateSubscriptionUsage(7, 101, 0.25)
 
 	require.Eventually(t, func() bool {
 		return cache.updateCalls.Load() == 1

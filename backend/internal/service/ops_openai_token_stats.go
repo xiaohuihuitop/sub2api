@@ -23,8 +23,8 @@ func (s *OpsService) GetOpenAITokenStats(ctx context.Context, filter *OpsOpenAIT
 		return nil, infraerrors.BadRequest("OPS_TIME_RANGE_INVALID", "start_time must be <= end_time")
 	}
 
-	if filter.GroupID != nil && *filter.GroupID <= 0 {
-		return nil, infraerrors.BadRequest("OPS_GROUP_ID_INVALID", "group_id must be > 0")
+	if filter.PlatformID != nil && *filter.PlatformID <= 0 {
+		return nil, infraerrors.BadRequest("OPS_PLATFORM_ID_INVALID", "platform_id must be > 0")
 	}
 
 	// top_n cannot be mixed with page/page_size params.

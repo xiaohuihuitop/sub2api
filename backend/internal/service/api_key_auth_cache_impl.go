@@ -339,8 +339,6 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		Version:                    apiKeyAuthSnapshotVersion,
 		APIKeyID:                   apiKey.ID,
 		UserID:                     apiKey.UserID,
-		GroupID:                    apiKey.GroupID,
-		AllowedGroupIDs:            append([]int64(nil), apiKey.AllowedGroupIDs...),
 		AllowedPlatformIDs:         append([]int64(nil), apiKey.AllowedPlatformIDs...),
 		AllowedSubscriptionPlanIDs: append([]int64(nil), apiKey.AllowedSubscriptionPlanIDs...),
 		AllowBalance:               apiKey.AllowBalance,
@@ -360,7 +358,6 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			Role:                       apiKey.User.Role,
 			Balance:                    apiKey.User.Balance,
 			Concurrency:                apiKey.User.Concurrency,
-			AllowedGroups:              apiKey.User.AllowedGroups,
 			Email:                      apiKey.User.Email,
 			Username:                   apiKey.User.Username,
 			BalanceNotifyEnabled:       apiKey.User.BalanceNotifyEnabled,
@@ -372,76 +369,8 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		},
 	}
 
-	// 填充 (user, group) RPM override —— snapshot 构建时查一次 DB，后续请求零 DB 往返。
-	if apiKey.GroupID != nil && *apiKey.GroupID > 0 && s.userGroupRateRepo != nil {
-		override, err := s.userGroupRateRepo.GetRPMOverrideByUserAndGroup(ctx, apiKey.UserID, *apiKey.GroupID)
-		if err == nil && override != nil {
-			snapshot.User.UserGroupRPMOverride = override
-		}
-		// 查询失败或无 override 时留 nil，checkRPM 会回退到 DB 查询
-	}
-	if apiKey.Group != nil {
-		snapshot.Group = apiKeyAuthGroupSnapshotFromGroup(apiKey.Group)
-	}
-	if len(apiKey.AllowedGroups) > 0 {
-		snapshot.AllowedGroups = make([]*APIKeyAuthGroupSnapshot, 0, len(apiKey.AllowedGroups))
-		for i := range apiKey.AllowedGroups {
-			snapshot.AllowedGroups = append(snapshot.AllowedGroups, apiKeyAuthGroupSnapshotFromGroup(&apiKey.AllowedGroups[i]))
-		}
-	}
+	_ = ctx
 	return snapshot
-}
-
-func apiKeyAuthGroupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
-	if group == nil {
-		return nil
-	}
-	return &APIKeyAuthGroupSnapshot{
-		ID:                              group.ID,
-		Name:                            group.Name,
-		Platform:                        group.Platform,
-		IsExclusive:                     group.IsExclusive,
-		Status:                          group.Status,
-		SubscriptionType:                group.SubscriptionType,
-		RateMultiplier:                  group.RateMultiplier,
-		DailyLimitUSD:                   group.DailyLimitUSD,
-		WeeklyLimitUSD:                  group.WeeklyLimitUSD,
-		MonthlyLimitUSD:                 group.MonthlyLimitUSD,
-		AllowImageGeneration:            group.AllowImageGeneration,
-		AllowBatchImageGeneration:       group.AllowBatchImageGeneration,
-		ImageRateIndependent:            group.ImageRateIndependent,
-		ImageRateMultiplier:             group.ImageRateMultiplier,
-		ImagePrice1K:                    group.ImagePrice1K,
-		ImagePrice2K:                    group.ImagePrice2K,
-		ImagePrice4K:                    group.ImagePrice4K,
-		VideoRateIndependent:            group.VideoRateIndependent,
-		VideoRateMultiplier:             group.VideoRateMultiplier,
-		VideoPrice480P:                  group.VideoPrice480P,
-		VideoPrice720P:                  group.VideoPrice720P,
-		VideoPrice1080P:                 group.VideoPrice1080P,
-		WebSearchPricePerCall:           group.WebSearchPricePerCall,
-		ClaudeCodeOnly:                  group.ClaudeCodeOnly,
-		FallbackGroupID:                 group.FallbackGroupID,
-		FallbackGroupIDOnInvalidRequest: group.FallbackGroupIDOnInvalidRequest,
-		ModelRouting:                    group.ModelRouting,
-		ModelRoutingEnabled:             group.ModelRoutingEnabled,
-		MCPXMLInject:                    group.MCPXMLInject,
-		SupportedModelScopes:            group.SupportedModelScopes,
-		SortOrder:                       group.SortOrder,
-		OpenAIEndpointCapabilities:      group.OpenAIEndpointCapabilities,
-		AllowMessagesDispatch:           group.AllowMessagesDispatch,
-		AllowLive:                       group.AllowLive,
-		DefaultMappedModel:              group.DefaultMappedModel,
-		MessagesDispatchModelConfig:     group.MessagesDispatchModelConfig,
-		ModelsListConfig:                group.ModelsListConfig,
-		RPMLimit:                        group.RPMLimit,
-		MaxReasoningEffort:              group.MaxReasoningEffort,
-		ReasoningEffortMappings:         group.ReasoningEffortMappings,
-		PeakRateEnabled:                 group.PeakRateEnabled,
-		PeakStart:                       group.PeakStart,
-		PeakEnd:                         group.PeakEnd,
-		PeakRateMultiplier:              group.PeakRateMultiplier,
-	}
 }
 
 func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapshot) *APIKey {
@@ -451,8 +380,6 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 	apiKey := &APIKey{
 		ID:                         snapshot.APIKeyID,
 		UserID:                     snapshot.UserID,
-		GroupID:                    snapshot.GroupID,
-		AllowedGroupIDs:            append([]int64(nil), snapshot.AllowedGroupIDs...),
 		AllowedPlatformIDs:         append([]int64(nil), snapshot.AllowedPlatformIDs...),
 		AllowedSubscriptionPlanIDs: append([]int64(nil), snapshot.AllowedSubscriptionPlanIDs...),
 		AllowBalance:               snapshot.AllowBalance,
@@ -473,7 +400,6 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Role:                       snapshot.User.Role,
 			Balance:                    snapshot.User.Balance,
 			Concurrency:                snapshot.User.Concurrency,
-			AllowedGroups:              snapshot.User.AllowedGroups,
 			Email:                      snapshot.User.Email,
 			Username:                   snapshot.User.Username,
 			BalanceNotifyEnabled:       snapshot.User.BalanceNotifyEnabled,
@@ -482,73 +408,8 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			BalanceNotifyExtraEmails:   snapshot.User.BalanceNotifyExtraEmails,
 			TotalRecharged:             snapshot.User.TotalRecharged,
 			RPMLimit:                   snapshot.User.RPMLimit,
-			UserGroupRPMOverride:       snapshot.User.UserGroupRPMOverride,
 		},
-	}
-	if snapshot.Group != nil {
-		apiKey.Group = apiKeyAuthSnapshotToGroup(snapshot.Group)
-	}
-	if len(snapshot.AllowedGroups) > 0 {
-		apiKey.AllowedGroups = make([]Group, 0, len(snapshot.AllowedGroups))
-		for _, groupSnapshot := range snapshot.AllowedGroups {
-			if group := apiKeyAuthSnapshotToGroup(groupSnapshot); group != nil {
-				apiKey.AllowedGroups = append(apiKey.AllowedGroups, *group)
-			}
-		}
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey
-}
-
-func apiKeyAuthSnapshotToGroup(snapshot *APIKeyAuthGroupSnapshot) *Group {
-	if snapshot == nil {
-		return nil
-	}
-	return &Group{
-		ID:                              snapshot.ID,
-		Name:                            snapshot.Name,
-		Platform:                        snapshot.Platform,
-		IsExclusive:                     snapshot.IsExclusive,
-		Status:                          snapshot.Status,
-		Hydrated:                        true,
-		SubscriptionType:                snapshot.SubscriptionType,
-		RateMultiplier:                  snapshot.RateMultiplier,
-		DailyLimitUSD:                   snapshot.DailyLimitUSD,
-		WeeklyLimitUSD:                  snapshot.WeeklyLimitUSD,
-		MonthlyLimitUSD:                 snapshot.MonthlyLimitUSD,
-		AllowImageGeneration:            snapshot.AllowImageGeneration,
-		AllowBatchImageGeneration:       snapshot.AllowBatchImageGeneration,
-		ImageRateIndependent:            snapshot.ImageRateIndependent,
-		ImageRateMultiplier:             snapshot.ImageRateMultiplier,
-		ImagePrice1K:                    snapshot.ImagePrice1K,
-		ImagePrice2K:                    snapshot.ImagePrice2K,
-		ImagePrice4K:                    snapshot.ImagePrice4K,
-		VideoRateIndependent:            snapshot.VideoRateIndependent,
-		VideoRateMultiplier:             snapshot.VideoRateMultiplier,
-		VideoPrice480P:                  snapshot.VideoPrice480P,
-		VideoPrice720P:                  snapshot.VideoPrice720P,
-		VideoPrice1080P:                 snapshot.VideoPrice1080P,
-		WebSearchPricePerCall:           snapshot.WebSearchPricePerCall,
-		ClaudeCodeOnly:                  snapshot.ClaudeCodeOnly,
-		FallbackGroupID:                 snapshot.FallbackGroupID,
-		FallbackGroupIDOnInvalidRequest: snapshot.FallbackGroupIDOnInvalidRequest,
-		ModelRouting:                    snapshot.ModelRouting,
-		ModelRoutingEnabled:             snapshot.ModelRoutingEnabled,
-		MCPXMLInject:                    snapshot.MCPXMLInject,
-		SupportedModelScopes:            snapshot.SupportedModelScopes,
-		SortOrder:                       snapshot.SortOrder,
-		OpenAIEndpointCapabilities:      snapshot.OpenAIEndpointCapabilities,
-		AllowMessagesDispatch:           snapshot.AllowMessagesDispatch,
-		AllowLive:                       snapshot.AllowLive,
-		DefaultMappedModel:              snapshot.DefaultMappedModel,
-		MessagesDispatchModelConfig:     snapshot.MessagesDispatchModelConfig,
-		ModelsListConfig:                snapshot.ModelsListConfig,
-		RPMLimit:                        snapshot.RPMLimit,
-		MaxReasoningEffort:              snapshot.MaxReasoningEffort,
-		ReasoningEffortMappings:         snapshot.ReasoningEffortMappings,
-		PeakRateEnabled:                 snapshot.PeakRateEnabled,
-		PeakStart:                       snapshot.PeakStart,
-		PeakEnd:                         snapshot.PeakEnd,
-		PeakRateMultiplier:              snapshot.PeakRateMultiplier,
-	}
 }

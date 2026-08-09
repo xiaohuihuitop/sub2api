@@ -34,7 +34,7 @@ function mountTable(row: Partial<OpsErrorLog>) {
     message: 'boom',
     user_email: '',
     account_name: '',
-    group_name: '',
+    platform_name: '',
     ...row,
   } as OpsErrorLog
 

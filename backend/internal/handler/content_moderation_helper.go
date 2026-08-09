@@ -34,7 +34,7 @@ func clientRequestedModel(c *gin.Context, fallback string) string {
 	return fallback
 }
 
-func clientRequestedUsageFields(c *gin.Context, mapping service.ChannelMappingResult, fallbackModel, upstreamModel string) service.ChannelUsageFields {
+func clientRequestedUsageFields(c *gin.Context, mapping service.ModelMappingResult, fallbackModel, upstreamModel string) service.ModelRoutingUsageFields {
 	return mapping.ToUsageFields(clientRequestedModel(c, fallbackModel), upstreamModel)
 }
 
@@ -49,8 +49,8 @@ func runContentModeration(c *gin.Context, reqLog *zap.Logger, svc *service.Conte
 			zap.Int64("user_id", input.UserID),
 			zap.Int64("api_key_id", input.APIKeyID),
 			zap.String("api_key_name", input.APIKeyName),
-			zap.Int64p("group_id", input.GroupID),
-			zap.String("group_name", input.GroupName),
+			zap.Int64p("platform_id", input.PlatformID),
+			zap.String("platform_name", input.PlatformName),
 			zap.String("endpoint", input.Endpoint),
 			zap.String("provider", input.Provider),
 			zap.String("protocol", input.Protocol),
@@ -93,6 +93,13 @@ func buildContentModerationInput(c *gin.Context, apiKey *service.APIKey, subject
 	if resolvedPlatform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok {
 		input.Provider = resolvedPlatform
 	}
+	if scope, ok := service.PlatformSchedulingScopeFromContext(c.Request.Context()); ok {
+		platformID := scope.PlatformID
+		input.PlatformID = &platformID
+		if input.Provider == "" {
+			input.Provider = scope.AccountPlatform
+		}
+	}
 	if forcedPlatform, ok := middleware2.GetForcePlatformFromContext(c); ok {
 		input.Provider = strings.TrimSpace(forcedPlatform)
 	}
@@ -102,13 +109,6 @@ func buildContentModerationInput(c *gin.Context, apiKey *service.APIKey, subject
 		if apiKey.User != nil {
 			input.UserEmail = apiKey.User.Email
 		}
-		if apiKey.GroupID != nil {
-			groupID := *apiKey.GroupID
-			input.GroupID = &groupID
-		}
-		if apiKey.Group != nil {
-			input.GroupName = apiKey.Group.Name
-		}
 	}
 	if input.Endpoint == "" && c.Request != nil && c.Request.URL != nil {
 		input.Endpoint = c.Request.URL.Path
@@ -117,10 +117,10 @@ func buildContentModerationInput(c *gin.Context, apiKey *service.APIKey, subject
 }
 
 func contentModerationProvider(apiKey *service.APIKey) string {
-	if apiKey == nil || apiKey.Group == nil {
+	if apiKey == nil {
 		return ""
 	}
-	return strings.TrimSpace(apiKey.Group.Platform)
+	return ""
 }
 
 func contentModerationRequestID(ctx context.Context) string {

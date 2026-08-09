@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -27,12 +26,9 @@ func normalizePlanCurrency(raw string) (string, error) {
 }
 
 // validatePlanRequired checks that all required fields for a plan are provided.
-func validatePlanRequired(name string, groupID int64, price float64, validityDays int, validityUnit string, originalPrice *float64) error {
+func validatePlanRequired(name string, price float64, validityDays int, validityUnit string, originalPrice *float64) error {
 	if strings.TrimSpace(name) == "" {
 		return infraerrors.BadRequest("PLAN_NAME_REQUIRED", "plan name is required")
-	}
-	if groupID < 0 {
-		return infraerrors.BadRequest("PLAN_GROUP_INVALID", "group id must be >= 0")
 	}
 	if price <= 0 {
 		return infraerrors.BadRequest("PLAN_PRICE_INVALID", "price must be > 0")
@@ -53,9 +49,6 @@ func validatePlanRequired(name string, groupID int64, price float64, validityDay
 func validatePlanPatch(req UpdatePlanRequest) error {
 	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
 		return infraerrors.BadRequest("PLAN_NAME_REQUIRED", "plan name is required")
-	}
-	if req.GroupID != nil && *req.GroupID < 0 {
-		return infraerrors.BadRequest("PLAN_GROUP_INVALID", "group id must be >= 0")
 	}
 	if req.Price != nil && *req.Price <= 0 {
 		return infraerrors.BadRequest("PLAN_PRICE_INVALID", "price must be > 0")
@@ -114,41 +107,6 @@ func planRateMultiplier(value *float64) float64 {
 
 // --- Plan CRUD ---
 
-// PlanGroupInfo holds the group details needed for subscription plan display.
-type PlanGroupInfo struct {
-	Platform    string   `json:"platform"`
-	Name        string   `json:"name"`
-	ModelScopes []string `json:"supported_model_scopes"`
-}
-
-// GetGroupInfoMap returns a map of group_id → PlanGroupInfo for the given plans.
-func (s *PaymentConfigService) GetGroupInfoMap(ctx context.Context, plans []*dbent.SubscriptionPlan) map[int64]PlanGroupInfo {
-	ids := make([]int64, 0, len(plans))
-	seen := make(map[int64]bool)
-	for _, p := range plans {
-		if !seen[p.GroupID] {
-			seen[p.GroupID] = true
-			ids = append(ids, p.GroupID)
-		}
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	groups, err := s.entClient.Group.Query().Where(group.IDIn(ids...)).All(ctx)
-	if err != nil {
-		return nil
-	}
-	m := make(map[int64]PlanGroupInfo, len(groups))
-	for _, g := range groups {
-		m[int64(g.ID)] = PlanGroupInfo{
-			Platform:    g.Platform,
-			Name:        g.Name,
-			ModelScopes: g.SupportedModelScopes,
-		}
-	}
-	return m
-}
-
 func (s *PaymentConfigService) ListPlans(ctx context.Context) ([]*dbent.SubscriptionPlan, error) {
 	return s.entClient.SubscriptionPlan.Query().Order(subscriptionplan.BySortOrder()).All(ctx)
 }
@@ -158,7 +116,7 @@ func (s *PaymentConfigService) ListPlansForSale(ctx context.Context) ([]*dbent.S
 }
 
 func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanRequest) (*dbent.SubscriptionPlan, error) {
-	if err := validatePlanRequired(req.Name, req.GroupID, req.Price, req.ValidityDays, req.ValidityUnit, req.OriginalPrice); err != nil {
+	if err := validatePlanRequired(req.Name, req.Price, req.ValidityDays, req.ValidityUnit, req.OriginalPrice); err != nil {
 		return nil, err
 	}
 	if err := validatePlanBillingTerms(req.DailyLimitUSD, req.WeeklyLimitUSD, req.MonthlyLimitUSD, req.RateMultiplier); err != nil {
@@ -174,9 +132,6 @@ func (s *PaymentConfigService) CreatePlan(ctx context.Context, req CreatePlanReq
 		SetFeatures(req.Features).SetProductName(req.ProductName).
 		SetForSale(req.ForSale).SetSortOrder(req.SortOrder).
 		SetRateMultiplier(planRateMultiplier(req.RateMultiplier))
-	if req.GroupID > 0 {
-		b.SetGroupID(req.GroupID)
-	}
 	if req.OriginalPrice != nil {
 		b.SetOriginalPrice(*req.OriginalPrice)
 	}
@@ -200,13 +155,6 @@ func (s *PaymentConfigService) UpdatePlan(ctx context.Context, id int64, req Upd
 		return nil, err
 	}
 	u := s.entClient.SubscriptionPlan.UpdateOneID(id)
-	if req.GroupID != nil {
-		if *req.GroupID > 0 {
-			u.SetGroupID(*req.GroupID)
-		} else {
-			u.ClearGroupID()
-		}
-	}
 	if req.Name != nil {
 		u.SetName(*req.Name)
 	}

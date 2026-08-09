@@ -1981,7 +1981,7 @@ func TestBindOIDCOAuthLoginAppliesFirstBindGrantOnce(t *testing.T) {
 		settingValues: map[string]string{
 			service.SettingKeyAuthSourceDefaultOIDCBalance:          "12.5",
 			service.SettingKeyAuthSourceDefaultOIDCConcurrency:      "3",
-			service.SettingKeyAuthSourceDefaultOIDCSubscriptions:    `[{"group_id":101,"validity_days":30}]`,
+			service.SettingKeyAuthSourceDefaultOIDCSubscriptions:    `[{"plan_id":101}]`,
 			service.SettingKeyAuthSourceDefaultOIDCGrantOnFirstBind: "true",
 		},
 		defaultSubAssigner: defaultSubAssigner,
@@ -2040,8 +2040,7 @@ func TestBindOIDCOAuthLoginAppliesFirstBindGrantOnce(t *testing.T) {
 	require.Zero(t, storedUser.TotalRecharged)
 	require.Len(t, defaultSubAssigner.calls, 1)
 	require.Equal(t, int64(existingUser.ID), defaultSubAssigner.calls[0].UserID)
-	require.Equal(t, int64(101), defaultSubAssigner.calls[0].GroupID)
-	require.Equal(t, 30, defaultSubAssigner.calls[0].ValidityDays)
+	require.Equal(t, int64(101), defaultSubAssigner.calls[0].PlanID)
 	require.Equal(t, 1, countProviderGrantRecords(t, client, existingUser.ID, "oidc", "first_bind"))
 
 	secondSession, err := client.PendingAuthSession.Create().
@@ -2781,17 +2780,22 @@ func (r *oauthPendingFlowRedeemCodeRepo) GetByCode(ctx context.Context, code str
 		notes = *entity.Notes
 	}
 	return &service.RedeemCode{
-		ID:           entity.ID,
-		Code:         entity.Code,
-		Type:         entity.Type,
-		Value:        entity.Value,
-		Status:       entity.Status,
-		UsedBy:       entity.UsedBy,
-		UsedAt:       entity.UsedAt,
-		Notes:        notes,
-		CreatedAt:    entity.CreatedAt,
-		GroupID:      entity.GroupID,
-		ValidityDays: entity.ValidityDays,
+		ID:                      entity.ID,
+		Code:                    entity.Code,
+		Type:                    entity.Type,
+		Value:                   entity.Value,
+		Status:                  entity.Status,
+		UsedBy:                  entity.UsedBy,
+		UsedAt:                  entity.UsedAt,
+		Notes:                   notes,
+		CreatedAt:               entity.CreatedAt,
+		SubscriptionPlanID:      entity.SubscriptionPlanID,
+		PlanNameSnapshot:        entity.PlanNameSnapshot,
+		DailyLimitUSDSnapshot:   entity.DailyLimitUsdSnapshot,
+		WeeklyLimitUSDSnapshot:  entity.WeeklyLimitUsdSnapshot,
+		MonthlyLimitUSDSnapshot: entity.MonthlyLimitUsdSnapshot,
+		RateMultiplierSnapshot:  entity.RateMultiplierSnapshot,
+		ValidityDays:            entity.ValidityDays,
 	}, nil
 }
 
@@ -2816,10 +2820,10 @@ func (r *oauthPendingFlowRedeemCodeRepo) Update(ctx context.Context, code *servi
 	} else {
 		update = update.ClearUsedAt()
 	}
-	if code.GroupID != nil {
-		update = update.SetGroupID(*code.GroupID)
+	if code.SubscriptionPlanID != nil {
+		update = update.SetSubscriptionPlanID(*code.SubscriptionPlanID)
 	} else {
-		update = update.ClearGroupID()
+		update = update.ClearSubscriptionPlanID()
 	}
 	_, err := update.Save(ctx)
 	return err
@@ -3218,18 +3222,6 @@ func (r *oauthPendingFlowUserRepo) ExistsByEmailAlias(ctx context.Context, email
 	return false, nil
 }
 
-func (r *oauthPendingFlowUserRepo) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
-	panic("unexpected RemoveGroupFromAllowedGroups call")
-}
-
-func (r *oauthPendingFlowUserRepo) AddGroupToAllowedGroups(context.Context, int64, int64) error {
-	panic("unexpected AddGroupToAllowedGroups call")
-}
-
-func (r *oauthPendingFlowUserRepo) RemoveGroupFromUserAllowedGroups(context.Context, int64, int64) error {
-	panic("unexpected RemoveGroupFromUserAllowedGroups call")
-}
-
 func (r *oauthPendingFlowUserRepo) ListUserAuthIdentities(ctx context.Context, userID int64) ([]service.UserAuthIdentityRecord, error) {
 	identities, err := r.client.AuthIdentity.Query().
 		Where(authidentity.UserIDEQ(userID)).
@@ -3317,17 +3309,17 @@ func oauthPendingFlowServiceUser(entity *dbent.User) *service.User {
 }
 
 type oauthPendingFlowDefaultSubAssignerStub struct {
-	calls []service.AssignSubscriptionInput
+	calls []service.AssignSubscriptionFromPlanInput
 }
 
-func (s *oauthPendingFlowDefaultSubAssignerStub) AssignOrExtendSubscription(
+func (s *oauthPendingFlowDefaultSubAssignerStub) AssignSubscriptionFromPlan(
 	_ context.Context,
-	input *service.AssignSubscriptionInput,
-) (*service.UserSubscription, bool, error) {
+	input *service.AssignSubscriptionFromPlanInput,
+) (*service.UserSubscription, error) {
 	if input != nil {
 		s.calls = append(s.calls, *input)
 	}
-	return nil, false, nil
+	return nil, nil
 }
 
 type oauthPendingFlowTotpCacheStub struct {

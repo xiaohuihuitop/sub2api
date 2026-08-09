@@ -135,7 +135,6 @@ type AdminPaymentOrderResult struct {
 	QRCodeImg           *string    `json:"qr_code_img,omitempty"`
 	OrderType           string     `json:"order_type"`
 	PlanID              *int64     `json:"plan_id,omitempty"`
-	SubscriptionGroupID *int64     `json:"subscription_group_id,omitempty"`
 	SubscriptionDays    *int       `json:"subscription_days,omitempty"`
 	ProviderInstanceID  *string    `json:"provider_instance_id,omitempty"`
 	ProviderKey         *string    `json:"provider_key,omitempty"`
@@ -192,7 +191,6 @@ func sanitizeAdminPaymentOrderForResponse(order *dbent.PaymentOrder) *AdminPayme
 		QRCodeImg:           order.QrCodeImg,
 		OrderType:           order.OrderType,
 		PlanID:              order.PlanID,
-		SubscriptionGroupID: order.SubscriptionGroupID,
 		SubscriptionDays:    order.SubscriptionDays,
 		ProviderInstanceID:  order.ProviderInstanceID,
 		ProviderKey:         order.ProviderKey,
@@ -288,7 +286,6 @@ func (h *PaymentHandler) ListPlans(c *gin.Context) {
 
 type AdminSubscriptionPlanResult struct {
 	ID              int64     `json:"id"`
-	GroupID         *int64    `json:"group_id,omitempty"`
 	RateMultiplier  float64   `json:"rate_multiplier"`
 	DailyLimitUSD   *float64  `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD  *float64  `json:"weekly_limit_usd,omitempty"`
@@ -316,7 +313,6 @@ func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan) []AdminS
 		}
 		result = append(result, AdminSubscriptionPlanResult{
 			ID:              int64(p.ID),
-			GroupID:         legacyPlanGroupID(p.GroupID),
 			RateMultiplier:  p.RateMultiplier,
 			DailyLimitUSD:   p.DailyLimitUsd,
 			WeeklyLimitUSD:  p.WeeklyLimitUsd,
@@ -337,14 +333,6 @@ func adminSubscriptionPlansForResponse(plans []*dbent.SubscriptionPlan) []AdminS
 		})
 	}
 	return result
-}
-
-func legacyPlanGroupID(groupID int64) *int64 {
-	if groupID <= 0 {
-		return nil
-	}
-	value := groupID
-	return &value
 }
 
 // CreatePlan creates a new subscription plan.

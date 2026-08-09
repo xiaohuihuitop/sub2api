@@ -11,7 +11,6 @@ import (
 
 type dailyResetTrackingUserSubRepo struct {
 	userSubRepoNoop
-
 	resetDailyCalled bool
 }
 
@@ -20,189 +19,74 @@ func (r *dailyResetTrackingUserSubRepo) ResetDailyUsage(context.Context, int64, 
 	return nil
 }
 
-func TestAssignOrExtendSubscription_ExpiredDailyCardStartsNewOneTimeQuota(t *testing.T) {
-	groupRepo := &subscriptionGroupRepoStub{
-		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeSubscription},
-	}
-	subRepo := newSubscriptionUserSubRepoStub()
-	oldStart := time.Now().AddDate(0, 0, -3)
-	oldWindowStart := startOfDay(oldStart)
-	subRepo.seed(&UserSubscription{
-		ID:                 100,
-		UserID:             200,
-		GroupID:            1,
-		StartsAt:           oldStart,
-		ExpiresAt:          oldStart.AddDate(0, 0, 1),
-		Status:             SubscriptionStatusExpired,
-		DailyWindowStart:   &oldWindowStart,
-		WeeklyWindowStart:  &oldWindowStart,
-		MonthlyWindowStart: &oldWindowStart,
-		DailyUsageUSD:      10,
-		WeeklyUsageUSD:     20,
-		MonthlyUsageUSD:    30,
-		Notes:              "old",
-	})
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
-
-	renewed, reused, err := svc.AssignOrExtendSubscription(context.Background(), &AssignSubscriptionInput{
-		UserID:       200,
-		GroupID:      1,
-		ValidityDays: 1,
-		Notes:        "new",
-	})
-
-	require.NoError(t, err)
-	require.True(t, reused)
-	require.True(t, renewed.HasOneTimeDailyQuota(), "过期后重新购买 1 日卡仍应被识别为一次性日额度")
-	require.Equal(t, SubscriptionStatusActive, renewed.Status)
-	require.True(t, renewed.StartsAt.After(oldStart), "重新购买过期订阅时应重置当前周期 StartsAt")
-	require.False(t, renewed.ExpiresAt.After(renewed.StartsAt.AddDate(0, 0, 1)))
-	require.NotNil(t, renewed.DailyWindowStart)
-	require.Equal(t, renewed.StartsAt, *renewed.DailyWindowStart)
-	require.Equal(t, 0.0, renewed.DailyUsageUSD)
-	require.Equal(t, 0.0, renewed.WeeklyUsageUSD)
-	require.Equal(t, 0.0, renewed.MonthlyUsageUSD)
-	require.Equal(t, "old\nnew", renewed.Notes)
-}
-
-func TestAssignOrExtendSubscription_ExpiredSubscriptionAppendsMatchingNotes(t *testing.T) {
-	groupRepo := &subscriptionGroupRepoStub{
-		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeSubscription},
-	}
-	subRepo := newSubscriptionUserSubRepoStub()
-	oldStart := time.Now().AddDate(0, 0, -3)
-	subRepo.seed(&UserSubscription{
-		ID:        101,
-		UserID:    201,
-		GroupID:   1,
-		StartsAt:  oldStart,
-		ExpiresAt: oldStart.AddDate(0, 0, 1),
-		Status:    SubscriptionStatusExpired,
-		Notes:     "same",
-	})
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
-
-	renewed, reused, err := svc.AssignOrExtendSubscription(context.Background(), &AssignSubscriptionInput{
-		UserID:       201,
-		GroupID:      1,
-		ValidityDays: 1,
-		Notes:        "same",
-	})
-
-	require.NoError(t, err)
-	require.True(t, reused)
-	require.Equal(t, "same\nsame", renewed.Notes)
-}
-
 func TestUserSubscriptionNeedsDailyReset_DailyCardKeepsOneTimeQuota(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
-	sub := &UserSubscription{
-		StartsAt:         start,
-		ExpiresAt:        start.Add(24 * time.Hour),
-		DailyWindowStart: &dailyWindowStart,
-		DailyUsageUSD:    10,
-	}
+	windowStart := startOfDay(start)
+	sub := &UserSubscription{StartsAt: start, ExpiresAt: start.Add(24 * time.Hour), DailyWindowStart: &windowStart}
 
 	require.True(t, sub.HasOneTimeDailyQuota())
-	require.False(t, sub.NeedsDailyResetAt(dailyWindowStart.Add(25*time.Hour)), "日卡应作为一次性配额，跨 0 点后不再刷新日额度")
+	require.False(t, sub.NeedsDailyResetAt(windowStart.Add(25*time.Hour)))
 }
 
 func TestUserSubscriptionNeedsDailyReset_MultiDaySubscriptionStillRefreshes(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
-	sub := &UserSubscription{
-		StartsAt:         start,
-		ExpiresAt:        start.AddDate(0, 0, 2),
-		DailyWindowStart: &dailyWindowStart,
-	}
+	windowStart := startOfDay(start)
+	sub := &UserSubscription{StartsAt: start, ExpiresAt: start.AddDate(0, 0, 2), DailyWindowStart: &windowStart}
 
 	require.False(t, sub.HasOneTimeDailyQuota())
-	require.True(t, sub.NeedsDailyResetAt(dailyWindowStart.Add(24*time.Hour)), "多日订阅仍应按 24 小时日窗口刷新")
+	require.True(t, sub.NeedsDailyResetAt(windowStart.Add(24*time.Hour)))
 }
 
 func TestUserSubscriptionDailyResetTime_DailyCardReturnsExpiry(t *testing.T) {
 	start := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
-	dailyWindowStart := time.Date(2026, 5, 18, 0, 0, 0, 0, time.UTC)
+	windowStart := startOfDay(start)
 	expiresAt := start.Add(24 * time.Hour)
-	sub := &UserSubscription{
-		StartsAt:         start,
-		ExpiresAt:        expiresAt,
-		DailyWindowStart: &dailyWindowStart,
-	}
+	sub := &UserSubscription{StartsAt: start, ExpiresAt: expiresAt, DailyWindowStart: &windowStart}
 
 	resetAt := sub.DailyResetTime()
 	require.NotNil(t, resetAt)
-	require.Equal(t, expiresAt, *resetAt, "日卡展示的日额度结束时间应为订阅过期时间")
+	require.Equal(t, expiresAt, *resetAt)
 }
 
 func TestCheckAndResetWindows_DailyCardDoesNotResetDailyUsage(t *testing.T) {
 	now := time.Now()
 	startsAt := now.Add(-23 * time.Hour)
-	dailyWindowStart := now.Add(-25 * time.Hour)
+	windowStart := now.Add(-25 * time.Hour)
 	repo := &dailyResetTrackingUserSubRepo{}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
-	sub := &UserSubscription{
-		ID:               1,
-		UserID:           10,
-		GroupID:          20,
-		StartsAt:         startsAt,
-		ExpiresAt:        startsAt.Add(24 * time.Hour),
-		DailyUsageUSD:    10,
-		DailyWindowStart: &dailyWindowStart,
-	}
+	svc := NewSubscriptionService(repo, nil, nil, nil)
+	sub := &UserSubscription{ID: 1, UserID: 10, StartsAt: startsAt, ExpiresAt: startsAt.Add(24 * time.Hour), DailyUsageUSD: 10, DailyWindowStart: &windowStart}
 
-	err := svc.CheckAndResetWindows(context.Background(), sub)
-
-	require.NoError(t, err)
-	require.False(t, repo.resetDailyCalled, "日卡作为一次性配额，过了 24 小时日窗口也不应重置 daily usage")
+	require.NoError(t, svc.CheckAndResetWindows(context.Background(), sub))
+	require.False(t, repo.resetDailyCalled)
 	require.Equal(t, 10.0, sub.DailyUsageUSD)
 }
 
-func TestCheckAndResetWindows_MultiDaySubscriptionStillResetsDailyUsage(t *testing.T) {
+func TestCheckAndResetWindows_MultiDaySubscriptionResetsDailyUsage(t *testing.T) {
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 	startsAt := now.Add(-48 * time.Hour)
-	dailyWindowStart := now.Add(-25 * time.Hour)
+	windowStart := now.Add(-25 * time.Hour)
 	repo := &dailyResetTrackingUserSubRepo{}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
-	sub := &UserSubscription{
-		ID:               1,
-		UserID:           10,
-		GroupID:          20,
-		StartsAt:         startsAt,
-		ExpiresAt:        startsAt.AddDate(0, 0, 4),
-		DailyUsageUSD:    10,
-		DailyWindowStart: &dailyWindowStart,
-	}
+	sub := &UserSubscription{ID: 1, UserID: 10, StartsAt: startsAt, ExpiresAt: startsAt.AddDate(0, 0, 4), DailyUsageUSD: 10, DailyWindowStart: &windowStart}
 
-	err := svc.CheckAndResetWindows(context.Background(), sub)
-
-	require.NoError(t, err)
-	require.True(t, repo.resetDailyCalled, "多日订阅仍应重置过期 daily window")
-	require.Equal(t, 0.0, sub.DailyUsageUSD)
+	require.NoError(t, svc.CheckAndResetWindows(context.Background(), sub))
+	require.True(t, repo.resetDailyCalled)
+	require.Zero(t, sub.DailyUsageUSD)
 }
 
-func TestValidateAndCheckLimits_DailyCardDoesNotAllowSecondQuotaAfterMidnight(t *testing.T) {
+func TestValidateAndCheckLimits_DailyCardDoesNotAllowSecondQuota(t *testing.T) {
 	start := time.Now().Add(-23 * time.Hour)
-	dailyWindowStart := time.Now().Add(-25 * time.Hour)
+	windowStart := time.Now().Add(-25 * time.Hour)
 	dailyLimit := 10.0
 	sub := &UserSubscription{
-		Status:           SubscriptionStatusActive,
-		StartsAt:         start,
-		ExpiresAt:        start.Add(24 * time.Hour),
-		DailyWindowStart: &dailyWindowStart,
-		DailyUsageUSD:    dailyLimit + 0.01,
+		Status: SubscriptionStatusActive, StartsAt: start, ExpiresAt: start.Add(24 * time.Hour),
+		DailyWindowStart: &windowStart, DailyUsageUSD: dailyLimit + 0.01, DailyLimitUSDSnapshot: &dailyLimit,
 	}
-	group := &Group{
-		SubscriptionType: SubscriptionTypeSubscription,
-		DailyLimitUSD:    &dailyLimit,
-	}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 
-	needsMaintenance, err := svc.ValidateAndCheckLimits(sub, group)
-
-	require.False(t, needsMaintenance, "日卡跨过日窗口后不应触发 daily reset 维护")
+	needsMaintenance, err := svc.ValidateAndCheckLimits(sub)
+	require.False(t, needsMaintenance)
 	require.True(t, errors.Is(err, ErrDailyLimitExceeded))
-	require.Equal(t, dailyLimit+0.01, sub.DailyUsageUSD, "热路径不应清零日卡已用额度")
+	require.Equal(t, dailyLimit+0.01, sub.DailyUsageUSD)
 }

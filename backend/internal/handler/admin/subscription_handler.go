@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"errors"
 	"strconv"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
@@ -41,43 +40,16 @@ func NewSubscriptionHandler(subscriptionService *service.SubscriptionService) *S
 
 // AssignSubscriptionRequest represents assign subscription request
 type AssignSubscriptionRequest struct {
-	UserID       int64  `json:"user_id" binding:"required"`
-	GroupID      int64  `json:"group_id"`
-	PlanID       int64  `json:"plan_id"`
-	ValidityDays int    `json:"validity_days" binding:"omitempty,max=36500"` // max 100 years
-	Notes        string `json:"notes"`
+	UserID int64  `json:"user_id" binding:"required"`
+	PlanID int64  `json:"plan_id" binding:"required,gt=0"`
+	Notes  string `json:"notes"`
 }
 
 // BulkAssignSubscriptionRequest represents bulk assign subscription request
 type BulkAssignSubscriptionRequest struct {
-	UserIDs      []int64 `json:"user_ids" binding:"required,min=1"`
-	GroupID      int64   `json:"group_id"`
-	PlanID       int64   `json:"plan_id"`
-	ValidityDays int     `json:"validity_days" binding:"omitempty,max=36500"` // max 100 years
-	Notes        string  `json:"notes"`
-}
-
-func (r AssignSubscriptionRequest) UsesPlan() bool {
-	return r.PlanID > 0
-}
-
-func (r AssignSubscriptionRequest) ValidateAssignmentSource() error {
-	return validateSubscriptionAssignmentSource(r.PlanID, r.GroupID)
-}
-
-func (r BulkAssignSubscriptionRequest) UsesPlan() bool {
-	return r.PlanID > 0
-}
-
-func (r BulkAssignSubscriptionRequest) ValidateAssignmentSource() error {
-	return validateSubscriptionAssignmentSource(r.PlanID, r.GroupID)
-}
-
-func validateSubscriptionAssignmentSource(planID, groupID int64) error {
-	if planID <= 0 && groupID <= 0 {
-		return errors.New("either plan_id or group_id is required")
-	}
-	return nil
+	UserIDs []int64 `json:"user_ids" binding:"required,min=1"`
+	PlanID  int64   `json:"plan_id" binding:"required,gt=0"`
+	Notes   string  `json:"notes"`
 }
 
 // AdjustSubscriptionRequest represents adjust subscription request (extend or shorten)
@@ -91,25 +63,19 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
 	// Parse optional filters
-	var userID, groupID *int64
+	var userID *int64
 	if userIDStr := c.Query("user_id"); userIDStr != "" {
 		if id, err := strconv.ParseInt(userIDStr, 10, 64); err == nil {
 			userID = &id
 		}
 	}
-	if groupIDStr := c.Query("group_id"); groupIDStr != "" {
-		if id, err := strconv.ParseInt(groupIDStr, 10, 64); err == nil {
-			groupID = &id
-		}
-	}
 	status := c.Query("status")
-	platform := c.Query("platform")
 
 	// Parse sorting parameters
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 
-	subscriptions, pagination, err := h.subscriptionService.List(c.Request.Context(), page, pageSize, userID, groupID, status, platform, sortBy, sortOrder)
+	subscriptions, pagination, err := h.subscriptionService.List(c.Request.Context(), page, pageSize, userID, status, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -166,32 +132,16 @@ func (h *SubscriptionHandler) Assign(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := req.ValidateAssignmentSource(); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
 
 	// Get admin user ID from context
 	adminID := getAdminIDFromContext(c)
 
-	var subscription *service.UserSubscription
-	var err error
-	if req.UsesPlan() {
-		subscription, err = h.subscriptionService.AssignSubscriptionFromPlan(c.Request.Context(), &service.AssignSubscriptionFromPlanInput{
-			UserID:     req.UserID,
-			PlanID:     req.PlanID,
-			AssignedBy: adminID,
-			Notes:      req.Notes,
-		})
-	} else {
-		subscription, err = h.subscriptionService.AssignSubscription(c.Request.Context(), &service.AssignSubscriptionInput{
-			UserID:       req.UserID,
-			GroupID:      req.GroupID,
-			ValidityDays: req.ValidityDays,
-			AssignedBy:   adminID,
-			Notes:        req.Notes,
-		})
-	}
+	subscription, err := h.subscriptionService.AssignSubscriptionFromPlan(c.Request.Context(), &service.AssignSubscriptionFromPlanInput{
+		UserID:     req.UserID,
+		PlanID:     req.PlanID,
+		AssignedBy: adminID,
+		Notes:      req.Notes,
+	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -208,32 +158,16 @@ func (h *SubscriptionHandler) BulkAssign(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := req.ValidateAssignmentSource(); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
 
 	// Get admin user ID from context
 	adminID := getAdminIDFromContext(c)
 
-	var result *service.BulkAssignResult
-	var err error
-	if req.UsesPlan() {
-		result, err = h.subscriptionService.BulkAssignSubscriptionFromPlan(c.Request.Context(), &service.BulkAssignSubscriptionFromPlanInput{
-			UserIDs:    req.UserIDs,
-			PlanID:     req.PlanID,
-			AssignedBy: adminID,
-			Notes:      req.Notes,
-		})
-	} else {
-		result, err = h.subscriptionService.BulkAssignSubscription(c.Request.Context(), &service.BulkAssignSubscriptionInput{
-			UserIDs:      req.UserIDs,
-			GroupID:      req.GroupID,
-			ValidityDays: req.ValidityDays,
-			AssignedBy:   adminID,
-			Notes:        req.Notes,
-		})
-	}
+	result, err := h.subscriptionService.BulkAssignSubscriptionFromPlan(c.Request.Context(), &service.BulkAssignSubscriptionFromPlanInput{
+		UserIDs:    req.UserIDs,
+		PlanID:     req.PlanID,
+		AssignedBy: adminID,
+		Notes:      req.Notes,
+	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -340,30 +274,6 @@ func (h *SubscriptionHandler) Restore(c *gin.Context) {
 	}
 
 	response.Success(c, dto.UserSubscriptionFromServiceAdmin(subscription))
-}
-
-// ListByGroup handles listing subscriptions for a specific group
-// GET /api/v1/admin/groups/:id/subscriptions
-func (h *SubscriptionHandler) ListByGroup(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	page, pageSize := response.ParsePagination(c)
-
-	subscriptions, pagination, err := h.subscriptionService.ListGroupSubscriptions(c.Request.Context(), groupID, page, pageSize)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	out := make([]dto.AdminUserSubscription, 0, len(subscriptions))
-	for i := range subscriptions {
-		out = append(out, *dto.UserSubscriptionFromServiceAdmin(&subscriptions[i]))
-	}
-	response.PaginatedWithResult(c, out, toResponsePagination(pagination))
 }
 
 // ListByUser handles listing subscriptions for a specific user

@@ -12,7 +12,6 @@ import (
 type stubAdminService struct {
 	users                               []service.User
 	apiKeys                             []service.APIKey
-	groups                              []service.Group
 	accounts                            []service.Account
 	accountSchedulerScoreFilterAccounts []service.Account
 	openAISchedulerScorePoolAccounts    []service.Account
@@ -39,16 +38,16 @@ type stubAdminService struct {
 	updateAccountExtraCalls             int
 	checkMixedErr                       error
 	lastMixedCheck                      struct {
-		accountID int64
-		platform  string
-		groupIDs  []int64
+		accountID   int64
+		platform    string
+		platformIDs []int64
 	}
 	lastListAccounts struct {
 		platform    string
 		accountType string
 		status      string
 		search      string
-		groupID     int64
+		platformID  int64
 		privacyMode string
 		sortBy      string
 		sortOrder   string
@@ -100,14 +99,6 @@ func newStubAdminService() *stubAdminService {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	group := service.Group{
-		ID:        2,
-		Name:      "group",
-		Platform:  service.PlatformAnthropic,
-		Status:    service.StatusActive,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
 	account := service.Account{
 		ID:        3,
 		Name:      "account",
@@ -138,7 +129,6 @@ func newStubAdminService() *stubAdminService {
 	return &stubAdminService{
 		users:       []service.User{user},
 		apiKeys:     []service.APIKey{apiKey},
-		groups:      []service.Group{group},
 		accounts:    []service.Account{account},
 		proxies:     []service.Proxy{proxy},
 		proxyCounts: []service.ProxyWithAccountCount{{Proxy: proxy, AccountCount: 1}},
@@ -265,145 +255,12 @@ func (s *stubAdminService) BindUserAuthIdentity(ctx context.Context, userID int6
 	return result, nil
 }
 
-func (s *stubAdminService) ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]service.Group, int64, error) {
-	return s.groups, int64(len(s.groups)), nil
-}
-
-func (s *stubAdminService) GetAllGroups(ctx context.Context) ([]service.Group, error) {
-	return s.groups, nil
-}
-
-func (s *stubAdminService) GetAllGroupsByPlatform(ctx context.Context, platform string) ([]service.Group, error) {
-	return s.groups, nil
-}
-
-func (s *stubAdminService) GetAllGroupsIncludingInactive(ctx context.Context) ([]service.Group, error) {
-	return s.groups, nil
-}
-
-func (s *stubAdminService) GetGroup(ctx context.Context, id int64) (*service.Group, error) {
-	group := service.Group{ID: id, Name: "group", Status: service.StatusActive}
-	return &group, nil
-}
-
-func (s *stubAdminService) GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
-	if platform == service.PlatformOpenAI {
-		return []string{"gpt-5.5", "gpt-5.4"}, nil
-	}
-	return []string{"claude-sonnet-4-6"}, nil
-}
-
-func (s *stubAdminService) ListCompositeRoutes(ctx context.Context, groupID int64) ([]service.CompositeModelRoute, error) {
-	return []service.CompositeModelRoute{
-		{
-			ID:             1,
-			GroupID:        groupID,
-			PublicModel:    "openrouter/gpt-5",
-			MatchType:      service.CompositeRouteMatchExact,
-			TargetPlatform: service.PlatformOpenAI,
-			UpstreamModel:  "gpt-5",
-			Endpoint:       service.CompositeRouteEndpointAny,
-			Priority:       100,
-			Enabled:        true,
-		},
-	}, nil
-}
-
-func (s *stubAdminService) CreateCompositeRoute(ctx context.Context, groupID int64, input service.CompositeRouteInput) (*service.CompositeModelRoute, error) {
-	return &service.CompositeModelRoute{
-		ID:             1,
-		GroupID:        groupID,
-		PublicModel:    input.PublicModel,
-		MatchType:      input.MatchType,
-		TargetPlatform: input.TargetPlatform,
-		UpstreamModel:  input.UpstreamModel,
-		Endpoint:       input.Endpoint,
-		Priority:       input.Priority,
-		Enabled:        input.Enabled,
-		Notes:          input.Notes,
-	}, nil
-}
-
-func (s *stubAdminService) UpdateCompositeRoute(ctx context.Context, groupID, routeID int64, input service.CompositeRouteInput) (*service.CompositeModelRoute, error) {
-	return &service.CompositeModelRoute{
-		ID:             routeID,
-		GroupID:        groupID,
-		PublicModel:    input.PublicModel,
-		MatchType:      input.MatchType,
-		TargetPlatform: input.TargetPlatform,
-		UpstreamModel:  input.UpstreamModel,
-		Endpoint:       input.Endpoint,
-		Priority:       input.Priority,
-		Enabled:        input.Enabled,
-		Notes:          input.Notes,
-	}, nil
-}
-
-func (s *stubAdminService) DeleteCompositeRoute(ctx context.Context, groupID, routeID int64) error {
-	return nil
-}
-
-func (s *stubAdminService) PreviewCompositeRoute(ctx context.Context, groupID int64, input service.CompositeRoutePreviewRequest) (*service.CompositeRouteDecision, error) {
-	decision, err := service.NewCompositeRouteResolver(nil).Resolve(ctx, groupID, input.Model, input.Endpoint)
-	if err != nil {
-		return nil, err
-	}
-	return &decision, nil
-}
-
-func (s *stubAdminService) CreateGroup(ctx context.Context, input *service.CreateGroupInput) (*service.Group, error) {
-	group := service.Group{ID: 200, Name: input.Name, Status: service.StatusActive}
-	return &group, nil
-}
-
-func (s *stubAdminService) DuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*service.Group, error) {
-	group := service.Group{ID: 201, Name: "group (Copy)", Status: "inactive"}
-	return &group, nil
-}
-
-func (s *stubAdminService) RecoverDuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*service.Group, error) {
-	return nil, nil
-}
-
-func (s *stubAdminService) UpdateGroup(ctx context.Context, id int64, input *service.UpdateGroupInput) (*service.Group, error) {
-	group := service.Group{ID: id, Name: input.Name, Status: service.StatusActive}
-	return &group, nil
-}
-
-func (s *stubAdminService) DeleteGroup(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (s *stubAdminService) GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]service.APIKey, int64, error) {
-	return s.apiKeys, int64(len(s.apiKeys)), nil
-}
-
-func (s *stubAdminService) GetGroupRateMultipliers(_ context.Context, _ int64) ([]service.UserGroupRateEntry, error) {
-	return nil, nil
-}
-
-func (s *stubAdminService) ClearGroupRateMultipliers(_ context.Context, _ int64) error {
-	return nil
-}
-
-func (s *stubAdminService) BatchSetGroupRateMultipliers(_ context.Context, _ int64, _ []service.GroupRateMultiplierInput) error {
-	return nil
-}
-
-func (s *stubAdminService) ClearGroupRPMOverrides(_ context.Context, _ int64) error {
-	return nil
-}
-
-func (s *stubAdminService) BatchSetGroupRPMOverrides(_ context.Context, _ int64, _ []service.GroupRPMOverrideInput) error {
-	return nil
-}
-
-func (s *stubAdminService) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode string, sortBy, sortOrder string) ([]service.Account, int64, error) {
+func (s *stubAdminService) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, platformID int64, privacyMode string, sortBy, sortOrder string) ([]service.Account, int64, error) {
 	s.lastListAccounts.platform = platform
 	s.lastListAccounts.accountType = accountType
 	s.lastListAccounts.status = status
 	s.lastListAccounts.search = search
-	s.lastListAccounts.groupID = groupID
+	s.lastListAccounts.platformID = platformID
 	s.lastListAccounts.privacyMode = privacyMode
 	s.lastListAccounts.sortBy = sortBy
 	s.lastListAccounts.sortOrder = sortOrder
@@ -427,7 +284,7 @@ func (s *stubAdminService) ListAccounts(ctx context.Context, page, pageSize int,
 	return accounts[start:end], int64(total), nil
 }
 
-func (s *stubAdminService) ListAccountsForSchedulerScoreFilter(_ context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {
+func (s *stubAdminService) ListAccountsForSchedulerScoreFilter(_ context.Context, platform, accountType, status, search string, platformID int64, privacyMode string) ([]service.Account, error) {
 	s.schedulerScoreFilterCalls++
 	if s.accountSchedulerScoreFilterAccounts != nil {
 		return s.accountSchedulerScoreFilterAccounts, nil
@@ -435,7 +292,7 @@ func (s *stubAdminService) ListAccountsForSchedulerScoreFilter(_ context.Context
 	return s.accounts, nil
 }
 
-func (s *stubAdminService) ListOpenAISchedulableAccountsForSchedulerScore(_ context.Context, groupID *int64) ([]service.Account, error) {
+func (s *stubAdminService) ListOpenAISchedulableAccountsForSchedulerScore(_ context.Context, platformID *int64) ([]service.Account, error) {
 	s.openAISchedulerScorePoolCalls++
 	accounts := s.openAISchedulerScorePoolAccounts
 	if accounts == nil {
@@ -446,17 +303,8 @@ func (s *stubAdminService) ListOpenAISchedulableAccountsForSchedulerScore(_ cont
 		if account.Platform != service.PlatformOpenAI || !account.IsSchedulable() {
 			continue
 		}
-		if groupID == nil {
-			if len(account.AccountGroups) == 0 && len(account.GroupIDs) == 0 {
-				out = append(out, account)
-			}
-			continue
-		}
-		for _, accountGroup := range account.AccountGroups {
-			if accountGroup.GroupID == *groupID {
-				out = append(out, account)
-				break
-			}
+		if platformID == nil || (account.PlatformID != nil && *account.PlatformID == *platformID) {
+			out = append(out, account)
 		}
 	}
 	return out, nil
@@ -544,10 +392,10 @@ func (s *stubAdminService) BulkUpdateAccounts(ctx context.Context, input *servic
 	return &service.BulkUpdateAccountsResult{Success: len(input.AccountIDs), Failed: 0, SuccessIDs: input.AccountIDs}, nil
 }
 
-func (s *stubAdminService) CheckMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error {
+func (s *stubAdminService) CheckMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, platformIDs []int64) error {
 	s.lastMixedCheck.accountID = currentAccountID
 	s.lastMixedCheck.platform = currentAccountPlatform
-	s.lastMixedCheck.groupIDs = append([]int64(nil), groupIDs...)
+	s.lastMixedCheck.platformIDs = append([]int64(nil), platformIDs...)
 	return s.checkMixedErr
 }
 
@@ -716,28 +564,6 @@ func (s *stubAdminService) GetUserBalanceHistory(ctx context.Context, userID int
 	return s.redeems, int64(len(s.redeems)), 100.0, nil
 }
 
-func (s *stubAdminService) UpdateGroupSortOrders(ctx context.Context, updates []service.GroupSortOrderUpdate) error {
-	return nil
-}
-
-func (s *stubAdminService) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*service.AdminUpdateAPIKeyGroupIDResult, error) {
-	for i := range s.apiKeys {
-		if s.apiKeys[i].ID == keyID {
-			k := s.apiKeys[i]
-			if groupID != nil {
-				if *groupID == 0 {
-					k.GroupID = nil
-				} else {
-					gid := *groupID
-					k.GroupID = &gid
-				}
-			}
-			return &service.AdminUpdateAPIKeyGroupIDResult{APIKey: &k}, nil
-		}
-	}
-	return nil, service.ErrAPIKeyNotFound
-}
-
 func (s *stubAdminService) AdminResetAPIKeyRateLimitUsage(ctx context.Context, keyID int64) (*service.APIKey, error) {
 	for i := range s.apiKeys {
 		if s.apiKeys[i].ID == keyID {
@@ -772,18 +598,6 @@ func (s *stubAdminService) ForceOpenAIPrivacy(ctx context.Context, account *serv
 
 func (s *stubAdminService) ForceAntigravityPrivacy(ctx context.Context, account *service.Account) string {
 	return ""
-}
-
-func (s *stubAdminService) ReplaceUserGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (*service.ReplaceUserGroupResult, error) {
-	return &service.ReplaceUserGroupResult{MigratedKeys: 0}, nil
-}
-
-func (s *stubAdminService) GetGroupBillingProfile(_ context.Context, groupID int64) (*service.BillingProfile, error) {
-	return &service.BillingProfile{GroupID: groupID, BalanceRateMultiplier: 1}, nil
-}
-
-func (s *stubAdminService) UpdateGroupBillingProfile(_ context.Context, groupID int64, input *service.UpdateBillingProfileInput) (*service.BillingProfile, error) {
-	return &service.BillingProfile{GroupID: groupID, BalanceRateMultiplier: input.BalanceRateMultiplier}, nil
 }
 
 func (s *stubAdminService) RevertAccountProxyFallback(ctx context.Context, id int64) error {

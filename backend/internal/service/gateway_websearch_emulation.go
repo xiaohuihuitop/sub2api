@@ -31,7 +31,7 @@ const (
 	webSearchToolUseIDPrefix   = "srvtoolu_ws_"
 	tokenEstimateDivisor       = 4
 
-	// featureKeyWebSearchEmulation is the key used in Account.Extra and Channel.FeaturesConfig.
+	// featureKeyWebSearchEmulation is the account feature key for web search emulation.
 	featureKeyWebSearchEmulation = "web_search_emulation"
 )
 
@@ -51,7 +51,7 @@ func getWebSearchManager() *websearch.Manager {
 //
 // Judgment chain: manager exists → only web_search tool → global enabled → account/channel enabled.
 // Account-level mode: "enabled" (force on), "disabled" (force off), "default" (follow channel).
-func (s *GatewayService) shouldEmulateWebSearch(ctx context.Context, account *Account, groupID *int64, body []byte) bool {
+func (s *GatewayService) shouldEmulateWebSearch(ctx context.Context, account *Account, platformID *int64, body []byte) bool {
 	if getWebSearchManager() == nil {
 		return false
 	}
@@ -68,15 +68,8 @@ func (s *GatewayService) shouldEmulateWebSearch(ctx context.Context, account *Ac
 		return true
 	case WebSearchModeDisabled:
 		return false
-	default: // "default" → follow channel config
-		if groupID == nil || s.channelService == nil {
-			return false
-		}
-		ch, err := s.channelService.GetChannelForGroup(ctx, *groupID)
-		if err != nil || ch == nil {
-			return false
-		}
-		return ch.IsWebSearchEmulationEnabled(account.Platform)
+	default:
+		return false
 	}
 }
 

@@ -3,18 +3,16 @@ package service
 import (
 	"context"
 	"strings"
-
-	"github.com/Wei-Shaw/sub2api/internal/config"
 )
 
 // ModelAvailabilityDiagnosis describes whether the requested model can be
-// served by any persistently eligible account in the group (active with its
+// served by any persistently eligible account in the platform pool (active with its
 // schedulable setting enabled), ignoring transient state such as rate limits,
 // overload, temporary unschedulability, and runtime blocks. Handlers use this
 // on the "no available accounts" error path to distinguish 404
 // model_not_found from 503 service_unavailable.
 type ModelAvailabilityDiagnosis struct {
-	// HasAccountsInPool is true if the group has at least one persistently
+	// HasAccountsInPool is true if the platform pool has at least one persistently
 	// eligible account on the queried platform (or, for Anthropic/Gemini, on
 	// the platform plus mixed-scheduled Antigravity accounts).
 	HasAccountsInPool bool
@@ -30,7 +28,6 @@ type ModelAvailabilityDiagnosis struct {
 type ModelAvailabilityDiagnoser interface {
 	DiagnoseModelAvailabilityForPlatform(
 		ctx context.Context,
-		groupID *int64,
 		requestedModel string,
 		platform string,
 	) ModelAvailabilityDiagnosis
@@ -47,7 +44,6 @@ type ModelAvailabilityDiagnoser interface {
 // callers stay on the 503 fallback branch.
 func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 	ctx context.Context,
-	groupID *int64,
 	requestedModel string,
 	platform string,
 ) ModelAvailabilityDiagnosis {
@@ -69,26 +65,11 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}
 
-	useMixed := platform == PlatformAnthropic || platform == PlatformGemini
-	platforms := []string{platform}
-	if useMixed {
-		platforms = append(platforms, PlatformAntigravity)
+	scope, ok := PlatformSchedulingScopeFromContext(ctx)
+	if !ok || scope.AccountPlatform != platform {
+		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}
-
-	queryGroupID := groupID
-	includeGrouped := false
-	if useMixed {
-		// Preserve the generic scheduler's scope rules: an explicit group wins
-		// for mixed scheduling, while group-less simple mode scans all accounts.
-		if groupID == nil && s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-			includeGrouped = true
-		}
-	} else if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		queryGroupID = nil
-		includeGrouped = true
-	}
-
-	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(ctx, queryGroupID, platforms, includeGrouped)
+	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(ctx, scope.PlatformID, scope.AccountPlatform)
 	if err != nil {
 		// Conservative fallback: pretend everything is fine so the caller
 		// returns 503 (we don't want to flip to 404 just because a lookup
@@ -96,16 +77,6 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}
 
-	diag := ModelAvailabilityDiagnosis{}
-	for i := range accounts {
-		if useMixed && accounts[i].Platform == PlatformAntigravity && !accounts[i].IsMixedSchedulingEnabled() {
-			continue
-		}
-		diag.HasAccountsInPool = true
-		if s.isModelSupportedByAccountWithContext(ctx, &accounts[i], requestedModel) {
-			diag.HasModelSupport = true
-			return diag
-		}
-	}
-	return diag
+	available := len(accounts) > 0
+	return ModelAvailabilityDiagnosis{HasAccountsInPool: available, HasModelSupport: available}
 }

@@ -21,7 +21,6 @@ func UserFromServiceShallow(u *service.User) *User {
 		FrozenBalance:              u.FrozenBalance,
 		Concurrency:                u.Concurrency,
 		Status:                     u.Status,
-		AllowedGroups:              u.AllowedGroups,
 		LastActiveAt:               u.LastActiveAt,
 		CreatedAt:                  u.CreatedAt,
 		UpdatedAt:                  u.UpdatedAt,
@@ -123,125 +122,6 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	return out
 }
 
-func GroupFromServiceShallow(g *service.Group) *Group {
-	if g == nil {
-		return nil
-	}
-	out := groupFromServiceBase(g)
-	return &out
-}
-
-func GroupFromService(g *service.Group) *Group {
-	if g == nil {
-		return nil
-	}
-	return GroupFromServiceShallow(g)
-}
-
-func BillingProfileFromService(profile *service.BillingProfile) *BillingProfile {
-	if profile == nil {
-		return nil
-	}
-	return &BillingProfile{
-		GroupID:                      profile.GroupID,
-		BalanceRateMultiplier:        profile.BalanceRateMultiplier,
-		PeakRateEnabled:              profile.PeakRateEnabled,
-		PeakStart:                    profile.PeakStart,
-		PeakEnd:                      profile.PeakEnd,
-		PeakRateMultiplier:           profile.PeakRateMultiplier,
-		ImageRateIndependent:         profile.ImageRateIndependent,
-		ImageRateMultiplier:          profile.ImageRateMultiplier,
-		ImagePrice1K:                 profile.ImagePrice1K,
-		ImagePrice2K:                 profile.ImagePrice2K,
-		ImagePrice4K:                 profile.ImagePrice4K,
-		BatchImageDiscountMultiplier: profile.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:     profile.BatchImageHoldMultiplier,
-		VideoRateIndependent:         profile.VideoRateIndependent,
-		VideoRateMultiplier:          profile.VideoRateMultiplier,
-		VideoPrice480P:               profile.VideoPrice480P,
-		VideoPrice720P:               profile.VideoPrice720P,
-		VideoPrice1080P:              profile.VideoPrice1080P,
-		WebSearchPricePerCall:        profile.WebSearchPricePerCall,
-	}
-}
-
-// GroupFromServiceAdmin converts a service Group to DTO for admin users.
-// It includes internal fields like model_routing and account_count.
-func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
-	if g == nil {
-		return nil
-	}
-	out := &AdminGroup{
-		Group:                       groupFromServiceBase(g),
-		ModelRouting:                g.ModelRouting,
-		ModelRoutingEnabled:         g.ModelRoutingEnabled,
-		MCPXMLInject:                g.MCPXMLInject,
-		DefaultMappedModel:          g.DefaultMappedModel,
-		MessagesDispatchModelConfig: g.MessagesDispatchModelConfig,
-		ModelsListConfig:            g.ModelsListConfig,
-		SupportedModelScopes:        g.SupportedModelScopes,
-		AccountCount:                g.AccountCount,
-		ActiveAccountCount:          g.ActiveAccountCount,
-		RateLimitedAccountCount:     g.RateLimitedAccountCount,
-	}
-	if len(g.AccountGroups) > 0 {
-		out.AccountGroups = make([]AccountGroup, 0, len(g.AccountGroups))
-		for i := range g.AccountGroups {
-			ag := g.AccountGroups[i]
-			out.AccountGroups = append(out.AccountGroups, *AccountGroupFromService(&ag))
-		}
-	}
-	return out
-}
-
-func groupFromServiceBase(g *service.Group) Group {
-	return Group{
-		ID:                              g.ID,
-		Name:                            g.Name,
-		Description:                     g.Description,
-		Platform:                        g.Platform,
-		RateMultiplier:                  g.RateMultiplier,
-		SortOrder:                       g.SortOrder,
-		IsExclusive:                     g.IsExclusive,
-		Status:                          g.Status,
-		SubscriptionType:                g.SubscriptionType,
-		DailyLimitUSD:                   g.DailyLimitUSD,
-		WeeklyLimitUSD:                  g.WeeklyLimitUSD,
-		MonthlyLimitUSD:                 g.MonthlyLimitUSD,
-		AllowImageGeneration:            g.AllowImageGeneration,
-		AllowBatchImageGeneration:       g.AllowBatchImageGeneration,
-		ImageRateIndependent:            g.ImageRateIndependent,
-		ImageRateMultiplier:             g.ImageRateMultiplier,
-		BatchImageDiscountMultiplier:    g.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        g.BatchImageHoldMultiplier,
-		VideoRateIndependent:            g.VideoRateIndependent,
-		VideoRateMultiplier:             g.VideoRateMultiplier,
-		PeakRateEnabled:                 g.PeakRateEnabled,
-		PeakStart:                       g.PeakStart,
-		PeakEnd:                         g.PeakEnd,
-		PeakRateMultiplier:              g.PeakRateMultiplier,
-		ImagePrice1K:                    g.ImagePrice1K,
-		ImagePrice2K:                    g.ImagePrice2K,
-		ImagePrice4K:                    g.ImagePrice4K,
-		VideoPrice480P:                  g.VideoPrice480P,
-		VideoPrice720P:                  g.VideoPrice720P,
-		VideoPrice1080P:                 g.VideoPrice1080P,
-		WebSearchPricePerCall:           g.WebSearchPricePerCall,
-		ClaudeCodeOnly:                  g.ClaudeCodeOnly,
-		FallbackGroupID:                 g.FallbackGroupID,
-		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
-		AllowMessagesDispatch:           g.AllowMessagesDispatch,
-		AllowLive:                       g.AllowLive,
-		RequireOAuthOnly:                g.RequireOAuthOnly,
-		RequirePrivacySet:               g.RequirePrivacySet,
-		RPMLimit:                        g.RPMLimit,
-		MaxReasoningEffort:              g.MaxReasoningEffort,
-		ReasoningEffortMappings:         g.ReasoningEffortMappings,
-		CreatedAt:                       g.CreatedAt,
-		UpdatedAt:                       g.UpdatedAt,
-	}
-}
-
 func AccountFromServiceShallow(a *service.Account) *Account {
 	if a == nil {
 		return nil
@@ -286,7 +166,6 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		SessionWindowStart:      a.SessionWindowStart,
 		SessionWindowEnd:        a.SessionWindowEnd,
 		SessionWindowStatus:     a.SessionWindowStatus,
-		GroupIDs:                a.GroupIDs,
 		ParentAccountID:         a.ParentAccountID,
 		QuotaDimension:          a.QuotaDimension,
 	}
@@ -444,19 +323,6 @@ func AccountFromService(a *service.Account) *Account {
 	}
 	out := AccountFromServiceShallow(a)
 	out.Proxy = ProxyFromService(a.Proxy)
-	if len(a.AccountGroups) > 0 {
-		out.AccountGroups = make([]AccountGroup, 0, len(a.AccountGroups))
-		for i := range a.AccountGroups {
-			ag := a.AccountGroups[i]
-			out.AccountGroups = append(out.AccountGroups, *AccountGroupFromService(&ag))
-		}
-	}
-	if len(a.Groups) > 0 {
-		out.Groups = make([]*Group, 0, len(a.Groups))
-		for _, g := range a.Groups {
-			out.Groups = append(out.Groups, GroupFromServiceShallow(g))
-		}
-	}
 	return out
 }
 
@@ -466,20 +332,6 @@ func timeToUnixSeconds(value *time.Time) *int64 {
 	}
 	ts := value.Unix()
 	return &ts
-}
-
-func AccountGroupFromService(ag *service.AccountGroup) *AccountGroup {
-	if ag == nil {
-		return nil
-	}
-	return &AccountGroup{
-		AccountID: ag.AccountID,
-		GroupID:   ag.GroupID,
-		Priority:  ag.Priority,
-		CreatedAt: ag.CreatedAt,
-		Account:   AccountFromServiceShallow(ag.Account),
-		Group:     GroupFromServiceShallow(ag.Group),
-	}
 }
 
 func ProxyFromService(p *service.Proxy) *Proxy {
@@ -615,7 +467,6 @@ func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
 		UsedAt:                  rc.UsedAt,
 		CreatedAt:               rc.CreatedAt,
 		ExpiresAt:               rc.ExpiresAt,
-		GroupID:                 rc.GroupID,
 		SubscriptionPlanID:      rc.SubscriptionPlanID,
 		PlanNameSnapshot:        rc.PlanNameSnapshot,
 		DailyLimitUSDSnapshot:   rc.DailyLimitUSDSnapshot,
@@ -624,7 +475,6 @@ func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
 		RateMultiplierSnapshot:  rc.RateMultiplierSnapshot,
 		ValidityDays:            rc.ValidityDays,
 		User:                    UserFromServiceShallow(rc.User),
-		Group:                   GroupFromServiceShallow(rc.Group),
 	}
 	if rc.IsExpired() {
 		out.Status = service.StatusExpired
@@ -677,7 +527,6 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		ServiceTier:               l.ServiceTier,
 		ReasoningEffort:           l.ReasoningEffort,
 		InboundEndpoint:           l.InboundEndpoint,
-		GroupID:                   l.GroupID,
 		SubscriptionID:            l.SubscriptionID,
 		PlatformID:                l.PlatformID,
 		PlatformCode:              l.PlatformCode,
@@ -723,7 +572,6 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		CreatedAt:                 l.CreatedAt,
 		User:                      UserFromServiceShallow(l.User),
 		APIKey:                    APIKeyFromService(l.APIKey),
-		Group:                     GroupFromServiceShallow(l.Group),
 		Subscription:              UserSubscriptionFromService(l.Subscription),
 	}
 }
@@ -749,7 +597,6 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 	return &AdminUsageLog{
 		UsageLog:              usageLog,
 		UpstreamModel:         l.UpstreamModel,
-		ChannelID:             l.ChannelID,
 		ModelMappingChain:     l.ModelMappingChain,
 		BillingTier:           l.BillingTier,
 		AccountRateMultiplier: l.AccountRateMultiplier,
@@ -772,7 +619,7 @@ func UsageCleanupTaskFromService(task *service.UsageCleanupTask) *UsageCleanupTa
 			UserID:      task.Filters.UserID,
 			APIKeyID:    task.Filters.APIKeyID,
 			AccountID:   task.Filters.AccountID,
-			GroupID:     task.Filters.GroupID,
+			PlatformID:  task.Filters.PlatformID,
 			Model:       task.Filters.Model,
 			RequestType: requestTypeStringPtr(task.Filters.RequestType),
 			Stream:      task.Filters.Stream,
@@ -837,7 +684,6 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 	return UserSubscription{
 		ID:                      sub.ID,
 		UserID:                  sub.UserID,
-		GroupID:                 optionalLegacySubscriptionGroupID(sub.GroupID),
 		SubscriptionPlanID:      sub.SubscriptionPlanID,
 		PlanNameSnapshot:        sub.PlanNameSnapshot,
 		DailyLimitUSDSnapshot:   sub.DailyLimitUSDSnapshot,
@@ -857,16 +703,7 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 		UpdatedAt:               sub.UpdatedAt,
 		RevokedAt:               sub.DeletedAt,
 		User:                    UserFromServiceShallow(sub.User),
-		Group:                   GroupFromServiceShallow(sub.Group),
 	}
-}
-
-func optionalLegacySubscriptionGroupID(groupID int64) *int64 {
-	if groupID <= 0 {
-		return nil
-	}
-	value := groupID
-	return &value
 }
 
 func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult {

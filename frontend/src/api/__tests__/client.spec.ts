@@ -149,7 +149,7 @@ describe('API Client', () => {
       })
       apiClient.defaults.adapter = adapter
 
-      await apiClient.get('/groups/available')
+      await apiClient.get('/platforms/available')
 
       const config = adapter.mock.calls[0][0]
       expect(config.headers.get('X-Admin-UI-Request')).toBe('1')
@@ -165,7 +165,7 @@ describe('API Client', () => {
       })
       apiClient.defaults.adapter = adapter
 
-      await apiClient.get('/groups/available')
+      await apiClient.get('/platforms/available')
 
       const config = adapter.mock.calls[0][0]
       expect(config.headers.get('X-Admin-UI-Request')).toBeFalsy()

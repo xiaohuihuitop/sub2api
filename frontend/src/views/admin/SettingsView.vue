@@ -3548,17 +3548,6 @@
                       >
                         {{ t("admin.settings.defaults.subscriptionPlan") }}
                       </label>
-                      <p
-                        v-if="isLegacyDefaultSubscription(item)"
-                        class="mb-1 text-xs text-amber-600 dark:text-amber-400"
-                      >
-                        {{
-                          t("admin.settings.defaults.legacySubscription", {
-                            groupId: item.group_id,
-                            days: item.validity_days,
-                          })
-                        }}
-                      </p>
                       <Select
                         v-model="item.plan_id"
                         class="default-sub-plan-select"
@@ -3815,17 +3804,6 @@
                           >
                             {{ t("admin.settings.defaults.subscriptionPlan") }}
                           </label>
-                          <p
-                            v-if="isLegacyDefaultSubscription(item)"
-                            class="mb-1 text-xs text-amber-600 dark:text-amber-400"
-                          >
-                            {{
-                              t("admin.settings.defaults.legacySubscription", {
-                                groupId: item.group_id,
-                                days: item.validity_days,
-                              })
-                            }}
-                          </p>
                           <Select
                             v-model="item.plan_id"
                             class="default-sub-plan-select"
@@ -4406,23 +4384,9 @@
               </p>
             </div>
             <div class="space-y-5 p-6">
-              <div class="flex items-center justify-between">
-                <div>
-                  <label
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    {{ t("admin.settings.scheduling.allowUngroupedKey") }}
-                  </label>
-                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {{ t("admin.settings.scheduling.allowUngroupedKeyHint") }}
-                  </p>
-                </div>
-                <Toggle v-model="form.allow_ungrouped_key_scheduling" />
-              </div>
-
               <div
                 v-if="!form.openai_advanced_scheduler_enabled"
-                class="flex items-center justify-between border-t border-gray-100 pt-5 dark:border-dark-700"
+                class="flex items-center justify-between"
               >
                 <div>
                   <label
@@ -6321,39 +6285,6 @@
               <p class="mt-1 text-xs text-gray-400">
                 {{ t('admin.settings.features.channelMonitor.defaultIntervalHint') }}
               </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.settings.features.availableChannels.title') }}
-            </h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('admin.settings.features.availableChannels.description') }}
-            </p>
-            <p class="mt-1.5 text-xs">
-              <router-link
-                to="/admin/channels/pricing"
-                class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
-              >
-                {{ t('admin.settings.features.availableChannels.configureLink') }}
-                <span aria-hidden="true">→</span>
-              </router-link>
-            </p>
-          </div>
-          <div class="space-y-5 p-6">
-            <div class="flex items-center justify-between">
-              <div>
-                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.features.availableChannels.enabled') }}
-                </label>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.features.availableChannels.enabledHint') }}
-                </p>
-              </div>
-              <Toggle v-model="form.available_channels_enabled" />
             </div>
           </div>
         </div>
@@ -8870,7 +8801,6 @@ const form = reactive<SettingsForm>({
   min_claude_code_version: "",
   max_claude_code_version: "",
   // 分组隔离
-  allow_ungrouped_key_scheduling: false,
   openai_low_upstream_rate_priority_enabled: false,
   openai_oauth_scheduling_rate_multiplier: 1,
   openai_advanced_scheduler_enabled: false,
@@ -8916,8 +8846,6 @@ const form = reactive<SettingsForm>({
   // Channel Monitor feature switch
   channel_monitor_enabled: true,
   channel_monitor_default_interval_seconds: 60,
-  // Available Channels feature switch
-  available_channels_enabled: false,
   // Model Plaza feature switches + description
   model_plaza_enabled: false,
   model_plaza_require_auth: false,
@@ -9267,7 +9195,7 @@ const defaultSubscriptionPlanOptions = computed<
     .sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
     .map((plan) => ({
       value: plan.id,
-      label: plan.group_name ? `${plan.name} - ${plan.group_name}` : plan.name,
+      label: plan.name,
       description: plan.description,
     })),
 );
@@ -10026,9 +9954,7 @@ function findDuplicateDefaultSubscription(
   const seen = new Set<string>();
 
   return subscriptions.find((item) => {
-    const identity = item.plan_id
-      ? `plan:${item.plan_id}`
-      : `legacy-group:${item.group_id}`;
+    const identity = `plan:${item.plan_id}`;
     if (seen.has(identity)) {
       return true;
     }
@@ -10037,12 +9963,8 @@ function findDuplicateDefaultSubscription(
   });
 }
 
-function isLegacyDefaultSubscription(item: DefaultSubscriptionSetting): boolean {
-  return !item.plan_id && Boolean(item.group_id && item.validity_days);
-}
-
 function defaultSubscriptionReference(item: DefaultSubscriptionSetting): string {
-  return item.plan_id ? `#${item.plan_id}` : `#${item.group_id}`;
+  return `#${item.plan_id}`;
 }
 
 async function saveSettings() {
@@ -10353,7 +10275,6 @@ async function saveSettings() {
       identity_patch_prompt: form.identity_patch_prompt,
       min_claude_code_version: form.min_claude_code_version,
       max_claude_code_version: form.max_claude_code_version,
-      allow_ungrouped_key_scheduling: form.allow_ungrouped_key_scheduling,
       enable_fingerprint_unification: form.enable_fingerprint_unification,
       enable_metadata_passthrough: form.enable_metadata_passthrough,
       enable_cch_signing: form.enable_cch_signing,
@@ -10467,8 +10388,6 @@ async function saveSettings() {
       channel_monitor_enabled: form.channel_monitor_enabled,
       channel_monitor_default_interval_seconds:
         Number(form.channel_monitor_default_interval_seconds) || 60,
-      // Available Channels feature switch
-      available_channels_enabled: form.available_channels_enabled,
       // Model Plaza feature switches + description
       model_plaza_enabled: form.model_plaza_enabled,
       model_plaza_require_auth: form.model_plaza_require_auth,

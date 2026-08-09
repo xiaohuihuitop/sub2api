@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+type ReasoningEffortMapping = domain.ReasoningEffortMapping
 
 const (
 	maxReasoningEffortMappings = 64
@@ -15,7 +18,7 @@ const (
 
 var openAIReasoningEffortValues = []string{"minimal", "low", "medium", "high", "xhigh", "max"}
 
-// NormalizeMaxReasoningEffort validates and canonicalizes a group policy value.
+// NormalizeMaxReasoningEffort validates and canonicalizes an account policy value.
 // Empty means that the group does not impose a ceiling.
 func NormalizeMaxReasoningEffort(raw string) string {
 	value := strings.ToLower(strings.TrimSpace(raw))
@@ -90,8 +93,8 @@ func reasoningEffortRank(raw string) (int, bool) {
 	}
 }
 
-// NormalizeReasoningEffortMappings validates group mapping rules against the
-// fixed effort values supported by OpenAI groups.
+// NormalizeReasoningEffortMappings validates account mapping rules against the
+// fixed effort values supported by OpenAI accounts.
 func NormalizeReasoningEffortMappings(platform string, raw []ReasoningEffortMapping) ([]ReasoningEffortMapping, error) {
 	if len(raw) > maxReasoningEffortMappings {
 		return nil, fmt.Errorf("reasoning effort mappings cannot exceed %d entries", maxReasoningEffortMappings)
@@ -133,22 +136,6 @@ func mapReasoningEffort(raw string, mappings []ReasoningEffortMapping) (string, 
 		}
 	}
 	return value, false
-}
-
-func sanitizeGroupReasoningEffortPolicy(group *Group) {
-	if group == nil {
-		return
-	}
-	maxEffort, maxErr := normalizeMaxReasoningEffortForPlatform(group.Platform, group.MaxReasoningEffort)
-	mappings, mappingsErr := NormalizeReasoningEffortMappings(group.Platform, group.ReasoningEffortMappings)
-	if maxErr != nil {
-		maxEffort = ""
-	}
-	if mappingsErr != nil {
-		mappings = []ReasoningEffortMapping{}
-	}
-	group.MaxReasoningEffort = maxEffort
-	group.ReasoningEffortMappings = mappings
 }
 
 // ApplyOpenAIReasoningEffortPolicy applies one exact mapping and then caps

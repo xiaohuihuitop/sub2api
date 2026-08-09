@@ -45,9 +45,9 @@ func TestPromptGuardFailureLogUsesCompleteAllowlistedContextAndNoSideEffects(t *
 	previous := slog.Default()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&output, nil)))
 	t.Cleanup(func() { slog.SetDefault(previous) })
-	groupID := int64(9)
+	platformID := int64(9)
 	snapshot := PromptSnapshot{
-		RequestID: "req-1", UserID: 2, APIKeyID: 3, GroupID: &groupID,
+		RequestID: "req-1", UserID: 2, APIKeyID: 3, PlatformID: &platformID,
 		Provider: "openai", Protocol: "openai_chat", Endpoint: "/v1/chat/completions",
 		Model: "gpt-test", Stage: "http",
 	}

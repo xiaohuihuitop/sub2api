@@ -17,7 +17,6 @@ export default {
     day: '按天',
     hour: '按小时',
     modelDistribution: '模型分布',
-    groupDistribution: '分组使用分布',
     platformBreakdown: '按平台拆分',
     platformBreakdownEmpty: '暂无平台用量',
     platformCount: '{count} 个平台',
@@ -34,8 +33,6 @@ export default {
     tokenUsageTrend: 'Token 使用趋势',
     noDataAvailable: '暂无数据',
     model: '模型',
-    group: '分组',
-    noGroup: '无分组',
     requests: '请求',
     tokens: 'Token',
     actual: '实际',
@@ -64,11 +61,6 @@ export default {
     }
   },
 
-  // Groups (shared)
-  groups: {
-    subscription: '订阅'
-  },
-
   // API Keys
   keys: {
     title: 'API 密钥',
@@ -82,7 +74,6 @@ export default {
       clickToCopy: '点击可复制此端点',
       speedTest: '测速',
     },
-    allGroups: '全部分组',
     allStatus: '全部状态',
     columnSettings: '列设置',
     columnAlwaysVisible: '该列固定显示，不可隐藏',
@@ -92,12 +83,8 @@ export default {
     deleteConfirmMessage: "确定要删除 '{name}' 吗？此操作无法撤销。",
     id: 'ID',
     apiKey: 'API 密钥',
-    group: '分组',
     authorization: '授权范围',
     currentConcurrency: '当前并发',
-    noGroup: '无分组',
-    searchGroup: '搜索分组...',
-    noGroupFound: '未找到匹配的分组',
     created: '创建时间',
     copyToClipboard: '复制到剪贴板',
     copied: '已复制！',
@@ -106,8 +93,6 @@ export default {
     disable: '禁用',
     nameLabel: '名称',
     namePlaceholder: '我的 API 密钥',
-    groupLabel: '分组',
-    selectGroup: '选择分组',
     platformsLabel: '平台',
     platformsHint: '勾选此密钥允许调度的平台。',
     noPlatforms: '当前没有可授权的平台',
@@ -122,7 +107,6 @@ export default {
     balanceHint: '套餐不可用或已耗尽时，允许按全局余额倍率使用余额扣费。',
     balanceEnabled: '余额',
     noBillingSource: '未授权扣费资产',
-    legacyAuthorization: '旧授权配置，需要重新选择平台',
     platformRequired: '请至少选择一个平台',
     billingSourceRequired: '请至少选择一个套餐，或开启余额扣费',
     statusLabel: '状态',
@@ -139,10 +123,6 @@ export default {
     failedToSave: '保存 API 密钥失败',
     failedToDelete: '删除 API 密钥失败',
     failedToUpdateStatus: '更新 API 密钥状态失败',
-    clickToChangeGroup: '点击更换分组',
-    groupChangedSuccess: '分组更换成功',
-    failedToChangeGroup: '更换分组失败',
-    groupRequired: '请选择分组',
     usage: '用量',
     today: '今日',
     total: '近30天',
@@ -181,7 +161,7 @@ export default {
         opencode: 'OpenCode'
       },
       antigravity: {
-        description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
+        description: '为 Antigravity 平台配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
         claudeNote:
@@ -196,9 +176,9 @@ export default {
         note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
       },
       grok: {
-        description: '配置 Grok Build、Claude Code、Codex 或 OpenCode，让请求通过当前 Sub2API Grok 分组发送。',
-        claudeDescription: '配置 Claude Code，让 Messages API 请求通过当前 Sub2API Grok 分组发送。',
-        codexDescription: '配置 Codex，让 Responses API 请求通过当前 Sub2API Grok 分组发送。',
+        description: '配置 Grok Build、Claude Code、Codex 或 OpenCode，让请求通过当前 Sub2API Grok 平台发送。',
+        claudeDescription: '配置 Claude Code，让 Messages API 请求通过当前 Sub2API Grok 平台发送。',
+        codexDescription: '配置 Codex，让 Responses API 请求通过当前 Sub2API Grok 平台发送。',
         configTomlHint: '如已有 config.toml，请先备份再合并此模型配置。保存后运行 grok inspect 验证生效配置。',
         codexConfigTomlHint: '如已有 config.toml，请先备份再合并此服务商配置。',
         note: '保存为 ~/.grok/config.toml，然后运行 grok inspect，并在 /model 中选择 grok。',
@@ -418,7 +398,7 @@ export default {
     tabs: { usage: '用量明细', errors: '错误请求', ranking: '用户排行' },
     errors: {
       time: '时间', model: '模型', endpoint: '端点', status: '状态码',
-      category: '分类', platform: '平台', message: '错误信息',
+      category: '分类', platform: '平台', routingPlatform: '路由平台', accountPlatform: '账号平台', message: '错误信息',
       keyName: 'Key 名称', keyDeleted: '已删除', allKeys: '全部 Key',
       modelPlaceholder: '搜索模型', allCategories: '全部分类', allStatuses: '全部状态码',
       empty: '暂无错误请求', failedToLoad: '加载错误请求失败',
@@ -514,67 +494,29 @@ export default {
     }
   },
 
-  // Available Channels (user-facing)
-  availableChannels: {
-    title: '可用渠道',
-    description: '查看您可访问的渠道与其支持的模型、定价',
-    searchPlaceholder: '搜索渠道或模型...',
-    empty: '暂无可用渠道',
-    noModels: '未配置模型',
-    noPricing: '未配置定价',
-    exclusive: '专属',
-    public: '公开',
-    exclusiveTooltip: '管理员授权给你的专属分组',
-    publicTooltip: '对所有用户公开的分组',
-    columns: {
-      name: '渠道名',
-      description: '描述',
-      platform: '平台',
-      groups: '我可访问的分组',
-      supportedModels: '支持模型'
-    },
-    pricing: {
-      billingMode: '计费模式',
-      billingModeToken: '按 Token',
-      billingModePerRequest: '按次',
-      billingModeImage: '按图片',
-      billingModeVideo: '按视频',
-      inputPrice: '输入',
-      outputPrice: '输出',
-      cacheWritePrice: '缓存写入',
-      cacheReadPrice: '缓存读取',
-      imageInputPrice: '图片输入',
-      imageOutputPrice: '图片输出',
-      perRequestPrice: '每次请求',
-      intervals: '阶梯定价',
-      unitPerMillion: '/ 1M token',
-      unitPerRequest: '/ 次'
-    }
-  },
 
-  // Model Plaza (public group/model pricing showcase)
+  // Model Plaza (public platform/model pricing showcase)
   modelPlaza: {
     title: '模型广场',
-    description: '按分组浏览可用模型与余额价格',
+    description: '按平台浏览可用模型与参考价格',
     loading: '加载中...',
-    empty: '暂无可展示的分组',
+    empty: '暂无可展示的平台',
     loadFailed: '加载模型广场失败',
     noSearchResult: '没有匹配的模型',
-    anonymousHint: '登录后可查看专属分组',
+    anonymousHint: '平台模型规则由管理员统一配置',
     filters: {
       platformLabel: '平台',
-      groupLabel: '分组',
-      rateLabel: '余额倍率',
+      rateLabel: '价格',
       modelLabel: '模型',
       searchPlaceholder: '搜索模型名称',
       all: '全部'
     },
     badges: {
-      exclusive: '专属分组',
-      subscription: '订阅'
+      exclusive: '平台账号池',
+      subscription: '套餐'
     },
     detail: {
-      noModels: '该分组暂未配置模型',
+      noModels: '该平台暂未配置模型',
       noPricing: '未配置定价',
       peakNote: '余额高峰时段 {window} 计费倍率 ×{multiplier}'
     },
@@ -585,9 +527,9 @@ export default {
       cache: '缓存',
       cacheWrite: '写入',
       cacheRead: '读取',
-      balancePrice: '余额价格',
+      balancePrice: '参考价格',
       officialPrice: '官方价格',
-      balanceRate: '余额倍率',
+      balanceRate: '倍率',
       unitPerMillion: '$ / 1M token',
       perUnitRequest: '/ 次',
       perUnitImage: '/ 张',
@@ -681,7 +623,6 @@ export default {
     concurrencyReducedAdmin: '并发减少（管理员）',
     adminAdjustment: '管理员调整',
     subscriptionAssigned: '订阅已分配',
-    subscriptionAssignedDesc: '您已获得 {groupName} 的访问权限',
     subscriptionDays: '{days} 天',
     days: '天',
     codeRedeemSuccess: '兑换成功！',

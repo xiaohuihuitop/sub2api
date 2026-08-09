@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-5">
-    <section class="space-y-2">
+    <section class="space-y-2" data-tour="key-form-platforms">
       <div>
         <label class="input-label">{{ t('keys.platformsLabel') }}</label>
         <p class="input-hint">{{ t('keys.platformsHint') }}</p>
@@ -28,7 +28,7 @@
       <p v-else class="text-sm text-amber-700 dark:text-amber-300">{{ t('keys.noPlatforms') }}</p>
     </section>
 
-    <section class="space-y-2 border-t border-gray-200 pt-5 dark:border-dark-700">
+    <section class="space-y-2 border-t border-gray-200 pt-5 dark:border-dark-700" data-tour="key-form-subscription-plans">
       <div>
         <label class="input-label">{{ t('keys.subscriptionPlansLabel') }}</label>
         <p class="input-hint">{{ t('keys.subscriptionPlansHint') }}</p>

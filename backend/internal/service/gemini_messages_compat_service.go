@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -46,7 +45,6 @@ const geminiDummyThoughtSignature = "skip_thought_signature_validator"
 
 type GeminiMessagesCompatService struct {
 	accountRepo               AccountRepository
-	groupRepo                 GroupRepository
 	cache                     GatewayCache
 	schedulerSnapshot         *SchedulerSnapshotService
 	tokenProvider             *GeminiTokenProvider
@@ -71,7 +69,6 @@ func (s *GeminiMessagesCompatService) readUpstreamErrorBody(resp *http.Response)
 
 func NewGeminiMessagesCompatService(
 	accountRepo AccountRepository,
-	groupRepo GroupRepository,
 	cache GatewayCache,
 	schedulerSnapshot *SchedulerSnapshotService,
 	tokenProvider *GeminiTokenProvider,
@@ -82,7 +79,6 @@ func NewGeminiMessagesCompatService(
 ) *GeminiMessagesCompatService {
 	return &GeminiMessagesCompatService{
 		accountRepo:               accountRepo,
-		groupRepo:                 groupRepo,
 		cache:                     cache,
 		schedulerSnapshot:         schedulerSnapshot,
 		tokenProvider:             tokenProvider,
@@ -99,14 +95,14 @@ func (s *GeminiMessagesCompatService) GetTokenProvider() *GeminiTokenProvider {
 	return s.tokenProvider
 }
 
-func (s *GeminiMessagesCompatService) SelectAccountForModel(ctx context.Context, groupID *int64, sessionHash string, requestedModel string) (*Account, error) {
-	return s.SelectAccountForModelWithExclusions(ctx, groupID, sessionHash, requestedModel, nil)
+func (s *GeminiMessagesCompatService) SelectAccountForModel(ctx context.Context, platformID *int64, sessionHash string, requestedModel string) (*Account, error) {
+	return s.SelectAccountForModelWithExclusions(ctx, platformID, sessionHash, requestedModel, nil)
 }
 
-func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
+func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx context.Context, platformID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
 	// 1. 确定目标平台和调度模式
 	// Determine target platform and scheduling mode
-	platform, useMixedScheduling, hasForcePlatform, err := s.resolvePlatformAndSchedulingMode(ctx, groupID)
+	platform, useMixedScheduling, hasForcePlatform, err := s.resolvePlatformAndSchedulingMode(ctx, platformID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,24 +111,17 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 
 	// 2. 尝试粘性会话命中
 	// Try sticky session hit
-	if account := s.tryStickySessionHit(ctx, groupID, sessionHash, cacheKey, requestedModel, excludedIDs, platform, useMixedScheduling); account != nil {
+	if account := s.tryStickySessionHit(ctx, platformID, sessionHash, cacheKey, requestedModel, excludedIDs, platform, useMixedScheduling); account != nil {
 		return account, nil
 	}
 
 	// 3. 查询可调度账户（强制平台模式：优先按分组查找，找不到再查全部）
 	// Query schedulable accounts (force platform mode: try group first, fallback to all)
-	accounts, err := s.listSchedulableAccountsOnce(ctx, groupID, platform, hasForcePlatform)
+	accounts, err := s.listSchedulableAccountsOnce(ctx, platformID, platform, hasForcePlatform)
 	if err != nil {
 		return nil, fmt.Errorf("query accounts failed: %w", err)
 	}
 	// 强制平台模式下，分组中找不到账户时回退查询全部
-	if len(accounts) == 0 && groupID != nil && hasForcePlatform {
-		accounts, err = s.listSchedulableAccountsOnce(ctx, nil, platform, hasForcePlatform)
-		if err != nil {
-			return nil, fmt.Errorf("query accounts failed: %w", err)
-		}
-	}
-
 	// 4. 按优先级 + LRU 选择最佳账号
 	// Select best account by priority + LRU
 	selected := s.selectBestGeminiAccount(ctx, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
@@ -147,7 +136,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 	// 5. 设置粘性会话绑定
 	// Set sticky session binding
 	if sessionHash != "" {
-		_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), cacheKey, selected.ID, geminiStickySessionTTL)
+		_ = s.cache.SetSessionAccountID(ctx, derefPlatformID(platformID), cacheKey, selected.ID, geminiStickySessionTTL)
 	}
 
 	return s.hydrateSelectedAccount(ctx, selected)
@@ -158,30 +147,11 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 //
 // resolvePlatformAndSchedulingMode resolves target platform and scheduling mode.
 // Returns: platform name, whether to use mixed scheduling, whether force platform, error.
-func (s *GeminiMessagesCompatService) resolvePlatformAndSchedulingMode(ctx context.Context, groupID *int64) (platform string, useMixedScheduling bool, hasForcePlatform bool, err error) {
-	// 优先检查 context 中的强制平台（/antigravity 路由）
-	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
-	if hasForcePlatform && forcePlatform != "" {
-		return forcePlatform, false, true, nil
+func (s *GeminiMessagesCompatService) resolvePlatformAndSchedulingMode(ctx context.Context, platformID *int64) (platform string, useMixedScheduling bool, hasForcePlatform bool, err error) {
+	if scope, ok := PlatformSchedulingScopeFromContext(ctx); ok {
+		return scope.AccountPlatform, false, true, nil
 	}
-
-	if groupID != nil {
-		// 根据分组 platform 决定查询哪种账号
-		var group *Group
-		if ctxGroup, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(ctxGroup) && ctxGroup.ID == *groupID {
-			group = ctxGroup
-		} else {
-			group, err = s.groupRepo.GetByIDLite(ctx, *groupID)
-			if err != nil {
-				return "", false, false, fmt.Errorf("get group failed: %w", err)
-			}
-		}
-		// gemini 分组支持混合调度（包含启用了 mixed_scheduling 的 antigravity 账户）
-		return group.Platform, group.Platform == PlatformGemini, false, nil
-	}
-
-	// 无分组时只使用原生 gemini 平台
-	return PlatformGemini, true, false, nil
+	return "", false, false, fmt.Errorf("%w: platform scheduling scope is required", ErrPlatformInvalid)
 }
 
 // tryStickySessionHit 尝试从粘性会话获取账号。
@@ -191,7 +161,7 @@ func (s *GeminiMessagesCompatService) resolvePlatformAndSchedulingMode(ctx conte
 // Returns account if hit and usable; clears session and returns nil if account unavailable.
 func (s *GeminiMessagesCompatService) tryStickySessionHit(
 	ctx context.Context,
-	groupID *int64,
+	platformID *int64,
 	sessionHash, cacheKey, requestedModel string,
 	excludedIDs map[int64]struct{},
 	platform string,
@@ -201,7 +171,7 @@ func (s *GeminiMessagesCompatService) tryStickySessionHit(
 		return nil
 	}
 
-	accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), cacheKey)
+	accountID, err := s.cache.GetSessionAccountID(ctx, derefPlatformID(platformID), cacheKey)
 	if err != nil || accountID <= 0 {
 		return nil
 	}
@@ -218,7 +188,7 @@ func (s *GeminiMessagesCompatService) tryStickySessionHit(
 	// 检查账号是否需要清理粘性会话
 	// Check if sticky session should be cleared
 	if shouldClearStickySession(account, requestedModel) {
-		_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), cacheKey)
+		_ = s.cache.DeleteSessionAccountID(ctx, derefPlatformID(platformID), cacheKey)
 		return nil
 	}
 
@@ -230,7 +200,7 @@ func (s *GeminiMessagesCompatService) tryStickySessionHit(
 
 	// 刷新会话 TTL 并返回账号
 	// Refresh session TTL and return account
-	_ = s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), cacheKey, geminiStickySessionTTL)
+	_ = s.cache.RefreshSessionTTL(ctx, derefPlatformID(platformID), cacheKey, geminiStickySessionTTL)
 	return account
 }
 
@@ -443,25 +413,16 @@ func (s *GeminiMessagesCompatService) hydrateSelectedAccount(ctx context.Context
 	return hydrated, nil
 }
 
-func (s *GeminiMessagesCompatService) listSchedulableAccountsOnce(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]Account, error) {
+func (s *GeminiMessagesCompatService) listSchedulableAccountsOnce(ctx context.Context, platformID *int64, platform string, hasForcePlatform bool) ([]Account, error) {
 	if s.schedulerSnapshot != nil {
-		accounts, _, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
+		accounts, _, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, platformID, platform, hasForcePlatform)
 		return accounts, err
 	}
 
-	useMixedScheduling := platform == PlatformGemini && !hasForcePlatform
-	queryPlatforms := []string{platform}
-	if useMixedScheduling {
-		queryPlatforms = []string{platform, PlatformAntigravity}
+	if scope, ok := PlatformSchedulingScopeFromContext(ctx); ok {
+		return s.accountRepo.ListSchedulableByPlatformPool(ctx, scope.PlatformID, scope.AccountPlatform)
 	}
-
-	if groupID != nil {
-		return s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, *groupID, queryPlatforms)
-	}
-	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		return s.accountRepo.ListSchedulableByPlatforms(ctx, queryPlatforms)
-	}
-	return s.accountRepo.ListSchedulableUngroupedByPlatforms(ctx, queryPlatforms)
+	return nil, fmt.Errorf("%w: platform scheduling scope is required", ErrPlatformInvalid)
 }
 
 func (s *GeminiMessagesCompatService) validateUpstreamBaseURL(raw string) (string, error) {
@@ -484,8 +445,8 @@ func (s *GeminiMessagesCompatService) validateUpstreamBaseURL(raw string) (strin
 }
 
 // HasAntigravityAccounts 检查是否有可用的 antigravity 账户
-func (s *GeminiMessagesCompatService) HasAntigravityAccounts(ctx context.Context, groupID *int64) (bool, error) {
-	accounts, err := s.listSchedulableAccountsOnce(ctx, groupID, PlatformAntigravity, false)
+func (s *GeminiMessagesCompatService) HasAntigravityAccounts(ctx context.Context, platformID *int64) (bool, error) {
+	accounts, err := s.listSchedulableAccountsOnce(ctx, platformID, PlatformAntigravity, false)
 	if err != nil {
 		return false, err
 	}
@@ -500,8 +461,8 @@ func (s *GeminiMessagesCompatService) HasAntigravityAccounts(ctx context.Context
 // 2) OAuth accounts without project_id (AI Studio OAuth)
 // 3) OAuth accounts explicitly marked as ai_studio
 // 4) Any remaining Gemini accounts (fallback)
-func (s *GeminiMessagesCompatService) SelectAccountForAIStudioEndpoints(ctx context.Context, groupID *int64) (*Account, error) {
-	accounts, err := s.listSchedulableAccountsOnce(ctx, groupID, PlatformGemini, true)
+func (s *GeminiMessagesCompatService) SelectAccountForAIStudioEndpoints(ctx context.Context, platformID *int64) (*Account, error) {
+	accounts, err := s.listSchedulableAccountsOnce(ctx, platformID, PlatformGemini, true)
 	if err != nil {
 		return nil, fmt.Errorf("query accounts failed: %w", err)
 	}

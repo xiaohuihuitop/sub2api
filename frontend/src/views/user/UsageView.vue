@@ -35,9 +35,9 @@
             :start-date="startDate"
             :end-date="endDate"
           />
-          <GroupDistributionChart
-            v-model:metric="groupDistributionMetric"
-            :group-stats="groupStats"
+          <PlatformDistributionChart
+            v-model:metric="platformDistributionMetric"
+            :platform-stats="platformStats"
             :loading="chartsLoading"
             :show-metric-toggle="true"
             :enable-breakdown="false"
@@ -220,7 +220,7 @@ import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
-import GroupDistributionChart from '@/components/charts/GroupDistributionChart.vue'
+import PlatformDistributionChart from '@/components/charts/PlatformDistributionChart.vue'
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -233,7 +233,7 @@ import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usag
 import type {
   ApiKey,
   EndpointStat,
-  GroupStat,
+  PlatformStat,
   ModelStat,
   TrendDataPoint,
   UsageLog,
@@ -254,7 +254,7 @@ const usageStats = ref<UsageStatsResponse | null>(null)
 const usageLogs = ref<UsageLog[]>([])
 const trendData = ref<TrendDataPoint[]>([])
 const requestedModelStats = ref<ModelStat[]>([])
-const groupStats = ref<GroupStat[]>([])
+const platformStats = ref<PlatformStat[]>([])
 const inboundEndpointStats = ref<EndpointStat[]>([])
 const upstreamEndpointStats = ref<EndpointStat[]>([])
 const endpointPathStats = ref<EndpointStat[]>([])
@@ -355,10 +355,9 @@ const defaultViewState: UserUsageViewState = {
 const persistedUserFilterKeys = new Set([
   'model', 'api_key_id', 'request_type', 'billing_type', 'billing_mode',
 ])
-const legacyPersistedUserFilterKeys = new Set([...persistedUserFilterKeys, 'group_id'])
 const isPersistedUserFilters = (value: unknown): value is Partial<UsageQueryParams> => {
   if (!value || typeof value !== 'object') return false
-  return Object.keys(value).every((key) => legacyPersistedUserFilterKeys.has(key))
+  return Object.keys(value).every((key) => persistedUserFilterKeys.has(key))
 }
 const isUserUsageViewState = (value: unknown): value is UserUsageViewState => {
   if (!value || typeof value !== 'object') return false
@@ -377,10 +376,9 @@ const startDate = ref(initialViewState.startDate)
 const endDate = ref(initialViewState.endDate)
 const granularity = ref<'day' | 'hour'>(initialViewState.granularity)
 const initialFilters: Partial<UsageQueryParams> = { ...initialViewState.filters }
-delete initialFilters.group_id
 
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
-const groupDistributionMetric = ref<DistributionMetric>('tokens')
+const platformDistributionMetric = ref<DistributionMetric>('tokens')
 const endpointDistributionMetric = ref<DistributionMetric>('tokens')
 const endpointDistributionSource = ref<EndpointSource>('inbound')
 const activeTab = ref<'usage' | 'errors'>('usage')
@@ -542,16 +540,16 @@ const loadChartData = async () => {
       granularity: granularity.value,
       include_trend: true,
       include_model_stats: false,
-      include_group_stats: true,
+      include_platform_stats: true,
     })
     if (seq !== chartReqSeq) return
     trendData.value = snapshot.trend || []
-    groupStats.value = snapshot.groups || []
+    platformStats.value = snapshot.platforms || []
   } catch (error) {
     if (seq !== chartReqSeq) return
     console.error('Failed to load chart data:', error)
     trendData.value = []
-    groupStats.value = []
+    platformStats.value = []
   } finally {
     if (seq === chartReqSeq) chartsLoading.value = false
   }
@@ -665,7 +663,7 @@ const getBillingSourceExportText = (log: UsageLog): string => {
     return log.subscription_name || log.subscription?.plan_name_snapshot || t('usage.subscription')
   }
   if (log.billing_source_type === 'balance') return t('usage.balance')
-  return log.group?.name || ''
+  return ''
 }
 
 const escapeCSVValue = (value: unknown): string => {
@@ -770,7 +768,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
   { key: 'platform', label: t('usage.platform'), sortable: false },
   { key: 'ip_address', label: 'IP', sortable: false },
-  { key: 'group', label: t('usage.billingSource'), sortable: false },
+  { key: 'billing_source', label: t('usage.billingSource'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
   { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
@@ -820,9 +818,9 @@ const errAllColumns = computed<Column[]>(() => [
   { key: 'model', label: t('usage.errors.model') },
   { key: 'endpoint', label: t('usage.errors.endpoint') },
   { key: 'client_ip', label: 'IP' },
-  { key: 'group', label: t('admin.usage.group') },
+  { key: 'platform_name', label: t('usage.errors.routingPlatform') },
   { key: 'type', label: t('usage.type') },
-  { key: 'platform', label: t('usage.errors.platform') },
+  { key: 'platform', label: t('usage.errors.accountPlatform') },
   { key: 'category', label: t('usage.errors.category') },
   { key: 'status', label: t('usage.errors.status') },
   { key: 'message', label: t('usage.errors.message') },

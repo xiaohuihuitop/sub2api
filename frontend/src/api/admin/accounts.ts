@@ -19,8 +19,6 @@ import type {
   CodexSessionImportRequest,
   CodexSessionImportResult,
   OpenAICodexPATCreateRequest,
-  CheckMixedChannelRequest,
-  CheckMixedChannelResponse,
   UpstreamBillingProbeResult,
   UpstreamBillingProbeSettings,
   OllamaCloudUsageSettings,
@@ -41,7 +39,6 @@ export async function list(
     platform?: string
     type?: string
     status?: string
-    group?: string
     search?: string
     privacy_mode?: string
     lite?: string
@@ -77,7 +74,6 @@ export async function listWithEtag(
     platform?: string
     type?: string
     status?: string
-    group?: string
     search?: string
     privacy_mode?: string
     lite?: string
@@ -194,16 +190,6 @@ export async function duplicate(id: number): Promise<Account> {
  */
 export async function update(id: number, updates: UpdateAccountRequest): Promise<Account> {
   const { data } = await apiClient.put<Account>(`/admin/accounts/${id}`, updates)
-  return data
-}
-
-/**
- * Check mixed-channel risk for account-group binding.
- */
-export async function checkMixedChannelRisk(
-  payload: CheckMixedChannelRequest
-): Promise<CheckMixedChannelResponse> {
-  const { data } = await apiClient.post<CheckMixedChannelResponse>('/admin/accounts/check-mixed-channel', payload)
   return data
 }
 
@@ -620,7 +606,6 @@ export async function exportData(options?: {
     platform?: string
     type?: string
     status?: string
-    group?: string
     privacy_mode?: string
     search?: string
     sort_by?: string
@@ -632,11 +617,10 @@ export async function exportData(options?: {
   if (options?.ids && options.ids.length > 0) {
     params.ids = options.ids.join(',')
   } else if (options?.filters) {
-    const { platform, type, status, group, privacy_mode, search, sort_by, sort_order } = options.filters
+    const { platform, type, status, privacy_mode, search, sort_by, sort_order } = options.filters
     if (platform) params.platform = platform
     if (type) params.type = type
     if (status) params.status = status
-    if (group) params.group = group
     if (privacy_mode) params.privacy_mode = privacy_mode
     if (search) params.search = search
     if (sort_by) params.sort_by = sort_by
@@ -649,13 +633,9 @@ export async function exportData(options?: {
   return data
 }
 
-export async function importData(payload: {
-  data: AdminDataPayload
-  skip_default_group_bind?: boolean
-}): Promise<AdminDataImportResult> {
+export async function importData(payload: { data: AdminDataPayload }): Promise<AdminDataImportResult> {
   const { data } = await apiClient.post<AdminDataImportResult>('/admin/accounts/data', {
-    data: payload.data,
-    skip_default_group_bind: payload.skip_default_group_bind
+    data: payload.data
   })
   return data
 }
@@ -856,7 +836,6 @@ export interface SparkShadowCreatePayload {
   name?: string
   priority?: number
   concurrency?: number
-  group_ids?: number[]
 }
 
 export async function createSparkShadow(parentId: number, payload: SparkShadowCreatePayload): Promise<Account> {
@@ -947,7 +926,6 @@ export const accountsAPI = {
   create,
   duplicate,
   update,
-  checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,
   testAccount,

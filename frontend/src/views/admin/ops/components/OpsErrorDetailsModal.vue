@@ -10,7 +10,7 @@ interface Props {
   show: boolean
   timeRange: string
   platform?: string
-  groupId?: number | null
+  platformId?: number | null
   errorType: 'request' | 'upstream'
 }
 
@@ -111,7 +111,7 @@ async function fetchErrorLogs() {
 
     const platform = String(props.platform || '').trim()
     if (platform) params.platform = platform
-    if (typeof props.groupId === 'number' && props.groupId > 0) params.group_id = props.groupId
+    if (typeof props.platformId === 'number' && props.platformId > 0) params.platform_id = props.platformId
 
     if (q.value.trim()) params.q = q.value.trim()
     if (statusCode.value === 'other') params.status_codes_other = '1'
@@ -160,7 +160,7 @@ watch(
 )
 
 watch(
-  () => [props.timeRange, props.platform, props.groupId] as const,
+  () => [props.timeRange, props.platform, props.platformId] as const,
   () => {
     if (!props.show) return
     page.value = 1

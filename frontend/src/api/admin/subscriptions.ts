@@ -17,7 +17,7 @@ import type {
  * List all subscriptions with pagination
  * @param page - Page number (default: 1)
  * @param pageSize - Items per page (default: 20)
- * @param filters - Optional filters (status, user_id, group_id, sort_by, sort_order)
+ * @param filters - Optional filters (status, user_id, platform, sort_by, sort_order)
  * @returns Paginated list of subscriptions
  */
 export async function list(
@@ -26,7 +26,6 @@ export async function list(
   filters?: {
     status?: 'active' | 'expired' | 'revoked' | 'suspended'
     user_id?: number
-    group_id?: number
     platform?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
@@ -149,27 +148,6 @@ export async function resetQuota(
 }
 
 /**
- * List subscriptions by group
- * @param groupId - Group ID
- * @param page - Page number
- * @param pageSize - Items per page
- * @returns Paginated list of subscriptions in the group
- */
-export async function listByGroup(
-  groupId: number,
-  page: number = 1,
-  pageSize: number = 20
-): Promise<PaginatedResponse<UserSubscription>> {
-  const { data } = await apiClient.get<PaginatedResponse<UserSubscription>>(
-    `/admin/groups/${groupId}/subscriptions`,
-    {
-      params: { page, page_size: pageSize }
-    }
-  )
-  return data
-}
-
-/**
  * List subscriptions by user
  * @param userId - User ID
  * @param page - Page number
@@ -200,7 +178,6 @@ export const subscriptionsAPI = {
   revoke,
   restore,
   resetQuota,
-  listByGroup,
   listByUser
 }
 

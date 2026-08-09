@@ -113,7 +113,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		handleError:     s.handleUpstreamError,
 		requestedModel:  originalModel,
 		isStickySession: isStickySession, // Forward 由上层判断粘性会话
-		groupID:         0,               // Forward 方法没有 groupID，由上层处理粘性会话清除
+		platformID:      0,               // Forward 方法没有 platformID，由上层处理粘性会话清除
 		sessionHash:     "",              // Forward 方法没有 sessionHash，由上层处理粘性会话清除
 	})
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 					handleError:     s.handleUpstreamError,
 					requestedModel:  originalModel,
 					isStickySession: isStickySession,
-					groupID:         0,  // Forward 方法没有 groupID，由上层处理粘性会话清除
+					platformID:      0,  // Forward 方法没有 platformID，由上层处理粘性会话清除
 					sessionHash:     "", // Forward 方法没有 sessionHash，由上层处理粘性会话清除
 				})
 				if retryErr != nil {
@@ -319,7 +319,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 							handleError:     s.handleUpstreamError,
 							requestedModel:  originalModel,
 							isStickySession: isStickySession,
-							groupID:         0,
+							platformID:      0,
 							sessionHash:     "",
 						})
 						if retryErr == nil {

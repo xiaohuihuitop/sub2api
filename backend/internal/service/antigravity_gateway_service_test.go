@@ -747,7 +747,7 @@ func TestAntigravityGatewayService_ForwardGemini_ClearsStickySessionOnGeminiRate
 	require.Equal(t, "gemini-3-flash", repo.modelRateLimitCalls[0].modelKey)
 	require.Equal(t, antigravityGeminiModelRateLimitKey, repo.modelRateLimitCalls[1].modelKey)
 	require.Len(t, cache.deleteCalls, 1)
-	require.Equal(t, int64(77), cache.deleteCalls[0].groupID)
+	require.Equal(t, int64(77), cache.deleteCalls[0].platformID)
 	require.Equal(t, "gemini:sticky-runtime", cache.deleteCalls[0].sessionHash)
 }
 

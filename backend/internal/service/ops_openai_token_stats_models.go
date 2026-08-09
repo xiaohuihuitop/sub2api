@@ -7,8 +7,8 @@ type OpsOpenAITokenStatsFilter struct {
 	StartTime time.Time
 	EndTime   time.Time
 
-	Platform string
-	GroupID  *int64
+	Platform   string
+	PlatformID *int64
 
 	// Pagination mode (default): page/page_size
 	Page     int
@@ -37,8 +37,8 @@ type OpsOpenAITokenStatsResponse struct {
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time"`
 
-	Platform string `json:"platform,omitempty"`
-	GroupID  *int64 `json:"group_id,omitempty"`
+	Platform   string `json:"platform,omitempty"`
+	PlatformID *int64 `json:"platform_id,omitempty"`
 
 	Items []*OpsOpenAITokenStatsItem `json:"items"`
 

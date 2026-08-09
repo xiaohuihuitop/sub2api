@@ -23,7 +23,7 @@ type pricingRemoteClientError struct {
 	err error
 }
 
-func (c *pricingRemoteClientError) FetchPricingJSON(_ context.Context, _ string) ([]byte, error) {
+func (c *pricingRemoteClientError) FetpricingOverrideJSON(_ context.Context, _ string) ([]byte, error) {
 	return nil, c.err
 }
 
@@ -55,7 +55,7 @@ func NewPricingRemoteClient(proxyURL string, allowDirectOnProxyError bool) servi
 	}
 }
 
-func (c *pricingRemoteClient) FetchPricingJSON(ctx context.Context, url string) ([]byte, error) {
+func (c *pricingRemoteClient) FetpricingOverrideJSON(ctx context.Context, url string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

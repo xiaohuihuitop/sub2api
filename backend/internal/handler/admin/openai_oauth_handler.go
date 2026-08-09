@@ -108,22 +108,19 @@ type OpenAIRefreshTokenRequest struct {
 }
 
 type OpenAICodexPATCreateRequest struct {
-	AccessToken             string         `json:"access_token" binding:"required"`
-	Name                    string         `json:"name"`
-	Notes                   *string        `json:"notes"`
-	PlatformID              *int64         `json:"platform_id"`
-	GroupIDs                []int64        `json:"-"`
-	ProxyID                 *int64         `json:"proxy_id"`
-	Concurrency             *int           `json:"concurrency"`
-	Priority                *int           `json:"priority"`
-	RateMultiplier          *float64       `json:"rate_multiplier"`
-	LoadFactor              *int           `json:"load_factor"`
-	ExpiresAt               *int64         `json:"expires_at"`
-	AutoPauseOnExpired      *bool          `json:"auto_pause_on_expired"`
-	CredentialExtras        map[string]any `json:"credential_extras"`
-	Extra                   map[string]any `json:"extra"`
-	SkipDefaultGroupBind    *bool          `json:"-"`
-	ConfirmMixedChannelRisk *bool          `json:"-"`
+	AccessToken        string         `json:"access_token" binding:"required"`
+	Name               string         `json:"name"`
+	Notes              *string        `json:"notes"`
+	PlatformID         *int64         `json:"platform_id"`
+	ProxyID            *int64         `json:"proxy_id"`
+	Concurrency        *int           `json:"concurrency"`
+	Priority           *int           `json:"priority"`
+	RateMultiplier     *float64       `json:"rate_multiplier"`
+	LoadFactor         *int           `json:"load_factor"`
+	ExpiresAt          *int64         `json:"expires_at"`
+	AutoPauseOnExpired *bool          `json:"auto_pause_on_expired"`
+	CredentialExtras   map[string]any `json:"credential_extras"`
+	Extra              map[string]any `json:"extra"`
 }
 
 // RefreshToken refreshes an OpenAI OAuth token
@@ -235,16 +232,15 @@ func (h *OpenAIOAuthHandler) RefreshAccountToken(c *gin.Context) {
 // POST /api/v1/admin/openai/create-from-oauth
 func (h *OpenAIOAuthHandler) CreateAccountFromOAuth(c *gin.Context) {
 	var req struct {
-		SessionID   string  `json:"session_id" binding:"required"`
-		Code        string  `json:"code" binding:"required"`
-		State       string  `json:"state" binding:"required"`
-		RedirectURI string  `json:"redirect_uri"`
-		ProxyID     *int64  `json:"proxy_id"`
-		Name        string  `json:"name"`
-		Concurrency int     `json:"concurrency"`
-		Priority    int     `json:"priority"`
-		PlatformID  *int64  `json:"platform_id"`
-		GroupIDs    []int64 `json:"-"`
+		SessionID   string `json:"session_id" binding:"required"`
+		Code        string `json:"code" binding:"required"`
+		State       string `json:"state" binding:"required"`
+		RedirectURI string `json:"redirect_uri"`
+		ProxyID     *int64 `json:"proxy_id"`
+		Name        string `json:"name"`
+		Concurrency int    `json:"concurrency"`
+		Priority    int    `json:"priority"`
+		PlatformID  *int64 `json:"platform_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -284,16 +280,15 @@ func (h *OpenAIOAuthHandler) CreateAccountFromOAuth(c *gin.Context) {
 
 	// Create account
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:                 name,
-		Platform:             platform,
-		Type:                 "oauth",
-		Credentials:          credentials,
-		Extra:                nil,
-		ProxyID:              req.ProxyID,
-		Concurrency:          req.Concurrency,
-		Priority:             req.Priority,
-		PlatformID:           req.PlatformID,
-		SkipDefaultGroupBind: true,
+		Name:        name,
+		Platform:    platform,
+		Type:        "oauth",
+		Credentials: credentials,
+		Extra:       nil,
+		ProxyID:     req.ProxyID,
+		Concurrency: req.Concurrency,
+		Priority:    req.Priority,
+		PlatformID:  req.PlatformID,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -374,21 +369,20 @@ func (h *OpenAIOAuthHandler) CreateAccountFromCodexPAT(c *gin.Context) {
 		priority = *req.Priority
 	}
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:                 buildOpenAICodexPATAccountName(req.Name, tokenInfo),
-		Notes:                req.Notes,
-		Platform:             service.PlatformOpenAI,
-		Type:                 service.AccountTypeOAuth,
-		Credentials:          credentials,
-		Extra:                extra,
-		ProxyID:              req.ProxyID,
-		Concurrency:          concurrency,
-		Priority:             priority,
-		RateMultiplier:       req.RateMultiplier,
-		LoadFactor:           req.LoadFactor,
-		PlatformID:           req.PlatformID,
-		ExpiresAt:            req.ExpiresAt,
-		AutoPauseOnExpired:   req.AutoPauseOnExpired,
-		SkipDefaultGroupBind: true,
+		Name:               buildOpenAICodexPATAccountName(req.Name, tokenInfo),
+		Notes:              req.Notes,
+		Platform:           service.PlatformOpenAI,
+		Type:               service.AccountTypeOAuth,
+		Credentials:        credentials,
+		Extra:              extra,
+		ProxyID:            req.ProxyID,
+		Concurrency:        concurrency,
+		Priority:           priority,
+		RateMultiplier:     req.RateMultiplier,
+		LoadFactor:         req.LoadFactor,
+		PlatformID:         req.PlatformID,
+		ExpiresAt:          req.ExpiresAt,
+		AutoPauseOnExpired: req.AutoPauseOnExpired,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

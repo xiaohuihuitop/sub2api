@@ -9,7 +9,6 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
@@ -28,8 +27,6 @@ type UserSubscription struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int64 `json:"user_id,omitempty"`
-	// GroupID holds the value of the "group_id" field.
-	GroupID int64 `json:"group_id,omitempty"`
 	// SubscriptionPlanID holds the value of the "subscription_plan_id" field.
 	SubscriptionPlanID *int64 `json:"subscription_plan_id,omitempty"`
 	// PlanNameSnapshot holds the value of the "plan_name_snapshot" field.
@@ -76,8 +73,6 @@ type UserSubscription struct {
 type UserSubscriptionEdges struct {
 	// User holds the value of the user edge.
 	User *User `json:"user,omitempty"`
-	// Group holds the value of the group edge.
-	Group *Group `json:"group,omitempty"`
 	// SubscriptionPlan holds the value of the subscription_plan edge.
 	SubscriptionPlan *SubscriptionPlan `json:"subscription_plan,omitempty"`
 	// AssignedByUser holds the value of the assigned_by_user edge.
@@ -86,7 +81,7 @@ type UserSubscriptionEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [4]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -100,23 +95,12 @@ func (e UserSubscriptionEdges) UserOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "user"}
 }
 
-// GroupOrErr returns the Group value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e UserSubscriptionEdges) GroupOrErr() (*Group, error) {
-	if e.Group != nil {
-		return e.Group, nil
-	} else if e.loadedTypes[1] {
-		return nil, &NotFoundError{label: group.Label}
-	}
-	return nil, &NotLoadedError{edge: "group"}
-}
-
 // SubscriptionPlanOrErr returns the SubscriptionPlan value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e UserSubscriptionEdges) SubscriptionPlanOrErr() (*SubscriptionPlan, error) {
 	if e.SubscriptionPlan != nil {
 		return e.SubscriptionPlan, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: subscriptionplan.Label}
 	}
 	return nil, &NotLoadedError{edge: "subscription_plan"}
@@ -127,7 +111,7 @@ func (e UserSubscriptionEdges) SubscriptionPlanOrErr() (*SubscriptionPlan, error
 func (e UserSubscriptionEdges) AssignedByUserOrErr() (*User, error) {
 	if e.AssignedByUser != nil {
 		return e.AssignedByUser, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: user.Label}
 	}
 	return nil, &NotLoadedError{edge: "assigned_by_user"}
@@ -136,7 +120,7 @@ func (e UserSubscriptionEdges) AssignedByUserOrErr() (*User, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserSubscriptionEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -149,7 +133,7 @@ func (*UserSubscription) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case usersubscription.FieldDailyLimitUsdSnapshot, usersubscription.FieldWeeklyLimitUsdSnapshot, usersubscription.FieldMonthlyLimitUsdSnapshot, usersubscription.FieldRateMultiplierSnapshot, usersubscription.FieldDailyUsageUsd, usersubscription.FieldWeeklyUsageUsd, usersubscription.FieldMonthlyUsageUsd:
 			values[i] = new(sql.NullFloat64)
-		case usersubscription.FieldID, usersubscription.FieldUserID, usersubscription.FieldGroupID, usersubscription.FieldSubscriptionPlanID, usersubscription.FieldAssignedBy:
+		case usersubscription.FieldID, usersubscription.FieldUserID, usersubscription.FieldSubscriptionPlanID, usersubscription.FieldAssignedBy:
 			values[i] = new(sql.NullInt64)
 		case usersubscription.FieldPlanNameSnapshot, usersubscription.FieldStatus, usersubscription.FieldNotes:
 			values[i] = new(sql.NullString)
@@ -200,12 +184,6 @@ func (_m *UserSubscription) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
 				_m.UserID = value.Int64
-			}
-		case usersubscription.FieldGroupID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field group_id", values[i])
-			} else if value.Valid {
-				_m.GroupID = value.Int64
 			}
 		case usersubscription.FieldSubscriptionPlanID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -342,11 +320,6 @@ func (_m *UserSubscription) QueryUser() *UserQuery {
 	return NewUserSubscriptionClient(_m.config).QueryUser(_m)
 }
 
-// QueryGroup queries the "group" edge of the UserSubscription entity.
-func (_m *UserSubscription) QueryGroup() *GroupQuery {
-	return NewUserSubscriptionClient(_m.config).QueryGroup(_m)
-}
-
 // QuerySubscriptionPlan queries the "subscription_plan" edge of the UserSubscription entity.
 func (_m *UserSubscription) QuerySubscriptionPlan() *SubscriptionPlanQuery {
 	return NewUserSubscriptionClient(_m.config).QuerySubscriptionPlan(_m)
@@ -398,9 +371,6 @@ func (_m *UserSubscription) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
-	builder.WriteString(", ")
-	builder.WriteString("group_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.GroupID))
 	builder.WriteString(", ")
 	if v := _m.SubscriptionPlanID; v != nil {
 		builder.WriteString("subscription_plan_id=")

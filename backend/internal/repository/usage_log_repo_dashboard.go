@@ -472,10 +472,10 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 	stats.Rpm = rpm
 	stats.Tpm = tpm
 
-	// 按"有效平台"维度拆分（group.platform 优先，否则 account.platform）。
+	// 按用量记录绑定的平台维度拆分。
 	// 与 ops 路径口径一致；HAVING 过滤掉无法确定平台的行（避免出现空字符串平台）。
 	// 与上面 totalStatsQuery/todayStatsQuery 的总值可能略微差异，原因有二：
-	//   1) 无平台归属的极少数行（group/account 都没 platform）会被 HAVING 排除；
+	//   1) 无平台归属的极少数行会被 HAVING 排除；
 	//   2) usageLogSuccessFilterUL 会把 actual_cost = 0 的失败 placeholder 行排除，
 	//      而 totalStatsQuery/todayStatsQuery 没有这层过滤、会把这些行的 request 计数算进去。
 	platformQuery := `
@@ -488,8 +488,7 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens) FILTER (WHERE ul.created_at >= $2), 0) as today_tokens,
 			COALESCE(SUM(ul.actual_cost) FILTER (WHERE ul.created_at >= $2), 0) as today_actual_cost
 		FROM usage_logs ul
-		LEFT JOIN groups g ON g.id = ul.group_id
-		LEFT JOIN accounts a ON a.id = ul.account_id
+		LEFT JOIN platforms p ON p.id = ul.platform_id
 		WHERE ul.user_id = $1
 		  AND ` + usageLogSuccessFilterUL + `
 		GROUP BY ` + usageLogEffectivePlatformExpr + `

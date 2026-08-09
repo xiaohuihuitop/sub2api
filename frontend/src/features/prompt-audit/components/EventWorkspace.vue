@@ -36,7 +36,7 @@
         </select>
       </label>
       <FilterInput v-model="localFilters.endpoint" :label="t('admin.promptAudit.events.endpoint')" @change="filtersChanged" />
-      <FilterInput v-model="localFilters.group_id" :label="t('admin.promptAudit.events.groupId')" type="number" @change="filtersChanged" />
+      <FilterInput v-model="localFilters.platform_id" :label="t('admin.promptAudit.events.platformId')" type="number" @change="filtersChanged" />
       <FilterInput v-model="localFilters.user_id" :label="t('admin.promptAudit.events.userId')" type="number" @change="filtersChanged" />
       <FilterInput v-model="localFilters.api_key_id" :label="t('admin.promptAudit.events.apiKeyId')" type="number" @change="filtersChanged" />
       <FilterInput v-model="localFilters.request_id" :label="t('admin.promptAudit.events.requestId')" @change="filtersChanged" />
@@ -63,7 +63,7 @@
             <th class="w-10 px-3 py-3"><input type="checkbox" :checked="allSelected" :aria-label="t('admin.promptAudit.events.selectAll')" @change="toggleAll" /></th>
             <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.time') }}</th>
             <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.identity') }}</th>
-            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.group') }}</th>
+            <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.platform') }}</th>
             <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.route') }}</th>
             <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.result') }}</th>
             <th class="px-3 py-3 font-medium">{{ t('admin.promptAudit.events.preview') }}</th>
@@ -81,7 +81,7 @@
               <CopyLine :label="t('admin.promptAudit.events.email')" :value="event.snapshot.user_email" />
               <CopyLine :label="t('admin.promptAudit.events.apiKey')" :value="event.snapshot.api_key_name" />
             </td>
-            <td class="px-3 py-3 text-gray-700 dark:text-dark-200">{{ event.snapshot.group_name || '—' }}</td>
+            <td class="px-3 py-3 text-gray-700 dark:text-dark-200">{{ event.snapshot.platform_name || '—' }}</td>
             <td class="px-3 py-3">
               <p class="font-medium text-gray-900 dark:text-white">{{ event.snapshot.endpoint }}</p>
               <p class="mt-1 text-xs text-gray-500">{{ event.snapshot.model }} · {{ event.snapshot.protocol }} · {{ event.snapshot.stage || 'http' }}</p>

@@ -119,7 +119,7 @@ func (s *OpenAIGatewayService) openAIStickyLegacyTTL(ttl time.Duration) time.Dur
 	return legacyTTL
 }
 
-func (s *OpenAIGatewayService) getStickySessionAccountID(ctx context.Context, groupID *int64, sessionHash string) (int64, error) {
+func (s *OpenAIGatewayService) getStickySessionAccountID(ctx context.Context, platformID *int64, sessionHash string) (int64, error) {
 	if s == nil || s.cache == nil {
 		return 0, nil
 	}
@@ -129,7 +129,7 @@ func (s *OpenAIGatewayService) getStickySessionAccountID(ctx context.Context, gr
 		return 0, nil
 	}
 
-	accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), primaryKey)
+	accountID, err := s.cache.GetSessionAccountID(ctx, derefPlatformID(platformID), primaryKey)
 	if err == nil && accountID > 0 {
 		return accountID, nil
 	}
@@ -143,7 +143,7 @@ func (s *OpenAIGatewayService) getStickySessionAccountID(ctx context.Context, gr
 	}
 
 	openAIStickyLegacyReadFallbackTotal.Add(1)
-	legacyAccountID, legacyErr := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), legacyKey)
+	legacyAccountID, legacyErr := s.cache.GetSessionAccountID(ctx, derefPlatformID(platformID), legacyKey)
 	if legacyErr == nil && legacyAccountID > 0 {
 		openAIStickyLegacyReadFallbackHit.Add(1)
 		return legacyAccountID, nil
@@ -151,7 +151,7 @@ func (s *OpenAIGatewayService) getStickySessionAccountID(ctx context.Context, gr
 	return accountID, err
 }
 
-func (s *OpenAIGatewayService) setStickySessionAccountID(ctx context.Context, groupID *int64, sessionHash string, accountID int64, ttl time.Duration) error {
+func (s *OpenAIGatewayService) setStickySessionAccountID(ctx context.Context, platformID *int64, sessionHash string, accountID int64, ttl time.Duration) error {
 	if s == nil || s.cache == nil || accountID <= 0 {
 		return nil
 	}
@@ -160,7 +160,7 @@ func (s *OpenAIGatewayService) setStickySessionAccountID(ctx context.Context, gr
 		return nil
 	}
 
-	if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), primaryKey, accountID, ttl); err != nil {
+	if err := s.cache.SetSessionAccountID(ctx, derefPlatformID(platformID), primaryKey, accountID, ttl); err != nil {
 		return err
 	}
 
@@ -171,14 +171,14 @@ func (s *OpenAIGatewayService) setStickySessionAccountID(ctx context.Context, gr
 	if legacyKey == "" {
 		return nil
 	}
-	if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), legacyKey, accountID, s.openAIStickyLegacyTTL(ttl)); err != nil {
+	if err := s.cache.SetSessionAccountID(ctx, derefPlatformID(platformID), legacyKey, accountID, s.openAIStickyLegacyTTL(ttl)); err != nil {
 		return err
 	}
 	openAIStickyLegacyDualWriteTotal.Add(1)
 	return nil
 }
 
-func (s *OpenAIGatewayService) refreshStickySessionTTL(ctx context.Context, groupID *int64, sessionHash string, ttl time.Duration) error {
+func (s *OpenAIGatewayService) refreshStickySessionTTL(ctx context.Context, platformID *int64, sessionHash string, ttl time.Duration) error {
 	if s == nil || s.cache == nil {
 		return nil
 	}
@@ -187,19 +187,19 @@ func (s *OpenAIGatewayService) refreshStickySessionTTL(ctx context.Context, grou
 		return nil
 	}
 
-	err := s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), primaryKey, ttl)
+	err := s.cache.RefreshSessionTTL(ctx, derefPlatformID(platformID), primaryKey, ttl)
 	if !s.openAISessionHashReadOldFallbackEnabled() && !s.openAISessionHashDualWriteOldEnabled() {
 		return err
 	}
 
 	legacyKey := s.openAILegacySessionCacheKey(ctx, sessionHash)
 	if legacyKey != "" {
-		_ = s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), legacyKey, s.openAIStickyLegacyTTL(ttl))
+		_ = s.cache.RefreshSessionTTL(ctx, derefPlatformID(platformID), legacyKey, s.openAIStickyLegacyTTL(ttl))
 	}
 	return err
 }
 
-func (s *OpenAIGatewayService) deleteStickySessionAccountID(ctx context.Context, groupID *int64, sessionHash string) error {
+func (s *OpenAIGatewayService) deleteStickySessionAccountID(ctx context.Context, platformID *int64, sessionHash string) error {
 	if s == nil || s.cache == nil {
 		return nil
 	}
@@ -208,14 +208,14 @@ func (s *OpenAIGatewayService) deleteStickySessionAccountID(ctx context.Context,
 		return nil
 	}
 
-	err := s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), primaryKey)
+	err := s.cache.DeleteSessionAccountID(ctx, derefPlatformID(platformID), primaryKey)
 	if !s.openAISessionHashReadOldFallbackEnabled() && !s.openAISessionHashDualWriteOldEnabled() {
 		return err
 	}
 
 	legacyKey := s.openAILegacySessionCacheKey(ctx, sessionHash)
 	if legacyKey != "" {
-		_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), legacyKey)
+		_ = s.cache.DeleteSessionAccountID(ctx, derefPlatformID(platformID), legacyKey)
 	}
 	return err
 }

@@ -17,7 +17,7 @@ import (
 
 const defaultBedrockRegion = "us-east-1"
 
-// featureKeyBedrockCCCompat is the key used in Channel.FeaturesConfig for Bedrock CC compatibility.
+// featureKeyBedrockCCCompat is the account feature key for Bedrock CC compatibility.
 const featureKeyBedrockCCCompat = "bedrock_cc_compat"
 
 var bedrockCrossRegionPrefixes = []string{"us.", "eu.", "apac.", "jp.", "au.", "us-gov.", "global."}

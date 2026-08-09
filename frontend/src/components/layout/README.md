@@ -49,7 +49,7 @@ Navigation sidebar with user and admin sections.
 - Admin navigation links (shown only if user is admin):
   - Admin Dashboard
   - Users
-  - Groups
+  - Platforms
   - Accounts
   - Proxies
   - Redeem Codes
@@ -198,7 +198,7 @@ Components use HTML entity icons for simplicity:
 - &#128100; User (Profile)
 - &#128268; Admin
 - &#128101; Users
-- &#128193; Folder (Groups)
+- &#128193; Folder (Platforms)
 - &#127760; Globe (Accounts)
 - &#128260; Network (Proxies)
 - &#127991; Ticket (Redeem Codes)

@@ -75,7 +75,6 @@ func TestResolvePlatformAssetRequestHonorsEndpointAndSelectsBalance(t *testing.T
 }
 
 func TestGatewayPlatformAssetContextSetsSchedulingAndModelRouting(t *testing.T) {
-	legacyGroupID := int64(9)
 	route := &GatewayPlatformAssetContext{
 		Platform: &ResolvedPlatformModel{
 			PlatformID:      1,
@@ -83,14 +82,12 @@ func TestGatewayPlatformAssetContextSetsSchedulingAndModelRouting(t *testing.T) 
 			AccountPlatform: PlatformOpenAI,
 			RequestedModel:  "public-gpt",
 			UpstreamModel:   "gpt-4o-2024-08-06",
-			LegacyGroupID:   &legacyGroupID,
 		},
 		SchedulingScope: PlatformSchedulingScope{
 			PlatformID:      1,
 			PlatformCode:    "gpt",
 			AccountPlatform: PlatformOpenAI,
 		},
-		PricingGroupID: &legacyGroupID,
 	}
 
 	ctx := WithGatewayPlatformAssetContext(context.Background(), route)
@@ -98,7 +95,6 @@ func TestGatewayPlatformAssetContextSetsSchedulingAndModelRouting(t *testing.T) 
 	got, ok := GatewayPlatformAssetContextFromContext(ctx)
 	require.True(t, ok)
 	require.Equal(t, int64(1), got.Platform.PlatformID)
-	require.Equal(t, int64(9), *got.PricingGroupID)
 	scope, ok := PlatformSchedulingScopeFromContext(ctx)
 	require.True(t, ok)
 	require.Equal(t, int64(1), scope.PlatformID)
@@ -113,9 +109,8 @@ func TestGatewayPlatformAssetContextSetsSchedulingAndModelRouting(t *testing.T) 
 	require.Equal(t, "public-gpt", publicModel)
 }
 
-func TestPlatformAssetBillingFactsOverrideLegacyGroupValues(t *testing.T) {
+func TestPlatformAssetBillingFactsOverrideDefaultValues(t *testing.T) {
 	platformID := int64(3)
-	pricingGroupID := int64(9)
 	subscriptionID := int64(22)
 	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
 		Platform: &ResolvedPlatformModel{PlatformID: platformID, AccountPlatform: PlatformOpenAI},
@@ -125,32 +120,15 @@ func TestPlatformAssetBillingFactsOverrideLegacyGroupValues(t *testing.T) {
 			RateMultiplier: 0.5,
 		},
 		SchedulingScope: PlatformSchedulingScope{PlatformID: platformID, AccountPlatform: PlatformOpenAI},
-		PricingGroupID:  &pricingGroupID,
 	})
 
 	token, image, video := overridePlatformAssetBillingMultipliers(ctx, 3, 4, 5)
 	require.Equal(t, 0.5, token)
 	require.Equal(t, 0.5, image)
 	require.Equal(t, 0.5, video)
-	pricingGroup, ok := PlatformAssetPricingGroupIDFromContext(ctx)
-	require.True(t, ok)
-	require.Equal(t, pricingGroupID, *pricingGroup)
 
 	usageLog := &UsageLog{}
 	applyPlatformAssetUsageAttribution(ctx, usageLog)
 	require.Equal(t, platformID, *usageLog.PlatformID)
 	require.Equal(t, BillingSourceSubscription, *usageLog.BillingSourceType)
-}
-
-func TestEffectivePricingGroupIDDoesNotFallBackInsidePlatformRoute(t *testing.T) {
-	legacyGroupID := int64(99)
-	ctx := WithGatewayPlatformAssetContext(context.Background(), &GatewayPlatformAssetContext{
-		Platform:        &ResolvedPlatformModel{PlatformID: 1, AccountPlatform: PlatformOpenAI},
-		SchedulingScope: PlatformSchedulingScope{PlatformID: 1, AccountPlatform: PlatformOpenAI},
-		PricingGroupID:  nil,
-	})
-	apiKey := &APIKey{GroupID: &legacyGroupID}
-
-	require.Nil(t, effectivePricingGroupID(ctx, apiKey))
-	require.Equal(t, PlatformOpenAI, effectivePricingAdapter(ctx, apiKey))
 }

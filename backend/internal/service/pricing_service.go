@@ -135,7 +135,7 @@ type LiteLLMModelPricing struct {
 
 // PricingRemoteClient 远程价格数据获取接口
 type PricingRemoteClient interface {
-	FetchPricingJSON(ctx context.Context, url string) ([]byte, error)
+	FetpricingOverrideJSON(ctx context.Context, url string) ([]byte, error)
 	FetchHashText(ctx context.Context, url string) (string, error)
 }
 
@@ -368,7 +368,7 @@ func (s *PricingService) downloadPricingData() error {
 		}
 	}
 
-	body, err := s.remoteClient.FetchPricingJSON(ctx, remoteURL)
+	body, err := s.remoteClient.FetpricingOverrideJSON(ctx, remoteURL)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}

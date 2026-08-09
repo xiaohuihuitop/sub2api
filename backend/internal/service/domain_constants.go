@@ -381,13 +381,8 @@ const (
 	// pre-filled when creating a new channel monitor from the admin UI. Range: [15, 3600].
 	SettingKeyChannelMonitorDefaultIntervalSeconds = "channel_monitor_default_interval_seconds"
 
-	// SettingKeyAvailableChannelsEnabled is a DB-backed soft switch for the "Available Channels"
-	// user-facing aggregate view. When false: user endpoint returns an empty list and the
-	// sidebar entry is hidden. Defaults to false (opt-in feature).
-	SettingKeyAvailableChannelsEnabled = "available_channels_enabled"
-
 	// SettingKeyModelPlazaEnabled is a DB-backed soft switch for the Model Plaza page
-	// (public group/model pricing showcase). When false: the plaza endpoint returns 404
+	// (public platform/model pricing showcase). When false: the plaza endpoint returns 404
 	// and the header entry is hidden. Defaults to false (opt-in feature).
 	SettingKeyModelPlazaEnabled = "model_plaza_enabled"
 
@@ -469,8 +464,6 @@ const (
 	// SettingKeyMaxClaudeCodeVersion 最高 Claude Code 版本号限制 (semver, 如 "3.0.0"，空值=不检查)
 	SettingKeyMaxClaudeCodeVersion = "max_claude_code_version"
 
-	// SettingKeyAllowUngroupedKeyScheduling 允许未分组 API Key 调度（默认 false：未分组 Key 返回 403）
-	SettingKeyAllowUngroupedKeyScheduling = "allow_ungrouped_key_scheduling"
 	// SettingKeyOpenAILowUpstreamRatePriorityEnabled 旧调度是否按上游 token 倍率优先。
 	SettingKeyOpenAILowUpstreamRatePriorityEnabled = "openai_low_upstream_rate_priority_enabled"
 	// SettingKeyOpenAIOAuthSchedulingRateMultiplier OAuth 账号参与成本调度时使用的参考倍率。

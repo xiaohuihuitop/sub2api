@@ -67,7 +67,6 @@ export default {
     selectOption: 'Select an option',
     searchPlaceholder: 'Search...',
     noOptionsFound: 'No options found',
-    noGroupsAvailable: 'No groups available',
     unknownError: 'Unknown error occurred',
     saving: 'Saving...',
     selectedCount: '({count} selected)',
@@ -163,10 +162,9 @@ export default {
     affiliateTransferRecords: 'Transfer Records',
     profile: 'Profile',
     users: 'Users',
-    groups: 'Groups',
     platforms: 'Platforms',
-    channels: 'Channels',
-    availableChannels: 'Available Channels',
+    modelPricing: 'Model Pricing',
+    availablePlatforms: 'Available Platforms',
     modelPlaza: 'Model Plaza',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
@@ -199,6 +197,12 @@ export default {
     contentModeration: 'Content Moderation',
     promptAudit: 'Prompt Audit',
     auditLogs: 'Audit Logs',
+  },
+
+  availablePlatforms: {
+    accountPlatform: 'Account protocol',
+    models: 'Available models',
+    empty: 'No available platforms',
   },
 
   // Auth

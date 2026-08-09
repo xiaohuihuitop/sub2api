@@ -103,7 +103,7 @@
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
-        <template #cell-group="{ row }">
+        <template #cell-billing_source="{ row }">
           <span
             v-if="getBillingSourceLabel(row) !== '-'"
             class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
@@ -628,7 +628,9 @@ const getBillingSourceLabel = (row: AdminUsageLog): string => {
     return row.subscription_name || row.subscription?.plan_name_snapshot || t('usage.subscription')
   }
   if (row.billing_source_type === 'balance') return t('usage.balance')
-  return row.group?.name || '-'
+  // Historical rows without an explicit billing source are intentionally
+  // blank; never reconstruct a billing label from the removed Group entity.
+  return '-'
 }
 
 const getBillingSourceBadgeClass = (row: AdminUsageLog): string => {

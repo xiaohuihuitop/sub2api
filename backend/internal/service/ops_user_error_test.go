@@ -124,7 +124,7 @@ func TestToUserErrorRequestDetail_WhitelistAndRedacts(t *testing.T) {
 			ClientIP:         func() *string { s := "1.2.3.4"; return &s }(),
 			UpstreamEndpoint: "https://api.openai.com/v1/chat/completions",
 			UserAgent:        "codex_cli_rs/0.125.0",
-			GroupName:        "grp-a",
+			PlatformName:     "GPT 主池",
 			Stream:           true,
 		},
 		ErrorBody:          `{"error":{"message":"upstream failed","type":"server_error"}}`,
@@ -150,15 +150,15 @@ func TestToUserErrorRequestDetail_WhitelistAndRedacts(t *testing.T) {
 		t.Errorf("UpstreamStatusCode mismatch")
 	}
 
-	// client_ip / user_agent / group_name / stream 经产品决策开放（与用量明细口径对齐）
+	// client_ip / user_agent / platform_name / stream 经产品决策开放（与用量明细口径对齐）
 	if out.ClientIP != "1.2.3.4" {
 		t.Errorf("want client_ip=1.2.3.4, got %q", out.ClientIP)
 	}
 	if out.UserAgent != "codex_cli_rs/0.125.0" {
 		t.Errorf("want user_agent=codex_cli_rs/0.125.0, got %q", out.UserAgent)
 	}
-	if out.GroupName != "grp-a" {
-		t.Errorf("want group_name=grp-a, got %q", out.GroupName)
+	if out.PlatformName != "GPT 主池" {
+		t.Errorf("want platform_name=GPT 主池, got %q", out.PlatformName)
 	}
 	if !out.Stream {
 		t.Errorf("want stream=true")

@@ -908,7 +908,7 @@ type GatewayConfig struct {
 	// 用于网关未透传/改写 User-Agent 时的兼容兜底（默认关闭，避免影响其他客户端）。
 	ForceCodexCLI bool `mapstructure:"force_codex_cli"`
 	// CodexImageGenerationBridgeEnabled: 是否为 Codex `/v1/responses` 自动注入 image_generation 工具和桥接指令。
-	// 默认关闭，避免纯文本 Codex 请求被意外改写；显式携带 image_generation 工具的请求仍按分组能力转发。
+	// 默认关闭，避免纯文本 Codex 请求被意外改写；显式携带 image_generation 工具的请求仍按平台能力转发。
 	CodexImageGenerationBridgeEnabled bool `mapstructure:"codex_image_generation_bridge_enabled"`
 	// ForcedCodexInstructionsTemplateFile: 服务端强制附加到 Codex 顶层 instructions 的模板文件路径。
 	// 模板渲染后会直接覆盖最终 instructions；若需要保留客户端 system 转换结果，请在模板中显式引用 {{ .ExistingInstructions }}。
@@ -1001,11 +1001,6 @@ type GatewayConfig struct {
 
 	// UsageRecord: 使用量记录异步队列配置（有界队列 + 固定 worker）
 	UsageRecord GatewayUsageRecordConfig `mapstructure:"usage_record"`
-
-	// UserGroupRateCacheTTLSeconds: 用户分组倍率热路径缓存 TTL（秒）
-	UserGroupRateCacheTTLSeconds int `mapstructure:"user_group_rate_cache_ttl_seconds"`
-	// ModelsListCacheTTLSeconds: /v1/models 模型列表短缓存 TTL（秒）
-	ModelsListCacheTTLSeconds int `mapstructure:"models_list_cache_ttl_seconds"`
 
 	// UserMessageQueue: 用户消息串行队列配置
 	// 对 role:"user" 的真实用户消息实施账号级串行化 + RPM 自适应延迟
@@ -2352,8 +2347,6 @@ func setDefaults() {
 	viper.SetDefault("gateway.usage_record.auto_scale_down_step", 16)
 	viper.SetDefault("gateway.usage_record.auto_scale_check_interval_seconds", 3)
 	viper.SetDefault("gateway.usage_record.auto_scale_cooldown_seconds", 10)
-	viper.SetDefault("gateway.user_group_rate_cache_ttl_seconds", 30)
-	viper.SetDefault("gateway.models_list_cache_ttl_seconds", 15)
 	// TLS指纹伪装配置（默认关闭，需要账号级别单独启用）
 	// 用户消息串行队列默认值
 	viper.SetDefault("gateway.user_message_queue.enabled", false)
@@ -3419,12 +3412,6 @@ func (c *Config) Validate() error {
 		if c.Gateway.UsageRecord.AutoScaleCooldownSeconds < 0 {
 			return fmt.Errorf("gateway.usage_record.auto_scale_cooldown_seconds must be non-negative")
 		}
-	}
-	if c.Gateway.UserGroupRateCacheTTLSeconds <= 0 {
-		return fmt.Errorf("gateway.user_group_rate_cache_ttl_seconds must be positive")
-	}
-	if c.Gateway.ModelsListCacheTTLSeconds < 10 || c.Gateway.ModelsListCacheTTLSeconds > 30 {
-		return fmt.Errorf("gateway.models_list_cache_ttl_seconds must be between 10-30")
 	}
 	if c.Gateway.Scheduling.StickySessionMaxWaiting <= 0 {
 		return fmt.Errorf("gateway.scheduling.sticky_session_max_waiting must be positive")

@@ -29,7 +29,7 @@ export interface OpsDashboardOverview {
   start_time: string
   end_time: string
   platform: string
-  group_id?: number | null
+  platform_id?: number | null
 
   health_score?: number
 
@@ -91,9 +91,9 @@ export interface OpsThroughputPlatformBreakdownItem {
   token_consumed: number
 }
 
-export interface OpsThroughputGroupBreakdownItem {
-  group_id: number
-  group_name: string
+export interface OpsThroughputPlatformPoolBreakdownItem {
+  platform_id: number
+  platform_name: string
   request_count: number
   token_consumed: number
 }
@@ -102,7 +102,7 @@ export interface OpsThroughputTrendResponse {
   bucket: string
   points: OpsThroughputTrendPoint[]
   by_platform?: OpsThroughputPlatformBreakdownItem[]
-  top_groups?: OpsThroughputGroupBreakdownItem[]
+  top_platforms?: OpsThroughputPlatformPoolBreakdownItem[]
 }
 
 export type OpsRequestKind = 'success' | 'error'
@@ -127,7 +127,7 @@ export interface OpsRequestDetail {
   user_id?: number | null
   api_key_id?: number | null
   account_id?: number | null
-  group_id?: number | null
+  platform_id?: number | null
 
   stream?: boolean
 }
@@ -140,7 +140,7 @@ export interface OpsRequestDetailsParams {
   kind?: OpsRequestDetailsKind
 
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
 
   user_id?: number
   api_key_id?: number
@@ -170,7 +170,7 @@ export interface OpsLatencyHistogramResponse {
   start_time: string
   end_time: string
   platform: string
-  group_id?: number | null
+  platform_id?: number | null
 
   total_requests: number
   buckets: OpsLatencyHistogramBucket[]
@@ -227,7 +227,7 @@ export interface OpsOpenAITokenStatsResponse {
   start_time: string
   end_time: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   items: OpsOpenAITokenStatsItem[]
   total: number
   page?: number
@@ -238,7 +238,7 @@ export interface OpsOpenAITokenStatsResponse {
 export interface OpsOpenAITokenStatsParams {
   time_range?: OpsOpenAITokenStatsTimeRange
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   page?: number
   page_size?: number
   top_n?: number
@@ -292,9 +292,9 @@ export interface PlatformConcurrencyInfo {
   waiting_in_queue: number
 }
 
-export interface GroupConcurrencyInfo {
-  group_id: number
-  group_name: string
+export interface PlatformIDConcurrencyInfo {
+  platform_id: number
+  platform_name: string
   platform: string
   current_in_use: number
   max_capacity: number
@@ -306,8 +306,8 @@ export interface AccountConcurrencyInfo {
   account_id: number
   account_name?: string
   platform: string
-  group_id: number
-  group_name: string
+  platform_id: number
+  platform_name: string
   current_in_use: number
   max_capacity: number
   load_percentage: number
@@ -317,7 +317,7 @@ export interface AccountConcurrencyInfo {
 export interface OpsConcurrencyStatsResponse {
   enabled: boolean
   platform: Record<string, PlatformConcurrencyInfo>
-  group: Record<string, GroupConcurrencyInfo>
+  platform_pool: Record<string, PlatformIDConcurrencyInfo>
   account: Record<string, AccountConcurrencyInfo>
   timestamp?: string
 }
@@ -338,13 +338,13 @@ export interface OpsUserConcurrencyStatsResponse {
   timestamp?: string
 }
 
-export async function getConcurrencyStats(platform?: string, groupId?: number | null): Promise<OpsConcurrencyStatsResponse> {
+export async function getConcurrencyStats(platform?: string, platformId?: number | null): Promise<OpsConcurrencyStatsResponse> {
   const params: Record<string, any> = {}
   if (platform) {
     params.platform = platform
   }
-  if (typeof groupId === 'number' && groupId > 0) {
-    params.group_id = groupId
+  if (typeof platformId === 'number' && platformId > 0) {
+    params.platform_id = platformId
   }
 
   const { data } = await apiClient.get<OpsConcurrencyStatsResponse>('/admin/ops/concurrency', { params })
@@ -364,9 +364,9 @@ export interface PlatformAvailability {
   error_count: number
 }
 
-export interface GroupAvailability {
-  group_id: number
-  group_name: string
+export interface PlatformIDAvailability {
+  platform_id: number
+  platform_name: string
   platform: string
   total_accounts: number
   available_count: number
@@ -378,8 +378,8 @@ export interface AccountAvailability {
   account_id: number
   account_name: string
   platform: string
-  group_id: number
-  group_name: string
+  platform_id: number
+  platform_name: string
   status: string
   is_available: boolean
   is_rate_limited: boolean
@@ -395,18 +395,18 @@ export interface AccountAvailability {
 export interface OpsAccountAvailabilityStatsResponse {
   enabled: boolean
   platform: Record<string, PlatformAvailability>
-  group: Record<string, GroupAvailability>
+  platform_pool: Record<string, PlatformIDAvailability>
   account: Record<string, AccountAvailability>
   timestamp?: string
 }
 
-export async function getAccountAvailabilityStats(platform?: string, groupId?: number | null): Promise<OpsAccountAvailabilityStatsResponse> {
+export async function getAccountAvailabilityStats(platform?: string, platformId?: number | null): Promise<OpsAccountAvailabilityStatsResponse> {
   const params: Record<string, any> = {}
   if (platform) {
     params.platform = platform
   }
-  if (typeof groupId === 'number' && groupId > 0) {
-    params.group_id = groupId
+  if (typeof platformId === 'number' && platformId > 0) {
+    params.platform_id = platformId
   }
   const { data } = await apiClient.get<OpsAccountAvailabilityStatsResponse>('/admin/ops/account-availability', { params })
   return data
@@ -423,7 +423,7 @@ export interface OpsRealtimeTrafficSummary {
   start_time: string
   end_time: string
   platform: string
-  group_id?: number | null
+  platform_id?: number | null
   qps: OpsRateSummary
   tps: OpsRateSummary
 }
@@ -437,14 +437,14 @@ export interface OpsRealtimeTrafficSummaryResponse {
 export async function getRealtimeTrafficSummary(
   window: string,
   platform?: string,
-  groupId?: number | null
+  platformId?: number | null
 ): Promise<OpsRealtimeTrafficSummaryResponse> {
   const params: Record<string, any> = { window }
   if (platform) {
     params.platform = platform
   }
-  if (typeof groupId === 'number' && groupId > 0) {
-    params.group_id = groupId
+  if (typeof platformId === 'number' && platformId > 0) {
+    params.platform_id = platformId
   }
 
   const { data } = await apiClient.get<OpsRealtimeTrafficSummaryResponse>('/admin/ops/realtime-traffic', { params })
@@ -680,9 +680,9 @@ export type MetricType =
   | 'cpu_usage_percent'
   | 'memory_usage_percent'
   | 'concurrency_queue_depth'
-  | 'group_available_accounts'
-  | 'group_available_ratio'
-  | 'group_rate_limit_ratio'
+  | 'platform_pool_available_accounts'
+  | 'platform_pool_available_ratio'
+  | 'platform_pool_rate_limit_ratio'
   | 'account_rate_limited_count'
   | 'account_error_count'
   | 'account_error_ratio'
@@ -920,8 +920,8 @@ export interface OpsErrorLog {
   api_key_deleted?: boolean
   account_id?: number | null
   account_name: string
-  group_id?: number | null
-  group_name: string
+  platform_id?: number | null
+  platform_name: string
 
   client_ip?: string | null
   request_path?: string
@@ -966,7 +966,7 @@ export async function getDashboardOverview(
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -984,7 +984,7 @@ export async function getDashboardSnapshotV2(
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1002,7 +1002,7 @@ export async function getThroughputTrend(
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1020,7 +1020,7 @@ export async function getLatencyHistogram(
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1038,7 +1038,7 @@ export async function getErrorTrend(
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1056,7 +1056,7 @@ export async function getErrorDistribution(
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1088,7 +1088,7 @@ export type OpsErrorListQueryParams = {
   start_time?: string
   end_time?: string
   platform?: string
-  group_id?: number | null
+  platform_id?: number | null
   account_id?: number | null
   user_id?: number
   api_key_id?: number
@@ -1203,7 +1203,7 @@ export interface AlertEventsQuery {
   before_fired_at?: string
   before_id?: number
   platform?: string
-  group_id?: number
+  platform_id?: number
 }
 
 export async function listAlertEvents(params: AlertEventsQuery = {}): Promise<AlertEvent[]> {
@@ -1223,7 +1223,7 @@ export async function updateAlertEventStatus(id: number, status: 'resolved' | 'm
 export async function createAlertSilence(payload: {
   rule_id: number
   platform: string
-  group_id?: number | null
+  platform_id?: number | null
   region?: string | null
   until: string
   reason?: string

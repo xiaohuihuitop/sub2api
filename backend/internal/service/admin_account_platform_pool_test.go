@@ -47,12 +47,11 @@ func TestCreateAccountDerivesAdapterFromSelectedPlatform(t *testing.T) {
 	}
 
 	created, err := (&adminServiceImpl{accountRepo: repo}).CreateAccount(context.Background(), &CreateAccountInput{
-		Name:                 "platform-account",
-		Platform:             PlatformGemini,
-		PlatformID:           int64Pointer(42),
-		Type:                 AccountTypeAPIKey,
-		Credentials:          map[string]any{"api_key": "test"},
-		SkipDefaultGroupBind: true,
+		Name:        "platform-account",
+		Platform:    PlatformGemini,
+		PlatformID:  int64Pointer(42),
+		Type:        AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "test"},
 	})
 
 	require.NoError(t, err)

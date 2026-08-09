@@ -89,7 +89,6 @@ function buildGrokOAuthAccount(
     priority: 1,
     rate_multiplier: 1,
     status: 'active',
-    group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
   } as any

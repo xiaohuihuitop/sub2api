@@ -25,7 +25,7 @@ import (
 // converts it to Anthropic Messages format (chained via Responses format),
 // forwards to the Anthropic upstream, and converts the response back to Chat
 // Completions format. This enables Chat Completions clients to access Anthropic
-// models through Anthropic platform groups.
+// models through Anthropic platform accounts.
 func (s *GatewayService) ForwardAsChatCompletions(
 	ctx context.Context,
 	c *gin.Context,

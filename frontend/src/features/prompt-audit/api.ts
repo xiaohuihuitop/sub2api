@@ -2,7 +2,7 @@ import { apiClient } from '@/api/client'
 import type {
   PromptAuditConfig,
   PromptAuditEvent,
-  PromptAuditGroup,
+	PromptAuditPlatform,
   PromptAuditRuntime,
   PromptAuditUpdateRequest,
   PromptDeletePreview,
@@ -96,11 +96,9 @@ export async function deleteEventsByFilter(
   return data
 }
 
-export async function listGroups(): Promise<PromptAuditGroup[]> {
-  const { data } = await apiClient.get<PromptAuditGroup[]>('/admin/groups/all', {
-    params: { include_inactive: true },
-  })
-  return data
+export async function listPlatforms(): Promise<PromptAuditPlatform[]> {
+	const { data } = await apiClient.get<PromptAuditPlatform[]>('/admin/platforms')
+	return data
 }
 
 export const promptAuditAPI = {
@@ -114,7 +112,7 @@ export const promptAuditAPI = {
   batchDeleteEvents,
   previewDelete,
   deleteEventsByFilter,
-  listGroups,
+	listPlatforms,
 }
 
 export default promptAuditAPI

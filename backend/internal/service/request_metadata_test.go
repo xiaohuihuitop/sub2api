@@ -28,9 +28,9 @@ func TestRequestMetadataWriteAndRead_NoBridge(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, int64(123), accountID)
 
-	groupID, ok := PrefetchedStickyGroupIDFromContext(ctx)
+	platformID, ok := PrefetchedStickyPlatformNamespaceIDFromContext(ctx)
 	require.True(t, ok)
-	require.Equal(t, int64(456), groupID)
+	require.Equal(t, int64(456), platformID)
 
 	singleRetry, ok := SingleAccountRetryFromContext(ctx)
 	require.True(t, ok)
@@ -43,7 +43,7 @@ func TestRequestMetadataWriteAndRead_NoBridge(t *testing.T) {
 	require.Nil(t, ctx.Value(ctxkey.IsMaxTokensOneHaikuRequest))
 	require.Nil(t, ctx.Value(ctxkey.ThinkingEnabled))
 	require.Nil(t, ctx.Value(ctxkey.PrefetchedStickyAccountID))
-	require.Nil(t, ctx.Value(ctxkey.PrefetchedStickyGroupID))
+	require.Nil(t, ctx.Value(ctxkey.PrefetchedStickyPlatformNamespaceID))
 	require.Nil(t, ctx.Value(ctxkey.SingleAccountRetry))
 	require.Nil(t, ctx.Value(ctxkey.AccountSwitchCount))
 }
@@ -59,7 +59,7 @@ func TestRequestMetadataWrite_BridgeLegacyKeys(t *testing.T) {
 	require.Equal(t, true, ctx.Value(ctxkey.IsMaxTokensOneHaikuRequest))
 	require.Equal(t, true, ctx.Value(ctxkey.ThinkingEnabled))
 	require.Equal(t, int64(123), ctx.Value(ctxkey.PrefetchedStickyAccountID))
-	require.Equal(t, int64(456), ctx.Value(ctxkey.PrefetchedStickyGroupID))
+	require.Equal(t, int64(456), ctx.Value(ctxkey.PrefetchedStickyPlatformNamespaceID))
 	require.Equal(t, true, ctx.Value(ctxkey.SingleAccountRetry))
 	require.Equal(t, 2, ctx.Value(ctxkey.AccountSwitchCount))
 }
@@ -71,7 +71,7 @@ func TestRequestMetadataRead_LegacyFallbackAndStats(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxkey.IsMaxTokensOneHaikuRequest, true)
 	ctx = context.WithValue(ctx, ctxkey.ThinkingEnabled, true)
 	ctx = context.WithValue(ctx, ctxkey.PrefetchedStickyAccountID, int64(321))
-	ctx = context.WithValue(ctx, ctxkey.PrefetchedStickyGroupID, int64(654))
+	ctx = context.WithValue(ctx, ctxkey.PrefetchedStickyPlatformNamespaceID, int64(654))
 	ctx = context.WithValue(ctx, ctxkey.SingleAccountRetry, true)
 	ctx = context.WithValue(ctx, ctxkey.AccountSwitchCount, int64(3))
 
@@ -87,9 +87,9 @@ func TestRequestMetadataRead_LegacyFallbackAndStats(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, int64(321), accountID)
 
-	groupID, ok := PrefetchedStickyGroupIDFromContext(ctx)
+	platformID, ok := PrefetchedStickyPlatformNamespaceIDFromContext(ctx)
 	require.True(t, ok)
-	require.Equal(t, int64(654), groupID)
+	require.Equal(t, int64(654), platformID)
 
 	singleRetry, ok := SingleAccountRetryFromContext(ctx)
 	require.True(t, ok)

@@ -152,45 +152,35 @@ type UpdateAccountRequest struct {
 
 // BulkUpdateAccountsRequest represents the payload for bulk editing accounts
 type BulkUpdateAccountsRequest struct {
-	AccountIDs              []int64                   `json:"account_ids"`
-	Filters                 *BulkUpdateAccountFilters `json:"filters"`
-	Name                    string                    `json:"name"`
-	ProxyID                 *int64                    `json:"proxy_id"`
-	Concurrency             *int                      `json:"concurrency"`
-	Priority                *int                      `json:"priority"`
-	RateMultiplier          *float64                  `json:"rate_multiplier"`
-	LoadFactor              *int                      `json:"load_factor"`
-	Status                  string                    `json:"status" binding:"omitempty,oneof=active inactive error"`
-	Schedulable             *bool                     `json:"schedulable"`
-	GroupIDs                *[]int64                  `json:"group_ids"`
-	Credentials             map[string]any            `json:"credentials"`
-	Extra                   map[string]any            `json:"extra"`
-	ProbeEnabled            *bool                     `json:"upstream_billing_probe_enabled"`
-	ConfirmMixedChannelRisk *bool                     `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
+	AccountIDs     []int64                   `json:"account_ids"`
+	Filters        *BulkUpdateAccountFilters `json:"filters"`
+	Name           string                    `json:"name"`
+	ProxyID        *int64                    `json:"proxy_id"`
+	Concurrency    *int                      `json:"concurrency"`
+	Priority       *int                      `json:"priority"`
+	RateMultiplier *float64                  `json:"rate_multiplier"`
+	LoadFactor     *int                      `json:"load_factor"`
+	Status         string                    `json:"status" binding:"omitempty,oneof=active inactive error"`
+	Schedulable    *bool                     `json:"schedulable"`
+	Credentials    map[string]any            `json:"credentials"`
+	Extra          map[string]any            `json:"extra"`
+	ProbeEnabled   *bool                     `json:"upstream_billing_probe_enabled"`
 }
 
 type BulkUpdateAccountFilters struct {
 	Platform    string `json:"platform"`
 	Type        string `json:"type"`
 	Status      string `json:"status"`
-	Group       string `json:"group"`
+	PlatformID  int64  `json:"platform_id"`
 	Search      string `json:"search"`
 	PrivacyMode string `json:"privacy_mode"`
-}
-
-// CheckMixedChannelRequest represents check mixed channel risk request
-type CheckMixedChannelRequest struct {
-	Platform  string  `json:"platform" binding:"required"`
-	GroupIDs  []int64 `json:"group_ids"`
-	AccountID *int64  `json:"account_id"`
 }
 
 // AccountWithConcurrency extends Account with real-time concurrency info
 type AccountWithConcurrency struct {
 	*dto.Account
-	CurrentConcurrency int                          `json:"current_concurrency"`
-	SchedulerScore     *AccountSchedulerScore       `json:"scheduler_score,omitempty"`
-	SchedulerScores    []AccountSchedulerGroupScore `json:"scheduler_scores,omitempty"`
+	CurrentConcurrency int                    `json:"current_concurrency"`
+	SchedulerScore     *AccountSchedulerScore `json:"scheduler_score,omitempty"`
 	// 以下字段仅对 Anthropic OAuth/SetupToken 账号有效，且仅在启用相应功能时返回
 	CurrentWindowCost *float64 `json:"current_window_cost,omitempty"` // 当前窗口费用
 	ActiveSessions    *int     `json:"active_sessions,omitempty"`     // 当前活跃会话数
@@ -203,15 +193,6 @@ type AccountSchedulerScore struct {
 	StickyScoreInfinity   bool    `json:"sticky_score_infinity"`
 	StickyWeightedEnabled bool    `json:"sticky_weighted_enabled"`
 }
-
-type AccountSchedulerGroupScore struct {
-	GroupID       *int64 `json:"group_id"`
-	GroupName     string `json:"group_name,omitempty"`
-	GroupPriority *int   `json:"group_priority,omitempty"`
-	AccountSchedulerScore
-}
-
-const accountListGroupUngroupedQueryValue = "ungrouped"
 
 func (h *AccountHandler) accountResponseFromService(account *service.Account) *dto.Account {
 	out := dto.AccountFromService(account)
@@ -342,142 +323,49 @@ func (h *AccountHandler) buildOpenAIAccountSchedulerScores(
 	ctx context.Context,
 	accounts []service.Account,
 	filterPool []service.Account,
-) (map[int64]*AccountSchedulerScore, map[int64][]AccountSchedulerGroupScore) {
+) map[int64]*AccountSchedulerScore {
 	if len(accounts) == 0 {
-		return nil, nil
+		return nil
 	}
 	if len(filterPool) == 0 {
 		filterPool = accounts
 	}
 
 	pageOpenAIAccountIDs := make(map[int64]struct{})
-	groupIDs := make(map[int64]struct{})
 	for i := range accounts {
 		account := &accounts[i]
 		if account.Platform != service.PlatformOpenAI {
 			continue
 		}
 		pageOpenAIAccountIDs[account.ID] = struct{}{}
-		if len(account.AccountGroups) == 0 && len(account.GroupIDs) == 0 {
-			continue
-		}
-		for _, accountGroup := range account.AccountGroups {
-			if accountGroup.GroupID > 0 {
-				groupIDs[accountGroup.GroupID] = struct{}{}
-			}
-		}
-		for _, groupID := range account.GroupIDs {
-			if groupID > 0 {
-				groupIDs[groupID] = struct{}{}
-			}
-		}
 	}
 	if len(pageOpenAIAccountIDs) == 0 {
-		return nil, nil
-	}
-
-	// 先取各分组池，再对"过滤池 ∪ 分组池"的账号并集做一次负载批查，
-	// 避免每个池各查一次 Redis 的 N+1。
-	groupIDList := make([]int64, 0, len(groupIDs))
-	for groupID := range groupIDs {
-		groupIDList = append(groupIDList, groupID)
-	}
-	sort.Slice(groupIDList, func(i, j int) bool { return groupIDList[i] < groupIDList[j] })
-
-	groupPools := make(map[int64][]service.Account, len(groupIDList))
-	if h.adminService != nil {
-		for _, groupID := range groupIDList {
-			gid := groupID
-			pool, err := h.adminService.ListOpenAISchedulableAccountsForSchedulerScore(ctx, &gid)
-			if err != nil {
-				slog.Warn("openai_scheduler_group_score_pool_failed", "group_id", gid, "error", err)
-				continue
-			}
-			groupPools[gid] = pool
-		}
+		return nil
 	}
 
 	loadUnion := make([]*service.Account, 0, len(filterPool))
-	collectOpenAIAccounts := func(pool []service.Account) {
-		for i := range pool {
-			if pool[i].Platform == service.PlatformOpenAI {
-				loadUnion = append(loadUnion, &pool[i])
-			}
+	for i := range filterPool {
+		if filterPool[i].Platform == service.PlatformOpenAI {
+			loadUnion = append(loadUnion, &filterPool[i])
 		}
-	}
-	collectOpenAIAccounts(filterPool)
-	for _, pool := range groupPools {
-		collectOpenAIAccounts(pool)
 	}
 	loadMap := h.fetchOpenAIAccountLoadMap(ctx, loadUnion)
 
 	baseScores := make(map[int64]*AccountSchedulerScore)
 	for accountID, score := range h.scoreOpenAIAccountSchedulerPool(ctx, filterPool, loadMap) {
+		if _, ok := pageOpenAIAccountIDs[accountID]; !ok {
+			continue
+		}
 		copiedScore := score
 		baseScores[accountID] = &copiedScore
 	}
-
-	groupScoresByAccount := make(map[int64][]AccountSchedulerGroupScore)
-	scoreGroupPool := func(groupID *int64, groupNameByID map[int64]string, groupPriorityByAccount map[int64]int, pool []service.Account) {
-		if len(pool) == 0 {
-			return
-		}
-		scores := h.scoreOpenAIAccountSchedulerPool(ctx, pool, loadMap)
-		for accountID, schedulerScore := range scores {
-			if _, ok := pageOpenAIAccountIDs[accountID]; !ok {
-				continue
-			}
-			groupScore := AccountSchedulerGroupScore{
-				GroupID:               groupID,
-				AccountSchedulerScore: schedulerScore,
-			}
-			if groupID != nil {
-				groupScore.GroupName = groupNameByID[*groupID]
-				if priority, ok := groupPriorityByAccount[accountID]; ok {
-					groupScore.GroupPriority = &priority
-				}
-			}
-			groupScoresByAccount[accountID] = append(groupScoresByAccount[accountID], groupScore)
-		}
-	}
-
-	for _, groupID := range groupIDList {
-		gid := groupID
-		pool, ok := groupPools[gid]
-		if !ok {
-			continue
-		}
-		groupNameByID := make(map[int64]string)
-		groupPriorityByAccount := make(map[int64]int)
-		for i := range pool {
-			account := &pool[i]
-			for _, accountGroup := range account.AccountGroups {
-				if accountGroup.GroupID != gid {
-					continue
-				}
-				groupPriorityByAccount[account.ID] = accountGroup.Priority
-				if accountGroup.Group != nil {
-					groupNameByID[gid] = accountGroup.Group.Name
-				}
-			}
-		}
-		scoreGroupPool(&gid, groupNameByID, groupPriorityByAccount, pool)
-	}
-
-	for accountID := range groupScoresByAccount {
-		sort.SliceStable(groupScoresByAccount[accountID], func(i, j int) bool {
-			left := groupScoresByAccount[accountID][i]
-			right := groupScoresByAccount[accountID][j]
-			return *left.GroupID < *right.GroupID
-		})
-	}
-	return baseScores, groupScoresByAccount
+	return baseScores
 }
 
 func (h *AccountHandler) listAccountSchedulerScoreFilterPool(
 	ctx context.Context,
 	platform, accountType, status, search string,
-	groupID int64,
+	platformID int64,
 	privacyMode string,
 ) []service.Account {
 	if h.adminService == nil || (platform != "" && platform != service.PlatformOpenAI) {
@@ -485,7 +373,7 @@ func (h *AccountHandler) listAccountSchedulerScoreFilterPool(
 	}
 	// 池只用于 OpenAI 分数计算（非 OpenAI 账号会在打分时被丢弃），
 	// 无论列表页平台过滤为何，查询一律限定 openai，避免无过滤时全表扫描。
-	accounts, err := h.adminService.ListAccountsForSchedulerScoreFilter(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode)
+	accounts, err := h.adminService.ListAccountsForSchedulerScoreFilter(ctx, service.PlatformOpenAI, accountType, status, search, platformID, privacyMode)
 	if err != nil {
 		slog.Warn("openai_scheduler_filter_score_pool_failed", "error", err)
 		return nil
@@ -513,25 +401,17 @@ func (h *AccountHandler) List(c *gin.Context) {
 	// 调度分需要跨候选池批量打分并读取负载，默认列表不计算；只有前端列可见时才显式开启。
 	includeSchedulerScore := parseBoolQueryWithDefault(c.Query("include_scheduler_score"), false)
 
-	var groupID int64
-	if groupIDStr := c.Query("group"); groupIDStr != "" {
-		if groupIDStr == accountListGroupUngroupedQueryValue {
-			groupID = service.AccountListGroupUngrouped
-		} else {
-			parsedGroupID, parseErr := strconv.ParseInt(groupIDStr, 10, 64)
-			if parseErr != nil {
-				response.ErrorFrom(c, infraerrors.BadRequest("INVALID_GROUP_FILTER", "invalid group filter"))
-				return
-			}
-			if parsedGroupID < 0 {
-				response.ErrorFrom(c, infraerrors.BadRequest("INVALID_GROUP_FILTER", "invalid group filter"))
-				return
-			}
-			groupID = parsedGroupID
+	var platformID int64
+	if rawPlatformID := strings.TrimSpace(c.Query("platform_id")); rawPlatformID != "" {
+		parsedPlatformID, parseErr := strconv.ParseInt(rawPlatformID, 10, 64)
+		if parseErr != nil || parsedPlatformID <= 0 {
+			response.ErrorFrom(c, infraerrors.BadRequest("INVALID_PLATFORM_FILTER", "invalid platform_id filter"))
+			return
 		}
+		platformID = parsedPlatformID
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, platformID, privacyMode, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -559,7 +439,6 @@ func (h *AccountHandler) List(c *gin.Context) {
 	var rpmCounts map[int64]int
 	// 双重门控：用户要看该列，且当前页确实有 OpenAI 账号，才进入昂贵的候选池打分路径。
 	var schedulerScores map[int64]*AccountSchedulerScore
-	var schedulerGroupScores map[int64][]AccountSchedulerGroupScore
 	pageHasOpenAIAccounts := false
 	for i := range accounts {
 		if accounts[i].Platform == service.PlatformOpenAI {
@@ -568,8 +447,8 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 	if includeSchedulerScore && pageHasOpenAIAccounts {
-		schedulerFilterPool := h.listAccountSchedulerScoreFilterPool(c.Request.Context(), platform, accountType, status, search, groupID, privacyMode)
-		schedulerScores, schedulerGroupScores = h.buildOpenAIAccountSchedulerScores(c.Request.Context(), accounts, schedulerFilterPool)
+		schedulerFilterPool := h.listAccountSchedulerScoreFilterPool(c.Request.Context(), platform, accountType, status, search, platformID, privacyMode)
+		schedulerScores = h.buildOpenAIAccountSchedulerScores(c.Request.Context(), accounts, schedulerFilterPool)
 	}
 
 	// 始终获取并发数（Redis ZCARD，极低开销）
@@ -652,7 +531,6 @@ func (h *AccountHandler) List(c *gin.Context) {
 			Account:            h.accountResponseFromService(acc),
 			CurrentConcurrency: concurrencyCounts[acc.ID],
 			SchedulerScore:     schedulerScores[acc.ID],
-			SchedulerScores:    schedulerGroupScores[acc.ID],
 		}
 
 		// 添加窗口费用（仅当启用时）
@@ -773,50 +651,6 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), account))
 }
 
-// CheckMixedChannel handles checking mixed channel risk for account-group binding.
-// POST /api/v1/admin/accounts/check-mixed-channel
-func (h *AccountHandler) CheckMixedChannel(c *gin.Context) {
-	var req CheckMixedChannelRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if len(req.GroupIDs) == 0 {
-		response.Success(c, gin.H{"has_risk": false})
-		return
-	}
-
-	accountID := int64(0)
-	if req.AccountID != nil {
-		accountID = *req.AccountID
-	}
-
-	err := h.adminService.CheckMixedChannelRisk(c.Request.Context(), accountID, req.Platform, req.GroupIDs)
-	if err != nil {
-		var mixedErr *service.MixedChannelError
-		if errors.As(err, &mixedErr) {
-			response.Success(c, gin.H{
-				"has_risk": true,
-				"error":    "mixed_channel_warning",
-				"message":  mixedErr.Error(),
-				"details": gin.H{
-					"group_id":         mixedErr.GroupID,
-					"group_name":       mixedErr.GroupName,
-					"current_platform": mixedErr.CurrentPlatform,
-					"other_platform":   mixedErr.OtherPlatform,
-				},
-			})
-			return
-		}
-
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"has_risk": false})
-}
-
 // Create handles creating a new account
 // POST /api/v1/admin/accounts
 func (h *AccountHandler) Create(c *gin.Context) {
@@ -846,22 +680,21 @@ func (h *AccountHandler) Create(c *gin.Context) {
 
 	result, err := executeAdminIdempotent(c, "admin.accounts.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		account, execErr := h.adminService.CreateAccount(ctx, &service.CreateAccountInput{
-			Name:                 req.Name,
-			Notes:                req.Notes,
-			Platform:             req.Platform,
-			Type:                 req.Type,
-			Credentials:          req.Credentials,
-			Extra:                req.Extra,
-			ProxyID:              req.ProxyID,
-			Concurrency:          req.Concurrency,
-			Priority:             req.Priority,
-			RateMultiplier:       req.RateMultiplier,
-			LoadFactor:           req.LoadFactor,
-			PlatformID:           req.PlatformID,
-			ExpiresAt:            req.ExpiresAt,
-			AutoPauseOnExpired:   req.AutoPauseOnExpired,
-			ProbeEnabled:         req.ProbeEnabled,
-			SkipDefaultGroupBind: true,
+			Name:               req.Name,
+			Notes:              req.Notes,
+			Platform:           req.Platform,
+			Type:               req.Type,
+			Credentials:        req.Credentials,
+			Extra:              req.Extra,
+			ProxyID:            req.ProxyID,
+			Concurrency:        req.Concurrency,
+			Priority:           req.Priority,
+			RateMultiplier:     req.RateMultiplier,
+			LoadFactor:         req.LoadFactor,
+			PlatformID:         req.PlatformID,
+			ExpiresAt:          req.ExpiresAt,
+			AutoPauseOnExpired: req.AutoPauseOnExpired,
+			ProbeEnabled:       req.ProbeEnabled,
 		})
 		if execErr != nil {
 			return nil, execErr
@@ -874,17 +707,6 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		return h.buildAccountResponseWithRuntime(ctx, account), nil
 	})
 	if err != nil {
-		// 检查是否为混合渠道错误
-		var mixedErr *service.MixedChannelError
-		if errors.As(err, &mixedErr) {
-			// 创建接口仅返回最小必要字段，详细信息由专门检查接口提供
-			c.JSON(409, gin.H{
-				"error":   "mixed_channel_warning",
-				"message": mixedErr.Error(),
-			})
-			return
-		}
-
 		if retryAfter := service.RetryAfterSecondsFromError(err); retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 		}
@@ -991,17 +813,6 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		AutoPauseOnExpired: req.AutoPauseOnExpired,
 	})
 	if err != nil {
-		// 检查是否为混合渠道错误
-		var mixedErr *service.MixedChannelError
-		if errors.As(err, &mixedErr) {
-			// 更新接口仅返回最小必要字段，详细信息由专门检查接口提供
-			c.JSON(409, gin.H{
-				"error":   "mixed_channel_warning",
-				"message": mixedErr.Error(),
-			})
-			return
-		}
-
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -1873,21 +1684,20 @@ func (h *AccountHandler) BatchCreate(c *gin.Context) {
 			sanitizeExtraBaseRPM(item.Extra)
 
 			account, err := h.adminService.CreateAccount(ctx, &service.CreateAccountInput{
-				Name:                 item.Name,
-				Notes:                item.Notes,
-				Platform:             item.Platform,
-				PlatformID:           item.PlatformID,
-				Type:                 item.Type,
-				Credentials:          item.Credentials,
-				Extra:                item.Extra,
-				ProxyID:              item.ProxyID,
-				Concurrency:          item.Concurrency,
-				Priority:             item.Priority,
-				RateMultiplier:       item.RateMultiplier,
-				ExpiresAt:            item.ExpiresAt,
-				AutoPauseOnExpired:   item.AutoPauseOnExpired,
-				ProbeEnabled:         item.ProbeEnabled,
-				SkipDefaultGroupBind: true,
+				Name:               item.Name,
+				Notes:              item.Notes,
+				Platform:           item.Platform,
+				PlatformID:         item.PlatformID,
+				Type:               item.Type,
+				Credentials:        item.Credentials,
+				Extra:              item.Extra,
+				ProxyID:            item.ProxyID,
+				Concurrency:        item.Concurrency,
+				Priority:           item.Priority,
+				RateMultiplier:     item.RateMultiplier,
+				ExpiresAt:          item.ExpiresAt,
+				AutoPauseOnExpired: item.AutoPauseOnExpired,
+				ProbeEnabled:       item.ProbeEnabled,
 			})
 			if err != nil {
 				failed++
@@ -2054,10 +1864,6 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if req.GroupIDs != nil {
-		response.BadRequest(c, "legacy account group bindings are read-only; assign the account to a platform pool instead")
-		return
-	}
 	if req.RateMultiplier != nil && *req.RateMultiplier < 0 {
 		response.BadRequest(c, "rate_multiplier must be >= 0")
 		return
@@ -2068,9 +1874,6 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	}
 	// base_rpm 输入校验：负值归零，超过 10000 截断
 	sanitizeExtraBaseRPM(req.Extra)
-
-	// 确定是否跳过混合渠道检查
-	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
 
 	hasUpdates := req.Name != "" ||
 		req.ProxyID != nil ||
@@ -2090,36 +1893,21 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	}
 
 	result, err := h.adminService.BulkUpdateAccounts(c.Request.Context(), &service.BulkUpdateAccountsInput{
-		AccountIDs:            req.AccountIDs,
-		Filters:               toServiceBulkUpdateAccountFilters(req.Filters),
-		Name:                  req.Name,
-		ProxyID:               req.ProxyID,
-		Concurrency:           req.Concurrency,
-		Priority:              req.Priority,
-		RateMultiplier:        req.RateMultiplier,
-		LoadFactor:            req.LoadFactor,
-		Status:                req.Status,
-		Schedulable:           req.Schedulable,
-		Credentials:           req.Credentials,
-		Extra:                 req.Extra,
-		ProbeEnabled:          req.ProbeEnabled,
-		SkipMixedChannelCheck: skipCheck,
+		AccountIDs:     req.AccountIDs,
+		Filters:        toServiceBulkUpdateAccountFilters(req.Filters),
+		Name:           req.Name,
+		ProxyID:        req.ProxyID,
+		Concurrency:    req.Concurrency,
+		Priority:       req.Priority,
+		RateMultiplier: req.RateMultiplier,
+		LoadFactor:     req.LoadFactor,
+		Status:         req.Status,
+		Schedulable:    req.Schedulable,
+		Credentials:    req.Credentials,
+		Extra:          req.Extra,
+		ProbeEnabled:   req.ProbeEnabled,
 	})
 	if err != nil {
-		var mixedErr *service.MixedChannelError
-		if errors.As(err, &mixedErr) {
-			c.JSON(409, gin.H{
-				"error":   "mixed_channel_warning",
-				"message": mixedErr.Error(),
-				"details": gin.H{
-					"group_id":         mixedErr.GroupID,
-					"group_name":       mixedErr.GroupName,
-					"current_platform": mixedErr.CurrentPlatform,
-					"other_platform":   mixedErr.OtherPlatform,
-				},
-			})
-			return
-		}
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -2135,7 +1923,7 @@ func toServiceBulkUpdateAccountFilters(filters *BulkUpdateAccountFilters) *servi
 		Platform:    filters.Platform,
 		Type:        filters.Type,
 		Status:      filters.Status,
-		Group:       filters.Group,
+		PlatformID:  filters.PlatformID,
 		Search:      filters.Search,
 		PrivacyMode: filters.PrivacyMode,
 	}

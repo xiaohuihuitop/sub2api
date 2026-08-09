@@ -109,7 +109,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	}
 
 	stateStore := s.getOpenAIWSStateStore()
-	groupID := getOpenAIGroupIDFromContext(c)
+	platformID := getOpenAIPlatformNamespaceIDFromContext(c)
 	sessionHash := s.GenerateSessionHash(c, nil)
 	if sessionHash == "" {
 		var legacySessionHash string
@@ -117,7 +117,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		attachOpenAILegacySessionHashToGin(c, legacySessionHash)
 	}
 	if turnState == "" && stateStore != nil && sessionHash != "" {
-		if savedTurnState, ok := stateStore.GetSessionTurnState(groupID, sessionHash); ok {
+		if savedTurnState, ok := stateStore.GetSessionTurnState(platformID, sessionHash); ok {
 			turnState = savedTurnState
 		}
 	}
@@ -129,7 +129,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	}
 	storeDisabled := s.isOpenAIWSStoreDisabledInRequest(reqBody, account)
 	if stateStore != nil && storeDisabled && previousResponseID == "" && sessionHash != "" {
-		if connID, ok := stateStore.GetSessionConn(groupID, sessionHash); ok {
+		if connID, ok := stateStore.GetSessionConn(platformID, sessionHash); ok {
 			preferredConnID = connID
 		}
 	}
@@ -229,9 +229,9 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		}
 		return nil, wrapOpenAIWSFallback(classifyOpenAIWSAcquireError(err), err)
 	}
-	// cleanExit 标记正常终端事件退出，此时上游不会再发送帧，连接可安全归还复用。
-	// 所有异常路径（读写错误、error 事件等）已在各自分支中提前调用 MarkBroken，
-	// 因此 defer 中只需处理正常退出时不 MarkBroken 即可。
+	// cleanExit 鏍囪姝ｅ父缁堢浜嬩欢閫€鍑猴紝姝ゆ椂涓婃父涓嶄細鍐嶅彂閫佸抚锛岃繛鎺ュ彲瀹夊叏褰掕繕澶嶇敤銆?
+	// 鎵€鏈夊紓甯歌矾寰勶紙璇诲啓閿欒銆乪rror 浜嬩欢绛夛級宸插湪鍚勮嚜鍒嗘敮涓彁鍓嶈皟鐢?MarkBroken锛?
+	// 鍥犳 defer 涓彧闇€澶勭悊姝ｅ父閫€鍑烘椂涓?MarkBroken 鍗冲彲銆?
 	cleanExit := false
 	defer func() {
 		if !cleanExit {
@@ -291,7 +291,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	)
 	if handshakeTurnState != "" {
 		if stateStore != nil && sessionHash != "" {
-			stateStore.BindSessionTurnState(groupID, sessionHash, handshakeTurnState, s.openAIWSSessionStickyTTL())
+			stateStore.BindSessionTurnState(platformID, sessionHash, handshakeTurnState, s.openAIWSSessionStickyTTL())
 		}
 		if c != nil {
 			c.Header(http.CanonicalHeaderKey(openAIWSTurnStateHeader), handshakeTurnState)
@@ -307,7 +307,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		reqBody,
 		account,
 		stateStore,
-		groupID,
+		platformID,
 	); err != nil {
 		return nil, err
 	}
@@ -623,7 +623,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 					errMessage,
 				)
 			}
-			// error 事件后连接不再可复用，避免回池后污染下一请求。
+			// error 浜嬩欢鍚庤繛鎺ヤ笉鍐嶅彲澶嶇敤锛岄伩鍏嶅洖姹犲悗姹℃煋涓嬩竴璇锋眰銆?
 			lease.MarkBroken()
 			if !wroteDownstream && canFallback {
 				return nil, wrapOpenAIWSFallback(fallbackReason, errors.New(errMsg))
@@ -646,8 +646,8 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		}
 
 		if reqStream {
-			// 在首个 token 前先缓冲事件（如 response.created），
-			// 以便上游早期断连时仍可安全回退到 HTTP，不给下游发送半截流。
+			// 鍦ㄩ涓?token 鍓嶅厛缂撳啿浜嬩欢锛堝 response.created锛夛紝
+			// 浠ヤ究涓婃父鏃╂湡鏂繛鏃朵粛鍙畨鍏ㄥ洖閫€鍒?HTTP锛屼笉缁欎笅娓稿彂閫佸崐鎴祦銆?
 			shouldBuffer := firstTokenMs == nil && !isTokenEvent && !isTerminalEvent
 			if shouldBuffer {
 				buffered := make([]byte, len(message))
@@ -718,11 +718,11 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 
 	if responseID != "" && stateStore != nil {
 		ttl := s.openAIWSResponseStickyTTL()
-		logOpenAIWSBindResponseAccountWarn(groupID, account.ID, responseID, stateStore.BindResponseAccount(ctx, groupID, responseID, account.ID, ttl))
+		logOpenAIWSBindResponseAccountWarn(platformID, account.ID, responseID, stateStore.BindResponseAccount(ctx, platformID, responseID, account.ID, ttl))
 		stateStore.BindResponseConn(responseID, lease.ConnID(), ttl)
 	}
 	if stateStore != nil && storeDisabled && sessionHash != "" {
-		stateStore.BindSessionConn(groupID, sessionHash, lease.ConnID(), s.openAIWSSessionStickyTTL())
+		stateStore.BindSessionConn(platformID, sessionHash, lease.ConnID(), s.openAIWSSessionStickyTTL())
 	}
 	firstTokenMsValue := -1
 	if firstTokenMs != nil {
@@ -765,9 +765,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	}, nil
 }
 
-// ProxyResponsesWebSocketFromClient 处理客户端入站 WebSocket（OpenAI Responses WS Mode）并转发到上游。
-// 当前实现按“单请求 -> 终止事件 -> 下一请求”的顺序代理，适配 Codex CLI 的 turn 模式。
-// stripCodexSparkImageGenerationToolFromRawPayload removes the image_generation
+// ProxyResponsesWebSocketFromClient 澶勭悊瀹㈡埛绔叆绔?WebSocket锛圤penAI Responses WS Mode锛夊苟杞彂鍒颁笂娓搞€?// 褰撳墠瀹炵幇鎸夆€滃崟璇锋眰 -> 缁堟浜嬩欢 -> 涓嬩竴璇锋眰鈥濈殑椤哄簭浠ｇ悊锛岄€傞厤 Codex CLI 鐨?turn 妯″紡銆?// stripCodexSparkImageGenerationToolFromRawPayload removes the image_generation
 // tool from a raw /responses payload when the upstream model is gpt-5.3-codex-spark.
 // Spark rejects that tool upstream with HTTP 400 (invalid_request_error, param=tools);
 // Codex clients advertise it by default. Returns the (possibly unchanged) payload,

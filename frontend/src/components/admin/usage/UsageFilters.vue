@@ -157,12 +157,6 @@
           <Select v-model="filters.status_code" :options="statusCodeOptions" @change="emitChange" />
         </div>
 
-        <!-- Group Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[200px]">
-          <label class="input-label">{{ t('admin.usage.group') }}</label>
-          <Select v-model="filters.group_id" :options="groupOptions" searchable @change="emitChange" />
-        </div>
-
       </div>
 
       <!-- Right: actions -->
@@ -258,8 +252,6 @@ const modelOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('admin.usage.allModels') },
   ...(props.modelOptions ?? []).map((m) => ({ value: m, label: m })),
 ])
-const groupOptions = ref<SelectOption[]>([{ value: null, label: t('admin.usage.allGroups') }])
-
 const requestTypeOptions = ref<SelectOption[]>([
   { value: null, label: t('admin.usage.allTypes') },
   { value: 'ws_v2', label: t('usage.ws') },
@@ -500,14 +492,8 @@ watch(
   }
 )
 
-onMounted(async () => {
+onMounted(() => {
   document.addEventListener('click', onDocumentClick)
-  try {
-    const gs = await adminAPI.groups.list(1, 1000)
-    groupOptions.value.push(...gs.items.map((g: any) => ({ value: g.id, label: g.name })))
-  } catch {
-    // Ignore filter option loading errors (page still usable)
-  }
 })
 
 onUnmounted(() => {

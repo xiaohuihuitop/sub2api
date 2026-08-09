@@ -43,7 +43,6 @@ func cloneIntent(intent *DispatchIntent) *DispatchIntent {
 			RequestedModel:       intent.Platform.RequestedModel,
 			UpstreamModel:        intent.Platform.UpstreamModel,
 			EndpointCapabilities: append([]string(nil), intent.Platform.EndpointCapabilities...),
-			LegacyPricingGroupID: cloneInt64(intent.Platform.LegacyPricingGroupID),
 		},
 		BillingAsset: cloneBillingAsset(intent.BillingAsset),
 	}

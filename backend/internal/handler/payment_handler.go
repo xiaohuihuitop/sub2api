@@ -51,7 +51,6 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	}
 	type planResponse struct {
 		ID              int64    `json:"id"`
-		GroupID         *int64   `json:"group_id,omitempty"`
 		RateMultiplier  float64  `json:"rate_multiplier"`
 		DailyLimitUSD   *float64 `json:"daily_limit_usd,omitempty"`
 		WeeklyLimitUSD  *float64 `json:"weekly_limit_usd,omitempty"`
@@ -71,7 +70,7 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	result := make([]planResponse, 0, len(plans))
 	for _, p := range plans {
 		result = append(result, planResponse{
-			ID: int64(p.ID), GroupID: legacyPlanGroupID(p.GroupID),
+			ID:             int64(p.ID),
 			RateMultiplier: p.RateMultiplier,
 			DailyLimitUSD:  p.DailyLimitUsd, WeeklyLimitUSD: p.WeeklyLimitUsd, MonthlyLimitUSD: p.MonthlyLimitUsd,
 			Name: p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
@@ -116,10 +115,10 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	planList := make([]checkoutPlan, 0, len(plans))
 	for _, p := range plans {
 		planList = append(planList, checkoutPlan{
-			ID: int64(p.ID), GroupID: legacyPlanGroupID(p.GroupID),
+			ID:             int64(p.ID),
 			RateMultiplier: p.RateMultiplier,
 			DailyLimitUSD:  p.DailyLimitUsd, WeeklyLimitUSD: p.WeeklyLimitUsd, MonthlyLimitUSD: p.MonthlyLimitUsd,
-			Name:        p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
+			Name: p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
 			Currency:     p.Currency,
 			ValidityDays: p.ValidityDays, ValidityUnit: p.ValidityUnit, Features: parseFeatures(p.Features),
 			ProductName: p.ProductName,
@@ -161,7 +160,6 @@ type checkoutInfoResponse struct {
 
 type checkoutPlan struct {
 	ID              int64    `json:"id"`
-	GroupID         *int64   `json:"group_id,omitempty"`
 	RateMultiplier  float64  `json:"rate_multiplier"`
 	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
 	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
@@ -175,14 +173,6 @@ type checkoutPlan struct {
 	ValidityUnit    string   `json:"validity_unit"`
 	Features        []string `json:"features"`
 	ProductName     string   `json:"product_name"`
-}
-
-func legacyPlanGroupID(groupID int64) *int64 {
-	if groupID <= 0 {
-		return nil
-	}
-	value := groupID
-	return &value
 }
 
 // parseFeatures splits a newline-separated features string into a string slice.

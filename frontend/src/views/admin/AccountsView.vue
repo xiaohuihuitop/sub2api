@@ -374,19 +374,10 @@
             </div>
           </template>
           <template #cell-scheduler_score="{ row }">
-            <div v-if="getSchedulerScoreRows(row).length" class="flex min-w-[7rem] flex-col gap-0.5 font-mono text-[11px] leading-4">
-              <div
-                v-for="score in getSchedulerScoreRows(row)"
-                :key="String(score.group_id)"
-                class="flex items-center gap-1 whitespace-nowrap text-gray-700 dark:text-gray-300"
-                :title="`${formatSchedulerScoreGroup(score)} / ${formatSchedulerScore(score.base_score)} / ${formatStickySchedulerScore(score)}`"
-              >
-                <span class="max-w-[4.75rem] truncate text-gray-500 dark:text-dark-400">{{ formatSchedulerScoreGroup(score) }}</span>
-                <span class="text-gray-300 dark:text-gray-600">/</span>
-                <span>{{ formatSchedulerScore(score.base_score) }}</span>
-                <span class="text-gray-300 dark:text-gray-600">/</span>
-                <span class="text-primary-700 dark:text-primary-300">{{ formatStickySchedulerScore(score) }}</span>
-              </div>
+            <div v-if="row.scheduler_score" class="flex min-w-[7rem] items-center gap-1 whitespace-nowrap font-mono text-[11px] leading-4 text-gray-700 dark:text-gray-300">
+              <span>{{ formatSchedulerScore(row.scheduler_score.base_score) }}</span>
+              <span class="text-gray-300 dark:text-gray-600">/</span>
+              <span class="text-primary-700 dark:text-primary-300">{{ formatStickySchedulerScore(row.scheduler_score) }}</span>
             </div>
             <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
           </template>
@@ -514,7 +505,7 @@ import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
-import type { Account, AccountPlatform, AccountSchedulerGroupScore, AccountType, Proxy as AccountProxy, PlatformPool, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
+import type { Account, AccountPlatform, AccountType, Proxy as AccountProxy, PlatformPool, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -748,28 +739,10 @@ const formatSchedulerScore = (value: unknown): string => {
   return num.toFixed(6).replace(/\.?0+$/, '')
 }
 
-const formatStickySchedulerScore = (score: AccountSchedulerGroupScore): string => {
+const formatStickySchedulerScore = (score: NonNullable<Account['scheduler_score']>): string => {
   if (!score) return '-'
   if (score.sticky_score_infinity) return '+∞'
   return formatSchedulerScore(score.sticky_score)
-}
-
-const getSchedulerScoreRows = (account: Account): AccountSchedulerGroupScore[] => {
-  const groupRows = Array.isArray(account.scheduler_scores)
-    ? account.scheduler_scores.filter(score => score.group_id != null)
-    : []
-  if (groupRows.length) return groupRows
-  // 未分组账号没有分组维度分数，回退展示后端返回的基础分
-  if (account.scheduler_score) {
-    return [{ group_id: null, ...account.scheduler_score }]
-  }
-  return []
-}
-
-const formatSchedulerScoreGroup = (score: AccountSchedulerGroupScore): string => {
-  if ('group_name' in score && score.group_name) return score.group_name
-  if ('group_id' in score && score.group_id != null) return `#${score.group_id}`
-  return t('admin.accounts.schedulerScore.ungrouped')
 }
 
 const loadSavedColumns = () => {

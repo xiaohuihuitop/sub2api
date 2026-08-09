@@ -17,9 +17,9 @@ type OpsThroughputPlatformBreakdownItem struct {
 	TokenConsumed int64  `json:"token_consumed"`
 }
 
-type OpsThroughputGroupBreakdownItem struct {
-	GroupID       int64  `json:"group_id"`
-	GroupName     string `json:"group_name"`
+type OpsThroughputPlatformPoolBreakdownItem struct {
+	PlatformID    int64  `json:"platform_id"`
+	PlatformName  string `json:"platform_name"`
 	RequestCount  int64  `json:"request_count"`
 	TokenConsumed int64  `json:"token_consumed"`
 }
@@ -30,10 +30,10 @@ type OpsThroughputTrendResponse struct {
 	Points []*OpsThroughputTrendPoint `json:"points"`
 
 	// Optional drilldown helpers:
-	// - When no platform/group is selected: returns totals by platform.
-	// - When platform is selected but group is not: returns top groups in that platform.
-	ByPlatform []*OpsThroughputPlatformBreakdownItem `json:"by_platform,omitempty"`
-	TopGroups  []*OpsThroughputGroupBreakdownItem    `json:"top_groups,omitempty"`
+	// - Without an account-platform filter: returns totals by account platform.
+	// - With an account-platform filter: returns top configured platform pools.
+	ByPlatform   []*OpsThroughputPlatformBreakdownItem     `json:"by_platform,omitempty"`
+	TopPlatforms []*OpsThroughputPlatformPoolBreakdownItem `json:"top_platforms,omitempty"`
 }
 
 type OpsErrorTrendPoint struct {

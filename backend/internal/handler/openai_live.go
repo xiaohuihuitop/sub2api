@@ -29,12 +29,8 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	if apiKey.Group == nil || apiKey.Group.Platform != service.PlatformOpenAI {
+	if effectiveAPIKeyPlatform(c, apiKey) != service.PlatformOpenAI {
 		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Live is not supported for this platform")
-		return
-	}
-	if !liveEnabledForAPIKey(apiKey) {
-		h.errorResponse(c, http.StatusForbidden, "permission_error", "Live is not enabled for this group")
 		return
 	}
 	request, err := parseLiveCallRequest(c)
@@ -48,7 +44,7 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		"handler.openai_gateway.live",
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
 	if decision := h.checkSecurityAudit(
 		c,
@@ -72,7 +68,6 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		c.Request.Context(),
 		apiKey.User,
 		apiKey,
-		apiKey.Group,
 		subscription,
 		service.QuotaPlatform(c.Request.Context(), apiKey),
 	); err != nil {
@@ -156,7 +151,7 @@ func liveCallIdentity(
 	return service.LiveCallIdentity{
 		APIKeyID:        apiKey.ID,
 		UserID:          userID,
-		GroupID:         apiKey.GroupID,
+		PlatformID:      service.PlatformSchedulingID(c.Request.Context()),
 		SubscriptionID:  subscriptionID,
 		UserAgent:       c.GetHeader("User-Agent"),
 		IPAddress:       ip.GetClientIP(c),
@@ -196,14 +191,10 @@ func (h *OpenAIGatewayHandler) LiveSideband(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	if !liveEnabledForAPIKey(apiKey) {
-		h.errorResponse(c, http.StatusForbidden, "permission_error", "Live is not enabled for this group")
-		return
-	}
 	identity := service.LiveCallIdentity{
-		APIKeyID: apiKey.ID,
-		UserID:   subject.UserID,
-		GroupID:  apiKey.GroupID,
+		APIKeyID:   apiKey.ID,
+		UserID:     subject.UserID,
+		PlatformID: service.PlatformSchedulingID(c.Request.Context()),
 	}
 	record, err := h.gatewayService.GetLiveCallForIdentity(c.Request.Context(), c.Param("call_id"), identity)
 	if err != nil {
@@ -226,11 +217,4 @@ func (h *OpenAIGatewayHandler) LiveSideband(c *gin.Context) {
 		return
 	}
 	_ = downstream.Close(coderws.StatusNormalClosure, "")
-}
-
-func liveEnabledForAPIKey(apiKey *service.APIKey) bool {
-	return apiKey != nil &&
-		apiKey.Group != nil &&
-		apiKey.Group.Platform == service.PlatformOpenAI &&
-		apiKey.Group.AllowLive
 }

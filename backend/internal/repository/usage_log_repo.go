@@ -29,12 +29,8 @@ const rawUsageLogModelColumn = "model"
 // 配合 `FROM usage_logs ul` JOIN 查询使用。
 const usageLogSuccessFilterUL = "ul.actual_cost > 0"
 
-// usageLogEffectivePlatformExpr 用于按"有效平台"维度聚合 usage_logs：
-// 优先取请求实际走的分组 platform，若分组未设置 platform 再 fallback 到 account.platform。
-// Composite groups are a routing layer, so platform analytics must use the
-// resolved concrete account platform instead of grouping spend under "composite".
-// 配套要求查询里 LEFT JOIN groups g ON g.id = ul.group_id 与 LEFT JOIN accounts a ON a.id = ul.account_id。
-const usageLogEffectivePlatformExpr = "CASE WHEN g.platform = 'composite' THEN a.platform ELSE COALESCE(NULLIF(g.platform,''), a.platform) END"
+// usageLogEffectivePlatformExpr 用于按用量记录的 Platform 维度聚合。
+const usageLogEffectivePlatformExpr = "COALESCE(NULLIF(p.code, ''), '')"
 
 // dateFormatWhitelist 将 granularity 参数映射为 PostgreSQL TO_CHAR 格式字符串，防止外部输入直接拼入 SQL
 var dateFormatWhitelist = map[string]string{

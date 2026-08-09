@@ -65,18 +65,18 @@ describe('Prompt Audit components', () => {
     expect(token.attributes('placeholder')).toContain('admin.promptAudit.pool.reenterSecret')
   })
 
-  it('supports group search, stale configured groups, nine scanners, and bounded worker inputs', async () => {
+  it('supports platform search, stale configured platforms, nine scanners, and bounded worker inputs', async () => {
     const draft: PromptAuditDraft = {
       enabled: true, blocking_enabled: false, blocking_latest_turn_only: false, store_pass_events: false, effective_mode: 'async_audit', strategy: 'priority',
-      worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_groups: false, group_ids: [1, 99],
+      worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_platforms: false, platform_ids: [1, 99],
       endpoints: [endpoint()], config_version: 1, updated_at: '', updated_by: 0, change_summary: '',
     }
     const wrapper = mount(PolicyPanel, {
-      props: { draft, groups: [{ id: 1, name: 'Alpha', platform: 'openai', status: 'active' }, { id: 2, name: 'Beta', platform: 'claude', status: 'inactive' }] },
+      props: { draft, platforms: [{ id: 1, code: 'openai-main', name: 'Alpha', account_platform: 'openai', status: 'active' }, { id: 2, code: 'claude-main', name: 'Beta', account_platform: 'claude', status: 'inactive' }] },
     })
     expect(wrapper.text()).toContain('99')
     expect(wrapper.findAll('input[type="checkbox"]').filter((input) => SCANNER_CATALOG.some((scanner) => input.attributes('aria-label') === `admin.promptAudit.scanners.${scanner.id}`))).toHaveLength(9)
-    await wrapper.get('[aria-label="admin.promptAudit.policy.searchGroups"]').setValue('Beta')
+    await wrapper.get('[aria-label="admin.promptAudit.policy.searchPlatforms"]').setValue('Beta')
     expect(wrapper.text()).toContain('Beta')
     expect(wrapper.text()).not.toContain('Alpha')
     await wrapper.get('[aria-label="admin.promptAudit.policy.workerCount"]').setValue('6')
@@ -87,7 +87,7 @@ describe('Prompt Audit components', () => {
   it('keeps identity fields separate, supports selection, and opens filter deletion from the toolbar', async () => {
     const event: PromptAuditEvent = {
       id: 1, job_id: 1, decision: 'critical', risk_level: 'critical', action: 'Block', categories: ['pii'], matched_scanners: ['pii'], scanner_scores: { pii: 1 }, scanner_evidence: { pii: 'redacted' }, scanner_backend: 'qwen3guard-openai', scanner_version: '1', guard_endpoint_id: 'guard-1', policy_id: 'priority', policy_version: 1, config_version: 1, chunk_total: 1, latency_ms: 10, issue_summaries: [], created_at: '2026-07-16T00:00:00Z',
-      snapshot: { request_id: 'req-1', user_id: 1, username: 'alice', user_email: 'alice@example.test', api_key_id: 2, api_key_name: 'alice-key', group_id: 3, group_name: 'Alpha', provider: 'openai', endpoint: '/v1/chat/completions', protocol: 'openai_chat', model: 'gpt-test', prompt_hash: 'a'.repeat(64), redacted_preview: 'redacted preview', full_prompt: 'full prompt text', prompt_length: 10, message_count: 1, stage: 'http' },
+      snapshot: { request_id: 'req-1', user_id: 1, username: 'alice', user_email: 'alice@example.test', api_key_id: 2, api_key_name: 'alice-key', platform_id: 3, platform_name: 'Alpha', provider: 'openai', endpoint: '/v1/chat/completions', protocol: 'openai_chat', model: 'gpt-test', prompt_hash: 'a'.repeat(64), redacted_preview: 'redacted preview', full_prompt: 'full prompt text', prompt_length: 10, message_count: 1, stage: 'http' },
     }
     const wrapper = mount(EventWorkspace, {
       props: { events: [event], total: 1, page: 1, pageSize: 20, filters: emptyEventFilters(), selectedIds: [], loading: false, error: '' },
@@ -219,7 +219,7 @@ describe('Prompt Audit components', () => {
       created_at: '2026-07-16T00:00:00Z',
       snapshot: {
         request_id: 'req-1', user_id: 1, username: 'alice', user_email: 'alice@example.test',
-        api_key_id: 2, api_key_name: 'alice-key', group_id: 3, group_name: 'Alpha', provider: 'openai',
+        api_key_id: 2, api_key_name: 'alice-key', platform_id: 3, platform_name: 'Alpha', provider: 'openai',
         endpoint: '/v1/chat/completions', protocol: 'openai_chat', model: 'gpt-test',
         prompt_hash: 'a'.repeat(64), redacted_preview: 'redacted prompt body', full_prompt: 'complete unmasked prompt body', prompt_length: 20,
         message_count: 1, stage: 'http',
@@ -254,7 +254,7 @@ describe('Prompt Audit components', () => {
       issue_summaries: [], created_at: '2026-07-16T00:00:00Z',
       snapshot: {
         request_id: 'req-2', user_id: 1, username: 'bob', user_email: '', api_key_id: 2,
-        api_key_name: 'bob-key', group_id: 3, group_name: 'Alpha', provider: 'openai',
+        api_key_name: 'bob-key', platform_id: 3, platform_name: 'Alpha', provider: 'openai',
         endpoint: '/v1/chat/completions', protocol: 'openai_chat', model: 'gpt-test',
         prompt_hash: 'b'.repeat(64), redacted_preview: 'legacy redacted preview', full_prompt: '', prompt_length: 20,
         message_count: 1, stage: 'http',

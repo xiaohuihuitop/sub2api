@@ -13,8 +13,7 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// Platform owns one provider-specific account pool. LegacyGroupID is only a
-// pricing compatibility reference while legacy groups remain readable.
+// Platform owns one provider-specific account pool.
 type Platform struct {
 	ent.Schema
 }
@@ -40,13 +39,11 @@ func (Platform) Fields() []ent.Field {
 		field.JSON("endpoint_capabilities", []string{}).
 			Default([]string{}).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
-		field.Int64("legacy_group_id").Optional().Nillable().Unique(),
 	}
 }
 
 func (Platform) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.To("legacy_group", Group.Type).Field("legacy_group_id").Unique(),
 		edge.To("model_rules", PlatformModelRule.Type),
 		edge.To("accounts", Account.Type),
 		edge.From("api_keys", APIKey.Type).Ref("platforms"),
@@ -57,6 +54,5 @@ func (Platform) Edges() []ent.Edge {
 func (Platform) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("status"),
-		index.Fields("legacy_group_id"),
 	}
 }

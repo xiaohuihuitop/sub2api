@@ -12,9 +12,6 @@ type APIKey func(*sql.Selector)
 // Account is the predicate function for account builders.
 type Account func(*sql.Selector)
 
-// AccountGroup is the predicate function for accountgroup builders.
-type AccountGroup func(*sql.Selector)
-
 // Announcement is the predicate function for announcement builders.
 type Announcement func(*sql.Selector)
 
@@ -36,9 +33,6 @@ type BatchImageItem func(*sql.Selector)
 // BatchImageJob is the predicate function for batchimagejob builders.
 type BatchImageJob func(*sql.Selector)
 
-// BillingProfile is the predicate function for billingprofile builders.
-type BillingProfile func(*sql.Selector)
-
 // ChannelMonitor is the predicate function for channelmonitor builders.
 type ChannelMonitor func(*sql.Selector)
 
@@ -51,20 +45,17 @@ type ChannelMonitorHistory func(*sql.Selector)
 // ChannelMonitorRequestTemplate is the predicate function for channelmonitorrequesttemplate builders.
 type ChannelMonitorRequestTemplate func(*sql.Selector)
 
-// CompositeModelRoute is the predicate function for compositemodelroute builders.
-type CompositeModelRoute func(*sql.Selector)
-
 // ErrorPassthroughRule is the predicate function for errorpassthroughrule builders.
 type ErrorPassthroughRule func(*sql.Selector)
-
-// Group is the predicate function for group builders.
-type Group func(*sql.Selector)
 
 // IdempotencyRecord is the predicate function for idempotencyrecord builders.
 type IdempotencyRecord func(*sql.Selector)
 
 // IdentityAdoptionDecision is the predicate function for identityadoptiondecision builders.
 type IdentityAdoptionDecision func(*sql.Selector)
+
+// ModelPricingOverride is the predicate function for modelpricingoverride builders.
+type ModelPricingOverride func(*sql.Selector)
 
 // PaymentAuditLog is the predicate function for paymentauditlog builders.
 type PaymentAuditLog func(*sql.Selector)
@@ -116,9 +107,6 @@ type UsageLog func(*sql.Selector)
 
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
-
-// UserAllowedGroup is the predicate function for userallowedgroup builders.
-type UserAllowedGroup func(*sql.Selector)
 
 // UserAttributeDefinition is the predicate function for userattributedefinition builders.
 type UserAttributeDefinition func(*sql.Selector)

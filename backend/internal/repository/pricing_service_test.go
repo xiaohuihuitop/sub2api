@@ -35,7 +35,7 @@ func (s *PricingServiceSuite) setupServer(handler http.HandlerFunc) {
 	s.srv = newLocalTestServer(s.T(), handler)
 }
 
-func (s *PricingServiceSuite) TestFetchPricingJSON_Success() {
+func (s *PricingServiceSuite) TestFetpricingOverrideJSON_Success() {
 	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/ok" {
 			w.WriteHeader(http.StatusOK)
@@ -45,17 +45,17 @@ func (s *PricingServiceSuite) TestFetchPricingJSON_Success() {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 
-	body, err := s.client.FetchPricingJSON(s.ctx, s.srv.URL+"/ok")
-	require.NoError(s.T(), err, "FetchPricingJSON")
+	body, err := s.client.FetpricingOverrideJSON(s.ctx, s.srv.URL+"/ok")
+	require.NoError(s.T(), err, "FetpricingOverrideJSON")
 	require.Equal(s.T(), `{"ok":true}`, string(body), "body mismatch")
 }
 
-func (s *PricingServiceSuite) TestFetchPricingJSON_NonOKStatus() {
+func (s *PricingServiceSuite) TestFetpricingOverrideJSON_NonOKStatus() {
 	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 
-	_, err := s.client.FetchPricingJSON(s.ctx, s.srv.URL+"/err")
+	_, err := s.client.FetpricingOverrideJSON(s.ctx, s.srv.URL+"/err")
 	require.Error(s.T(), err, "expected error for non-200 status")
 }
 
@@ -91,8 +91,8 @@ func (s *PricingServiceSuite) TestFetchHashText_NonOKStatus() {
 	require.Error(s.T(), err, "expected error for non-200 status")
 }
 
-func (s *PricingServiceSuite) TestFetchPricingJSON_InvalidURL() {
-	_, err := s.client.FetchPricingJSON(s.ctx, "://invalid-url")
+func (s *PricingServiceSuite) TestFetpricingOverrideJSON_InvalidURL() {
+	_, err := s.client.FetpricingOverrideJSON(s.ctx, "://invalid-url")
 	require.Error(s.T(), err, "expected error for invalid URL")
 }
 
@@ -118,7 +118,7 @@ func (s *PricingServiceSuite) TestFetchHashText_WhitespaceOnly() {
 	require.Equal(s.T(), "", hash, "expected empty hash after trimming")
 }
 
-func (s *PricingServiceSuite) TestFetchPricingJSON_ContextCancel() {
+func (s *PricingServiceSuite) TestFetpricingOverrideJSON_ContextCancel() {
 	started := make(chan struct{})
 	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(started)
@@ -129,7 +129,7 @@ func (s *PricingServiceSuite) TestFetchPricingJSON_ContextCancel() {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := s.client.FetchPricingJSON(ctx, s.srv.URL+"/block")
+		_, err := s.client.FetpricingOverrideJSON(ctx, s.srv.URL+"/block")
 		done <- err
 	}()
 
@@ -145,7 +145,7 @@ func TestNewPricingRemoteClient_InvalidProxy_NoFallback(t *testing.T) {
 	_, ok := client.(*pricingRemoteClientError)
 	require.True(t, ok, "should return error client when proxy is invalid and fallback disabled")
 
-	_, err := client.FetchPricingJSON(context.Background(), "http://example.com")
+	_, err := client.FetpricingOverrideJSON(context.Background(), "http://example.com")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "proxy client init failed")
 }

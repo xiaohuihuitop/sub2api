@@ -23,34 +23,34 @@ import (
 )
 
 type authIdentityDefaultSubAssignerStub struct {
-	calls []*service.AssignSubscriptionInput
+	calls []*service.AssignSubscriptionFromPlanInput
 }
 
-func (s *authIdentityDefaultSubAssignerStub) AssignOrExtendSubscription(
+func (s *authIdentityDefaultSubAssignerStub) AssignSubscriptionFromPlan(
 	_ context.Context,
-	input *service.AssignSubscriptionInput,
-) (*service.UserSubscription, bool, error) {
+	input *service.AssignSubscriptionFromPlanInput,
+) (*service.UserSubscription, error) {
 	cloned := *input
 	s.calls = append(s.calls, &cloned)
-	return &service.UserSubscription{UserID: input.UserID, GroupID: input.GroupID}, true, nil
+	return &service.UserSubscription{UserID: input.UserID, SubscriptionPlanID: &input.PlanID}, nil
 }
 
 type flakyAuthIdentityDefaultSubAssignerStub struct {
 	failuresRemaining int
-	calls             []*service.AssignSubscriptionInput
+	calls             []*service.AssignSubscriptionFromPlanInput
 }
 
-func (s *flakyAuthIdentityDefaultSubAssignerStub) AssignOrExtendSubscription(
+func (s *flakyAuthIdentityDefaultSubAssignerStub) AssignSubscriptionFromPlan(
 	_ context.Context,
-	input *service.AssignSubscriptionInput,
-) (*service.UserSubscription, bool, error) {
+	input *service.AssignSubscriptionFromPlanInput,
+) (*service.UserSubscription, error) {
 	cloned := *input
 	s.calls = append(s.calls, &cloned)
 	if s.failuresRemaining > 0 {
 		s.failuresRemaining--
-		return nil, false, errors.New("temporary assign failure")
+		return nil, errors.New("temporary assign failure")
 	}
-	return &service.UserSubscription{UserID: input.UserID, GroupID: input.GroupID}, true, nil
+	return &service.UserSubscription{UserID: input.UserID, SubscriptionPlanID: &input.PlanID}, nil
 }
 
 type authIdentitySettingRepoStub struct {
@@ -265,7 +265,7 @@ func TestAuthServiceLogin_DoesNotApplyEmailFirstBindDefaultsWhenBackfillingLegac
 		service.SettingKeyRegistrationEnabled:                    "true",
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "4",
-		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"group_id":11,"validity_days":30}]`,
+		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"plan_id":11}]`,
 		service.SettingKeyAuthSourceDefaultEmailGrantOnFirstBind: "true",
 	}, assigner)
 	ctx := context.Background()
@@ -323,7 +323,7 @@ func TestAuthServiceLogin_DoesNotApplyMergedEmailFirstBindDefaultsWhenBackfillin
 	assigner := &authIdentityDefaultSubAssignerStub{}
 	svc, _, client := newAuthServiceWithEnt(t, map[string]string{
 		service.SettingKeyRegistrationEnabled:                    "true",
-		service.SettingKeyDefaultSubscriptions:                   `[{"group_id":21,"validity_days":14}]`,
+		service.SettingKeyDefaultSubscriptions:                   `[{"plan_id":21}]`,
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "5",
 		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[]`,
@@ -364,7 +364,7 @@ func TestAuthServiceLogin_DoesNotApplyEmailFirstBindDefaultsWhenIdentityAlreadyE
 		service.SettingKeyRegistrationEnabled:                    "true",
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "4",
-		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"group_id":11,"validity_days":30}]`,
+		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"plan_id":11}]`,
 		service.SettingKeyAuthSourceDefaultEmailGrantOnFirstBind: "true",
 	}, assigner)
 	ctx := context.Background()
@@ -411,7 +411,7 @@ func TestAuthServiceLogin_DoesNotRetryEmailFirstBindDefaultsForBackfilledEmailId
 		service.SettingKeyRegistrationEnabled:                    "true",
 		service.SettingKeyAuthSourceDefaultEmailBalance:          "8.5",
 		service.SettingKeyAuthSourceDefaultEmailConcurrency:      "4",
-		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"group_id":11,"validity_days":30}]`,
+		service.SettingKeyAuthSourceDefaultEmailSubscriptions:    `[{"plan_id":11}]`,
 		service.SettingKeyAuthSourceDefaultEmailGrantOnFirstBind: "true",
 	}, assigner)
 	ctx := context.Background()

@@ -73,12 +73,12 @@ func (r *openAICodexExtraListRepo) SetRateLimited(_ context.Context, _ int64, re
 	return nil
 }
 
-func (r *openAICodexExtraListRepo) ListWithFilters(_ context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, *pagination.PaginationResult, error) {
+func (r *openAICodexExtraListRepo) ListWithFilters(_ context.Context, params pagination.PaginationParams, platform, accountType, status, search string, platformID int64, privacyMode string) ([]Account, *pagination.PaginationResult, error) {
 	_ = platform
 	_ = accountType
 	_ = status
 	_ = search
-	_ = groupID
+	_ = platformID
 	_ = privacyMode
 	return r.accounts, &pagination.PaginationResult{Total: int64(len(r.accounts)), Page: params.Page, PageSize: params.PageSize}, nil
 }

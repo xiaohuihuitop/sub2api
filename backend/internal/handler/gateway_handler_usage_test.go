@@ -29,10 +29,7 @@ func TestUsageUnrestrictedIncludesWeeklyWindowStart(t *testing.T) {
 	handler.usageUnrestricted(
 		c,
 		context.Background(),
-		&service.APIKey{Group: &service.Group{
-			Name:             "Weekly plan",
-			SubscriptionType: service.SubscriptionTypeSubscription,
-		}},
+		&service.APIKey{},
 		middleware.AuthSubject{},
 		nil,
 		nil,

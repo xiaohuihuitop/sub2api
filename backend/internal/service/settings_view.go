@@ -183,10 +183,7 @@ type SystemSettings struct {
 	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
 	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
 
-	// Available Channels feature (user-facing aggregate view)
-	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
-
-	// Model Plaza feature (public group/model pricing showcase)
+	// Model Plaza feature (public platform/model pricing showcase)
 	ModelPlazaEnabled     bool   `json:"model_plaza_enabled"`
 	ModelPlazaRequireAuth bool   `json:"model_plaza_require_auth"`
 	ModelPlazaDescription string `json:"model_plaza_description"`
@@ -194,9 +191,6 @@ type SystemSettings struct {
 	// Claude Code version check
 	MinClaudeCodeVersion string
 	MaxClaudeCodeVersion string
-
-	// 分组隔离：允许未分组 Key 调度（默认 false → 403）
-	AllowUngroupedKeyScheduling bool
 
 	// Backend 模式：禁用用户注册和自助服务，仅管理员可登录
 	BackendModeEnabled bool
@@ -278,9 +272,7 @@ type SystemSettings struct {
 }
 
 type DefaultSubscriptionSetting struct {
-	PlanID       int64 `json:"plan_id,omitempty"`
-	GroupID      int64 `json:"group_id,omitempty"`
-	ValidityDays int   `json:"validity_days,omitempty"`
+	PlanID int64 `json:"plan_id"`
 }
 
 type PublicSettings struct {
@@ -340,10 +332,7 @@ type PublicSettings struct {
 	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
 	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
 
-	// Available Channels feature (user-facing aggregate view)
-	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
-
-	// Model Plaza feature (public group/model pricing showcase)
+	// Model Plaza feature (public platform/model pricing showcase)
 	ModelPlazaEnabled     bool `json:"model_plaza_enabled"`
 	ModelPlazaRequireAuth bool `json:"model_plaza_require_auth"`
 

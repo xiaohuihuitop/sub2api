@@ -33,7 +33,6 @@ const messages: Record<string, string> = {
   'admin.dashboard.day': 'Day',
   'admin.dashboard.hour': 'Hour',
   'admin.users.columnSettings': 'Columns',
-  'admin.usage.group': 'Group',
   'admin.usage.billingType': 'Billing type',
   'admin.usage.billingMode': 'Billing mode',
   'admin.usage.allTypes': 'All types',
@@ -44,7 +43,6 @@ const messages: Record<string, string> = {
   'admin.usage.billingModeToken': 'Token',
   'admin.usage.billingModePerRequest': 'Per request',
   'admin.usage.billingModeImage': 'Image',
-  'admin.usage.allGroups': 'All groups',
   'admin.usage.allModels': 'All models',
   'usage.allApiKeys': 'All API Keys',
   'usage.apiKeyFilter': 'API Key',
@@ -148,7 +146,7 @@ function mountUsageView() {
         UsageStatsCards: chartStub,
         UsageTable: usageTableStub,
         ModelDistributionChart: chartStub,
-        GroupDistributionChart: chartStub,
+        PlatformDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
         TokenUsageTrend: chartStub,
       },
@@ -158,7 +156,7 @@ function mountUsageView() {
 
 describe('user UsageView', () => {
   beforeEach(() => {
-	localStorage.clear()
+    localStorage.clear()
     query.mockReset()
     getStats.mockReset()
     getDashboardModels.mockReset()
@@ -195,7 +193,7 @@ describe('user UsageView', () => {
       end_date: '2026-03-08',
       granularity: 'hour',
       trend: [],
-      groups: [],
+      platforms: [],
     })
     list.mockResolvedValue({ items: [{ id: 1, name: 'demo-key' }] })
     getAvailable.mockResolvedValue([{ id: 1, name: 'default' }])
@@ -211,7 +209,7 @@ describe('user UsageView', () => {
     expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
       include_trend: true,
       include_model_stats: false,
-      include_group_stats: true,
+      include_platform_stats: true,
     }))
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).not.toHaveBeenCalled()
@@ -227,7 +225,7 @@ describe('user UsageView', () => {
       'model',
       'reasoning_effort',
       'endpoint',
-      'group',
+      'billing_source',
       'stream',
       'tokens',
       'cost',
@@ -249,7 +247,7 @@ describe('user UsageView', () => {
   })
 
   it('preserves the user saved usage column preferences', async () => {
-    localStorage.setItem('user-usage-hidden-columns', JSON.stringify(['model', 'group']))
+    localStorage.setItem('user-usage-hidden-columns', JSON.stringify(['model', 'billing_source']))
 
     const wrapper = mountUsageView()
     await flushPromises()
@@ -271,27 +269,32 @@ describe('user UsageView', () => {
     ])
   })
 
-  it('restores compatible filters but drops the legacy group filter', async () => {
+  it('ignores persisted state containing removed legacy filters', async () => {
     localStorage.setItem('sub2api:user-usage:view-state:v1', JSON.stringify({
       startDate: '2026-07-03',
       endDate: '2026-07-10',
       granularity: 'day',
-      filters: { model: 'glm-4.7', group_id: 6 },
+      filters: { model: 'glm-4.7', platform_id: 6 },
     }))
 
     mountUsageView()
     await flushPromises()
 
-    expect(query).toHaveBeenCalledWith(
-      expect.objectContaining({
-        start_date: '2026-07-03',
-        end_date: '2026-07-10',
-        model: 'glm-4.7',
-      }),
-      expect.anything(),
-    )
+    const endDate = new Date()
+    const startDate = new Date(endDate)
+    startDate.setDate(startDate.getDate() - 1)
+    const formatLocalDate = (date: Date) => [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('-')
+
+    expect(query).toHaveBeenCalledWith(expect.objectContaining({
+      start_date: formatLocalDate(startDate),
+      end_date: formatLocalDate(endDate),
+    }), expect.anything())
     expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
-      granularity: 'day',
+      granularity: 'hour',
     }))
   })
 

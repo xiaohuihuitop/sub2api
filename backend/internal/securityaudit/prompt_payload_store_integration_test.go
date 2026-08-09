@@ -48,7 +48,7 @@ func TestPromptRuntimeAggregatesConfigWorkersQueueRedisEndpointsAndGuardMetrics(
 
 	config := &fakeConfigStore{active: true, cfg: ActiveConfig{
 		RiskControlEnabled: true, Enabled: true, WorkerCount: 3, QueueCapacity: 123,
-		ConfigVersion: 9, AllGroups: true,
+		ConfigVersion: 9, AllPlatforms: true,
 	}}
 	metrics := NewAtomicMetrics()
 	metrics.Observe(DecisionBlock, 25*time.Millisecond)

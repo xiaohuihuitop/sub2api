@@ -13,7 +13,6 @@ func TestBulkAssignSubscriptionFromPlanCreatesSeparateInstances(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentConfigServiceTestClient(t)
 	plan, err := client.SubscriptionPlan.Create().
-		SetGroupID(7).
 		SetName("Parallel package").
 		SetPrice(9.9).
 		SetValidityDays(30).
@@ -22,7 +21,7 @@ func TestBulkAssignSubscriptionFromPlanCreatesSeparateInstances(t *testing.T) {
 	require.NoError(t, err)
 
 	subRepo := newSubscriptionUserSubRepoStub()
-	svc := NewSubscriptionService(groupRepoNoop{}, subRepo, nil, client, nil)
+	svc := NewSubscriptionService(subRepo, nil, client, nil)
 	t.Cleanup(svc.Stop)
 
 	result, err := svc.BulkAssignSubscriptionFromPlan(ctx, &BulkAssignSubscriptionFromPlanInput{

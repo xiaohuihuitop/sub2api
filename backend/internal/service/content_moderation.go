@@ -149,8 +149,8 @@ type ContentModerationConfig struct {
 	APIKeys              []string                     `json:"api_keys,omitempty"`
 	TimeoutMS            int                          `json:"timeout_ms"`
 	SampleRate           int                          `json:"sample_rate"`
-	AllGroups            bool                         `json:"all_groups"`
-	GroupIDs             []int64                      `json:"group_ids"`
+	AllPlatforms         bool                         `json:"all_platforms"`
+	PlatformIDs          []int64                      `json:"platform_ids"`
 	RecordNonHits        bool                         `json:"record_non_hits"`
 	Thresholds           map[string]float64           `json:"thresholds"`
 	WorkerCount          int                          `json:"worker_count"`
@@ -187,8 +187,8 @@ type ContentModerationConfigView struct {
 	APIKeyStatuses                 []ContentModerationAPIKeyStatus `json:"api_key_statuses"`
 	TimeoutMS                      int                             `json:"timeout_ms"`
 	SampleRate                     int                             `json:"sample_rate"`
-	AllGroups                      bool                            `json:"all_groups"`
-	GroupIDs                       []int64                         `json:"group_ids"`
+	AllPlatforms                   bool                            `json:"all_platforms"`
+	PlatformIDs                    []int64                         `json:"platform_ids"`
 	RecordNonHits                  bool                            `json:"record_non_hits"`
 	Thresholds                     map[string]float64              `json:"thresholds"`
 	WorkerCount                    int                             `json:"worker_count"`
@@ -279,8 +279,8 @@ type UpdateContentModerationConfigInput struct {
 	ClearAPIKey                    bool                          `json:"clear_api_key"`
 	TimeoutMS                      *int                          `json:"timeout_ms"`
 	SampleRate                     *int                          `json:"sample_rate"`
-	AllGroups                      *bool                         `json:"all_groups"`
-	GroupIDs                       *[]int64                      `json:"group_ids"`
+	AllPlatforms                   *bool                         `json:"all_platforms"`
+	PlatformIDs                    *[]int64                      `json:"platform_ids"`
 	RecordNonHits                  *bool                         `json:"record_non_hits"`
 	Thresholds                     *map[string]float64           `json:"thresholds"`
 	WorkerCount                    *int                          `json:"worker_count"`
@@ -307,18 +307,18 @@ type ContentModerationModelFilter struct {
 }
 
 type ContentModerationCheckInput struct {
-	RequestID  string
-	UserID     int64
-	UserEmail  string
-	APIKeyID   int64
-	APIKeyName string
-	GroupID    *int64
-	GroupName  string
-	Endpoint   string
-	Provider   string
-	Model      string
-	Protocol   string
-	Body       []byte
+	RequestID    string
+	UserID       int64
+	UserEmail    string
+	APIKeyID     int64
+	APIKeyName   string
+	PlatformID   *int64
+	PlatformName string
+	Endpoint     string
+	Provider     string
+	Model        string
+	Protocol     string
+	Body         []byte
 }
 
 type ContentModerationInput struct {
@@ -392,8 +392,8 @@ type ContentModerationLog struct {
 	UserEmail         string             `json:"user_email"`
 	APIKeyID          *int64             `json:"api_key_id,omitempty"`
 	APIKeyName        string             `json:"api_key_name"`
-	GroupID           *int64             `json:"group_id,omitempty"`
-	GroupName         string             `json:"group_name"`
+	PlatformID        *int64             `json:"platform_id,omitempty"`
+	PlatformName      string             `json:"platform_name"`
 	Endpoint          string             `json:"endpoint"`
 	Provider          string             `json:"provider"`
 	Model             string             `json:"model"`
@@ -419,7 +419,7 @@ type ContentModerationLog struct {
 type ContentModerationLogFilter struct {
 	Pagination pagination.PaginationParams
 	Result     string
-	GroupID    *int64
+	PlatformID *int64
 	Endpoint   string
 	Search     string
 	From       *time.Time
@@ -501,7 +501,7 @@ type ContentModerationService struct {
 	settingRepo              SettingRepository
 	repo                     ContentModerationRepository
 	hashCache                ContentModerationHashCache
-	groupRepo                GroupRepository
+	platformRepo             PlatformRepository
 	userRepo                 UserRepository
 	proxyRepo                ProxyRepository
 	authCacheInvalidator     APIKeyAuthCacheInvalidator
@@ -574,7 +574,7 @@ func NewContentModerationService(
 	settingRepo SettingRepository,
 	repo ContentModerationRepository,
 	hashCache ContentModerationHashCache,
-	groupRepo GroupRepository,
+	platformRepo PlatformRepository,
 	userRepo UserRepository,
 	proxyRepo ProxyRepository,
 	authCacheInvalidator APIKeyAuthCacheInvalidator,
@@ -584,7 +584,7 @@ func NewContentModerationService(
 		settingRepo:          settingRepo,
 		repo:                 repo,
 		hashCache:            hashCache,
-		groupRepo:            groupRepo,
+		platformRepo:         platformRepo,
 		userRepo:             userRepo,
 		proxyRepo:            proxyRepo,
 		authCacheInvalidator: authCacheInvalidator,
@@ -687,11 +687,11 @@ func (s *ContentModerationService) UpdateConfig(ctx context.Context, input Updat
 	if input.ModelFilter != nil {
 		cfg.ModelFilter = *input.ModelFilter
 	}
-	if input.AllGroups != nil {
-		cfg.AllGroups = *input.AllGroups
+	if input.AllPlatforms != nil {
+		cfg.AllPlatforms = *input.AllPlatforms
 	}
-	if input.GroupIDs != nil {
-		cfg.GroupIDs = normalizeInt64IDs(*input.GroupIDs)
+	if input.PlatformIDs != nil {
+		cfg.PlatformIDs = normalizeInt64IDs(*input.PlatformIDs)
 	}
 	if input.RecordNonHits != nil {
 		cfg.RecordNonHits = *input.RecordNonHits
@@ -817,7 +817,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.skip_unavailable",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol)
 		return allow, nil
@@ -827,7 +827,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Warn("content_moderation.skip_config_load_failed",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
 			"error", err)
@@ -837,28 +837,28 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.skip_feature_disabled",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol)
 		return allow, nil
 	}
 	cfg := runtimeSnapshot.config
-	inGroupScope := cfg.includesGroup(input.GroupID)
+	inPlatformScope := cfg.includesPlatform(input.PlatformID)
 	inModelScope := cfg.includesModel(input.Model)
 	slog.Info("content_moderation.config_loaded",
 		"user_id", input.UserID,
 		"api_key_id", input.APIKeyID,
-		"group_id", contentModerationLogGroupID(input.GroupID),
-		"group_name", input.GroupName,
+		"platform_id", contentModerationLogPlatformID(input.PlatformID),
+		"platform_name", input.PlatformName,
 		"endpoint", input.Endpoint,
 		"provider", input.Provider,
 		"protocol", input.Protocol,
 		"model", input.Model,
 		"enabled", cfg.Enabled,
 		"mode", cfg.Mode,
-		"all_groups", cfg.AllGroups,
-		"configured_group_ids", cfg.GroupIDs,
-		"in_group_scope", inGroupScope,
+		"all_platforms", cfg.AllPlatforms,
+		"configured_platform_ids", cfg.PlatformIDs,
+		"in_platform_scope", inPlatformScope,
 		"model_filter_type", cfg.ModelFilter.Type,
 		"configured_models", cfg.ModelFilter.Models,
 		"in_model_scope", inModelScope,
@@ -870,7 +870,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.skip_config_disabled",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol)
 		return allow, nil
@@ -879,29 +879,29 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.skip_mode_off",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol)
 		return allow, nil
 	}
-	if !inGroupScope {
-		slog.Info("content_moderation.skip_group_out_of_scope",
+	if !inPlatformScope {
+		slog.Info("content_moderation.skip_platform_out_of_scope",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
-			"group_name", input.GroupName,
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
+			"platform_name", input.PlatformName,
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
-			"all_groups", cfg.AllGroups,
-			"configured_group_ids", cfg.GroupIDs)
+			"all_platforms", cfg.AllPlatforms,
+			"configured_platform_ids", cfg.PlatformIDs)
 		return allow, nil
 	}
 	if !inModelScope {
 		slog.Info("content_moderation.skip_model_out_of_scope",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
-			"group_name", input.GroupName,
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
+			"platform_name", input.PlatformName,
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
 			"model", input.Model,
@@ -914,7 +914,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.skip_empty_input",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
 			"body_bytes", len(input.Body))
@@ -924,7 +924,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 	slog.Info("content_moderation.input_extracted",
 		"user_id", input.UserID,
 		"api_key_id", input.APIKeyID,
-		"group_id", contentModerationLogGroupID(input.GroupID),
+		"platform_id", contentModerationLogPlatformID(input.PlatformID),
 		"endpoint", input.Endpoint,
 		"protocol", input.Protocol,
 		"text_runes", len([]rune(content.Text)),
@@ -937,7 +937,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 				slog.Info("content_moderation.keyword_block",
 					"user_id", input.UserID,
 					"api_key_id", input.APIKeyID,
-					"group_id", contentModerationLogGroupID(input.GroupID),
+					"platform_id", contentModerationLogPlatformID(input.PlatformID),
 					"endpoint", input.Endpoint,
 					"protocol", input.Protocol,
 					"keyword_blocking_mode", cfg.KeywordBlockingMode,
@@ -964,7 +964,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 			slog.Info("content_moderation.skip_api_keyword_only",
 				"user_id", input.UserID,
 				"api_key_id", input.APIKeyID,
-				"group_id", contentModerationLogGroupID(input.GroupID),
+				"platform_id", contentModerationLogPlatformID(input.PlatformID),
 				"endpoint", input.Endpoint,
 				"protocol", input.Protocol)
 			return allow, nil
@@ -982,7 +982,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 			slog.Info("content_moderation.hash_block",
 				"user_id", input.UserID,
 				"api_key_id", input.APIKeyID,
-				"group_id", contentModerationLogGroupID(input.GroupID),
+				"platform_id", contentModerationLogPlatformID(input.PlatformID),
 				"endpoint", input.Endpoint,
 				"protocol", input.Protocol,
 				"input_hash", hashText)
@@ -1011,7 +1011,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.skip_sample_rate",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
 			"sample_rate", cfg.SampleRate)
@@ -1024,7 +1024,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Warn("content_moderation.skip_no_audit_api_keys",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol)
 		return allow, nil
@@ -1033,7 +1033,7 @@ func (s *ContentModerationService) Check(ctx context.Context, input ContentModer
 		slog.Info("content_moderation.enqueue_observe",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
 			"queue_len", len(s.asyncQueue))
@@ -1061,7 +1061,7 @@ func (s *ContentModerationService) checkSync(ctx context.Context, input ContentM
 		slog.Warn("content_moderation.audit_api_failed",
 			"user_id", input.UserID,
 			"api_key_id", input.APIKeyID,
-			"group_id", contentModerationLogGroupID(input.GroupID),
+			"platform_id", contentModerationLogPlatformID(input.PlatformID),
 			"endpoint", input.Endpoint,
 			"protocol", input.Protocol,
 			"mode", cfg.Mode,
@@ -1092,8 +1092,8 @@ func (s *ContentModerationService) checkSync(ctx context.Context, input ContentM
 	slog.Info("content_moderation.audit_result",
 		"user_id", input.UserID,
 		"api_key_id", input.APIKeyID,
-		"group_id", contentModerationLogGroupID(input.GroupID),
-		"group_name", input.GroupName,
+		"platform_id", contentModerationLogPlatformID(input.PlatformID),
+		"platform_name", input.PlatformName,
 		"endpoint", input.Endpoint,
 		"protocol", input.Protocol,
 		"mode", cfg.Mode,
@@ -1260,7 +1260,7 @@ func (s *ContentModerationService) worker(id int) {
 			if !cfg.Enabled || cfg.Mode == ContentModerationModeOff || len(cfg.apiKeys()) == 0 {
 				return
 			}
-			if !cfg.includesGroup(task.input.GroupID) {
+			if !cfg.includesPlatform(task.input.PlatformID) {
 				return
 			}
 			if !cfg.includesModel(task.input.Model) {
@@ -1672,10 +1672,18 @@ func (s *ContentModerationService) validateConfig(ctx context.Context, cfg *Cont
 	if cfg.ModelFilter.Type != ContentModerationModelFilterAll && len(cfg.ModelFilter.Models) == 0 {
 		return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_MODEL_FILTER", "指定或排除模型时至少需要配置 1 个模型")
 	}
-	if !cfg.AllGroups && len(cfg.GroupIDs) > 0 && s.groupRepo != nil {
-		for _, groupID := range cfg.GroupIDs {
-			if _, err := s.groupRepo.GetByIDLite(ctx, groupID); err != nil {
-				return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_GROUP", fmt.Sprintf("审计分组不存在: %d", groupID))
+	if !cfg.AllPlatforms && len(cfg.PlatformIDs) > 0 && s.platformRepo != nil {
+		platforms, err := s.platformRepo.List(ctx)
+		if err != nil {
+			return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_PLATFORM", "无法加载审计平台")
+		}
+		known := make(map[int64]struct{}, len(platforms))
+		for _, platform := range platforms {
+			known[platform.ID] = struct{}{}
+		}
+		for _, platformID := range cfg.PlatformIDs {
+			if _, ok := known[platformID]; !ok {
+				return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_PLATFORM", fmt.Sprintf("审计平台不存在: %d", platformID))
 			}
 		}
 	}
@@ -1867,8 +1875,8 @@ func (s *ContentModerationService) buildLog(input ContentModerationCheckInput, c
 		UserEmail:         input.UserEmail,
 		APIKeyID:          apiKeyID,
 		APIKeyName:        input.APIKeyName,
-		GroupID:           cloneInt64Ptr(input.GroupID),
-		GroupName:         input.GroupName,
+		PlatformID:        cloneInt64Ptr(input.PlatformID),
+		PlatformName:      input.PlatformName,
 		Endpoint:          input.Endpoint,
 		Provider:          input.Provider,
 		Model:             input.Model,
@@ -2040,7 +2048,7 @@ func contentModerationEmailSourceID(log *ContentModerationLog) string {
 func contentModerationEmailVariables(log *ContentModerationLog, cfg *ContentModerationConfig) map[string]string {
 	variables := map[string]string{
 		"triggered_at":        time.Now().UTC().Format(time.RFC3339),
-		"group_name":          "-",
+		"platform_name":       "-",
 		"moderation_category": "-",
 		"moderation_score":    "0.000",
 		"violation_count":     "0",
@@ -2050,8 +2058,8 @@ func contentModerationEmailVariables(log *ContentModerationLog, cfg *ContentMode
 		if !log.CreatedAt.IsZero() {
 			variables["triggered_at"] = log.CreatedAt.UTC().Format(time.RFC3339)
 		}
-		if strings.TrimSpace(log.GroupName) != "" {
-			variables["group_name"] = strings.TrimSpace(log.GroupName)
+		if strings.TrimSpace(log.PlatformName) != "" {
+			variables["platform_name"] = strings.TrimSpace(log.PlatformName)
 		}
 		if strings.TrimSpace(log.HighestCategory) != "" {
 			variables["moderation_category"] = strings.TrimSpace(log.HighestCategory)
@@ -2084,8 +2092,8 @@ func defaultContentModerationConfig() *ContentModerationConfig {
 		Model:                defaultContentModerationModel,
 		TimeoutMS:            defaultContentModerationTimeoutMS,
 		SampleRate:           100,
-		AllGroups:            true,
-		GroupIDs:             []int64{},
+		AllPlatforms:         true,
+		PlatformIDs:          []int64{},
 		RecordNonHits:        false,
 		Thresholds:           ContentModerationDefaultThresholds(),
 		WorkerCount:          defaultContentModerationWorkerCount,
@@ -2117,7 +2125,7 @@ func cloneContentModerationConfig(cfg *ContentModerationConfig) *ContentModerati
 	clone := *cfg
 	clone.ProxyID = cloneInt64Ptr(cfg.ProxyID)
 	clone.APIKeys = append([]string(nil), cfg.APIKeys...)
-	clone.GroupIDs = append([]int64(nil), cfg.GroupIDs...)
+	clone.PlatformIDs = append([]int64(nil), cfg.PlatformIDs...)
 	clone.BlockedKeywords = append([]string(nil), cfg.BlockedKeywords...)
 	clone.Thresholds = cloneFloatMap(cfg.Thresholds)
 	clone.ModelFilter = ContentModerationModelFilter{
@@ -2203,22 +2211,22 @@ func (cfg *ContentModerationConfig) normalize() {
 	if cfg.NonHitRetentionDays > maxContentModerationNonHitRetentionDays {
 		cfg.NonHitRetentionDays = maxContentModerationNonHitRetentionDays
 	}
-	cfg.GroupIDs = normalizeInt64IDs(cfg.GroupIDs)
+	cfg.PlatformIDs = normalizeInt64IDs(cfg.PlatformIDs)
 	cfg.Thresholds = mergeContentModerationThresholds(ContentModerationDefaultThresholds(), cfg.Thresholds)
 	cfg.BlockedKeywords = normalizeBlockedKeywords(cfg.BlockedKeywords)
 	cfg.KeywordBlockingMode = normalizeKeywordBlockingMode(cfg.KeywordBlockingMode)
 	cfg.ModelFilter = normalizeContentModerationModelFilter(cfg.ModelFilter)
 }
 
-func (cfg *ContentModerationConfig) includesGroup(groupID *int64) bool {
-	if cfg.AllGroups {
+func (cfg *ContentModerationConfig) includesPlatform(platformID *int64) bool {
+	if cfg.AllPlatforms {
 		return true
 	}
-	if groupID == nil {
+	if platformID == nil {
 		return false
 	}
-	for _, id := range cfg.GroupIDs {
-		if id == *groupID {
+	for _, id := range cfg.PlatformIDs {
+		if id == *platformID {
 			return true
 		}
 	}
@@ -2240,11 +2248,11 @@ func (cfg *ContentModerationConfig) includesModel(model string) bool {
 	}
 }
 
-func contentModerationLogGroupID(groupID *int64) int64 {
-	if groupID == nil {
+func contentModerationLogPlatformID(platformID *int64) int64 {
+	if platformID == nil {
 		return 0
 	}
-	return *groupID
+	return *platformID
 }
 
 func (cfg *ContentModerationConfig) shouldSample(hashText string) bool {
@@ -2419,8 +2427,8 @@ func (s *ContentModerationService) configView(cfg *ContentModerationConfig) *Con
 		APIKeyStatuses:                 s.apiKeyStatuses(keys),
 		TimeoutMS:                      cfg.TimeoutMS,
 		SampleRate:                     cfg.SampleRate,
-		AllGroups:                      cfg.AllGroups,
-		GroupIDs:                       append([]int64(nil), cfg.GroupIDs...),
+		AllPlatforms:                   cfg.AllPlatforms,
+		PlatformIDs:                    append([]int64(nil), cfg.PlatformIDs...),
 		RecordNonHits:                  cfg.RecordNonHits,
 		Thresholds:                     cloneFloatMap(cfg.Thresholds),
 		WorkerCount:                    cfg.WorkerCount,
@@ -2974,8 +2982,8 @@ type CyberPolicyRecordInput struct {
 	UserEmail       string
 	APIKeyID        int64
 	APIKeyName      string
-	GroupID         *int64
-	GroupName       string
+	PlatformID      *int64
+	PlatformName    string
 	Endpoint        string
 	Model           string
 	UpstreamMessage string
@@ -3022,8 +3030,8 @@ func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, i
 		UserEmail:       in.UserEmail,
 		APIKeyID:        apiKeyID,
 		APIKeyName:      in.APIKeyName,
-		GroupID:         cloneInt64Ptr(in.GroupID),
-		GroupName:       in.GroupName,
+		PlatformID:      cloneInt64Ptr(in.PlatformID),
+		PlatformName:    in.PlatformName,
 		Endpoint:        in.Endpoint,
 		Provider:        "openai",
 		Model:           in.Model,
@@ -3075,7 +3083,7 @@ func (s *ContentModerationService) sendCyberPolicyEmail(ctx context.Context, log
 		variables := map[string]string{
 			"triggered_at":     log.CreatedAt.UTC().Format(time.RFC3339),
 			"model":            defaultContentModerationString(log.Model, "-"),
-			"group_name":       defaultContentModerationString(log.GroupName, "-"),
+			"platform_name":    defaultContentModerationString(log.PlatformName, "-"),
 			"upstream_message": defaultContentModerationString(log.Error, "-"),
 		}
 		err := s.emailService.notificationEmailService.Send(ctx, NotificationEmailSendInput{

@@ -16,13 +16,9 @@ import (
 )
 
 var (
-	ErrRedeemCodeNotFound                   = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
-	ErrRedeemCodeUsed                       = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
-	ErrRedeemCodeExpired                    = infraerrors.Conflict("REDEEM_CODE_EXPIRED", "redeem code expired")
-	ErrRedeemCodeSubscriptionTermsImmutable = infraerrors.Conflict(
-		"REDEEM_CODE_SUBSCRIPTION_TERMS_IMMUTABLE",
-		"subscription plan terms cannot be batch updated",
-	)
+	ErrRedeemCodeNotFound  = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
+	ErrRedeemCodeUsed      = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
+	ErrRedeemCodeExpired   = infraerrors.Conflict("REDEEM_CODE_EXPIRED", "redeem code expired")
 	ErrInsufficientBalance = infraerrors.BadRequest("INSUFFICIENT_BALANCE", "insufficient balance")
 	ErrRedeemRateLimited   = infraerrors.TooManyRequests("REDEEM_RATE_LIMITED", "too many failed attempts, please try again later")
 	ErrRedeemCodeLocked    = infraerrors.Conflict("REDEEM_CODE_LOCKED", "redeem code is being processed, please try again")
@@ -92,16 +88,10 @@ type NullableTimeUpdate struct {
 	Value *time.Time
 }
 
-type NullableInt64Update struct {
-	Set   bool
-	Value *int64
-}
-
 type RedeemCodeBatchUpdateFields struct {
 	Status    *string
 	ExpiresAt NullableTimeUpdate
 	Notes     *string
-	GroupID   NullableInt64Update
 
 	// Core fields are intentionally modeled only so service validation can
 	// reject payloads that try to mutate redemption value semantics in bulk.
@@ -113,7 +103,6 @@ func (f RedeemCodeBatchUpdateFields) HasChanges() bool {
 	return f.Status != nil ||
 		f.ExpiresAt.Set ||
 		f.Notes != nil ||
-		f.GroupID.Set ||
 		f.Type != nil ||
 		f.Value != nil
 }
@@ -123,7 +112,7 @@ func (f RedeemCodeBatchUpdateFields) HasCoreFieldChanges() bool {
 }
 
 func (f RedeemCodeBatchUpdateFields) TouchesUsedSensitiveFields() bool {
-	return f.Status != nil || f.ExpiresAt.Set || f.GroupID.Set
+	return f.Status != nil || f.ExpiresAt.Set
 }
 
 type RedeemCodeBatchUpdateInput struct {
@@ -258,6 +247,9 @@ func (s *RedeemService) CreateCode(ctx context.Context, code *RedeemCode) error 
 	if code.Type == "" {
 		code.Type = RedeemTypeBalance
 	}
+	if code.Type == RedeemTypeSubscription && (code.SubscriptionPlanID == nil || *code.SubscriptionPlanID <= 0) {
+		return infraerrors.BadRequest("REDEEM_CODE_PLAN_REQUIRED", "subscription redeem code requires a subscription plan")
+	}
 	if code.Type != RedeemTypeInvitation && code.Value == 0 {
 		return errors.New("value must not be zero")
 	}
@@ -338,10 +330,6 @@ func (s *RedeemService) BatchUpdate(ctx context.Context, input *RedeemCodeBatchU
 		}
 		input.Fields.ExpiresAt.Value = &expiresAt
 	}
-	if input.Fields.GroupID.Set && input.Fields.GroupID.Value != nil && *input.Fields.GroupID.Value <= 0 {
-		return nil, infraerrors.BadRequest("REDEEM_CODE_GROUP_ID_INVALID", "group_id must be positive")
-	}
-
 	updated, err := s.redeemRepo.BatchUpdate(ctx, ids, input.Fields)
 	if err != nil {
 		return nil, err
@@ -445,8 +433,8 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	switch redeemCode.Type {
 	case RedeemTypeBalance, RedeemTypeConcurrency:
 	case RedeemTypeSubscription:
-		if redeemCode.GroupID == nil && (redeemCode.SubscriptionPlanID == nil || *redeemCode.SubscriptionPlanID <= 0) {
-			return nil, infraerrors.BadRequest("REDEEM_CODE_INVALID", "invalid subscription redeem code: missing plan or group")
+		if redeemCode.SubscriptionPlanID == nil || *redeemCode.SubscriptionPlanID <= 0 {
+			return nil, infraerrors.BadRequest("REDEEM_CODE_INVALID", "subscription redeem code requires a subscription plan")
 		}
 	default:
 		return nil, unsupportedRedeemTypeError(redeemCode.Type)
@@ -506,32 +494,8 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 		}
 
 	case RedeemTypeSubscription:
-		if redeemCode.hasSubscriptionPlanSnapshot() {
-			if err := s.assignSubscriptionFromRedeemCode(txCtx, userID, redeemCode); err != nil {
-				return nil, err
-			}
-			break
-		}
-		validityDays := redeemCode.ValidityDays
-		if validityDays < 0 {
-			// 负数天数：缩短订阅，减到 0 则取消订阅
-			if err := s.reduceOrCancelSubscription(txCtx, userID, *redeemCode.GroupID, -validityDays, redeemCode.Code); err != nil {
-				return nil, fmt.Errorf("reduce or cancel subscription: %w", err)
-			}
-		} else {
-			if validityDays == 0 {
-				validityDays = 30
-			}
-			_, _, err := s.subscriptionService.AssignOrExtendSubscription(txCtx, &AssignSubscriptionInput{
-				UserID:       userID,
-				GroupID:      *redeemCode.GroupID,
-				ValidityDays: validityDays,
-				AssignedBy:   0, // 系统分配
-				Notes:        fmt.Sprintf("通过兑换码 %s 兑换", redeemCode.Code),
-			})
-			if err != nil {
-				return nil, fmt.Errorf("assign or extend subscription: %w", err)
-			}
+		if err := s.assignSubscriptionFromRedeemCode(txCtx, userID, redeemCode); err != nil {
+			return nil, err
 		}
 
 	default:
@@ -608,12 +572,8 @@ func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64
 		if s.billingCacheService == nil {
 			return
 		}
-		if redeemCode.GroupID != nil {
-			groupID := *redeemCode.GroupID
-			go func() {
-				s.billingCacheService.InvalidateSubscriptionGroup(userID, groupID)
-			}()
-		}
+		// Plan candidate lookup is read directly from the subscription repository;
+		// invalidating the user auth snapshot above is sufficient here.
 	}
 }
 
@@ -707,52 +667,4 @@ func (s *RedeemService) GetUserHistory(ctx context.Context, userID int64, limit 
 		return nil, fmt.Errorf("get user redeem history: %w", err)
 	}
 	return codes, nil
-}
-
-// reduceOrCancelSubscription 缩短订阅天数，剩余天数 <= 0 时取消订阅
-func (s *RedeemService) reduceOrCancelSubscription(ctx context.Context, userID, groupID int64, reduceDays int, code string) error {
-	sub, err := s.subscriptionService.userSubRepo.GetByUserIDAndGroupID(ctx, userID, groupID)
-	if err != nil {
-		return ErrSubscriptionNotFound
-	}
-
-	now := time.Now()
-	remaining := int(sub.ExpiresAt.Sub(now).Hours() / 24)
-	if remaining < 0 {
-		remaining = 0
-	}
-
-	notes := fmt.Sprintf("通过兑换码 %s 退款扣减 %d 天", code, reduceDays)
-
-	if remaining <= reduceDays {
-		// 剩余天数不足，直接取消订阅
-		if err := s.subscriptionService.userSubRepo.UpdateStatus(ctx, sub.ID, SubscriptionStatusExpired); err != nil {
-			return fmt.Errorf("cancel subscription: %w", err)
-		}
-		// 设置过期时间为当前时间
-		if err := s.subscriptionService.userSubRepo.ExtendExpiry(ctx, sub.ID, now); err != nil {
-			return fmt.Errorf("set subscription expiry: %w", err)
-		}
-	} else {
-		// 缩短天数
-		newExpiresAt := sub.ExpiresAt.AddDate(0, 0, -reduceDays)
-		if err := s.subscriptionService.userSubRepo.ExtendExpiry(ctx, sub.ID, newExpiresAt); err != nil {
-			return fmt.Errorf("reduce subscription: %w", err)
-		}
-	}
-
-	// 追加备注
-	newNotes := sub.Notes
-	if newNotes != "" {
-		newNotes += "\n"
-	}
-	newNotes += notes
-	if err := s.subscriptionService.userSubRepo.UpdateNotes(ctx, sub.ID, newNotes); err != nil {
-		return fmt.Errorf("update subscription notes: %w", err)
-	}
-
-	// 失效缓存
-	s.subscriptionService.InvalidateSubCache(userID, groupID)
-
-	return nil
 }

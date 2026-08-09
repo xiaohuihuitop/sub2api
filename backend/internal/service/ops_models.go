@@ -52,13 +52,13 @@ type OpsErrorLog struct {
 	RequestID       string `json:"request_id"`
 	Message         string `json:"message"`
 
-	UserID      *int64 `json:"user_id"`
-	UserEmail   string `json:"user_email"`
-	APIKeyID    *int64 `json:"api_key_id"`
-	AccountID   *int64 `json:"account_id"`
-	AccountName string `json:"account_name"`
-	GroupID     *int64 `json:"group_id"`
-	GroupName   string `json:"group_name"`
+	UserID       *int64 `json:"user_id"`
+	UserEmail    string `json:"user_email"`
+	APIKeyID     *int64 `json:"api_key_id"`
+	AccountID    *int64 `json:"account_id"`
+	AccountName  string `json:"account_name"`
+	PlatformID   *int64 `json:"platform_id"`
+	PlatformName string `json:"platform_name"`
 
 	ClientIP    *string `json:"client_ip"`
 	RequestPath string  `json:"request_path"`
@@ -105,9 +105,9 @@ type OpsErrorLogFilter struct {
 	StartTime *time.Time
 	EndTime   *time.Time
 
-	Platform  string
-	GroupID   *int64
-	AccountID *int64
+	Platform   string
+	PlatformID *int64
+	AccountID  *int64
 
 	StatusCodes      []int
 	StatusCodesOther bool

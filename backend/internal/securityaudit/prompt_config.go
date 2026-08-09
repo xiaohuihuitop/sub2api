@@ -72,8 +72,8 @@ type storageConfig struct {
 	WorkerCount            int               `json:"worker_count"`
 	QueueCapacity          int               `json:"queue_capacity"`
 	Scanners               []string          `json:"scanners"`
-	AllGroups              bool              `json:"all_groups"`
-	GroupIDs               []int64           `json:"group_ids"`
+	AllPlatforms           bool              `json:"all_platforms"`
+	PlatformIDs            []int64           `json:"platform_ids"`
 	Endpoints              []StorageEndpoint `json:"endpoints"`
 	ConfigVersion          int64             `json:"config_version"`
 	UpdatedAt              time.Time         `json:"updated_at"`
@@ -108,8 +108,8 @@ type ActiveConfig struct {
 	WorkerCount            int
 	QueueCapacity          int
 	Scanners               []string
-	AllGroups              bool
-	GroupIDs               []int64
+	AllPlatforms           bool
+	PlatformIDs            []int64
 	Endpoints              []ActiveEndpoint
 	ConfigVersion          int64
 	UpdatedAt              time.Time
@@ -140,8 +140,8 @@ type PublicConfig struct {
 	WorkerCount            int              `json:"worker_count"`
 	QueueCapacity          int              `json:"queue_capacity"`
 	Scanners               []string         `json:"scanners"`
-	AllGroups              bool             `json:"all_groups"`
-	GroupIDs               []int64          `json:"group_ids"`
+	AllPlatforms           bool             `json:"all_platforms"`
+	PlatformIDs            []int64          `json:"platform_ids"`
 	Endpoints              []PublicEndpoint `json:"endpoints"`
 	ConfigVersion          int64            `json:"config_version"`
 	UpdatedAt              time.Time        `json:"updated_at"`
@@ -172,8 +172,8 @@ type UpdateConfigRequest struct {
 	WorkerCount            int              `json:"worker_count"`
 	QueueCapacity          int              `json:"queue_capacity"`
 	Scanners               []string         `json:"scanners"`
-	AllGroups              bool             `json:"all_groups"`
-	GroupIDs               []int64          `json:"group_ids"`
+	AllPlatforms           bool             `json:"all_platforms"`
+	PlatformIDs            []int64          `json:"platform_ids"`
 	Endpoints              []UpdateEndpoint `json:"endpoints"`
 }
 
@@ -187,8 +187,8 @@ func DefaultStorageConfig() storageConfig {
 		WorkerCount:            DefaultWorkerCount,
 		QueueCapacity:          DefaultQueueCapacity,
 		Scanners:               append([]string(nil), AllScannerIDs...),
-		AllGroups:              true,
-		GroupIDs:               []int64{},
+		AllPlatforms:           true,
+		PlatformIDs:            []int64{},
 		Endpoints:              []StorageEndpoint{},
 		ConfigVersion:          1,
 	}
@@ -229,7 +229,7 @@ func normalizeStorageConfig(cfg *storageConfig) {
 		cfg.Scanners = append([]string(nil), AllScannerIDs...)
 	}
 	cfg.Scanners = canonicalScannerIDs(cfg.Scanners)
-	cfg.GroupIDs = canonicalInt64s(cfg.GroupIDs)
+	cfg.PlatformIDs = canonicalInt64s(cfg.PlatformIDs)
 	// Preserve an invalid blocking-without-audit combination so validation can
 	// reject it instead of silently changing administrator intent.
 	for i := range cfg.Endpoints {
@@ -267,8 +267,8 @@ func validateStorageConfig(cfg storageConfig) error {
 	if cfg.QueueCapacity < 1 || cfg.QueueCapacity > MaxQueueCapacity {
 		return infraerrors.BadRequest("prompt_audit_invalid_queue_capacity", "队列容量超出允许范围")
 	}
-	if !cfg.AllGroups && len(cfg.GroupIDs) == 0 {
-		return infraerrors.BadRequest("prompt_audit_groups_required", "指定分组模式至少需要选择一个分组")
+	if !cfg.AllPlatforms && len(cfg.PlatformIDs) == 0 {
+		return infraerrors.BadRequest("prompt_audit_platforms_required", "指定平台模式至少需要选择一个平台")
 	}
 	if len(cfg.Scanners) == 0 {
 		return infraerrors.BadRequest("prompt_audit_scanners_required", "至少需要启用一个风险分类")
@@ -323,13 +323,13 @@ func validateUpdateConfigRequest(req UpdateConfigRequest) error {
 			return infraerrors.BadRequest("prompt_audit_invalid_scanner", "提示词审计风险分类无效")
 		}
 	}
-	if !req.AllGroups {
-		if len(req.GroupIDs) == 0 {
-			return infraerrors.BadRequest("prompt_audit_groups_required", "指定分组模式至少需要选择一个分组")
+	if !req.AllPlatforms {
+		if len(req.PlatformIDs) == 0 {
+			return infraerrors.BadRequest("prompt_audit_platforms_required", "指定平台模式至少需要选择一个平台")
 		}
-		for _, groupID := range req.GroupIDs {
-			if groupID <= 0 {
-				return infraerrors.BadRequest("prompt_audit_invalid_group", "提示词审计分组 ID 无效")
+		for _, platformID := range req.PlatformIDs {
+			if platformID <= 0 {
+				return infraerrors.BadRequest("prompt_audit_invalid_platform", "提示词审计平台 ID 无效")
 			}
 		}
 	}
@@ -354,15 +354,15 @@ func (cfg ActiveConfig) EffectiveMode() Mode {
 	return ModeAsync
 }
 
-func (cfg ActiveConfig) IncludesGroup(groupID *int64) bool {
-	if cfg.AllGroups {
+func (cfg ActiveConfig) IncludesPlatform(platformID *int64) bool {
+	if cfg.AllPlatforms {
 		return true
 	}
-	if groupID == nil {
+	if platformID == nil {
 		return false
 	}
-	i := sort.Search(len(cfg.GroupIDs), func(i int) bool { return cfg.GroupIDs[i] >= *groupID })
-	return i < len(cfg.GroupIDs) && cfg.GroupIDs[i] == *groupID
+	i := sort.Search(len(cfg.PlatformIDs), func(i int) bool { return cfg.PlatformIDs[i] >= *platformID })
+	return i < len(cfg.PlatformIDs) && cfg.PlatformIDs[i] == *platformID
 }
 
 func (cfg ActiveConfig) EnabledEndpoints() []ActiveEndpoint {
@@ -393,7 +393,7 @@ func PublicFromStorage(cfg storageConfig, riskControlEnabled bool, invalidTokenE
 		invalid[id] = struct{}{}
 	}
 	scanners := append([]string{}, cfg.Scanners...)
-	groupIDs := append([]int64{}, cfg.GroupIDs...)
+	platformIDs := append([]int64{}, cfg.PlatformIDs...)
 	endpoints := make([]PublicEndpoint, 0, len(cfg.Endpoints))
 	for _, ep := range cfg.Endpoints {
 		hasToken := strings.TrimSpace(ep.TokenCiphertext) != ""
@@ -414,8 +414,8 @@ func PublicFromStorage(cfg storageConfig, riskControlEnabled bool, invalidTokenE
 	return PublicConfig{
 		Enabled: cfg.Enabled, BlockingEnabled: cfg.BlockingEnabled, BlockingLatestTurnOnly: cfg.BlockingLatestTurnOnly, StorePassEvents: cfg.StorePassEvents,
 		EffectiveMode: active.EffectiveMode(), Strategy: cfg.Strategy, WorkerCount: cfg.WorkerCount,
-		QueueCapacity: cfg.QueueCapacity, Scanners: scanners, AllGroups: cfg.AllGroups,
-		GroupIDs: groupIDs, Endpoints: endpoints, ConfigVersion: cfg.ConfigVersion,
+		QueueCapacity: cfg.QueueCapacity, Scanners: scanners, AllPlatforms: cfg.AllPlatforms,
+		PlatformIDs: platformIDs, Endpoints: endpoints, ConfigVersion: cfg.ConfigVersion,
 		UpdatedAt: cfg.UpdatedAt, UpdatedBy: cfg.UpdatedBy, ChangeSummary: cfg.ChangeSummary,
 	}
 }
@@ -425,8 +425,8 @@ func ActiveFromStorage(cfg storageConfig, riskControlEnabled bool, encryptor Sec
 		RiskControlEnabled: riskControlEnabled, Enabled: cfg.Enabled, BlockingEnabled: cfg.BlockingEnabled,
 		BlockingLatestTurnOnly: cfg.BlockingLatestTurnOnly,
 		StorePassEvents:        cfg.StorePassEvents, Strategy: cfg.Strategy, WorkerCount: cfg.WorkerCount,
-		QueueCapacity: cfg.QueueCapacity, Scanners: append([]string(nil), cfg.Scanners...), AllGroups: cfg.AllGroups,
-		GroupIDs: append([]int64(nil), cfg.GroupIDs...), ConfigVersion: cfg.ConfigVersion,
+		QueueCapacity: cfg.QueueCapacity, Scanners: append([]string(nil), cfg.Scanners...), AllPlatforms: cfg.AllPlatforms,
+		PlatformIDs: append([]int64(nil), cfg.PlatformIDs...), ConfigVersion: cfg.ConfigVersion,
 		UpdatedAt: cfg.UpdatedAt, UpdatedBy: cfg.UpdatedBy, ChangeSummary: cfg.ChangeSummary,
 		Endpoints: make([]ActiveEndpoint, 0, len(cfg.Endpoints)),
 	}
@@ -466,13 +466,13 @@ func changeSummary(cfg storageConfig) string {
 		StorePassEvents        bool   `json:"store_pass_events"`
 		EndpointCount          int    `json:"endpoint_count"`
 		ScannerCount           int    `json:"scanner_count"`
-		AllGroups              bool   `json:"all_groups"`
-		GroupCount             int    `json:"group_count"`
-		GroupHash              string `json:"group_hash"`
-	}{cfg.Enabled, cfg.BlockingEnabled, cfg.BlockingLatestTurnOnly, cfg.StorePassEvents, len(cfg.Endpoints), len(cfg.Scanners), cfg.AllGroups, len(cfg.GroupIDs), ""}
-	rawGroups, _ := json.Marshal(cfg.GroupIDs)
-	digest := sha256.Sum256(rawGroups)
-	summary.GroupHash = hex.EncodeToString(digest[:])
+		AllPlatforms           bool   `json:"all_platforms"`
+		PlatformCount          int    `json:"platform_count"`
+		PlatformHash           string `json:"platform_hash"`
+	}{cfg.Enabled, cfg.BlockingEnabled, cfg.BlockingLatestTurnOnly, cfg.StorePassEvents, len(cfg.Endpoints), len(cfg.Scanners), cfg.AllPlatforms, len(cfg.PlatformIDs), ""}
+	rawPlatforms, _ := json.Marshal(cfg.PlatformIDs)
+	digest := sha256.Sum256(rawPlatforms)
+	summary.PlatformHash = hex.EncodeToString(digest[:])
 	raw, _ := json.Marshal(summary)
 	return string(raw)
 }

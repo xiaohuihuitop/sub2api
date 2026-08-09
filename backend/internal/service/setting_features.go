@@ -721,15 +721,6 @@ func (s *SettingService) GetStreamTimeoutSettings(ctx context.Context) (*StreamT
 	return &settings, nil
 }
 
-// IsUngroupedKeySchedulingAllowed 查询是否允许未分组 Key 调度
-func (s *SettingService) IsUngroupedKeySchedulingAllowed(ctx context.Context) bool {
-	value, err := s.settingRepo.GetValue(ctx, SettingKeyAllowUngroupedKeyScheduling)
-	if err != nil {
-		return false // fail-closed: 查询失败时默认不允许
-	}
-	return value == "true"
-}
-
 // GetRectifierSettings 获取请求整流器配置
 func (s *SettingService) GetRectifierSettings(ctx context.Context) (*RectifierSettings, error) {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyRectifierSettings)

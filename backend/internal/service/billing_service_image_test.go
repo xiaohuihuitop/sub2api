@@ -29,22 +29,22 @@ func TestCalculateImageCost_GroupCustomPricing(t *testing.T) {
 	price1K := 0.10
 	price2K := 0.15
 	price4K := 0.30
-	groupConfig := &ImagePriceConfig{
+	priceConfig := &ImagePriceConfig{
 		Price1K: &price1K,
 		Price2K: &price2K,
 		Price4K: &price4K,
 	}
 
 	// 1K 使用分组价格
-	cost := svc.CalculateImageCost("gemini-3-pro-image", "1K", 2, groupConfig, 1.0)
+	cost := svc.CalculateImageCost("gemini-3-pro-image", "1K", 2, priceConfig, 1.0)
 	require.InDelta(t, 0.20, cost.TotalCost, 0.0001)
 
 	// 2K 使用分组价格
-	cost = svc.CalculateImageCost("gemini-3-pro-image", "2K", 1, groupConfig, 1.0)
+	cost = svc.CalculateImageCost("gemini-3-pro-image", "2K", 1, priceConfig, 1.0)
 	require.InDelta(t, 0.15, cost.TotalCost, 0.0001)
 
 	// 4K 使用分组价格
-	cost = svc.CalculateImageCost("gemini-3-pro-image", "4K", 1, groupConfig, 1.0)
+	cost = svc.CalculateImageCost("gemini-3-pro-image", "4K", 1, priceConfig, 1.0)
 	require.InDelta(t, 0.30, cost.TotalCost, 0.0001)
 }
 
@@ -52,11 +52,11 @@ func TestCalculateImageCost_NormalizesInvalidSizeTo2K(t *testing.T) {
 	svc := &BillingService{}
 
 	price2K := 0.25
-	groupConfig := &ImagePriceConfig{Price2K: &price2K}
+	priceConfig := &ImagePriceConfig{Price2K: &price2K}
 
 	for _, imageSize := range []string{"", "auto", "not-a-size"} {
 		t.Run(imageSize, func(t *testing.T) {
-			cost := svc.CalculateImageCost("gemini-3-pro-image", imageSize, 2, groupConfig, 1.0)
+			cost := svc.CalculateImageCost("gemini-3-pro-image", imageSize, 2, priceConfig, 1.0)
 			require.InDelta(t, 0.50, cost.TotalCost, 0.0001)
 			require.InDelta(t, 0.50, cost.ActualCost, 0.0001)
 		})
@@ -120,12 +120,12 @@ func TestGetImageUnitPrice_GroupPriorityOverDefault(t *testing.T) {
 	svc := &BillingService{}
 
 	price2K := 0.20
-	groupConfig := &ImagePriceConfig{
+	priceConfig := &ImagePriceConfig{
 		Price2K: &price2K,
 	}
 
 	// 分组配置了 2K 价格，应该使用分组价格而不是默认的 $0.134
-	cost := svc.CalculateImageCost("gemini-3-pro-image", "2K", 1, groupConfig, 1.0)
+	cost := svc.CalculateImageCost("gemini-3-pro-image", "2K", 1, priceConfig, 1.0)
 	require.InDelta(t, 0.20, cost.TotalCost, 0.0001)
 }
 
@@ -135,20 +135,20 @@ func TestGetImageUnitPrice_PartialGroupConfig(t *testing.T) {
 
 	// 只配置 1K 价格
 	price1K := 0.10
-	groupConfig := &ImagePriceConfig{
+	priceConfig := &ImagePriceConfig{
 		Price1K: &price1K,
 	}
 
 	// 1K 使用分组价格
-	cost := svc.CalculateImageCost("gemini-3-pro-image", "1K", 1, groupConfig, 1.0)
+	cost := svc.CalculateImageCost("gemini-3-pro-image", "1K", 1, priceConfig, 1.0)
 	require.InDelta(t, 0.10, cost.TotalCost, 0.0001)
 
 	// 2K 回退默认价格 $0.201 (1.5倍)
-	cost = svc.CalculateImageCost("gemini-3-pro-image", "2K", 1, groupConfig, 1.0)
+	cost = svc.CalculateImageCost("gemini-3-pro-image", "2K", 1, priceConfig, 1.0)
 	require.InDelta(t, 0.201, cost.TotalCost, 0.0001)
 
 	// 4K 回退默认价格 $0.268 (翻倍)
-	cost = svc.CalculateImageCost("gemini-3-pro-image", "4K", 1, groupConfig, 1.0)
+	cost = svc.CalculateImageCost("gemini-3-pro-image", "4K", 1, priceConfig, 1.0)
 	require.InDelta(t, 0.268, cost.TotalCost, 0.0001)
 }
 

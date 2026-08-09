@@ -87,15 +87,14 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	}
 
 	user := &User{
-		Email:         input.Email,
-		Username:      input.Username,
-		Notes:         input.Notes,
-		Role:          role,
-		Balance:       balance,
-		Concurrency:   input.Concurrency,
-		RPMLimit:      input.RPMLimit,
-		Status:        StatusActive,
-		AllowedGroups: input.AllowedGroups,
+		Email:       input.Email,
+		Username:    input.Username,
+		Notes:       input.Notes,
+		Role:        role,
+		Balance:     balance,
+		Concurrency: input.Concurrency,
+		RPMLimit:    input.RPMLimit,
+		Status:      StatusActive,
 	}
 	if err := user.SetPassword(input.Password); err != nil {
 		return nil, err
@@ -137,7 +136,7 @@ func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userI
 	items := s.settingService.GetDefaultSubscriptions(ctx)
 	for _, item := range items {
 		if err := assignDefaultSubscription(ctx, s.defaultSubAssigner, userID, item, "auto assigned by default user subscriptions setting"); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to assign default subscription: user_id=%d plan_id=%d group_id=%d err=%v", userID, item.PlanID, item.GroupID, err)
+			logger.LegacyPrintf("service.admin", "failed to assign default subscription: user_id=%d plan_id=%d err=%v", userID, item.PlanID, err)
 		}
 	}
 }
@@ -157,7 +156,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	oldStatus := user.Status
 	oldRole := user.Role
 	oldRPMLimit := user.RPMLimit
-	oldAllowedGroups := append([]int64(nil), user.AllowedGroups...)
 
 	// fields 与下面的 input.X 判空条件一一对应：管理员没提交的列不写回，
 	// 避免这份快照回滚并发的扣费、状态变更或批量限额调整。
@@ -215,11 +213,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		fields.RPMLimit = true
 	}
 
-	if input.AllowedGroups != nil {
-		user.AllowedGroups = *input.AllowedGroups
-		fields.AllowedGroups = true
-	}
-
 	if err := s.userRepo.Update(ctx, user, fields); err != nil {
 		return nil, err
 	}
@@ -232,8 +225,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
-		// allowed_groups 参与 API Key 专属分组授权判断；不失效缓存会让修改在一个 L2 TTL 内失去效果。
-		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || !sameInt64Set(user.AllowedGroups, oldAllowedGroups) {
+		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
 		}
 	}
@@ -551,63 +543,9 @@ func (s *adminServiceImpl) GetUserRPMStatus(ctx context.Context, userID int64) (
 		logger.LegacyPrintf("service.admin", "failed to get user rpm: user_id=%d err=%v", userID, err)
 	}
 
-	keys, _, err := s.GetUserAPIKeys(ctx, userID, 1, 1000, "", "")
-	if err != nil {
-		return nil, err
-	}
-
-	groupIDSet := make(map[int64]struct{})
-	for _, key := range keys {
-		if key.GroupID != nil && *key.GroupID > 0 {
-			groupIDSet[*key.GroupID] = struct{}{}
-		}
-	}
-
-	groupIDs := make([]int64, 0, len(groupIDSet))
-	for groupID := range groupIDSet {
-		groupIDs = append(groupIDs, groupID)
-	}
-	sort.Slice(groupIDs, func(i, j int) bool { return groupIDs[i] < groupIDs[j] })
-
-	var perGroup []UserGroupRPMStatus
-	for _, groupID := range groupIDs {
-		used, getErr := s.userRPMCache.GetUserGroupRPM(ctx, userID, groupID)
-		if getErr != nil {
-			logger.LegacyPrintf("service.admin", "failed to get user group rpm: user_id=%d group_id=%d err=%v", userID, groupID, getErr)
-		}
-
-		entry := UserGroupRPMStatus{
-			GroupID: groupID,
-			Used:    used,
-		}
-
-		if s.groupRepo != nil {
-			if group, groupErr := s.groupRepo.GetByIDLite(ctx, groupID); groupErr == nil && group != nil {
-				entry.GroupName = group.Name
-				entry.Limit = group.RPMLimit
-				entry.Source = "group"
-			} else if groupErr != nil {
-				logger.LegacyPrintf("service.admin", "failed to get group rpm status metadata: group_id=%d err=%v", groupID, groupErr)
-			}
-		}
-
-		if s.userGroupRateRepo != nil {
-			override, overrideErr := s.userGroupRateRepo.GetRPMOverrideByUserAndGroup(ctx, userID, groupID)
-			if overrideErr != nil {
-				logger.LegacyPrintf("service.admin", "failed to get rpm override: user_id=%d group_id=%d err=%v", userID, groupID, overrideErr)
-			} else if override != nil {
-				entry.Limit = *override
-				entry.Source = "override"
-			}
-		}
-
-		perGroup = append(perGroup, entry)
-	}
-
 	return &UserRPMStatus{
 		UserRPMUsed:  userRPMUsed,
 		UserRPMLimit: user.RPMLimit,
-		PerGroup:     perGroup,
 	}, nil
 }
 
@@ -1208,12 +1146,6 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			if err := applySubscriptionPlanToRedeemCode(&code, plan); err != nil {
 				return nil, err
 			}
-		} else if input.Type == RedeemTypeSubscription {
-			code.GroupID = input.GroupID
-			code.ValidityDays = input.ValidityDays
-			if code.ValidityDays <= 0 {
-				code.ValidityDays = 30 // 默认30天
-			}
 		}
 		if err := s.redeemCodeRepo.Create(ctx, &code); err != nil {
 			return nil, err
@@ -1243,17 +1175,7 @@ func (s *adminServiceImpl) resolveSubscriptionRedeemPlan(
 		}
 		return plan, nil
 	}
-	if input.GroupID == nil {
-		return nil, errors.New("subscription_plan_id is required for subscription type")
-	}
-	group, err := s.groupRepo.GetByID(ctx, *input.GroupID)
-	if err != nil {
-		return nil, fmt.Errorf("group not found: %w", err)
-	}
-	if !group.IsSubscriptionType() {
-		return nil, errors.New("group must be subscription type")
-	}
-	return nil, nil
+	return nil, errors.New("subscription_plan_id is required for subscription type")
 }
 
 func (s *adminServiceImpl) DeleteRedeemCode(ctx context.Context, id int64) error {

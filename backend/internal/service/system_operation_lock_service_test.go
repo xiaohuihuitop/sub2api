@@ -254,7 +254,7 @@ func TestSystemOperationLockService_ExistingNilAndReclaimBranches(t *testing.T) 
 		IdempotencyKeyHash: HashIdempotencyKey(systemOperationLockKey),
 		RequestFingerprint: "other-op",
 		Status:             IdempotencyStatusFailedRetryable,
-		LockedUntil:        ptrTime(now.Add(-time.Second)),
+		LockedUntil:        func() *time.Time { value := now.Add(-time.Second); return &value }(),
 		ExpiresAt:          now.Add(time.Hour),
 	}
 	repo.reclaimErr = errors.New("reclaim failed")

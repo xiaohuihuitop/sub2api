@@ -293,10 +293,7 @@ const handleImport = async () => {
     }
     const dataPayload = mergeDataPayloads(dataPayloads)
 
-    const res = await adminAPI.accounts.importData({
-      data: dataPayload,
-      skip_default_group_bind: true
-    })
+    const res = await adminAPI.accounts.importData({ data: dataPayload })
 
     result.value = res
 

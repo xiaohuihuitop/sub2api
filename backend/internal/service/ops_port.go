@@ -52,7 +52,7 @@ type OpsRepository interface {
 
 	// Alert silences
 	CreateAlertSilence(ctx context.Context, input *OpsAlertSilence) (*OpsAlertSilence, error)
-	IsAlertSilenced(ctx context.Context, ruleID int64, platform string, groupID *int64, region *string, now time.Time) (bool, error)
+	IsAlertSilenced(ctx context.Context, ruleID int64, platform string, platformID *int64, region *string, now time.Time) (bool, error)
 
 	// Pre-aggregation (hourly/daily) used for long-window dashboard performance.
 	UpsertHourlyMetrics(ctx context.Context, startTime, endTime time.Time) error
@@ -65,11 +65,11 @@ type OpsInsertErrorLogInput struct {
 	RequestID       string
 	ClientRequestID string
 
-	UserID    *int64
-	APIKeyID  *int64
-	AccountID *int64
-	GroupID   *int64
-	ClientIP  *string
+	UserID     *int64
+	APIKeyID   *int64
+	AccountID  *int64
+	PlatformID *int64
+	ClientIP   *string
 
 	Platform    string
 	Model       string
@@ -128,8 +128,8 @@ type OpsInsertSystemMetricsInput struct {
 	CreatedAt     time.Time
 	WindowMinutes int
 
-	Platform *string
-	GroupID  *int64
+	Platform   *string
+	PlatformID *int64
 
 	SuccessCount         int64
 	ErrorCountTotal      int64

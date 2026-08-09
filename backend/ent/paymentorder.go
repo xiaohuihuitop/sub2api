@@ -51,8 +51,6 @@ type PaymentOrder struct {
 	OrderType string `json:"order_type,omitempty"`
 	// PlanID holds the value of the "plan_id" field.
 	PlanID *int64 `json:"plan_id,omitempty"`
-	// SubscriptionGroupID holds the value of the "subscription_group_id" field.
-	SubscriptionGroupID *int64 `json:"subscription_group_id,omitempty"`
 	// SubscriptionDays holds the value of the "subscription_days" field.
 	SubscriptionDays *int `json:"subscription_days,omitempty"`
 	// ProviderInstanceID holds the value of the "provider_instance_id" field.
@@ -134,7 +132,7 @@ func (*PaymentOrder) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case paymentorder.FieldAmount, paymentorder.FieldPayAmount, paymentorder.FieldFeeRate, paymentorder.FieldRefundAmount:
 			values[i] = new(sql.NullFloat64)
-		case paymentorder.FieldID, paymentorder.FieldUserID, paymentorder.FieldPlanID, paymentorder.FieldSubscriptionGroupID, paymentorder.FieldSubscriptionDays:
+		case paymentorder.FieldID, paymentorder.FieldUserID, paymentorder.FieldPlanID, paymentorder.FieldSubscriptionDays:
 			values[i] = new(sql.NullInt64)
 		case paymentorder.FieldUserEmail, paymentorder.FieldUserName, paymentorder.FieldUserNotes, paymentorder.FieldRechargeCode, paymentorder.FieldOutTradeNo, paymentorder.FieldPaymentType, paymentorder.FieldPaymentTradeNo, paymentorder.FieldPayURL, paymentorder.FieldQrCode, paymentorder.FieldQrCodeImg, paymentorder.FieldOrderType, paymentorder.FieldProviderInstanceID, paymentorder.FieldProviderKey, paymentorder.FieldStatus, paymentorder.FieldRefundReason, paymentorder.FieldRefundRequestReason, paymentorder.FieldRefundRequestedBy, paymentorder.FieldFailedReason, paymentorder.FieldClientIP, paymentorder.FieldSrcHost, paymentorder.FieldSrcURL:
 			values[i] = new(sql.NullString)
@@ -261,13 +259,6 @@ func (_m *PaymentOrder) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PlanID = new(int64)
 				*_m.PlanID = value.Int64
-			}
-		case paymentorder.FieldSubscriptionGroupID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field subscription_group_id", values[i])
-			} else if value.Valid {
-				_m.SubscriptionGroupID = new(int64)
-				*_m.SubscriptionGroupID = value.Int64
 			}
 		case paymentorder.FieldSubscriptionDays:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -512,11 +503,6 @@ func (_m *PaymentOrder) String() string {
 	builder.WriteString(", ")
 	if v := _m.PlanID; v != nil {
 		builder.WriteString("plan_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
-	builder.WriteString(", ")
-	if v := _m.SubscriptionGroupID; v != nil {
-		builder.WriteString("subscription_group_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

@@ -96,7 +96,7 @@
                   {{ t('redeem.redeemSuccess') }}
                 </h3>
                 <div class="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
-                  <p>{{ redeemResult.message }}</p>
+                  <p>{{ t('redeem.codeRedeemSuccess') }}</p>
                   <div class="mt-3 space-y-1">
                     <p v-if="redeemResult.type === 'balance'" class="font-medium">
                       {{ t('redeem.added') }}: ${{ redeemResult.value.toFixed(2) }}
@@ -107,21 +107,11 @@
                     </p>
                     <p v-else-if="redeemResult.type === 'subscription'" class="font-medium">
                       {{ t('redeem.subscriptionAssigned') }}
-                      <span v-if="redeemResult.group_name"> - {{ redeemResult.group_name }}</span>
+                      <span v-if="redeemResult.plan_name_snapshot"> - {{ redeemResult.plan_name_snapshot }}</span>
                       <span v-if="redeemResult.validity_days">
                         ({{
                           t('redeem.subscriptionDays', { days: redeemResult.validity_days })
                         }})</span
-                      >
-                    </p>
-                    <p v-if="redeemResult.new_balance !== undefined">
-                      {{ t('redeem.newBalance') }}:
-                      <span class="font-semibold">${{ redeemResult.new_balance.toFixed(2) }}</span>
-                    </p>
-                    <p v-if="redeemResult.new_concurrency !== undefined">
-                      {{ t('redeem.newConcurrency') }}:
-                      <span class="font-semibold"
-                        >{{ redeemResult.new_concurrency }} {{ t('redeem.requests') }}</span
                       >
                     </p>
                   </div>
@@ -362,12 +352,9 @@ const user = computed(() => authStore.user)
 const redeemCode = ref('')
 const submitting = ref(false)
 const redeemResult = ref<{
-  message: string
   type: string
   value: number
-  new_balance?: number
-  new_concurrency?: number
-  group_name?: string
+  plan_name_snapshot?: string
   validity_days?: number
 } | null>(null)
 const errorMessage = ref('')
@@ -410,10 +397,7 @@ const formatHistoryValue = (item: RedeemHistoryItem) => {
     const sign = item.value >= 0 ? '+' : ''
     return `${sign}$${item.value.toFixed(2)}`
   } else if (isSubscriptionType(item.type)) {
-    // 订阅类型显示有效天数和分组名称
-    const days = item.validity_days || Math.round(item.value)
-    const groupName = item.group?.name || ''
-    return groupName ? `${days}${t('redeem.days')} - ${groupName}` : `${days}${t('redeem.days')}`
+    return `${Math.round(item.value)}${t('redeem.days')}`
   } else {
     const sign = item.value >= 0 ? '+' : ''
     return `${sign}${item.value} ${t('redeem.requests')}`

@@ -349,9 +349,9 @@ func buildUsageCleanupWhere(filters service.UsageCleanupFilters) (string, []any)
 		args = append(args, *filters.AccountID)
 		idx++
 	}
-	if filters.GroupID != nil {
-		conditions = append(conditions, fmt.Sprintf("group_id = $%d", idx))
-		args = append(args, *filters.GroupID)
+	if filters.PlatformID != nil {
+		conditions = append(conditions, fmt.Sprintf("platform_id = $%d", idx))
+		args = append(args, *filters.PlatformID)
 		idx++
 	}
 	if filters.Model != nil {

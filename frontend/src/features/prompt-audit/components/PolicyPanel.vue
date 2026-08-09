@@ -11,35 +11,35 @@
           <legend class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.promptAudit.policy.scope') }}</legend>
           <div class="mt-3 flex flex-wrap gap-5 text-sm text-gray-700 dark:text-dark-200">
             <label class="flex items-center gap-2">
-              <input type="radio" name="prompt-audit-scope" :checked="draft.all_groups" @change="patch({ all_groups: true, group_ids: [] })" />
-              {{ t('admin.promptAudit.policy.allGroups') }}
+              <input type="radio" name="prompt-audit-scope" :checked="draft.all_platforms" @change="patch({ all_platforms: true, platform_ids: [] })" />
+              {{ t('admin.promptAudit.policy.allPlatforms') }}
             </label>
             <label class="flex items-center gap-2">
-              <input type="radio" name="prompt-audit-scope" :checked="!draft.all_groups" @change="patch({ all_groups: false })" />
-              {{ t('admin.promptAudit.policy.selectedGroups') }}
+              <input type="radio" name="prompt-audit-scope" :checked="!draft.all_platforms" @change="patch({ all_platforms: false })" />
+              {{ t('admin.promptAudit.policy.selectedPlatforms') }}
             </label>
           </div>
         </fieldset>
 
-        <div v-if="!draft.all_groups" class="mt-4">
+        <div v-if="!draft.all_platforms" class="mt-4">
           <label class="block text-sm text-gray-700 dark:text-dark-200">
-            <span>{{ t('admin.promptAudit.policy.searchGroups') }}</span>
-            <input v-model="groupSearch" type="search" class="input mt-1.5 w-full" :aria-label="t('admin.promptAudit.policy.searchGroups')" />
+            <span>{{ t('admin.promptAudit.policy.searchPlatforms') }}</span>
+            <input v-model="platformSearch" type="search" class="input mt-1.5 w-full" :aria-label="t('admin.promptAudit.policy.searchPlatforms')" />
           </label>
           <div class="mt-3 max-h-52 overflow-y-auto rounded-lg border border-gray-200 p-2 dark:border-dark-700">
-            <label v-for="group in filteredGroups" :key="group.id" class="flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-2 text-sm hover:bg-gray-50 dark:hover:bg-dark-800">
+            <label v-for="platform in filteredPlatforms" :key="platform.id" class="flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-2 text-sm hover:bg-gray-50 dark:hover:bg-dark-800">
               <span class="flex items-center gap-2 text-gray-800 dark:text-dark-100">
-                <input type="checkbox" :checked="draft.group_ids.includes(group.id)" @change="toggleGroup(group.id)" />
-                {{ group.name }}
+                <input type="checkbox" :checked="draft.platform_ids.includes(platform.id)" @change="togglePlatform(platform.id)" />
+                {{ platform.name }}
               </span>
-              <span class="text-xs text-gray-500 dark:text-dark-400">{{ group.platform }} · {{ group.status }}</span>
+              <span class="text-xs text-gray-500 dark:text-dark-400">{{ platform.code }} · {{ platform.account_platform }} · {{ platform.status }}</span>
             </label>
-            <p v-if="filteredGroups.length === 0" class="px-2 py-4 text-center text-sm text-gray-500">{{ t('admin.promptAudit.policy.noGroups') }}</p>
+            <p v-if="filteredPlatforms.length === 0" class="px-2 py-4 text-center text-sm text-gray-500">{{ t('admin.promptAudit.policy.noPlatforms') }}</p>
           </div>
-          <div v-if="missingGroupIds.length" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            {{ t('admin.promptAudit.policy.missingGroups') }}: {{ missingGroupIds.join(', ') }}
+          <div v-if="missingPlatformIds.length" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            {{ t('admin.promptAudit.policy.missingPlatforms') }}: {{ missingPlatformIds.join(', ') }}
           </div>
-          <p class="mt-2 text-xs text-gray-500 dark:text-dark-400">{{ t('admin.promptAudit.policy.selectedCount', { count: draft.group_ids.length }) }}</p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-dark-400">{{ t('admin.promptAudit.policy.selectedPlatformCount', { count: draft.platform_ids.length }) }}</p>
         </div>
 
         <fieldset class="mt-5 border-t border-gray-100 pt-5 dark:border-dark-800">
@@ -74,30 +74,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { PromptAuditDraft, PromptAuditGroup } from '../types'
+import type { PromptAuditDraft, PromptAuditPlatform } from '../types'
 import { cloneData, SCANNER_CATALOG } from '../viewModel'
 
-const props = defineProps<{ draft: PromptAuditDraft; groups: PromptAuditGroup[] }>()
+const props = defineProps<{ draft: PromptAuditDraft; platforms: PromptAuditPlatform[] }>()
 const emit = defineEmits<{ (event: 'update:draft', value: PromptAuditDraft): void }>()
 const { t } = useI18n()
-const groupSearch = ref('')
+const platformSearch = ref('')
 
-const filteredGroups = computed(() => {
-  const query = groupSearch.value.trim().toLowerCase()
-  if (!query) return props.groups
-  return props.groups.filter((group) => `${group.name} ${group.id} ${group.platform}`.toLowerCase().includes(query))
+const filteredPlatforms = computed(() => {
+  const query = platformSearch.value.trim().toLowerCase()
+  if (!query) return props.platforms
+  return props.platforms.filter((platform) => `${platform.name} ${platform.id} ${platform.code} ${platform.account_platform}`.toLowerCase().includes(query))
 })
-const knownGroupIds = computed(() => new Set(props.groups.map((group) => group.id)))
-const missingGroupIds = computed(() => props.draft.group_ids.filter((id) => !knownGroupIds.value.has(id)))
+const knownPlatformIds = computed(() => new Set(props.platforms.map((platform) => platform.id)))
+const missingPlatformIds = computed(() => props.draft.platform_ids.filter((id) => !knownPlatformIds.value.has(id)))
 
 function patch(value: Partial<PromptAuditDraft>) {
   emit('update:draft', { ...cloneData(props.draft), ...value })
 }
-function toggleGroup(id: number) {
-  const selected = new Set(props.draft.group_ids)
+function togglePlatform(id: number) {
+  const selected = new Set(props.draft.platform_ids)
   if (selected.has(id)) selected.delete(id)
   else selected.add(id)
-  patch({ group_ids: [...selected].sort((a, b) => a - b) })
+  patch({ platform_ids: [...selected].sort((a, b) => a - b) })
 }
 function toggleScanner(id: string) {
   const selected = new Set(props.draft.scanners)

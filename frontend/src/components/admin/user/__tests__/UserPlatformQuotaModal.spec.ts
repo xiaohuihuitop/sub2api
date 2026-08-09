@@ -197,7 +197,7 @@ describe('UserPlatformQuotaModal', () => {
           user: makeUser({
             subscriptions: [
               {
-                id: 1, user_id: 99, group_id: 1, status: 'active',
+				id: 1, user_id: 99, subscription_plan_id: 1, plan_name_snapshot: 'Active plan', status: 'active',
                 starts_at: '2026-01-01T00:00:00Z', expires_at: null,
                 daily_usage_usd: 0, weekly_usage_usd: 0, monthly_usage_usd: 0,
                 daily_window_start: null, weekly_window_start: null, monthly_window_start: null,
@@ -218,7 +218,7 @@ describe('UserPlatformQuotaModal', () => {
           user: makeUser({
             subscriptions: [
               {
-                id: 2, user_id: 99, group_id: 1, status: 'expired',
+				id: 2, user_id: 99, subscription_plan_id: 1, plan_name_snapshot: 'Expired plan', status: 'expired',
                 starts_at: '2025-01-01T00:00:00Z', expires_at: '2025-12-31T00:00:00Z',
                 daily_usage_usd: 0, weekly_usage_usd: 0, monthly_usage_usd: 0,
                 daily_window_start: null, weekly_window_start: null, monthly_window_start: null,

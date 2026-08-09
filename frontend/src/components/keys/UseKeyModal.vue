@@ -201,13 +201,13 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
-import type { GroupPlatform } from '@/types'
+import type { AccountPlatform } from '@/types'
 
 interface Props {
   show: boolean
   apiKey: string
   baseUrl: string
-  platform: GroupPlatform | null
+  platform: AccountPlatform | null
   allowMessagesDispatch?: boolean
 }
 

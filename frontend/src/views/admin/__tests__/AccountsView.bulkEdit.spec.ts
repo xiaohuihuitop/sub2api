@@ -163,7 +163,6 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountCapacityCell: true,
           AccountStatusIndicator: true,
           AccountTodayStatsCell: true,
-          AccountGroupsCell: true,
           AccountUsageCell: true,
           Icon: true
         }
@@ -228,7 +227,6 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountCapacityCell: true,
           AccountStatusIndicator: true,
           AccountTodayStatsCell: true,
-          AccountGroupsCell: true,
           AccountUsageCell: true,
           Icon: true
         }
@@ -302,7 +300,6 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountCapacityCell: true,
           AccountStatusIndicator: true,
           AccountTodayStatsCell: true,
-          AccountGroupsCell: true,
           AccountUsageCell: true,
           Icon: true
         }
@@ -358,7 +355,6 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountCapacityCell: true,
           AccountStatusIndicator: true,
           AccountTodayStatsCell: true,
-          AccountGroupsCell: true,
           AccountUsageCell: true,
           Icon: true
         }
@@ -431,7 +427,6 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountCapacityCell: true,
           AccountStatusIndicator: true,
           AccountTodayStatsCell: true,
-          AccountGroupsCell: true,
           AccountUsageCell: true,
           Icon: true
         }

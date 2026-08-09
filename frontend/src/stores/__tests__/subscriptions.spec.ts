@@ -15,7 +15,8 @@ const fakeSubscriptions = [
   {
     id: 1,
     user_id: 1,
-    group_id: 1,
+		subscription_plan_id: 1,
+		plan_name_snapshot: 'Plan 1',
     status: 'active' as const,
     daily_usage_usd: 5,
     weekly_usage_usd: 20,
@@ -30,7 +31,8 @@ const fakeSubscriptions = [
   {
     id: 2,
     user_id: 1,
-    group_id: 2,
+		subscription_plan_id: 2,
+		plan_name_snapshot: 'Plan 2',
     status: 'active' as const,
     daily_usage_usd: 10,
     weekly_usage_usd: 40,

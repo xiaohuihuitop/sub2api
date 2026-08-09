@@ -665,11 +665,11 @@
               </ol>
               <div class="ml-8 mt-2">
                 <router-link
-                  to="/admin/groups"
+                  to="/admin/orders/plans"
                   @click="showGuideModal = false"
                   class="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
                 >
-                  {{ t('admin.subscriptions.guide.step1.link') }}
+                  {{ t('nav.paymentPlans') }}
                   <Icon name="arrowRight" size="xs" />
                 </router-link>
               </div>

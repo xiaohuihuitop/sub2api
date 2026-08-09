@@ -97,7 +97,6 @@ func (r *platformModelResolver) ListCandidates(requestedModel string) ([]*Resolv
 			UpstreamModel:        upstream,
 			EndpointCapabilities: append([]string(nil), rule.EndpointCapabilities...),
 			MatchPriority:        priority,
-			LegacyGroupID:        clonePlatformInt64Pointer(rule.LegacyGroupID),
 			RuleID:               rule.ID,
 		})
 	}

@@ -15,14 +15,14 @@ import (
 // account selection failed with ErrNoAvailableAccounts. Handlers obtain it
 // via classifyNoAccountError and choose between:
 //
-//   - 404 model_not_found — the group has accounts, but none of them are
+//   - 404 model_not_found — the platform pool has accounts, but none of them are
 //     configured to serve the requested model (config / typo / unsupported
 //     model). Returning 503 here misleads operators and trips reverse-proxy
 //     health checks; 404 lets the client surface the real problem.
 //
 //   - 503 api_error — accounts that could serve the model exist but are
 //     temporarily exhausted (rate limit, quota auto-pause, runtime block) OR
-//     the group has no accounts at all. Both stay on 503 because retrying
+//     the platform pool has no accounts at all. Both stay on 503 because retrying
 //     after a backoff can plausibly succeed (or, in the empty-pool case, the
 //     operator may be in the middle of adding accounts).
 type noAccountErrorClassification struct {
@@ -42,11 +42,11 @@ type noAccountErrorClassification struct {
 // Its dedicated database query considers only persistent eligibility
 // (active status + schedulable setting) and model_mapping, bypassing scheduler
 // snapshots and transient filters. That guarantees a 404 is only returned
-// when persistent account/group/model configuration must change before the
+// when persistent platform/account/model configuration must change before the
 // request can succeed.
 //
 // routingModel is the model name that account selection actually compared
-// against (i.e. after group-level dispatch mapping). displayModel is the
+// against (i.e. after platform-level dispatch mapping). displayModel is the
 // raw model the caller asked for; it is used only in the user-facing error
 // message so that internal mapping details don't leak. Most callers pass
 // the same value for both.
@@ -75,16 +75,16 @@ func classifyNoAccountError(
 	if displayModel == "" {
 		displayModel = routingModel
 	}
-	if diag == nil || apiKey == nil || apiKey.GroupID == nil || routingModel == "" {
+	if diag == nil || apiKey == nil || service.PlatformSchedulingID(ctx) == nil || routingModel == "" {
 		return fallback
 	}
 
-	result := diag.DiagnoseModelAvailabilityForPlatform(ctx, apiKey.GroupID, routingModel, platform)
+	result := diag.DiagnoseModelAvailabilityForPlatform(ctx, routingModel, platform)
 	if result.HasAccountsInPool && !result.HasModelSupport {
 		return noAccountErrorClassification{
 			Status:        http.StatusNotFound,
 			ErrType:       "model_not_found",
-			Message:       fmt.Sprintf("Model %q is not supported by any configured account in this group", displayModel),
+			Message:       fmt.Sprintf("Model %q is not supported by any configured account in this platform", displayModel),
 			ModelNotFound: true,
 		}
 	}

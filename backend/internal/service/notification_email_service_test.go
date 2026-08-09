@@ -78,7 +78,7 @@ func TestNotificationEmailTemplateRejectsUnsupportedPlaceholder(t *testing.T) {
 		NotificationEmailEventSubscriptionPurchaseSuccess,
 		"en",
 		"Purchased {{not_allowed}}",
-		"<p>{{subscription_group}}</p>",
+		"<p>{{subscription_plan}}</p>",
 	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported placeholder")
@@ -440,9 +440,9 @@ func TestNotificationEmailSendDeduplicatesSubscriptionExpiryReminder(t *testing.
 		SourceID:       "1234567890",
 		ReminderKey:    "7d",
 		Variables: map[string]string{
-			"subscription_group": "Codex",
-			"expiry_time":        "2026-05-27 12:00",
-			"days_remaining":     "7",
+			"subscription_plan": "Codex",
+			"expiry_time":       "2026-05-27 12:00",
+			"days_remaining":    "7",
 		},
 	}
 

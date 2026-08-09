@@ -23,12 +23,12 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		return
 	}
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
-	if !ok || apiKey.Group == nil {
-		h.errorResponse(c, http.StatusUnauthorized, "invalid_request_error", "API key group is required")
+	if !ok || apiKey == nil {
+		h.errorResponse(c, http.StatusUnauthorized, "invalid_request_error", "API key platform is required")
 		return
 	}
-	if apiKey.Group.Platform != service.PlatformOpenAI {
-		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Codex models manifest is only available for OpenAI groups")
+	if effectiveAPIKeyPlatform(c, apiKey) != service.PlatformOpenAI {
+		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Codex models manifest is only available for OpenAI platforms")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 	var lastUpstreamErr error
 
 	for {
-		account, err := h.gatewayService.SelectAccountForModelWithExclusions(c.Request.Context(), apiKey.GroupID, "", "", failedAccountIDs)
+		account, err := h.gatewayService.SelectAccountForModelWithExclusions(c.Request.Context(), service.PlatformSchedulingID(c.Request.Context()), "", "", failedAccountIDs)
 		if err != nil {
 			if c.Request.Context().Err() != nil {
 				return

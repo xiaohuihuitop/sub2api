@@ -1,309 +1,225 @@
 import { DriveStep } from 'driver.js'
 
-/**
- * 管理员完整引导流程
- * 交互式引导：指引用户实际操作
- * @param t 国际化函数
- * @param isSimpleMode 是否为简易模式（简易模式下会过滤分组相关步骤）
- */
+const interactive = ['close'] as const
+const navigable = ['next', 'previous'] as const
+
+/** 管理员引导：平台定义路由，账号加入平台池，密钥授权平台与计费资产。 */
 export const getAdminSteps = (t: (key: string) => string, isSimpleMode = false): DriveStep[] => {
-  const allSteps: DriveStep[] = [
-  // ========== 欢迎介绍 ==========
-  {
-    popover: {
-      title: t('onboarding.admin.welcome.title'),
-      description: t('onboarding.admin.welcome.description'),
-      align: 'center',
-      nextBtnText: t('onboarding.admin.welcome.nextBtn'),
-      prevBtnText: t('onboarding.admin.welcome.prevBtn')
-    }
-  },
-
-  // ========== 第一部分：创建分组 ==========
-  {
-    element: '#sidebar-group-manage',
-    popover: {
-      title: t('onboarding.admin.groupManage.title'),
-      description: t('onboarding.admin.groupManage.description'),
-      side: 'right',
-      align: 'center',
-      showButtons: ['close'],
-    }
-  },
-  {
-    element: '[data-tour="groups-create-btn"]',
-    popover: {
-      title: t('onboarding.admin.createGroup.title'),
-      description: t('onboarding.admin.createGroup.description'),
-      side: 'bottom',
-      align: 'end',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="group-form-name"]',
-    popover: {
-      title: t('onboarding.admin.groupName.title'),
-      description: t('onboarding.admin.groupName.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="group-form-platform"]',
-    popover: {
-      title: t('onboarding.admin.groupPlatform.title'),
-      description: t('onboarding.admin.groupPlatform.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="group-form-multiplier"]',
-    popover: {
-      title: t('onboarding.admin.groupMultiplier.title'),
-      description: t('onboarding.admin.groupMultiplier.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="group-form-exclusive"]',
-    popover: {
-      title: t('onboarding.admin.groupExclusive.title'),
-      description: t('onboarding.admin.groupExclusive.description'),
-      side: 'top',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="group-form-submit"]',
-    popover: {
-      title: t('onboarding.admin.groupSubmit.title'),
-      description: t('onboarding.admin.groupSubmit.description'),
-      side: 'left',
-      align: 'center',
-      showButtons: ['close']
-    }
-  },
-
-  // ========== 第二部分：创建账号授权 ==========
-  {
-    element: '#sidebar-channel-manage',
-    popover: {
-      title: t('onboarding.admin.accountManage.title'),
-      description: t('onboarding.admin.accountManage.description'),
-      side: 'right',
-      align: 'center',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="accounts-create-btn"]',
-    popover: {
-      title: t('onboarding.admin.createAccount.title'),
-      description: t('onboarding.admin.createAccount.description'),
-      side: 'bottom',
-      align: 'end',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="account-form-name"]',
-    popover: {
-      title: t('onboarding.admin.accountName.title'),
-      description: t('onboarding.admin.accountName.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="account-form-platform"]',
-    popover: {
-      title: t('onboarding.admin.accountPlatform.title'),
-      description: t('onboarding.admin.accountPlatform.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="account-form-type"]',
-    popover: {
-      title: t('onboarding.admin.accountType.title'),
-      description: t('onboarding.admin.accountType.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="account-form-priority"]',
-    popover: {
-      title: t('onboarding.admin.accountPriority.title'),
-      description: t('onboarding.admin.accountPriority.description'),
-      side: 'top',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="account-form-groups"]',
-    popover: {
-      title: t('onboarding.admin.accountGroups.title'),
-      description: t('onboarding.admin.accountGroups.description'),
-      side: 'top',
-      align: 'center',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="account-form-submit"]',
-    popover: {
-      title: t('onboarding.admin.accountSubmit.title'),
-      description: t('onboarding.admin.accountSubmit.description'),
-      side: 'left',
-      align: 'center',
-      showButtons: ['close']
-    }
-  },
-
-  // ========== 第三部分：创建API密钥 ==========
-  {
-    element: '[data-tour="sidebar-my-keys"]',
-    popover: {
-      title: t('onboarding.admin.keyManage.title'),
-      description: t('onboarding.admin.keyManage.description'),
-      side: 'right',
-      align: 'center',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="keys-create-btn"]',
-    popover: {
-      title: t('onboarding.admin.createKey.title'),
-      description: t('onboarding.admin.createKey.description'),
-      side: 'bottom',
-      align: 'end',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="key-form-name"]',
-    popover: {
-      title: t('onboarding.admin.keyName.title'),
-      description: t('onboarding.admin.keyName.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="key-form-group"]',
-    popover: {
-      title: t('onboarding.admin.keyGroup.title'),
-      description: t('onboarding.admin.keyGroup.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="key-form-submit"]',
-    popover: {
-      title: t('onboarding.admin.keySubmit.title'),
-      description: t('onboarding.admin.keySubmit.description'),
-      side: 'left',
-      align: 'center',
-      showButtons: ['close']
-    }
-  }
+  const steps: DriveStep[] = [
+    {
+      popover: {
+        title: t('onboarding.admin.welcome.title'),
+        description: t('admin.platforms.modelRulesHint'),
+        align: 'center',
+        nextBtnText: t('common.next'),
+        prevBtnText: t('common.back')
+      }
+    },
+    {
+      element: '[data-tour="sidebar-platforms"]',
+      popover: {
+        title: t('nav.platforms'),
+        description: t('admin.platforms.endpointCapabilitiesHint'),
+        side: 'right',
+        align: 'center',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="platforms-create-btn"]',
+      popover: {
+        title: t('admin.platforms.create'),
+        description: t('admin.platforms.modelRulesHint'),
+        side: 'bottom',
+        align: 'end',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="platform-form-identity"]',
+      popover: {
+        title: t('admin.platforms.name'),
+        description: t('admin.platforms.requiredFields'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="platform-form-models"]',
+      popover: {
+        title: t('admin.platforms.modelRules'),
+        description: t('admin.platforms.modelRulesHint'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="platform-form-submit"]',
+      popover: {
+        title: t('common.save'),
+        description: t('admin.platforms.endpointCapabilitiesHint'),
+        side: 'left',
+        align: 'center',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="sidebar-accounts"]',
+      popover: {
+        title: t('nav.accounts'),
+        description: t('admin.accounts.platformModelPolicyNotice'),
+        side: 'right',
+        align: 'center',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="accounts-create-btn"]',
+      popover: {
+        title: t('admin.accounts.addAccount'),
+        description: t('admin.accounts.platformPoolRequired'),
+        side: 'bottom',
+        align: 'end',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="account-form-name"]',
+      popover: {
+        title: t('admin.accounts.accountName'),
+        description: t('admin.accounts.enterAccountName'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="account-form-platform-pool"]',
+      popover: {
+        title: t('admin.accounts.platformPool'),
+        description: t('admin.accounts.platformModelPolicyNotice'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="account-form-type"]',
+      popover: {
+        title: t('admin.accounts.accountType'),
+        description: t('admin.accounts.accountType'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="account-form-priority"]',
+      popover: {
+        title: t('admin.accounts.priority'),
+        description: t('admin.accounts.priorityHint'),
+        side: 'top',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="account-form-submit"]',
+      popover: {
+        title: t('common.save'),
+        description: t('admin.accounts.platformModelPolicyNotice'),
+        side: 'left',
+        align: 'center',
+        showButtons: [...interactive]
+      }
+    },
+    ...getKeySteps(t, true)
   ]
 
-  // 简易模式下过滤分组相关步骤
-  if (isSimpleMode) {
-    return allSteps.filter(step => {
-      const element = step.element as string | undefined
-      // 过滤掉分组管理和账号分组选择相关步骤
-      return !element || (
-        !element.includes('sidebar-group-manage') &&
-        !element.includes('groups-create-btn') &&
-        !element.includes('group-form-') &&
-        !element.includes('account-form-groups')
-      )
-    })
-  }
-
-  return allSteps
+  if (!isSimpleMode) return steps
+  return steps.filter(step => {
+    const element = typeof step.element === 'string' ? step.element : ''
+    return !element.includes('sidebar-platforms') && !element.includes('platform-form-') && !element.includes('platforms-create-btn')
+  })
 }
 
-/**
- * 普通用户引导流程
- */
+function getKeySteps(t: (key: string) => string, admin: boolean): DriveStep[] {
+  return [
+    {
+      element: '[data-tour="sidebar-my-keys"]',
+      popover: {
+        title: t('nav.apiKeys'),
+        description: t('keys.platformsHint'),
+        side: 'right',
+        align: 'center',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="keys-create-btn"]',
+      popover: {
+        title: t('keys.createKey'),
+        description: t('keys.createFirstKey'),
+        side: 'bottom',
+        align: 'end',
+        showButtons: [...interactive]
+      }
+    },
+    {
+      element: '[data-tour="key-form-name"]',
+      popover: {
+        title: t('keys.nameLabel'),
+        description: t('keys.namePlaceholder'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="key-form-platforms"]',
+      popover: {
+        title: t('keys.platformsLabel'),
+        description: t('keys.platformsHint'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="key-form-subscription-plans"]',
+      popover: {
+        title: t('keys.subscriptionPlansLabel'),
+        description: t('keys.subscriptionPlansHint'),
+        side: 'right',
+        align: 'start',
+        showButtons: [...navigable]
+      }
+    },
+    {
+      element: '[data-tour="key-form-submit"]',
+      popover: {
+        title: t('keys.createKey'),
+        description: admin ? t('keys.platformsHint') : t('keys.subscriptionPlansHint'),
+        side: 'left',
+        align: 'center',
+        showButtons: [...interactive]
+      }
+    }
+  ]
+}
+
+/** 普通用户引导：密钥必须显式授权平台，并选择套餐或余额。 */
 export const getUserSteps = (t: (key: string) => string): DriveStep[] => [
   {
     popover: {
       title: t('onboarding.user.welcome.title'),
-      description: t('onboarding.user.welcome.description'),
+      description: t('keys.platformsHint'),
       align: 'center',
-      nextBtnText: t('onboarding.user.welcome.nextBtn'),
-      prevBtnText: t('onboarding.user.welcome.prevBtn')
+      nextBtnText: t('common.next'),
+      prevBtnText: t('common.back')
     }
   },
-  {
-    element: '[data-tour="sidebar-my-keys"]',
-    popover: {
-      title: t('onboarding.user.keyManage.title'),
-      description: t('onboarding.user.keyManage.description'),
-      side: 'right',
-      align: 'center',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="keys-create-btn"]',
-    popover: {
-      title: t('onboarding.user.createKey.title'),
-      description: t('onboarding.user.createKey.description'),
-      side: 'bottom',
-      align: 'end',
-      showButtons: ['close']
-    }
-  },
-  {
-    element: '[data-tour="key-form-name"]',
-    popover: {
-      title: t('onboarding.user.keyName.title'),
-      description: t('onboarding.user.keyName.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="key-form-group"]',
-    popover: {
-      title: t('onboarding.user.keyGroup.title'),
-      description: t('onboarding.user.keyGroup.description'),
-      side: 'right',
-      align: 'start',
-      showButtons: ['next', 'previous']
-    }
-  },
-  {
-    element: '[data-tour="key-form-submit"]',
-    popover: {
-      title: t('onboarding.user.keySubmit.title'),
-      description: t('onboarding.user.keySubmit.description'),
-      side: 'left',
-      align: 'center',
-      showButtons: ['close']
-    }
-  }
+  ...getKeySteps(t, false)
 ]

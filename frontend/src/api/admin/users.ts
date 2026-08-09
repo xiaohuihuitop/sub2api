@@ -70,8 +70,6 @@ export async function list(
     status?: 'active' | 'disabled'
     role?: 'admin' | 'user'
     search?: string
-    group_name?: string         // fuzzy filter by allowed group name
-    api_key_group_id?: number   // filter users by the group their API keys are bound to
     attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
     sort_by?: string
@@ -88,8 +86,6 @@ export async function list(
     status: filters?.status,
     role: filters?.role,
     search: filters?.search,
-    group_name: filters?.group_name,
-    api_key_group_id: filters?.api_key_group_id,
     include_subscriptions: filters?.include_subscriptions,
     sort_by: filters?.sort_by,
     sort_order: filters?.sort_order
@@ -136,7 +132,6 @@ export async function create(userData: {
   balance?: number
   concurrency?: number
   rpm_limit?: number
-  allowed_groups?: number[] | null
 }): Promise<AdminUser> {
   const { data } = await apiClient.post<AdminUser>('/admin/users', userData)
   return data
@@ -262,11 +257,10 @@ export interface BalanceHistoryItem {
   used_by: number | null
   used_at: string | null
   created_at: string
-  group_id: number | null
-  validity_days: number
+  subscription_plan_id: number | null
   notes: string
   user?: { id: number; email: string } | null
-  group?: { id: number; name: string } | null
+  subscription_plan?: { id: number; name: string } | null
 }
 
 // Balance history response extends pagination with total_recharged summary
@@ -293,25 +287,6 @@ export async function getUserBalanceHistory(
   const { data } = await apiClient.get<BalanceHistoryResponse>(
     `/admin/users/${id}/balance-history`,
     { params }
-  )
-  return data
-}
-
-/**
- * Replace user's exclusive group
- * @param userId - User ID
- * @param oldGroupId - Current group ID to replace
- * @param newGroupId - New group ID to replace with
- * @returns Number of migrated keys
- */
-export async function replaceGroup(
-  userId: number,
-  oldGroupId: number,
-  newGroupId: number
-): Promise<{ migrated_keys: number }> {
-  const { data } = await apiClient.post<{ migrated_keys: number }>(
-    `/admin/users/${userId}/replace-group`,
-    { old_group_id: oldGroupId, new_group_id: newGroupId }
   )
   return data
 }
@@ -412,7 +387,6 @@ export const usersAPI = {
   getUserApiKeys,
   getUserUsageStats,
   getUserBalanceHistory,
-  replaceGroup,
   bindUserAuthIdentity,
   getPlatformQuotas,
   updatePlatformQuotas,

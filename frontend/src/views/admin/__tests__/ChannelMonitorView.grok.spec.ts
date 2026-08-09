@@ -30,10 +30,6 @@ vi.mock('@/api/keys', () => ({
   keysAPI: { list: vi.fn() },
 }))
 
-vi.mock('@/api/groups', () => ({
-  userGroupsAPI: { getUserGroupRates: vi.fn() },
-}))
-
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
     cachedPublicSettings: null,

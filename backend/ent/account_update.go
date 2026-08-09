@@ -12,7 +12,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
@@ -585,21 +584,6 @@ func (_u *AccountUpdate) SetNillableQuotaDimension(v *account.QuotaDimension) *A
 	return _u
 }
 
-// AddGroupIDs adds the "groups" edge to the Group entity by IDs.
-func (_u *AccountUpdate) AddGroupIDs(ids ...int64) *AccountUpdate {
-	_u.mutation.AddGroupIDs(ids...)
-	return _u
-}
-
-// AddGroups adds the "groups" edges to the Group entity.
-func (_u *AccountUpdate) AddGroups(v ...*Group) *AccountUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddGroupIDs(ids...)
-}
-
 // SetPlatformPoolID sets the "platform_pool" edge to the Platform entity by ID.
 func (_u *AccountUpdate) SetPlatformPoolID(id int64) *AccountUpdate {
 	_u.mutation.SetPlatformPoolID(id)
@@ -676,27 +660,6 @@ func (_u *AccountUpdate) AddUsageLogs(v ...*UsageLog) *AccountUpdate {
 // Mutation returns the AccountMutation object of the builder.
 func (_u *AccountUpdate) Mutation() *AccountMutation {
 	return _u.mutation
-}
-
-// ClearGroups clears all "groups" edges to the Group entity.
-func (_u *AccountUpdate) ClearGroups() *AccountUpdate {
-	_u.mutation.ClearGroups()
-	return _u
-}
-
-// RemoveGroupIDs removes the "groups" edge to Group entities by IDs.
-func (_u *AccountUpdate) RemoveGroupIDs(ids ...int64) *AccountUpdate {
-	_u.mutation.RemoveGroupIDs(ids...)
-	return _u
-}
-
-// RemoveGroups removes "groups" edges to Group entities.
-func (_u *AccountUpdate) RemoveGroups(v ...*Group) *AccountUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveGroupIDs(ids...)
 }
 
 // ClearPlatformPool clears the "platform_pool" edge to the Platform entity.
@@ -991,63 +954,6 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.QuotaDimension(); ok {
 		_spec.SetField(account.FieldQuotaDimension, field.TypeEnum, value)
-	}
-	if _u.mutation.GroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   account.GroupsTable,
-			Columns: account.GroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		createE := &AccountGroupCreate{config: _u.config, mutation: newAccountGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedGroupsIDs(); len(nodes) > 0 && !_u.mutation.GroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   account.GroupsTable,
-			Columns: account.GroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &AccountGroupCreate{config: _u.config, mutation: newAccountGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GroupsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   account.GroupsTable,
-			Columns: account.GroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &AccountGroupCreate{config: _u.config, mutation: newAccountGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PlatformPoolCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1799,21 +1705,6 @@ func (_u *AccountUpdateOne) SetNillableQuotaDimension(v *account.QuotaDimension)
 	return _u
 }
 
-// AddGroupIDs adds the "groups" edge to the Group entity by IDs.
-func (_u *AccountUpdateOne) AddGroupIDs(ids ...int64) *AccountUpdateOne {
-	_u.mutation.AddGroupIDs(ids...)
-	return _u
-}
-
-// AddGroups adds the "groups" edges to the Group entity.
-func (_u *AccountUpdateOne) AddGroups(v ...*Group) *AccountUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddGroupIDs(ids...)
-}
-
 // SetPlatformPoolID sets the "platform_pool" edge to the Platform entity by ID.
 func (_u *AccountUpdateOne) SetPlatformPoolID(id int64) *AccountUpdateOne {
 	_u.mutation.SetPlatformPoolID(id)
@@ -1890,27 +1781,6 @@ func (_u *AccountUpdateOne) AddUsageLogs(v ...*UsageLog) *AccountUpdateOne {
 // Mutation returns the AccountMutation object of the builder.
 func (_u *AccountUpdateOne) Mutation() *AccountMutation {
 	return _u.mutation
-}
-
-// ClearGroups clears all "groups" edges to the Group entity.
-func (_u *AccountUpdateOne) ClearGroups() *AccountUpdateOne {
-	_u.mutation.ClearGroups()
-	return _u
-}
-
-// RemoveGroupIDs removes the "groups" edge to Group entities by IDs.
-func (_u *AccountUpdateOne) RemoveGroupIDs(ids ...int64) *AccountUpdateOne {
-	_u.mutation.RemoveGroupIDs(ids...)
-	return _u
-}
-
-// RemoveGroups removes "groups" edges to Group entities.
-func (_u *AccountUpdateOne) RemoveGroups(v ...*Group) *AccountUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveGroupIDs(ids...)
 }
 
 // ClearPlatformPool clears the "platform_pool" edge to the Platform entity.
@@ -2235,63 +2105,6 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 	}
 	if value, ok := _u.mutation.QuotaDimension(); ok {
 		_spec.SetField(account.FieldQuotaDimension, field.TypeEnum, value)
-	}
-	if _u.mutation.GroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   account.GroupsTable,
-			Columns: account.GroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		createE := &AccountGroupCreate{config: _u.config, mutation: newAccountGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedGroupsIDs(); len(nodes) > 0 && !_u.mutation.GroupsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   account.GroupsTable,
-			Columns: account.GroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &AccountGroupCreate{config: _u.config, mutation: newAccountGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.GroupsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: false,
-			Table:   account.GroupsTable,
-			Columns: account.GroupsPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &AccountGroupCreate{config: _u.config, mutation: newAccountGroupMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PlatformPoolCleared() {
 		edge := &sqlgraph.EdgeSpec{

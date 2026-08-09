@@ -28,16 +28,8 @@ const (
 	FieldRequestedModel = "requested_model"
 	// FieldUpstreamModel holds the string denoting the upstream_model field in the database.
 	FieldUpstreamModel = "upstream_model"
-	// FieldChannelID holds the string denoting the channel_id field in the database.
-	FieldChannelID = "channel_id"
-	// FieldModelMappingChain holds the string denoting the model_mapping_chain field in the database.
-	FieldModelMappingChain = "model_mapping_chain"
-	// FieldBillingTier holds the string denoting the billing_tier field in the database.
-	FieldBillingTier = "billing_tier"
 	// FieldBillingMode holds the string denoting the billing_mode field in the database.
 	FieldBillingMode = "billing_mode"
-	// FieldGroupID holds the string denoting the group_id field in the database.
-	FieldGroupID = "group_id"
 	// FieldSubscriptionID holds the string denoting the subscription_id field in the database.
 	FieldSubscriptionID = "subscription_id"
 	// FieldPlatformID holds the string denoting the platform_id field in the database.
@@ -114,8 +106,6 @@ const (
 	EdgeAPIKey = "api_key"
 	// EdgeAccount holds the string denoting the account edge name in mutations.
 	EdgeAccount = "account"
-	// EdgeGroup holds the string denoting the group edge name in mutations.
-	EdgeGroup = "group"
 	// EdgeSubscription holds the string denoting the subscription edge name in mutations.
 	EdgeSubscription = "subscription"
 	// EdgePlatform holds the string denoting the platform edge name in mutations.
@@ -143,13 +133,6 @@ const (
 	AccountInverseTable = "accounts"
 	// AccountColumn is the table column denoting the account relation/edge.
 	AccountColumn = "account_id"
-	// GroupTable is the table that holds the group relation/edge.
-	GroupTable = "usage_logs"
-	// GroupInverseTable is the table name for the Group entity.
-	// It exists in this package in order to avoid circular dependency with the "group" package.
-	GroupInverseTable = "groups"
-	// GroupColumn is the table column denoting the group relation/edge.
-	GroupColumn = "group_id"
 	// SubscriptionTable is the table that holds the subscription relation/edge.
 	SubscriptionTable = "usage_logs"
 	// SubscriptionInverseTable is the table name for the UserSubscription entity.
@@ -176,11 +159,7 @@ var Columns = []string{
 	FieldModel,
 	FieldRequestedModel,
 	FieldUpstreamModel,
-	FieldChannelID,
-	FieldModelMappingChain,
-	FieldBillingTier,
 	FieldBillingMode,
-	FieldGroupID,
 	FieldSubscriptionID,
 	FieldPlatformID,
 	FieldBillingSourceType,
@@ -237,10 +216,6 @@ var (
 	RequestedModelValidator func(string) error
 	// UpstreamModelValidator is a validator for the "upstream_model" field. It is called by the builders before save.
 	UpstreamModelValidator func(string) error
-	// ModelMappingChainValidator is a validator for the "model_mapping_chain" field. It is called by the builders before save.
-	ModelMappingChainValidator func(string) error
-	// BillingTierValidator is a validator for the "billing_tier" field. It is called by the builders before save.
-	BillingTierValidator func(string) error
 	// BillingModeValidator is a validator for the "billing_mode" field. It is called by the builders before save.
 	BillingModeValidator func(string) error
 	// BillingSourceTypeValidator is a validator for the "billing_source_type" field. It is called by the builders before save.
@@ -344,29 +319,9 @@ func ByUpstreamModel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpstreamModel, opts...).ToFunc()
 }
 
-// ByChannelID orders the results by the channel_id field.
-func ByChannelID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldChannelID, opts...).ToFunc()
-}
-
-// ByModelMappingChain orders the results by the model_mapping_chain field.
-func ByModelMappingChain(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldModelMappingChain, opts...).ToFunc()
-}
-
-// ByBillingTier orders the results by the billing_tier field.
-func ByBillingTier(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBillingTier, opts...).ToFunc()
-}
-
 // ByBillingMode orders the results by the billing_mode field.
 func ByBillingMode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBillingMode, opts...).ToFunc()
-}
-
-// ByGroupID orders the results by the group_id field.
-func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
 }
 
 // BySubscriptionID orders the results by the subscription_id field.
@@ -560,13 +515,6 @@ func ByAccountField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByGroupField orders the results by group field.
-func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newGroupStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // BySubscriptionField orders the results by subscription field.
 func BySubscriptionField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -599,13 +547,6 @@ func newAccountStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AccountInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, AccountTable, AccountColumn),
-	)
-}
-func newGroupStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(GroupInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
 	)
 }
 func newSubscriptionStep() *sqlgraph.Step {

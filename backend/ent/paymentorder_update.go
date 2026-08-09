@@ -311,33 +311,6 @@ func (_u *PaymentOrderUpdate) ClearPlanID() *PaymentOrderUpdate {
 	return _u
 }
 
-// SetSubscriptionGroupID sets the "subscription_group_id" field.
-func (_u *PaymentOrderUpdate) SetSubscriptionGroupID(v int64) *PaymentOrderUpdate {
-	_u.mutation.ResetSubscriptionGroupID()
-	_u.mutation.SetSubscriptionGroupID(v)
-	return _u
-}
-
-// SetNillableSubscriptionGroupID sets the "subscription_group_id" field if the given value is not nil.
-func (_u *PaymentOrderUpdate) SetNillableSubscriptionGroupID(v *int64) *PaymentOrderUpdate {
-	if v != nil {
-		_u.SetSubscriptionGroupID(*v)
-	}
-	return _u
-}
-
-// AddSubscriptionGroupID adds value to the "subscription_group_id" field.
-func (_u *PaymentOrderUpdate) AddSubscriptionGroupID(v int64) *PaymentOrderUpdate {
-	_u.mutation.AddSubscriptionGroupID(v)
-	return _u
-}
-
-// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
-func (_u *PaymentOrderUpdate) ClearSubscriptionGroupID() *PaymentOrderUpdate {
-	_u.mutation.ClearSubscriptionGroupID()
-	return _u
-}
-
 // SetSubscriptionDays sets the "subscription_days" field.
 func (_u *PaymentOrderUpdate) SetSubscriptionDays(v int) *PaymentOrderUpdate {
 	_u.mutation.ResetSubscriptionDays()
@@ -923,15 +896,6 @@ func (_u *PaymentOrderUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.PlanIDCleared() {
 		_spec.ClearField(paymentorder.FieldPlanID, field.TypeInt64)
 	}
-	if value, ok := _u.mutation.SubscriptionGroupID(); ok {
-		_spec.SetField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
-	}
-	if value, ok := _u.mutation.AddedSubscriptionGroupID(); ok {
-		_spec.AddField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
-	}
-	if _u.mutation.SubscriptionGroupIDCleared() {
-		_spec.ClearField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64)
-	}
 	if value, ok := _u.mutation.SubscriptionDays(); ok {
 		_spec.SetField(paymentorder.FieldSubscriptionDays, field.TypeInt, value)
 	}
@@ -1371,33 +1335,6 @@ func (_u *PaymentOrderUpdateOne) AddPlanID(v int64) *PaymentOrderUpdateOne {
 // ClearPlanID clears the value of the "plan_id" field.
 func (_u *PaymentOrderUpdateOne) ClearPlanID() *PaymentOrderUpdateOne {
 	_u.mutation.ClearPlanID()
-	return _u
-}
-
-// SetSubscriptionGroupID sets the "subscription_group_id" field.
-func (_u *PaymentOrderUpdateOne) SetSubscriptionGroupID(v int64) *PaymentOrderUpdateOne {
-	_u.mutation.ResetSubscriptionGroupID()
-	_u.mutation.SetSubscriptionGroupID(v)
-	return _u
-}
-
-// SetNillableSubscriptionGroupID sets the "subscription_group_id" field if the given value is not nil.
-func (_u *PaymentOrderUpdateOne) SetNillableSubscriptionGroupID(v *int64) *PaymentOrderUpdateOne {
-	if v != nil {
-		_u.SetSubscriptionGroupID(*v)
-	}
-	return _u
-}
-
-// AddSubscriptionGroupID adds value to the "subscription_group_id" field.
-func (_u *PaymentOrderUpdateOne) AddSubscriptionGroupID(v int64) *PaymentOrderUpdateOne {
-	_u.mutation.AddSubscriptionGroupID(v)
-	return _u
-}
-
-// ClearSubscriptionGroupID clears the value of the "subscription_group_id" field.
-func (_u *PaymentOrderUpdateOne) ClearSubscriptionGroupID() *PaymentOrderUpdateOne {
-	_u.mutation.ClearSubscriptionGroupID()
 	return _u
 }
 
@@ -2015,15 +1952,6 @@ func (_u *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentOrd
 	}
 	if _u.mutation.PlanIDCleared() {
 		_spec.ClearField(paymentorder.FieldPlanID, field.TypeInt64)
-	}
-	if value, ok := _u.mutation.SubscriptionGroupID(); ok {
-		_spec.SetField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
-	}
-	if value, ok := _u.mutation.AddedSubscriptionGroupID(); ok {
-		_spec.AddField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64, value)
-	}
-	if _u.mutation.SubscriptionGroupIDCleared() {
-		_spec.ClearField(paymentorder.FieldSubscriptionGroupID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.SubscriptionDays(); ok {
 		_spec.SetField(paymentorder.FieldSubscriptionDays, field.TypeInt, value)

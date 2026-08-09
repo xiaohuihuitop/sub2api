@@ -9,8 +9,8 @@ import (
 
 func (s *APIKeyRepoSuite) TestListByUserID_SortByNameAsc() {
 	user := s.mustCreateUser("sort-name@example.com")
-	s.mustCreateApiKey(user.ID, "sk-z", "z-key", nil)
-	s.mustCreateApiKey(user.ID, "sk-a", "a-key", nil)
+	s.mustCreateApiKey(user.ID, "sk-z", "z-key")
+	s.mustCreateApiKey(user.ID, "sk-a", "a-key")
 
 	keys, _, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{
 		Page:      1,
@@ -26,8 +26,8 @@ func (s *APIKeyRepoSuite) TestListByUserID_SortByNameAsc() {
 
 func (s *APIKeyRepoSuite) TestListByUserID_SortByID() {
 	user := s.mustCreateUser("sort-id@example.com")
-	first := s.mustCreateApiKey(user.ID, "sk-id-a", "a-key", nil)
-	second := s.mustCreateApiKey(user.ID, "sk-id-b", "b-key", nil)
+	first := s.mustCreateApiKey(user.ID, "sk-id-a", "a-key")
+	second := s.mustCreateApiKey(user.ID, "sk-id-b", "b-key")
 
 	keys, _, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{
 		Page:      1,

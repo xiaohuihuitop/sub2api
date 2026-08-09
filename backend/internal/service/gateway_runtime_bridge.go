@@ -71,9 +71,6 @@ func dispatchIntentFromGatewayRoute(route *GatewayPlatformAssetContext) *gateway
 	if platform == nil {
 		return nil
 	}
-	if route.PricingGroupID != nil {
-		platform.LegacyPricingGroupID = clonePlatformInt64Pointer(route.PricingGroupID)
-	}
 	return &gatewayruntime.DispatchIntent{
 		Platform:     *platform,
 		BillingAsset: productBillingAssetFromResolved(route.BillingAsset),
@@ -88,7 +85,6 @@ func cloneGatewayPlatformAssetContext(route *GatewayPlatformAssetContext) *Gatew
 		Platform:        cloneResolvedPlatformModel(route.Platform),
 		BillingAsset:    cloneResolvedBillingAsset(route.BillingAsset),
 		SchedulingScope: route.SchedulingScope,
-		PricingGroupID:  clonePlatformInt64Pointer(route.PricingGroupID),
 	}
 }
 

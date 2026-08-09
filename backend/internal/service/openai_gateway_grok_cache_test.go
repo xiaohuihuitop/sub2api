@@ -18,8 +18,9 @@ func newGrokCacheTestContext(apiKeyID int64) *gin.Context {
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Request = c.Request.WithContext(WithResolvedTargetPlatform(c.Request.Context(), PlatformGrok))
 	if apiKeyID > 0 {
-		c.Set("api_key", &APIKey{ID: apiKeyID, Group: &Group{Platform: PlatformGrok}})
+		c.Set("api_key", &APIKey{ID: apiKeyID})
 	}
 	return c
 }
@@ -298,12 +299,14 @@ func TestGrokConversationHeaderIsScopedToGrokRequestScheduling(t *testing.T) {
 	require.Equal(t, "native-grok-session", (&OpenAIGatewayService{}).ExtractSessionID(grokContext, body))
 
 	openAIContext := newGrokCacheTestContext(601)
-	openAIContext.Set("api_key", &APIKey{ID: 601, Group: &Group{Platform: PlatformOpenAI}})
+	openAIContext.Set("api_key", &APIKey{ID: 601})
+	openAIContext.Request = openAIContext.Request.WithContext(WithResolvedTargetPlatform(openAIContext.Request.Context(), PlatformOpenAI))
 	openAIContext.Request.Header.Set(grokConversationIDHeader, "must-be-ignored")
 	require.Equal(t, "body-session", (&OpenAIGatewayService{}).ExtractSessionID(openAIContext, body))
 
 	withoutGrokHeader := newGrokCacheTestContext(601)
-	withoutGrokHeader.Set("api_key", &APIKey{ID: 601, Group: &Group{Platform: PlatformOpenAI}})
+	withoutGrokHeader.Set("api_key", &APIKey{ID: 601})
+	withoutGrokHeader.Request = withoutGrokHeader.Request.WithContext(WithResolvedTargetPlatform(withoutGrokHeader.Request.Context(), PlatformOpenAI))
 	require.Equal(t,
 		(&OpenAIGatewayService{}).GenerateSessionHash(withoutGrokHeader, body),
 		(&OpenAIGatewayService{}).GenerateSessionHash(openAIContext, body),

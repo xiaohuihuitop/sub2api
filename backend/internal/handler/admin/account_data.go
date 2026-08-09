@@ -74,8 +74,7 @@ type DataAccount struct {
 }
 
 type DataImportRequest struct {
-	Data                 DataPayload `json:"data"`
-	SkipDefaultGroupBind *bool       `json:"skip_default_group_bind"`
+	Data DataPayload `json:"data"`
 }
 
 type DataImportResult struct {
@@ -250,11 +249,6 @@ func (h *AccountHandler) ImportData(c *gin.Context) {
 }
 
 func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) (DataImportResult, error) {
-	skipDefaultGroupBind := true
-	if req.SkipDefaultGroupBind != nil {
-		skipDefaultGroupBind = *req.SkipDefaultGroupBind
-	}
-
 	dataPayload := req.Data
 	result := DataImportResult{}
 
@@ -437,21 +431,19 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 		enrichCredentialsFromIDToken(&item)
 
 		accountInput := &service.CreateAccountInput{
-			Name:                 item.Name,
-			Notes:                item.Notes,
-			Platform:             item.Platform,
-			PlatformID:           item.PlatformID,
-			Type:                 item.Type,
-			Credentials:          item.Credentials,
-			Extra:                item.Extra,
-			ProxyID:              proxyID,
-			Concurrency:          item.Concurrency,
-			Priority:             item.Priority,
-			RateMultiplier:       item.RateMultiplier,
-			GroupIDs:             nil,
-			ExpiresAt:            item.ExpiresAt,
-			AutoPauseOnExpired:   item.AutoPauseOnExpired,
-			SkipDefaultGroupBind: skipDefaultGroupBind,
+			Name:               item.Name,
+			Notes:              item.Notes,
+			Platform:           item.Platform,
+			PlatformID:         item.PlatformID,
+			Type:               item.Type,
+			Credentials:        item.Credentials,
+			Extra:              item.Extra,
+			ProxyID:            proxyID,
+			Concurrency:        item.Concurrency,
+			Priority:           item.Priority,
+			RateMultiplier:     item.RateMultiplier,
+			ExpiresAt:          item.ExpiresAt,
+			AutoPauseOnExpired: item.AutoPauseOnExpired,
 		}
 
 		created, err := h.adminService.CreateAccount(ctx, accountInput)
@@ -510,12 +502,12 @@ func (h *AccountHandler) listAllProxies(ctx context.Context) ([]service.Proxy, e
 	return out, nil
 }
 
-func (h *AccountHandler) listAccountsFiltered(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, sortBy, sortOrder string) ([]service.Account, error) {
+func (h *AccountHandler) listAccountsFiltered(ctx context.Context, platform, accountType, status, search string, platformID int64, privacyMode, sortBy, sortOrder string) ([]service.Account, error) {
 	page := 1
 	pageSize := dataPageCap
 	var out []service.Account
 	for {
-		items, total, err := h.adminService.ListAccounts(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+		items, total, err := h.adminService.ListAccounts(ctx, page, pageSize, platform, accountType, status, search, platformID, privacyMode, sortBy, sortOrder)
 		if err != nil {
 			return nil, err
 		}
@@ -555,20 +547,16 @@ func (h *AccountHandler) resolveExportAccounts(ctx context.Context, ids []int64,
 		search = search[:100]
 	}
 
-	groupID := int64(0)
-	if groupIDStr := c.Query("group"); groupIDStr != "" {
-		if groupIDStr == accountListGroupUngroupedQueryValue {
-			groupID = service.AccountListGroupUngrouped
-		} else {
-			parsedGroupID, parseErr := strconv.ParseInt(groupIDStr, 10, 64)
-			if parseErr != nil || parsedGroupID <= 0 {
-				return nil, infraerrors.BadRequest("INVALID_GROUP_FILTER", "invalid group filter")
-			}
-			groupID = parsedGroupID
+	platformID := int64(0)
+	if rawPlatformID := strings.TrimSpace(c.Query("platform_id")); rawPlatformID != "" {
+		parsedPlatformID, parseErr := strconv.ParseInt(rawPlatformID, 10, 64)
+		if parseErr != nil || parsedPlatformID <= 0 {
+			return nil, infraerrors.BadRequest("INVALID_PLATFORM_FILTER", "invalid platform_id filter")
 		}
+		platformID = parsedPlatformID
 	}
 
-	return h.listAccountsFiltered(ctx, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	return h.listAccountsFiltered(ctx, platform, accountType, status, search, platformID, privacyMode, sortBy, sortOrder)
 }
 
 func (h *AccountHandler) resolveExportProxies(ctx context.Context, accounts []service.Account) ([]service.Proxy, error) {

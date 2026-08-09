@@ -55,7 +55,7 @@ func (h *OpenAIGatewayHandler) GrokCountTokens(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"input_tokens": estimated})
 }
 
-// CountTokens handles Anthropic-compatible POST /v1/messages/count_tokens for OpenAI groups.
+// CountTokens handles Anthropic-compatible POST /v1/messages/count_tokens for OpenAI platform accounts.
 // It validates billing and routes to an OpenAI token-count bridge without taking concurrency slots
 // or recording usage.
 func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
@@ -75,14 +75,8 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 		"handler.openai_gateway.count_tokens",
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("group_id", apiKey.GroupID),
+		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
 	)
-
-	if apiKey.Group != nil && !apiKey.Group.AllowMessagesDispatch {
-		h.anthropicErrorResponse(c, http.StatusForbidden, "permission_error",
-			"This group does not allow /v1/messages dispatch")
-		return
-	}
 
 	if !h.ensureResponsesDependencies(c, reqLog) {
 		return
@@ -116,9 +110,9 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 	}
 
 	reqModel := parsedReq.Model
-	ensureCompositeTargetPlatform(c, apiKey, reqModel)
-	if !compositeTargetPlatformAllowed(c, apiKey, reqModel, service.PlatformOpenAI) {
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
+	ensureModelTargetPlatform(c, reqModel)
+	if !modelTargetPlatformAllowed(c, reqModel, service.PlatformOpenAI) {
+		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint")
 		return
 	}
 	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
@@ -128,11 +122,11 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, false)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(false, false)))
 
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	modelMapping := h.gatewayService.ResolvePlatformModelMapping(c.Request.Context(), reqModel)
 	mappedBodyForMessages := newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_count_tokens.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -150,7 +144,7 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 	}
 	selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 		c.Request.Context(),
-		apiKey.GroupID,
+		service.PlatformSchedulingID(c.Request.Context()),
 		"",
 		sessionHash,
 		currentRoutingModel,
@@ -187,7 +181,7 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 	if selection.Acquired && selection.ReleaseFunc != nil {
 		defer selection.ReleaseFunc()
 	}
-	forwardBody := mappedBodyForMessages(channelMapping.Mapped, channelMapping.MappedModel)
+	forwardBody := mappedBodyForMessages(modelMapping.Mapped, modelMapping.MappedModel)
 	defaultMappedModel := preferredMappedModel
 
 	if err := h.gatewayService.ForwardCountTokensAsAnthropic(c.Request.Context(), c, account, forwardBody, defaultMappedModel); err != nil {

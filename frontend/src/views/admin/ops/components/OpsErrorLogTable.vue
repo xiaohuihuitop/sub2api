@@ -53,13 +53,13 @@
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
-        <template #cell-group="{ row }">
+        <template #cell-routing_platform="{ row }">
           <span
-            v-if="row.group_id"
+            v-if="row.platform_id"
             class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
-            :title="t('admin.ops.errorLog.id') + ' ' + row.group_id"
+            :title="t('admin.ops.errorLog.id') + ' ' + row.platform_id"
           >
-            {{ row.group_name || '#' + row.group_id }}
+            {{ row.platform_name || '#' + row.platform_id }}
           </span>
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
@@ -203,7 +203,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'platform', label: t('admin.ops.errorLog.platform') },
   { key: 'model', label: t('admin.ops.errorLog.model'), sortable: true },
   { key: 'endpoint', label: t('admin.ops.errorLog.endpoint') },
-  { key: 'group', label: t('admin.ops.errorLog.group') },
+  { key: 'routing_platform', label: t('admin.ops.errorLog.routingPlatform') },
   { key: 'type', label: t('admin.ops.errorLog.type') },
   { key: 'category', label: t('usage.errors.category') },
   { key: 'status', label: t('admin.ops.errorLog.status'), sortable: true },

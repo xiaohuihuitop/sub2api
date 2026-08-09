@@ -29,13 +29,11 @@ const i18n = createI18n({
   },
 });
 
-const mountPlanCard = (groupPlatform: string, overrides: Partial<SubscriptionPlan> = {}) =>
+const mountPlanCard = (overrides: Partial<SubscriptionPlan> = {}) =>
   mount(SubscriptionPlanCard, {
     props: {
       plan: {
         id: 1,
-        group_id: 10,
-        group_platform: groupPlatform,
         name: "Pro",
         price: 10,
         amount: 1000,
@@ -53,7 +51,7 @@ const mountPlanCard = (groupPlatform: string, overrides: Partial<SubscriptionPla
 
 describe("SubscriptionPlanCard", () => {
   it("does not expose routing-platform details for a standalone plan", () => {
-    const text = mountPlanCard("antigravity").text();
+		const text = mountPlanCard().text();
 
     expect(text).not.toContain("Antigravity");
     expect(text).not.toContain("Claude");
@@ -62,7 +60,7 @@ describe("SubscriptionPlanCard", () => {
   });
 
   it("does not show Antigravity model scopes for OpenAI plans", () => {
-    const text = mountPlanCard("openai").text();
+		const text = mountPlanCard().text();
 
     expect(text).not.toContain("Claude");
     expect(text).not.toContain("Gemini");
@@ -70,7 +68,7 @@ describe("SubscriptionPlanCard", () => {
   });
 
   it("does not show model scopes for standalone plans", () => {
-    const text = mountPlanCard("antigravity").text();
+		const text = mountPlanCard().text();
 
     expect(text).not.toContain("Claude");
     expect(text).not.toContain("Gemini");
@@ -81,19 +79,19 @@ describe("SubscriptionPlanCard", () => {
   // 'month'，「1 个月」的套餐卡片被显示成「1天」。测试环境的 vue-i18n 为
   // runtime-only 构建，t() 原样返回 key，故按 key 断言单位分支。
   it("renders plural admin-form validity units instead of mislabeled days (#4607)", () => {
-    expect(mountPlanCard("openai", { validity_days: 1, validity_unit: "months" }).text()).toContain("/ payment.perMonth");
-    expect(mountPlanCard("openai", { validity_days: 3, validity_unit: "months" }).text()).toContain("/ 3payment.months");
-    expect(mountPlanCard("openai", { validity_days: 2, validity_unit: "weeks" }).text()).toContain("/ 2payment.weeks");
-    expect(mountPlanCard("openai", { validity_days: 30, validity_unit: "day" }).text()).toContain("/ 30payment.days");
+		expect(mountPlanCard({ validity_days: 1, validity_unit: "months" }).text()).toContain("/ payment.perMonth");
+		expect(mountPlanCard({ validity_days: 3, validity_unit: "months" }).text()).toContain("/ 3payment.months");
+		expect(mountPlanCard({ validity_days: 2, validity_unit: "weeks" }).text()).toContain("/ 2payment.weeks");
+		expect(mountPlanCard({ validity_days: 30, validity_unit: "day" }).text()).toContain("/ 30payment.days");
   });
 
   it("uses the configured currency symbol while preserving USD for legacy plans", () => {
-    const cnyPlan = mountPlanCard("openai", { currency: "CNY", original_price: 20 }).text();
+		const cnyPlan = mountPlanCard({ currency: "CNY", original_price: 20 }).text();
 
     expect(cnyPlan).toContain("¥10CNY");
     expect(cnyPlan).toContain("¥20CNY");
-    expect(mountPlanCard("openai", { currency: "USD" }).text()).toContain("$10USD");
-    expect(mountPlanCard("openai", { currency: "" }).text()).toContain("$10");
+		expect(mountPlanCard({ currency: "USD" }).text()).toContain("$10USD");
+		expect(mountPlanCard({ currency: "" }).text()).toContain("$10");
   });
 
   it.each([
@@ -101,7 +99,7 @@ describe("SubscriptionPlanCard", () => {
     ["long English", "Enterprise Global Acceleration Subscription with Priority Support"],
     ["unbroken token", "EnterpriseGlobalAccelerationSubscriptionWithPrioritySupport1234567890"],
   ])("keeps the full %s plan title accessible in a bounded two-line area", (_label, name) => {
-    const wrapper = mountPlanCard("openai", { name });
+		const wrapper = mountPlanCard({ name });
     const title = wrapper.get("h3");
 
     expect(title.text()).toBe(name);
@@ -117,7 +115,7 @@ describe("SubscriptionPlanCard", () => {
   });
 
   it("keeps title, price, description, and purchase action in separate bounded regions", () => {
-    const wrapper = mountPlanCard("openai", {
+		const wrapper = mountPlanCard({
       name: "Enterprise Global Acceleration Subscription with Priority Support",
       price: 123.45,
       currency: "USD",
@@ -134,7 +132,7 @@ describe("SubscriptionPlanCard", () => {
   });
 
   it("keeps short plan titles compact and aligned", () => {
-    const wrapper = mountPlanCard("openai", { name: "Pro", description: "" });
+		const wrapper = mountPlanCard({ name: "Pro", description: "" });
     const title = wrapper.get("h3");
 
     expect(title.text()).toBe("Pro");

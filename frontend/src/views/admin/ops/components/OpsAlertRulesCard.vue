@@ -6,7 +6,6 @@ import { useAppStore } from '@/stores/app'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
-import { adminAPI } from '@/api'
 import { opsAPI } from '@/api/admin/ops'
 import type { AlertRule, MetricType, Operator } from '../types'
 import type { OpsSeverity } from '@/api/admin/ops'
@@ -36,7 +35,6 @@ async function load() {
 
 onMounted(() => {
   load()
-  loadGroups()
 })
 
 const sortedRules = computed(() => {
@@ -48,7 +46,7 @@ const saving = ref(false)
 const editingId = ref<number | null>(null)
 const draft = ref<AlertRule | null>(null)
 
-type MetricGroup = 'system' | 'group' | 'account'
+type MetricGroup = 'system' | 'account'
 
 interface MetricDefinition {
   type: MetricType
@@ -59,60 +57,6 @@ interface MetricDefinition {
   recommendedThreshold: number
   unit?: string
 }
-
-const groupMetricTypes = new Set<MetricType>([
-  'group_available_accounts',
-  'group_available_ratio',
-  'group_rate_limit_ratio'
-])
-
-function parsePositiveInt(value: unknown): number | null {
-  if (value == null) return null
-  if (typeof value === 'boolean') return null
-  const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10)
-  return Number.isFinite(n) && n > 0 ? n : null
-}
-
-const groupOptionsBase = ref<SelectOption[]>([])
-
-async function loadGroups() {
-  try {
-    const list = await adminAPI.groups.getAll()
-    groupOptionsBase.value = list.map((g) => ({ value: g.id, label: g.name }))
-  } catch (err) {
-    console.error('[OpsAlertRulesCard] Failed to load groups', err)
-    groupOptionsBase.value = []
-  }
-}
-
-const isGroupMetricSelected = computed(() => {
-  const metricType = draft.value?.metric_type
-  return metricType ? groupMetricTypes.has(metricType) : false
-})
-
-const draftGroupId = computed<number | null>({
-  get() {
-    return parsePositiveInt(draft.value?.filters?.group_id)
-  },
-  set(value) {
-    if (!draft.value) return
-    if (value == null) {
-      if (!draft.value.filters) return
-      delete draft.value.filters.group_id
-      if (Object.keys(draft.value.filters).length === 0) {
-        delete draft.value.filters
-      }
-      return
-    }
-    if (!draft.value.filters) draft.value.filters = {}
-    draft.value.filters.group_id = value
-  }
-})
-
-const groupOptions = computed<SelectOption[]>(() => {
-  if (isGroupMetricSelected.value) return groupOptionsBase.value
-  return [{ value: null, label: t('admin.ops.alertRules.form.allGroups') }, ...groupOptionsBase.value]
-})
 
 const metricDefinitions = computed(() => {
   return [
@@ -169,34 +113,6 @@ const metricDefinitions = computed(() => {
       description: t('admin.ops.alertRules.metricDescriptions.queueDepth'),
       recommendedOperator: '>',
       recommendedThreshold: 10
-    },
-
-    // Group-level metrics (requires group_id filter)
-    {
-      type: 'group_available_accounts',
-      group: 'group',
-      label: t('admin.ops.alertRules.metrics.groupAvailableAccounts'),
-      description: t('admin.ops.alertRules.metricDescriptions.groupAvailableAccounts'),
-      recommendedOperator: '<',
-      recommendedThreshold: 1
-    },
-    {
-      type: 'group_available_ratio',
-      group: 'group',
-      label: t('admin.ops.alertRules.metrics.groupAvailableRatio'),
-      description: t('admin.ops.alertRules.metricDescriptions.groupAvailableRatio'),
-      recommendedOperator: '<',
-      recommendedThreshold: 50,
-      unit: '%'
-    },
-    {
-      type: 'group_rate_limit_ratio',
-      group: 'group',
-      label: t('admin.ops.alertRules.metrics.groupRateLimitRatio'),
-      description: t('admin.ops.alertRules.metricDescriptions.groupRateLimitRatio'),
-      recommendedOperator: '>',
-      recommendedThreshold: 10,
-      unit: '%'
     },
 
     // Account-level metrics
@@ -266,7 +182,7 @@ const metricOptions = computed(() => {
     ]
   }
 
-  return [...buildGroup('system'), ...buildGroup('group'), ...buildGroup('account')]
+  return [...buildGroup('system'), ...buildGroup('account')]
 })
 
 const operatorOptions = computed(() => {
@@ -318,9 +234,6 @@ const editorValidation = computed(() => {
   if (!r) return { valid: true, errors }
   if (!r.name || !r.name.trim()) errors.push(t('admin.ops.alertRules.validation.nameRequired'))
   if (!r.metric_type) errors.push(t('admin.ops.alertRules.validation.metricRequired'))
-  if (groupMetricTypes.has(r.metric_type) && !parsePositiveInt(r.filters?.group_id)) {
-    errors.push(t('admin.ops.alertRules.validation.groupIdRequired'))
-  }
   if (!r.operator) errors.push(t('admin.ops.alertRules.validation.operatorRequired'))
   if (!(typeof r.threshold === 'number' && Number.isFinite(r.threshold)))
     errors.push(t('admin.ops.alertRules.validation.thresholdRequired'))
@@ -552,23 +465,6 @@ function cancelDelete() {
           <div>
             <label class="input-label">{{ t('admin.ops.alertRules.form.operator') }}</label>
             <Select v-model="draft!.operator" :options="operatorOptions" />
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="input-label">
-              {{ t('admin.ops.alertRules.form.groupId') }}
-              <span v-if="isGroupMetricSelected" class="ml-1 text-red-500">*</span>
-            </label>
-            <Select
-              v-model="draftGroupId"
-              :options="groupOptions"
-              searchable
-              :placeholder="t('admin.ops.alertRules.form.groupPlaceholder')"
-              :error="isGroupMetricSelected && !draftGroupId"
-            />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ isGroupMetricSelected ? t('admin.ops.alertRules.hints.groupRequired') : t('admin.ops.alertRules.hints.groupOptional') }}
-            </p>
           </div>
 
           <div>

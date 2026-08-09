@@ -386,9 +386,6 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.CodexCLIOnlyWhitelist != after.CodexCLIOnlyWhitelist {
 		changed = append(changed, "codex_cli_only_whitelist")
 	}
-	if before.AllowUngroupedKeyScheduling != after.AllowUngroupedKeyScheduling {
-		changed = append(changed, "allow_ungrouped_key_scheduling")
-	}
 	if before.BackendModeEnabled != after.BackendModeEnabled {
 		changed = append(changed, "backend_mode_enabled")
 	}
@@ -528,9 +525,6 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.ChannelMonitorDefaultIntervalSeconds != after.ChannelMonitorDefaultIntervalSeconds {
 		changed = append(changed, "channel_monitor_default_interval_seconds")
 	}
-	if before.AvailableChannelsEnabled != after.AvailableChannelsEnabled {
-		changed = append(changed, "available_channels_enabled")
-	}
 	if before.ModelPlazaEnabled != after.ModelPlazaEnabled {
 		changed = append(changed, "model_plaza_enabled")
 	}
@@ -618,15 +612,7 @@ func normalizeDefaultSubscriptions(input []dto.DefaultSubscriptionSetting) []dto
 	for _, item := range input {
 		if item.PlanID > 0 {
 			normalized = append(normalized, dto.DefaultSubscriptionSetting{PlanID: item.PlanID})
-			continue
 		}
-		if item.GroupID <= 0 || item.ValidityDays <= 0 {
-			continue
-		}
-		if item.ValidityDays > service.MaxValidityDays {
-			item.ValidityDays = service.MaxValidityDays
-		}
-		normalized = append(normalized, item)
 	}
 	return normalized
 }
@@ -667,9 +653,7 @@ func defaultSubscriptionsValueOrDefault(input *[]dto.DefaultSubscriptionSetting,
 	result := make([]service.DefaultSubscriptionSetting, 0, len(*input))
 	for _, item := range *input {
 		result = append(result, service.DefaultSubscriptionSetting{
-			PlanID:       item.PlanID,
-			GroupID:      item.GroupID,
-			ValidityDays: item.ValidityDays,
+			PlanID: item.PlanID,
 		})
 	}
 	return result
@@ -703,7 +687,7 @@ func equalDefaultSubscriptions(a, b []service.DefaultSubscriptionSetting) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].PlanID != b[i].PlanID || a[i].GroupID != b[i].GroupID || a[i].ValidityDays != b[i].ValidityDays {
+		if a[i].PlanID != b[i].PlanID {
 			return false
 		}
 	}

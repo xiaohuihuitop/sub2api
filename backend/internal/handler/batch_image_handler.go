@@ -280,10 +280,15 @@ func batchImageOwnerFromContext(c *gin.Context) (service.BatchImageOwner, bool) 
 	if !ok || apiKey == nil || apiKey.ID <= 0 || apiKey.UserID <= 0 {
 		return service.BatchImageOwner{}, false
 	}
+	route, ok := service.GatewayPlatformAssetContextFromContext(c.Request.Context())
+	if !ok || route.Platform == nil || route.BillingAsset == nil {
+		return service.BatchImageOwner{}, false
+	}
 	return service.BatchImageOwner{
-		UserID:   apiKey.UserID,
-		APIKeyID: apiKey.ID,
-		GroupID:  apiKey.GroupID,
+		UserID:         apiKey.UserID,
+		APIKeyID:       apiKey.ID,
+		PlatformID:     route.Platform.PlatformID,
+		RateMultiplier: route.BillingAsset.RateMultiplier,
 	}, true
 }
 

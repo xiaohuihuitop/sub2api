@@ -44,7 +44,6 @@ const DataTableStub = {
   template: `
     <div>
       <div v-for="row in data" :key="row.id">
-        <slot name="cell-group_id" :value="row.group_id" :row="row" />
         <slot name="cell-price" :value="row.price" :row="row" />
         <slot name="cell-rate_multiplier" :value="row.rate_multiplier" :row="row" />
         <slot name="cell-limits" :value="row.daily_limit_usd" :row="row" />
@@ -65,7 +64,6 @@ describe('AdminPaymentPlansView', () => {
         {
           id: 1,
           name: 'CNY plan',
-          group_id: 1,
           price: 499,
           original_price: 599,
           currency: 'CNY',
@@ -82,7 +80,6 @@ describe('AdminPaymentPlansView', () => {
         {
           id: 2,
           name: 'Legacy plan',
-          group_id: 1,
           price: 10,
           original_price: 0,
           currency: '',

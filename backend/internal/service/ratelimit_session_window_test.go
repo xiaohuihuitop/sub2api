@@ -122,19 +122,22 @@ func (m *sessionWindowMockRepo) BindGroups(context.Context, int64, []int64) erro
 func (m *sessionWindowMockRepo) ListSchedulable(context.Context) ([]Account, error) {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) ListSchedulableByGroupID(context.Context, int64) ([]Account, error) {
+func (m *sessionWindowMockRepo) ListSchedulableByPlatformID(context.Context, int64) ([]Account, error) {
 	panic("unexpected")
 }
 func (m *sessionWindowMockRepo) ListSchedulableByPlatform(context.Context, string) ([]Account, error) {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) ListSchedulableByGroupIDAndPlatform(context.Context, int64, string) ([]Account, error) {
+func (m *sessionWindowMockRepo) ListSchedulableByPlatformIDAndPlatform(context.Context, int64, string) ([]Account, error) {
 	panic("unexpected")
 }
 func (m *sessionWindowMockRepo) ListSchedulableByPlatforms(context.Context, []string) ([]Account, error) {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) ListSchedulableByGroupIDAndPlatforms(context.Context, int64, []string) ([]Account, error) {
+func (m *sessionWindowMockRepo) ListSchedulableByPlatformPool(context.Context, int64, string) ([]Account, error) {
+	panic("unexpected")
+}
+func (m *sessionWindowMockRepo) ListSchedulableByPlatformIDAndPlatforms(context.Context, int64, []string) ([]Account, error) {
 	panic("unexpected")
 }
 func (m *sessionWindowMockRepo) ListSchedulableUngroupedByPlatform(context.Context, string) ([]Account, error) {
@@ -143,7 +146,7 @@ func (m *sessionWindowMockRepo) ListSchedulableUngroupedByPlatform(context.Conte
 func (m *sessionWindowMockRepo) ListSchedulableUngroupedByPlatforms(context.Context, []string) ([]Account, error) {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) ListModelAvailabilityCandidates(context.Context, *int64, []string, bool) ([]Account, error) {
+func (m *sessionWindowMockRepo) ListModelAvailabilityCandidates(context.Context, int64, string) ([]Account, error) {
 	panic("unexpected")
 }
 func (m *sessionWindowMockRepo) SetRateLimited(context.Context, int64, time.Time) error {

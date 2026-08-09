@@ -88,9 +88,8 @@ export interface User {
   balance: number // User balance for API usage
   frozen_balance?: number // Balance currently held by async batch jobs
   concurrency: number // Allowed concurrent requests
-  rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
+  rpm_limit?: number // User-level RPM cap (0 = unlimited)
   status: 'active' | 'disabled' // Account status
-  allowed_groups: number[] | null // Allowed group IDs (null = all non-exclusive groups)
   balance_notify_enabled: boolean
   balance_notify_threshold: number | null
   balance_notify_extra_emails: NotifyEmailEntry[]
@@ -237,7 +236,6 @@ export interface PublicSettings {
   balance_low_notify_threshold: number
   channel_monitor_enabled: boolean
   channel_monitor_default_interval_seconds: number
-  available_channels_enabled: boolean
   model_plaza_enabled: boolean
   model_plaza_require_auth: boolean
   service_quota_enabled: boolean
@@ -300,7 +298,7 @@ export type AnnouncementOperator = 'in' | 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
 export interface AnnouncementCondition {
   type: AnnouncementConditionType
   operator: AnnouncementOperator
-  group_ids?: number[]
+  subscription_plan_ids?: number[]
   value?: number
 }
 
@@ -492,163 +490,7 @@ export interface PaginationConfig {
   page_size: number
 }
 
-// ==================== API Key & Group Types ====================
-
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'composite'
-
-export type SubscriptionType = 'standard' | 'subscription'
-
-export interface OpenAIMessagesDispatchModelConfig {
-  opus_mapped_model?: string
-  sonnet_mapped_model?: string
-  haiku_mapped_model?: string
-  exact_model_mappings?: Record<string, string>
-}
-
-export interface ReasoningEffortMapping {
-  from: string
-  to: string
-}
-
-export interface Group {
-  id: number
-  name: string
-  description: string | null
-  platform: GroupPlatform
-  rate_multiplier: number
-  sort_order: number
-  rpm_limit?: number // Group-level RPM cap (0 = unlimited); overrides user-level rpm_limit when set
-  max_reasoning_effort?: string // OpenAI/Codex reasoning ceiling; empty means unlimited
-  reasoning_effort_mappings?: ReasoningEffortMapping[]
-  is_exclusive: boolean
-  status: 'active' | 'inactive'
-  subscription_type: SubscriptionType
-  daily_limit_usd: number | null
-  weekly_limit_usd: number | null
-  monthly_limit_usd: number | null
-  // 图片生成计费配置
-  allow_image_generation: boolean
-  allow_batch_image_generation: boolean
-  image_rate_independent: boolean
-  image_rate_multiplier: number
-  batch_image_discount_multiplier: number
-  batch_image_hold_multiplier: number
-  image_price_1k: number | null
-  image_price_2k: number | null
-  image_price_4k: number | null
-  video_rate_independent: boolean
-  video_rate_multiplier: number
-  video_price_480p: number | null
-  video_price_720p: number | null
-  video_price_1080p: number | null
-  // Codex 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
-  web_search_price_per_call: number | null
-  // 高峰时段倍率配置
-  peak_rate_enabled: boolean
-  peak_start: string
-  peak_end: string
-  peak_rate_multiplier: number
-  // Claude Code 客户端限制
-  claude_code_only: boolean
-  fallback_group_id: number | null
-  fallback_group_id_on_invalid_request: number | null
-  // OpenAI Messages 调度开关（用户侧需要此字段判断是否展示 Claude Code 教程）
-  allow_messages_dispatch?: boolean
-  // OpenAI Live 接口开关
-  allow_live: boolean
-  default_mapped_model?: string
-  messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
-  require_oauth_only: boolean
-  require_privacy_set: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface AdminGroup extends Group {
-  // 模型路由配置（仅管理员可见，内部信息）
-  model_routing: Record<string, number[]> | null
-  model_routing_enabled: boolean
-
-  // MCP XML 协议注入（仅 antigravity 平台使用）
-  mcp_xml_inject: boolean
-
-  // 支持的模型系列（仅 antigravity 平台使用）
-  supported_model_scopes?: string[]
-
-  // 分组下账号数量（仅管理员可见）
-  account_count?: number
-  active_account_count?: number
-  rate_limited_account_count?: number
-
-  // OpenAI Messages 调度配置（仅 openai 平台使用）
-  default_mapped_model?: string
-  messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
-  models_list_config?: ModelsListConfig
-
-  // 分组排序
-}
-
-export interface ModelsListConfig {
-  enabled: boolean
-  models: string[]
-}
-
-export type CompositeRouteMatchType = 'exact' | 'prefix'
-
-export type CompositeRouteEndpoint =
-  | 'any'
-  | 'messages'
-  | 'count_tokens'
-  | 'responses'
-  | 'chat_completions'
-  | 'embeddings'
-  | 'images'
-  | 'gemini'
-
-export type CompositeRouteSource = 'route' | 'detector' | string
-
-export interface CompositeModelRoute {
-  id: number
-  group_id: number
-  public_model: string
-  match_type: CompositeRouteMatchType
-  target_platform: Exclude<GroupPlatform, 'composite'>
-  upstream_model: string
-  endpoint: CompositeRouteEndpoint
-  priority: number
-  enabled: boolean
-  notes: string
-  created_at?: string
-  updated_at?: string
-}
-
-export interface CompositeModelRouteInput {
-  public_model: string
-  match_type: CompositeRouteMatchType
-  target_platform: Exclude<GroupPlatform, 'composite'>
-  upstream_model?: string
-  endpoint: CompositeRouteEndpoint
-  priority?: number
-  enabled?: boolean
-  notes?: string
-}
-
-export interface CompositeRoutePreviewRequest {
-  model: string
-  endpoint: CompositeRouteEndpoint
-}
-
-export interface CompositeRouteDecision {
-  matched: boolean
-  source: CompositeRouteSource
-  group_id: number
-  public_model: string
-  target_platform: Exclude<GroupPlatform, 'composite'> | ''
-  upstream_model: string
-  endpoint: CompositeRouteEndpoint
-  route?: CompositeModelRoute
-  reason?: string
-}
+// ==================== API Key Types ====================
 
 export interface ApiKey {
   id: number
@@ -715,106 +557,6 @@ export interface UpdateApiKeyRequest {
   reset_rate_limit_usage?: boolean
 }
 
-export interface CreateGroupRequest {
-  name: string
-  description?: string | null
-  platform?: GroupPlatform
-  rate_multiplier?: number
-  is_exclusive?: boolean
-  subscription_type?: SubscriptionType
-  daily_limit_usd?: number | null
-  weekly_limit_usd?: number | null
-  monthly_limit_usd?: number | null
-  allow_image_generation?: boolean
-  allow_batch_image_generation?: boolean
-  image_rate_independent?: boolean
-  image_rate_multiplier?: number
-  batch_image_discount_multiplier?: number
-  batch_image_hold_multiplier?: number
-  image_price_1k?: number | null
-  image_price_2k?: number | null
-  image_price_4k?: number | null
-  video_rate_independent?: boolean
-  video_rate_multiplier?: number
-  video_price_480p?: number | null
-  video_price_720p?: number | null
-  video_price_1080p?: number | null
-  web_search_price_per_call?: number | null
-  peak_rate_enabled?: boolean
-  peak_start?: string
-  peak_end?: string
-  peak_rate_multiplier?: number
-  claude_code_only?: boolean
-  fallback_group_id?: number | null
-  fallback_group_id_on_invalid_request?: number | null
-  mcp_xml_inject?: boolean
-  supported_model_scopes?: string[]
-  models_list_config?: ModelsListConfig
-  allow_messages_dispatch?: boolean
-  allow_live?: boolean
-  default_mapped_model?: string
-  messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
-  model_routing?: Record<string, number[]> | null
-  model_routing_enabled?: boolean
-  rpm_limit?: number
-  max_reasoning_effort?: string
-  reasoning_effort_mappings?: ReasoningEffortMapping[]
-  require_oauth_only?: boolean
-  require_privacy_set?: boolean
-  // 从指定分组复制账号
-  copy_accounts_from_group_ids?: number[]
-}
-
-export interface UpdateGroupRequest {
-  name?: string
-  description?: string | null
-  platform?: GroupPlatform
-  rate_multiplier?: number
-  is_exclusive?: boolean
-  status?: 'active' | 'inactive'
-  subscription_type?: SubscriptionType
-  daily_limit_usd?: number | null
-  weekly_limit_usd?: number | null
-  monthly_limit_usd?: number | null
-  allow_image_generation?: boolean
-  allow_batch_image_generation?: boolean
-  image_rate_independent?: boolean
-  image_rate_multiplier?: number
-  batch_image_discount_multiplier?: number
-  batch_image_hold_multiplier?: number
-  image_price_1k?: number | null
-  image_price_2k?: number | null
-  image_price_4k?: number | null
-  video_rate_independent?: boolean
-  video_rate_multiplier?: number
-  video_price_480p?: number | null
-  video_price_720p?: number | null
-  video_price_1080p?: number | null
-  web_search_price_per_call?: number | null
-  peak_rate_enabled?: boolean
-  peak_start?: string
-  peak_end?: string
-  peak_rate_multiplier?: number
-  claude_code_only?: boolean
-  fallback_group_id?: number | null
-  fallback_group_id_on_invalid_request?: number | null
-  mcp_xml_inject?: boolean
-  supported_model_scopes?: string[]
-  models_list_config?: ModelsListConfig
-  allow_messages_dispatch?: boolean
-  allow_live?: boolean
-  default_mapped_model?: string
-  messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
-  model_routing?: Record<string, number[]> | null
-  model_routing_enabled?: boolean
-  rpm_limit?: number
-  max_reasoning_effort?: string
-  reasoning_effort_mappings?: ReasoningEffortMapping[]
-  require_oauth_only?: boolean
-  require_privacy_set?: boolean
-  copy_accounts_from_group_ids?: number[]
-}
-
 // ==================== Account & Proxy Types ====================
 
 export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok'
@@ -841,13 +583,20 @@ export interface PlatformPool {
   model_rules: PlatformModelRule[]
 }
 
-// Safe metadata returned to users when they authorize an API Key. It omits
-// account, model-rule, legacy group, and billing implementation details.
+// Safe metadata returned to users for platform authorization and the platform
+// catalog. Account details and legacy billing/group data are never exposed.
 export interface AvailablePlatformPool {
   id: number
   code: string
   name: string
   account_platform: AccountPlatform
+  models?: AvailablePlatformModel[]
+}
+
+export interface AvailablePlatformModel {
+  pattern: string
+  upstream_model?: string
+  endpoint_capabilities?: string[]
 }
 
 export interface CreatePlatformPoolRequest {
@@ -1116,7 +865,6 @@ export interface Account {
     sticky_score_infinity?: boolean
     sticky_weighted_enabled: boolean
   } | null
-  scheduler_scores?: AccountSchedulerGroupScore[] | null
   priority: number
   rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   status: 'active' | 'inactive' | 'error'
@@ -1127,8 +875,6 @@ export interface Account {
   created_at: string
   updated_at: string
   proxy?: Proxy
-  group_ids?: number[] // Groups this account belongs to
-  groups?: Group[] // Preloaded group objects
 
   // Rate limit & scheduling fields
   schedulable: boolean
@@ -1205,16 +951,6 @@ export interface Account {
   parent_privacy_mode?: string
   parent_subscription_expires_at?: string
   parent_chatgpt_account_id?: string
-}
-
-export interface AccountSchedulerGroupScore {
-  group_id?: number | null
-  group_name?: string
-  group_priority?: number | null
-  base_score: number
-  sticky_score?: number
-  sticky_score_infinity?: boolean
-  sticky_weighted_enabled: boolean
 }
 
 // Account Usage types
@@ -1406,26 +1142,6 @@ export interface UpdateAccountRequest {
   auto_pause_on_expired?: boolean
 }
 
-export interface CheckMixedChannelRequest {
-  platform: AccountPlatform
-  group_ids: number[]
-  account_id?: number
-}
-
-export interface MixedChannelWarningDetails {
-  group_id: number
-  group_name: string
-  current_platform: string
-  other_platform: string
-}
-
-export interface CheckMixedChannelResponse {
-  has_risk: boolean
-  error?: string
-  message?: string
-  details?: MixedChannelWarningDetails
-}
-
 export interface CreateProxyRequest {
   name: string
   protocol: ProxyProtocol
@@ -1583,12 +1299,11 @@ export interface UsageLog {
   inbound_endpoint?: string | null
   upstream_endpoint?: string | null
 
-  group_id: number | null
   subscription_id: number | null
   platform_id?: number | null
   platform_code?: string
   platform_name?: string
-  billing_source_type?: 'subscription' | 'balance' | 'legacy_group' | null
+  billing_source_type?: 'subscription' | 'balance' | null
   subscription_name?: string
 
   input_tokens: number
@@ -1646,7 +1361,6 @@ export interface UsageLog {
   rate_multiplier_snapshot?: number
   user?: User
   api_key?: ApiKey
-  group?: Group
   subscription?: UserSubscription
 }
 
@@ -1664,8 +1378,7 @@ export interface AdminUsageLog extends UsageLog {
   // 自定义定价规则计算的账号统计费用（nil 时使用 total_cost * multiplier）
   account_stats_cost?: number | null
 
-  // 渠道 ID 和计费等级（仅管理员可见）
-  channel_id?: number | null
+  // 计费等级（仅管理员可见）
   billing_tier?: string | null
 
   // 最小账号信息（仅管理员接口返回）
@@ -1678,7 +1391,6 @@ export interface UsageCleanupFilters {
   user_id?: number
   api_key_id?: number
   account_id?: number
-  group_id?: number
   model?: string | null
   request_type?: UsageRequestType | null
   stream?: boolean | null
@@ -1712,10 +1424,8 @@ export interface RedeemCode {
   expires_at?: string | null
   updated_at?: string
   notes?: string
-  group_id?: number | null // 订阅类型专用
-  validity_days?: number // 订阅类型专用
+  subscription_plan_id?: number | null
   user?: User
-  group?: Group // 关联的分组
 }
 
 export interface GenerateRedeemCodesRequest {
@@ -1723,8 +1433,6 @@ export interface GenerateRedeemCodesRequest {
   type: RedeemCodeType
   value: number
   subscription_plan_id?: number | null
-  group_id?: number | null // 订阅类型专用
-  validity_days?: number // 订阅类型专用
   expires_at?: string | null
   expires_in_days?: number
 }
@@ -1733,7 +1441,6 @@ export interface BatchUpdateRedeemCodeFields {
   status?: 'unused' | 'disabled'
   expires_at?: string | null
   notes?: string
-  group_id?: number | null
 }
 
 export interface BatchUpdateRedeemCodesRequest {
@@ -1851,9 +1558,10 @@ export interface EndpointStat {
   actual_cost: number
 }
 
-export interface GroupStat {
-  group_id: number
-  group_name: string
+export interface PlatformStat {
+  platform_id: number
+  platform_code: string
+  platform_name: string
   requests: number
   total_tokens: number
   cost: number // 标准计费
@@ -1922,7 +1630,6 @@ export interface UpdateUserRequest {
   concurrency?: number
   rpm_limit?: number
   status?: 'active' | 'disabled'
-  allowed_groups?: number[] | null
 }
 
 export interface ChangePasswordRequest {
@@ -1935,8 +1642,7 @@ export interface ChangePasswordRequest {
 export interface UserSubscription {
   id: number
   user_id: number
-  group_id?: number | null
-  subscription_plan_id?: number | null
+  subscription_plan_id: number
   plan_name_snapshot?: string
   daily_limit_usd_snapshot?: number | null
   weekly_limit_usd_snapshot?: number | null
@@ -1955,7 +1661,6 @@ export interface UserSubscription {
   revoked_at?: string | null
   expires_at: string | null
   user?: User
-  group?: Group
 }
 
 export interface SubscriptionProgress {
@@ -1984,17 +1689,13 @@ export interface SubscriptionProgress {
 
 export interface AssignSubscriptionRequest {
   user_id: number
-  plan_id?: number
-  group_id?: number
-  validity_days?: number
+  plan_id: number
   notes?: string
 }
 
 export interface BulkAssignSubscriptionRequest {
   user_ids: number[]
-  plan_id?: number
-  group_id?: number
-  validity_days?: number
+  plan_id: number
   notes?: string
 }
 
@@ -2016,7 +1717,7 @@ export interface UserErrorRequest {
   key_name: string
   key_deleted: boolean
   client_ip?: string
-  group_name?: string
+  platform_name?: string
   request_type?: number
   stream?: boolean
   user_agent?: string
@@ -2048,7 +1749,7 @@ export interface UsageQueryParams {
   api_key_id?: number
   user_id?: number
   account_id?: number
-  group_id?: number
+  platform_id?: number
   model?: string
   request_type?: UsageRequestType
   stream?: boolean
@@ -2070,7 +1771,7 @@ export interface AccountUsageHistory {
   tokens: number
   cost: number
   actual_cost: number // Account cost (account multiplier)
-  user_cost: number // User/API key billed cost (group multiplier)
+  user_cost: number // User/API key billed cost (asset multiplier)
 }
 
 export interface AccountUsageSummary {

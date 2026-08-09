@@ -373,12 +373,12 @@ func (_q *SubscriptionPlanQuery) WithAPIKeys(opts ...func(*APIKeyQuery)) *Subscr
 // Example:
 //
 //	var v []struct {
-//		GroupID int64 `json:"group_id,omitempty"`
+//		Name string `json:"name,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.SubscriptionPlan.Query().
-//		GroupBy(subscriptionplan.FieldGroupID).
+//		GroupBy(subscriptionplan.FieldName).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *SubscriptionPlanQuery) GroupBy(field string, fields ...string) *SubscriptionPlanGroupBy {
@@ -396,11 +396,11 @@ func (_q *SubscriptionPlanQuery) GroupBy(field string, fields ...string) *Subscr
 // Example:
 //
 //	var v []struct {
-//		GroupID int64 `json:"group_id,omitempty"`
+//		Name string `json:"name,omitempty"`
 //	}
 //
 //	client.SubscriptionPlan.Query().
-//		Select(subscriptionplan.FieldGroupID).
+//		Select(subscriptionplan.FieldName).
 //		Scan(ctx, &v)
 func (_q *SubscriptionPlanQuery) Select(fields ...string) *SubscriptionPlanSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)

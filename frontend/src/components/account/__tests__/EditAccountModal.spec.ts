@@ -151,7 +151,6 @@ function buildAccount() {
     rate_multiplier: 1,
     status: 'active',
     platform_id: 1,
-    group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
   } as any
@@ -177,7 +176,6 @@ function buildOpenAISparkShadowAccount() {
         'gpt-5.3-codex-spark': 'gpt-5.3-codex-spark-compact'
       }
     },
-    group_ids: []
   } as any
 }
 
@@ -202,7 +200,6 @@ function buildVertexAccount() {
     rate_multiplier: 1,
     status: 'active',
     platform_id: 2,
-    group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
   } as any
@@ -228,7 +225,6 @@ function buildAntigravityAccount(projectId = 'configured-project') {
     rate_multiplier: 1,
     status: 'active',
     platform_id: 3,
-    group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
   } as any
@@ -255,7 +251,6 @@ function buildGrokOAuthAccount() {
     rate_multiplier: 1,
     status: 'active',
     platform_id: 4,
-    group_ids: [],
     expires_at: null,
     auto_pause_on_expired: false
   } as any

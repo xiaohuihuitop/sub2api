@@ -3,21 +3,15 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
-	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 
@@ -52,29 +46,6 @@ func (r *apiKeyRepository) rawExecutor(ctx context.Context) sqlExecutor {
 	return r.sql
 }
 
-func apiKeyBelongsToGroup(groupID int64) predicate.APIKey {
-	return func(selector *entsql.Selector) {
-		selector.Where(entsql.Or(
-			entsql.EQ(selector.C(apikey.FieldGroupID), groupID),
-			entsql.ExprP(
-				"EXISTS (SELECT 1 FROM api_key_allowed_groups AS akag WHERE akag.api_key_id = "+selector.C(apikey.FieldID)+" AND akag.group_id = ?)",
-				groupID,
-			),
-		))
-	}
-}
-
-func apiKeyHasNoGroups() predicate.APIKey {
-	return func(selector *entsql.Selector) {
-		selector.Where(entsql.And(
-			entsql.IsNull(selector.C(apikey.FieldGroupID)),
-			entsql.ExprP(
-				"NOT EXISTS (SELECT 1 FROM api_key_allowed_groups AS akag WHERE akag.api_key_id = "+selector.C(apikey.FieldID)+")",
-			),
-		))
-	}
-}
-
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
 	builder := r.client.APIKey.Create().
 		SetUserID(key.UserID).
@@ -82,7 +53,6 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetName(key.Name).
 		SetStatus(key.Status).
 		SetAllowBalance(key.AllowBalance).
-		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
 		SetQuotaUsed(key.QuotaUsed).
@@ -118,9 +88,6 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
 		WithUser().
-		WithGroup(func(q *dbent.GroupQuery) {
-			q.WithBillingProfile()
-		}).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -129,7 +96,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		return nil, err
 	}
 	out := apiKeyEntityToService(m)
-	if err := r.loadAllowedGroups(ctx, []*service.APIKey{out}); err != nil {
+	if err := r.loadAssetPermissions(ctx, []*service.APIKey{out}); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -157,14 +124,7 @@ func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (stri
 func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
 		Where(apikey.KeyEQ(key)).
-		WithUser(func(q *dbent.UserQuery) {
-			q.WithAllowedGroups(func(gq *dbent.GroupQuery) {
-				gq.Select(group.FieldID)
-			})
-		}).
-		WithGroup(func(q *dbent.GroupQuery) {
-			q.WithBillingProfile()
-		}).
+		WithUser().
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -173,7 +133,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		return nil, err
 	}
 	out := apiKeyEntityToService(m)
-	if err := r.loadAllowedGroups(ctx, []*service.APIKey{out}); err != nil {
+	if err := r.loadAssetPermissions(ctx, []*service.APIKey{out}); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -183,7 +143,6 @@ func apiKeyAuthFieldSelection() []string {
 	return []string{
 		apikey.FieldID,
 		apikey.FieldUserID,
-		apikey.FieldGroupID,
 		apikey.FieldAllowBalance,
 		apikey.FieldName,
 		apikey.FieldStatus,
@@ -221,56 +180,6 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				user.FieldLastActiveAt,
 				user.FieldRpmLimit,
 			)
-			q.WithAllowedGroups(func(gq *dbent.GroupQuery) {
-				gq.Select(group.FieldID)
-			})
-		}).
-		WithGroup(func(q *dbent.GroupQuery) {
-			q.WithBillingProfile()
-			q.Select(
-				group.FieldID,
-				group.FieldName,
-				group.FieldPlatform,
-				group.FieldIsExclusive,
-				group.FieldStatus,
-				group.FieldSubscriptionType,
-				group.FieldRateMultiplier,
-				group.FieldDailyLimitUsd,
-				group.FieldWeeklyLimitUsd,
-				group.FieldMonthlyLimitUsd,
-				group.FieldAllowImageGeneration,
-				group.FieldAllowBatchImageGeneration,
-				group.FieldImageRateIndependent,
-				group.FieldImageRateMultiplier,
-				group.FieldImagePrice1k,
-				group.FieldImagePrice2k,
-				group.FieldImagePrice4k,
-				group.FieldVideoRateIndependent,
-				group.FieldVideoRateMultiplier,
-				group.FieldVideoPrice480p,
-				group.FieldVideoPrice720p,
-				group.FieldVideoPrice1080p,
-				group.FieldWebSearchPricePerCall,
-				group.FieldClaudeCodeOnly,
-				group.FieldFallbackGroupID,
-				group.FieldFallbackGroupIDOnInvalidRequest,
-				group.FieldModelRoutingEnabled,
-				group.FieldModelRouting,
-				group.FieldMcpXMLInject,
-				group.FieldSupportedModelScopes,
-				group.FieldAllowMessagesDispatch,
-				group.FieldAllowLive,
-				group.FieldDefaultMappedModel,
-				group.FieldMessagesDispatchModelConfig,
-				group.FieldModelsListConfig,
-				group.FieldRpmLimit,
-				group.FieldMaxReasoningEffort,
-				group.FieldReasoningEffortMappings,
-				group.FieldPeakRateEnabled,
-				group.FieldPeakStart,
-				group.FieldPeakEnd,
-				group.FieldPeakRateMultiplier,
-			)
 		}).
 		Only(ctx)
 	if err != nil {
@@ -280,7 +189,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		return nil, err
 	}
 	out := apiKeyEntityToService(m)
-	if err := r.loadAllowedGroups(ctx, []*service.APIKey{out}); err != nil {
+	if err := r.loadAssetPermissions(ctx, []*service.APIKey{out}); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -343,14 +252,6 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 			builder.ClearWindow7dStart()
 		}
 	}
-	if fields.GroupID {
-		if key.GroupID != nil {
-			builder.SetGroupID(*key.GroupID)
-		} else {
-			builder.ClearGroupID()
-		}
-	}
-
 	// Expiration time
 	if fields.ExpiresAt {
 		if key.ExpiresAt != nil {
@@ -488,14 +389,6 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 	if filters.Status != "" {
 		q = q.Where(apikey.StatusEQ(filters.Status))
 	}
-	if filters.GroupID != nil {
-		if *filters.GroupID == 0 {
-			q = q.Where(apiKeyHasNoGroups())
-		} else {
-			q = q.Where(apiKeyBelongsToGroup(*filters.GroupID))
-		}
-	}
-
 	return q
 }
 
@@ -508,9 +401,6 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	}
 
 	keysQuery := q.
-		WithGroup(func(q *dbent.GroupQuery) {
-			q.WithBillingProfile()
-		}).
 		Offset(params.Offset()).
 		Limit(params.Limit())
 	for _, order := range apiKeyListOrder(params) {
@@ -526,7 +416,11 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
 	}
-	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+	keyPointers := make([]*service.APIKey, 0, len(outKeys))
+	for i := range outKeys {
+		keyPointers = append(keyPointers, &outKeys[i])
+	}
+	if err := r.loadAssetPermissions(ctx, keyPointers); err != nil {
 		return nil, nil, err
 	}
 	if err := r.attachLastUsedIPs(ctx, outKeys); err != nil {
@@ -538,9 +432,6 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 
 func (r *apiKeyRepository) ListAllByUserID(ctx context.Context, userID int64, filters service.APIKeyListFilters) ([]service.APIKey, error) {
 	keys, err := r.apiKeyListByUserIDQuery(userID, filters).
-		WithGroup(func(q *dbent.GroupQuery) {
-			q.WithBillingProfile()
-		}).
 		Order(dbent.Asc(apikey.FieldID)).
 		All(ctx)
 	if err != nil {
@@ -551,7 +442,11 @@ func (r *apiKeyRepository) ListAllByUserID(ctx context.Context, userID int64, fi
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
 	}
-	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+	keyPointers := make([]*service.APIKey, 0, len(outKeys))
+	for i := range outKeys {
+		keyPointers = append(keyPointers, &outKeys[i])
+	}
+	if err := r.loadAssetPermissions(ctx, keyPointers); err != nil {
 		return nil, err
 	}
 	if err := r.attachLastUsedIPs(ctx, outKeys); err != nil {
@@ -673,38 +568,6 @@ func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, e
 	return count > 0, err
 }
 
-func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]service.APIKey, *pagination.PaginationResult, error) {
-	q := r.activeQuery().Where(apiKeyBelongsToGroup(groupID))
-
-	total, err := q.Count(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	keysQuery := q.
-		WithUser().
-		Offset(params.Offset()).
-		Limit(params.Limit())
-	for _, order := range apiKeyListOrder(params) {
-		keysQuery = keysQuery.Order(order)
-	}
-
-	keys, err := keysQuery.All(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	outKeys := make([]service.APIKey, 0, len(keys))
-	for i := range keys {
-		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
-	}
-	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
-		return nil, nil, err
-	}
-
-	return outKeys, paginationResultFromTotal(int64(total), params), nil
-}
-
 func apiKeyListOrder(params pagination.PaginationParams) []func(*entsql.Selector) {
 	sortBy := strings.ToLower(strings.TrimSpace(params.SortBy))
 	sortOrder := params.NormalizedSortOrder(pagination.SortOrderDesc)
@@ -761,43 +624,14 @@ func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyw
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
 	}
-	if err := r.loadAllowedGroupValues(ctx, outKeys); err != nil {
+	keyPointers := make([]*service.APIKey, 0, len(outKeys))
+	for i := range outKeys {
+		keyPointers = append(keyPointers, &outKeys[i])
+	}
+	if err := r.loadAssetPermissions(ctx, keyPointers); err != nil {
 		return nil, err
 	}
 	return outKeys, nil
-}
-
-func (r *apiKeyRepository) loadAllowedGroupValues(ctx context.Context, keys []service.APIKey) error {
-	pointers := make([]*service.APIKey, 0, len(keys))
-	for i := range keys {
-		pointers = append(pointers, &keys[i])
-	}
-	return r.loadAllowedGroups(ctx, pointers)
-}
-
-func (r *apiKeyRepository) loadAllowedGroups(ctx context.Context, keys []*service.APIKey) error {
-	for _, key := range keys {
-		if key == nil || key.ID <= 0 {
-			continue
-		}
-		groups, err := r.ListAllowedGroups(ctx, key.ID)
-		if err != nil {
-			return err
-		}
-		if len(groups) == 0 && key.Group != nil {
-			groups = []service.Group{*key.Group}
-		}
-		key.AllowedGroups = groups
-		key.AllowedGroupIDs = make([]int64, 0, len(groups))
-		for i := range groups {
-			key.AllowedGroupIDs = append(key.AllowedGroupIDs, groups[i].ID)
-		}
-		if len(groups) > 0 {
-			key.Group = &key.AllowedGroups[0]
-			key.GroupID = &key.AllowedGroups[0].ID
-		}
-	}
-	return r.loadAssetPermissions(ctx, keys)
 }
 
 func (r *apiKeyRepository) loadAssetPermissions(ctx context.Context, keys []*service.APIKey) error {
@@ -883,278 +717,6 @@ func (r *apiKeyRepository) loadAssetPermissionIDs(
 	return rows.Err()
 }
 
-func (r *apiKeyRepository) ListAllowedGroups(ctx context.Context, keyID int64) ([]service.Group, error) {
-	rows, err := r.rawExecutor(ctx).QueryContext(ctx, `
-		SELECT links.group_id
-		FROM api_key_allowed_groups AS links
-		JOIN groups AS g ON g.id = links.group_id
-		WHERE links.api_key_id = $1 AND g.deleted_at IS NULL
-		ORDER BY g.sort_order ASC, g.id ASC
-	`, keyID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	groupIDs := make([]int64, 0)
-	for rows.Next() {
-		var groupID int64
-		if err := rows.Scan(&groupID); err != nil {
-			return nil, err
-		}
-		groupIDs = append(groupIDs, groupID)
-	}
-	if err := rows.Err(); err != nil || len(groupIDs) == 0 {
-		return []service.Group{}, err
-	}
-
-	entities, err := clientFromContext(ctx, r.client).Group.Query().
-		Where(group.IDIn(groupIDs...), group.DeletedAtIsNil()).
-		WithBillingProfile().
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	byID := make(map[int64]service.Group, len(entities))
-	for _, entity := range entities {
-		mapped := groupEntityToService(entity)
-		if mapped != nil {
-			byID[mapped.ID] = *mapped
-		}
-	}
-	groups := make([]service.Group, 0, len(groupIDs))
-	for _, groupID := range groupIDs {
-		if mapped, ok := byID[groupID]; ok {
-			groups = append(groups, mapped)
-		}
-	}
-	if err := r.hydrateOpenAIBillingEndpointCapabilities(ctx, groups); err != nil {
-		return nil, err
-	}
-	return groups, nil
-}
-
-func (r *apiKeyRepository) hydrateOpenAIBillingEndpointCapabilities(ctx context.Context, groups []service.Group) error {
-	groupIndexes := make(map[int64]int)
-	groupIDs := make([]int64, 0, len(groups))
-	for i := range groups {
-		if groups[i].Platform != service.PlatformOpenAI {
-			continue
-		}
-		groups[i].OpenAIEndpointCapabilities = map[string]bool{}
-		groupIndexes[groups[i].ID] = i
-		groupIDs = append(groupIDs, groups[i].ID)
-	}
-	if len(groupIDs) == 0 {
-		return nil
-	}
-
-	links, err := clientFromContext(ctx, r.client).AccountGroup.Query().
-		Where(accountgroup.GroupIDIn(groupIDs...)).
-		WithAccount(func(q *dbent.AccountQuery) {
-			q.Select(dbaccount.FieldID, dbaccount.FieldPlatform, dbaccount.FieldType, dbaccount.FieldCredentials, dbaccount.FieldExtra)
-		}).
-		All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, link := range links {
-		index, ok := groupIndexes[link.GroupID]
-		if !ok || link.Edges.Account == nil {
-			continue
-		}
-		account := accountEntityToService(link.Edges.Account)
-		for _, capability := range openAIAccountBillingEndpointCapabilities(account) {
-			groups[index].OpenAIEndpointCapabilities[string(capability)] = true
-		}
-	}
-	return nil
-}
-
-func openAIAccountBillingEndpointCapabilities(account *service.Account) []service.OpenAIEndpointCapability {
-	if account == nil || !account.IsOpenAICompatible() {
-		return nil
-	}
-	configured, found := configuredOpenAIEndpointCapabilities(account.Credentials)
-	if account.Type == service.AccountTypeAPIKey {
-		// These capabilities select a billing group for an inbound request. In auto
-		// mode, either text endpoint is accepted and the probe chooses the upstream
-		// protocol later. Image scheduling still uses the account-level capability.
-		if found && !configured[string(service.OpenAIEndpointCapabilityChatCompletions)] {
-			return nil
-		}
-		switch openai_compat.NormalizeResponsesSupportMode(
-			account.GetExtraString(openai_compat.ExtraKeyResponsesMode),
-		) {
-		case openai_compat.ResponsesSupportModeForceResponses:
-			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
-		case openai_compat.ResponsesSupportModeForceChatCompletions:
-			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityChatCompletions}
-		default:
-			return []service.OpenAIEndpointCapability{
-				service.OpenAIEndpointCapabilityChatCompletions,
-				service.OpenAIEndpointCapabilityResponses,
-			}
-		}
-	}
-	if !found {
-		if account.SupportsOpenAIEndpointCapability(service.OpenAIEndpointCapabilityResponses) {
-			return []service.OpenAIEndpointCapability{service.OpenAIEndpointCapabilityResponses}
-		}
-		return nil
-	}
-	result := make([]service.OpenAIEndpointCapability, 0, 2)
-	for _, capability := range []service.OpenAIEndpointCapability{
-		service.OpenAIEndpointCapabilityChatCompletions,
-		service.OpenAIEndpointCapabilityResponses,
-	} {
-		if configured[string(capability)] && account.SupportsOpenAIEndpointCapability(capability) {
-			result = append(result, capability)
-		}
-	}
-	return result
-}
-
-func configuredOpenAIEndpointCapabilities(credentials map[string]any) (map[string]bool, bool) {
-	if credentials == nil {
-		return nil, false
-	}
-	raw, found := credentials["openai_capabilities"]
-	if !found || raw == nil {
-		return nil, false
-	}
-	result := make(map[string]bool)
-	add := func(value string) {
-		value = strings.ToLower(strings.TrimSpace(value))
-		if value != "" {
-			result[value] = true
-		}
-	}
-	switch values := raw.(type) {
-	case []any:
-		for _, value := range values {
-			if text, ok := value.(string); ok {
-				add(text)
-			}
-		}
-	case []string:
-		for _, value := range values {
-			add(value)
-		}
-	case map[string]any:
-		for key, value := range values {
-			if enabled, ok := value.(bool); ok && enabled {
-				add(key)
-			}
-		}
-	case string:
-		var decoded []string
-		if json.Unmarshal([]byte(values), &decoded) == nil {
-			for _, value := range decoded {
-				add(value)
-			}
-		} else {
-			add(values)
-		}
-	}
-	return result, true
-}
-
-// ClearGroupIDByGroupID 将指定分组的所有 API Key 的 group_id 设为 nil
-func (r *apiKeyRepository) ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	result, err := r.rawExecutor(ctx).ExecContext(ctx, `
-		WITH affected AS (
-			SELECT DISTINCT keys.id
-			FROM api_keys AS keys
-			LEFT JOIN api_key_allowed_groups AS links ON links.api_key_id = keys.id
-			WHERE keys.deleted_at IS NULL
-			  AND (keys.group_id = $1 OR links.group_id = $1)
-		), deleted AS (
-			DELETE FROM api_key_allowed_groups
-			WHERE group_id = $1
-			RETURNING api_key_id
-		), next_groups AS (
-			SELECT affected.id AS api_key_id, (
-				SELECT links.group_id
-				FROM api_key_allowed_groups AS links
-				JOIN groups ON groups.id = links.group_id
-				WHERE links.api_key_id = affected.id
-				  AND links.group_id <> $1
-				  AND groups.deleted_at IS NULL
-				ORDER BY groups.sort_order ASC, groups.id ASC
-				LIMIT 1
-			) AS group_id
-			FROM affected
-		)
-		UPDATE api_keys AS keys
-		SET group_id = next_groups.group_id, updated_at = NOW()
-		FROM next_groups
-		WHERE keys.id = next_groups.api_key_id
-	`, groupID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
-// UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
-func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
-	result, err := r.rawExecutor(ctx).ExecContext(ctx, `
-		WITH affected AS (
-			SELECT DISTINCT keys.id
-			FROM api_keys AS keys
-			LEFT JOIN api_key_allowed_groups AS links ON links.api_key_id = keys.id
-			WHERE keys.user_id = $1
-			  AND keys.deleted_at IS NULL
-			  AND (keys.group_id = $2 OR links.group_id = $2)
-		), inserted AS (
-			INSERT INTO api_key_allowed_groups (api_key_id, group_id)
-			SELECT affected.id, $3
-			FROM affected
-			ON CONFLICT (api_key_id, group_id) DO NOTHING
-			RETURNING api_key_id
-		), deleted AS (
-			DELETE FROM api_key_allowed_groups AS links
-			USING affected
-			WHERE links.api_key_id = affected.id
-			  AND links.group_id = $2
-			  AND $2 <> $3
-			RETURNING links.api_key_id
-		), next_groups AS (
-			SELECT affected.id AS api_key_id, (
-				SELECT candidates.group_id
-				FROM (
-					SELECT links.group_id
-					FROM api_key_allowed_groups AS links
-					WHERE links.api_key_id = affected.id
-					  AND (links.group_id <> $2 OR $2 = $3)
-					UNION
-					SELECT $3
-				) AS candidates
-				JOIN groups ON groups.id = candidates.group_id
-				WHERE groups.deleted_at IS NULL
-				ORDER BY groups.sort_order ASC, groups.id ASC
-				LIMIT 1
-			) AS group_id
-			FROM affected
-		)
-		UPDATE api_keys AS keys
-		SET group_id = next_groups.group_id, updated_at = NOW()
-		FROM next_groups
-		WHERE keys.id = next_groups.api_key_id
-	`, userID, oldGroupID, newGroupID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
-// CountByGroupID 获取分组的 API Key 数量
-func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	count, err := r.activeQuery().Where(apiKeyBelongsToGroup(groupID)).Count(ctx)
-	return int64(count), err
-}
-
 func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
 	keys, err := r.activeQuery().
 		Where(apikey.UserIDEQ(userID)).
@@ -1166,18 +728,6 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 	return keys, nil
 }
 
-func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
-	keys, err := r.activeQuery().
-		Where(apiKeyBelongsToGroup(groupID)).
-		Select(apikey.FieldKey).
-		Strings(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return keys, nil
-}
-
-// IncrementQuotaUsed 使用 Ent 原子递增 quota_used 字段并返回新值
 func (r *apiKeyRepository) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {
 	updated, err := r.client.APIKey.UpdateOneID(id).
 		Where(apikey.DeletedAtIsNil()).
@@ -1247,24 +797,6 @@ func (r *apiKeyRepository) IncrementRateLimitUsage(ctx context.Context, id int64
 			updated_at = NOW()
 		WHERE id = $2 AND deleted_at IS NULL`,
 		cost, id)
-	return err
-}
-
-func (r *apiKeyRepository) ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error {
-	_, err := r.sql.ExecContext(ctx, `
-		WITH deleted AS (
-			DELETE FROM api_key_allowed_groups
-			WHERE api_key_id = $1
-		), normalized AS (
-			SELECT DISTINCT group_id
-			FROM unnest($2::bigint[]) AS group_id
-			WHERE group_id > 0
-		)
-		INSERT INTO api_key_allowed_groups (api_key_id, group_id)
-		SELECT $1, group_id
-		FROM normalized
-		ON CONFLICT (api_key_id, group_id) DO NOTHING
-	`, keyID, pq.Array(groupIDs))
 	return err
 }
 
@@ -1380,7 +912,6 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		LastUsedAt:    m.LastUsedAt,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
-		GroupID:       m.GroupID,
 		AllowBalance:  m.AllowBalance,
 		Quota:         m.Quota,
 		QuotaUsed:     m.QuotaUsed,
@@ -1397,17 +928,6 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 	}
 	if m.Edges.User != nil {
 		out.User = userEntityToService(m.Edges.User)
-		if allowed := m.Edges.User.Edges.AllowedGroups; len(allowed) > 0 {
-			out.User.AllowedGroups = make([]int64, 0, len(allowed))
-			for _, g := range allowed {
-				if g != nil {
-					out.User.AllowedGroups = append(out.User.AllowedGroups, g.ID)
-				}
-			}
-		}
-	}
-	if m.Edges.Group != nil {
-		out.Group = groupEntityToService(m.Edges.Group)
 	}
 	return out
 }
@@ -1447,88 +967,6 @@ func userEntityToService(u *dbent.User) *service.User {
 		out.BalanceNotifyExtraEmails = service.ParseNotifyEmails(u.BalanceNotifyExtraEmails)
 	}
 	return out
-}
-
-func groupEntityToService(g *dbent.Group) *service.Group {
-	if g == nil {
-		return nil
-	}
-	mapped := &service.Group{
-		ID:                              g.ID,
-		Name:                            g.Name,
-		Description:                     derefString(g.Description),
-		Platform:                        g.Platform,
-		RateMultiplier:                  g.RateMultiplier,
-		IsExclusive:                     g.IsExclusive,
-		Status:                          g.Status,
-		Hydrated:                        true,
-		DuplicateOperationID:            derefString(g.DuplicateOperationID),
-		SubscriptionType:                g.SubscriptionType,
-		DailyLimitUSD:                   g.DailyLimitUsd,
-		WeeklyLimitUSD:                  g.WeeklyLimitUsd,
-		MonthlyLimitUSD:                 g.MonthlyLimitUsd,
-		AllowImageGeneration:            g.AllowImageGeneration,
-		AllowBatchImageGeneration:       g.AllowBatchImageGeneration,
-		ImageRateIndependent:            g.ImageRateIndependent,
-		ImageRateMultiplier:             g.ImageRateMultiplier,
-		ImagePrice1K:                    g.ImagePrice1k,
-		ImagePrice2K:                    g.ImagePrice2k,
-		ImagePrice4K:                    g.ImagePrice4k,
-		BatchImageDiscountMultiplier:    g.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        g.BatchImageHoldMultiplier,
-		VideoRateIndependent:            g.VideoRateIndependent,
-		VideoRateMultiplier:             g.VideoRateMultiplier,
-		VideoPrice480P:                  g.VideoPrice480p,
-		VideoPrice720P:                  g.VideoPrice720p,
-		VideoPrice1080P:                 g.VideoPrice1080p,
-		WebSearchPricePerCall:           g.WebSearchPricePerCall,
-		DefaultValidityDays:             g.DefaultValidityDays,
-		ClaudeCodeOnly:                  g.ClaudeCodeOnly,
-		FallbackGroupID:                 g.FallbackGroupID,
-		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
-		ModelRouting:                    g.ModelRouting,
-		ModelRoutingEnabled:             g.ModelRoutingEnabled,
-		MCPXMLInject:                    g.McpXMLInject,
-		SupportedModelScopes:            g.SupportedModelScopes,
-		SortOrder:                       g.SortOrder,
-		AllowMessagesDispatch:           g.AllowMessagesDispatch,
-		AllowLive:                       g.AllowLive,
-		RequireOAuthOnly:                g.RequireOauthOnly,
-		RequirePrivacySet:               g.RequirePrivacySet,
-		DefaultMappedModel:              g.DefaultMappedModel,
-		MessagesDispatchModelConfig:     g.MessagesDispatchModelConfig,
-		ModelsListConfig:                g.ModelsListConfig,
-		RPMLimit:                        g.RpmLimit,
-		MaxReasoningEffort:              g.MaxReasoningEffort,
-		ReasoningEffortMappings:         g.ReasoningEffortMappings,
-		PeakRateEnabled:                 g.PeakRateEnabled,
-		PeakStart:                       g.PeakStart,
-		PeakEnd:                         g.PeakEnd,
-		PeakRateMultiplier:              g.PeakRateMultiplier,
-		CreatedAt:                       g.CreatedAt,
-		UpdatedAt:                       g.UpdatedAt,
-	}
-	if profile := g.Edges.BillingProfile; profile != nil {
-		mapped.RateMultiplier = profile.BalanceRateMultiplier
-		mapped.PeakRateEnabled = profile.PeakRateEnabled
-		mapped.PeakStart = profile.PeakStart
-		mapped.PeakEnd = profile.PeakEnd
-		mapped.PeakRateMultiplier = profile.PeakRateMultiplier
-		mapped.ImageRateIndependent = profile.ImageRateIndependent
-		mapped.ImageRateMultiplier = profile.ImageRateMultiplier
-		mapped.ImagePrice1K = profile.ImagePrice1k
-		mapped.ImagePrice2K = profile.ImagePrice2k
-		mapped.ImagePrice4K = profile.ImagePrice4k
-		mapped.BatchImageDiscountMultiplier = profile.BatchImageDiscountMultiplier
-		mapped.BatchImageHoldMultiplier = profile.BatchImageHoldMultiplier
-		mapped.VideoRateIndependent = profile.VideoRateIndependent
-		mapped.VideoRateMultiplier = profile.VideoRateMultiplier
-		mapped.VideoPrice480P = profile.VideoPrice480p
-		mapped.VideoPrice720P = profile.VideoPrice720p
-		mapped.VideoPrice1080P = profile.VideoPrice1080p
-		mapped.WebSearchPricePerCall = profile.WebSearchPricePerCall
-	}
-	return mapped
 }
 
 func derefString(s *string) string {

@@ -35,12 +35,7 @@ const (
 
 type BatchImageAccountSelectionRepository interface {
 	GetByID(ctx context.Context, id int64) (*Account, error)
-	ListSchedulableByPlatform(ctx context.Context, platform string) ([]Account, error)
-	ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]Account, error)
-}
-
-type BatchImageGroupPricingRepository interface {
-	GetByIDLite(ctx context.Context, id int64) (*Group, error)
+	ListSchedulableByPlatformPool(ctx context.Context, platformID int64, accountPlatform string) ([]Account, error)
 }
 
 type BatchImageSubmitRequest struct {
@@ -72,15 +67,15 @@ type BatchImageReferenceInput struct {
 }
 
 type BatchImageOwner struct {
-	UserID   int64
-	APIKeyID int64
-	GroupID  *int64
+	UserID         int64
+	APIKeyID       int64
+	PlatformID     int64
+	RateMultiplier float64
 }
 
 type BatchImagePublicService struct {
 	Repo             BatchImageRepository
 	AccountRepo      BatchImageAccountSelectionRepository
-	GroupRepo        BatchImageGroupPricingRepository
 	Queue            BatchImageQueue
 	ProviderRegistry *BatchImageProviderRegistry
 	Pricing          BatchImagePricingResolver
@@ -177,11 +172,10 @@ type BatchImageItemsQuery struct {
 	Cursor string
 }
 
-func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRepository, groupRepo GroupRepository, queue BatchImageQueue, pricing *BatchImageModelPricingResolver, billingRepo UsageBillingRepository, authCache APIKeyAuthCacheInvalidator, cfg *config.Config) *BatchImagePublicService {
+func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRepository, queue BatchImageQueue, pricing *BatchImageModelPricingResolver, billingRepo UsageBillingRepository, authCache APIKeyAuthCacheInvalidator, cfg *config.Config) *BatchImagePublicService {
 	return &BatchImagePublicService{
 		Repo:             repo,
 		AccountRepo:      accountRepo,
-		GroupRepo:        groupRepo,
 		Queue:            queue,
 		ProviderRegistry: NewBatchImageProviderRegistryFromConfig(cfg),
 		Pricing:          pricing,
@@ -201,9 +195,6 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	}
 	// 与 ListModels 使用同一鉴权谓词（AllowBatchImageGeneration + Platform==Gemini），
 	// 避免两个入口校验口径不一致留下防御纵深缺口。
-	if err := s.ensureGroupAllowsBatchImage(ctx, owner.GroupID); err != nil {
-		return nil, err
-	}
 	requestHash := HashBatchImageSubmitRequest(normalized)
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
 	if idempotencyKey != "" {
@@ -615,9 +606,6 @@ func (s *BatchImagePublicService) ListModels(ctx context.Context, owner BatchIma
 	if s.Pricing == nil {
 		return nil, ErrBatchImageSettlementPricingMissing
 	}
-	if err := s.ensureGroupAllowsBatchImage(ctx, owner.GroupID); err != nil {
-		return nil, err
-	}
 
 	modelsByProvider := make(map[string]map[string]struct{})
 	for _, providerName := range batchImageProviderSelectionOrder("") {
@@ -625,7 +613,7 @@ func (s *BatchImagePublicService) ListModels(ctx context.Context, owner BatchIma
 		if !ok || provider == nil {
 			continue
 		}
-		accounts, err := s.listCandidateAccounts(ctx, owner.GroupID, batchImageProviderPlatform(providerName))
+		accounts, err := s.listCandidateAccounts(ctx, owner.PlatformID, batchImageProviderPlatform(providerName))
 		if err != nil {
 			return nil, err
 		}
@@ -934,7 +922,7 @@ func (s *BatchImagePublicService) selectProviderAndAccount(ctx context.Context, 
 		if !ok || provider == nil {
 			continue
 		}
-		accounts, err := s.listCandidateAccounts(ctx, owner.GroupID, batchImageProviderPlatform(providerName))
+		accounts, err := s.listCandidateAccounts(ctx, owner.PlatformID, batchImageProviderPlatform(providerName))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -960,70 +948,21 @@ func (s *BatchImagePublicService) selectProviderAndAccount(ctx context.Context, 
 	return nil, nil, ErrBatchImageNoAccountAvailable
 }
 
-func (s *BatchImagePublicService) listCandidateAccounts(ctx context.Context, groupID *int64, platform string) ([]Account, error) {
+func (s *BatchImagePublicService) listCandidateAccounts(ctx context.Context, platformID int64, platform string) ([]Account, error) {
 	if s.AccountRepo == nil {
 		return nil, ErrBatchImageNoAccountAvailable
 	}
-	if groupID != nil && *groupID > 0 {
-		return s.AccountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, platform)
+	if platformID <= 0 {
+		return nil, fmt.Errorf("%w: platform scheduling scope is required", ErrPlatformInvalid)
 	}
-	return s.AccountRepo.ListSchedulableByPlatform(ctx, platform)
-}
-
-func (s *BatchImagePublicService) ensureGroupAllowsBatchImage(ctx context.Context, groupID *int64) error {
-	if groupID == nil || *groupID <= 0 {
-		return nil
-	}
-	if s.GroupRepo == nil {
-		return ErrBatchImageSettlementPricingMissing
-	}
-	group, err := s.GroupRepo.GetByIDLite(ctx, *groupID)
-	if err != nil || group == nil {
-		return ErrBatchImageSettlementPricingMissing
-	}
-	if !group.AllowBatchImageGeneration {
-		return ErrBatchImageGroupDisabled
-	}
-	if group.Platform != PlatformGemini {
-		return ErrBatchImageGroupDisabled
-	}
-	return nil
+	return s.AccountRepo.ListSchedulableByPlatformPool(ctx, platformID, platform)
 }
 
 func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, owner BatchImageOwner, req BatchImageSubmitRequest, provider string, account *Account) (*BatchImagePricingSnapshot, error) {
 	unit := -1.0
-	groupMultiplier := 1.0
+	assetMultiplier := nonNegativeMultiplier(owner.RateMultiplier)
 	discountMultiplier := defaultBatchImageDiscountMultiplier
 	holdMultiplier := defaultBatchImageHoldMultiplier
-	if owner.GroupID != nil && *owner.GroupID > 0 {
-		if s.GroupRepo == nil {
-			return nil, ErrBatchImageSettlementPricingMissing
-		}
-		group, err := s.GroupRepo.GetByIDLite(ctx, *owner.GroupID)
-		if err != nil || group == nil {
-			return nil, ErrBatchImageSettlementPricingMissing
-		}
-		if !group.AllowBatchImageGeneration {
-			return nil, ErrBatchImageGroupDisabled
-		}
-		groupMultiplier = group.RateMultiplier
-		if group.ImageRateIndependent {
-			groupMultiplier = group.ImageRateMultiplier
-		}
-		if groupMultiplier < 0 {
-			groupMultiplier = 0
-		}
-		discountMultiplier = group.BatchImageDiscountMultiplier
-		if discountMultiplier < 0 {
-			discountMultiplier = 0
-		}
-		if group.BatchImageHoldMultiplier >= 0 {
-			holdMultiplier = group.BatchImageHoldMultiplier
-		}
-		if configuredUnit := group.GetImagePrice(req.ImageSize); configuredUnit != nil && *configuredUnit >= 0 {
-			unit = *configuredUnit
-		}
-	}
 	if unit < 0 {
 		if s.Pricing == nil {
 			return nil, ErrBatchImageSettlementPricingMissing
@@ -1051,12 +990,12 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 	if accountMultiplier < 0 {
 		accountMultiplier = 0
 	}
-	standardUnitPrice := unit * groupMultiplier * accountMultiplier
+	standardUnitPrice := unit * assetMultiplier * accountMultiplier
 	billableUnitPrice := standardUnitPrice * discountMultiplier
 	holdUnitPrice := standardUnitPrice * holdMultiplier
 	return &BatchImagePricingSnapshot{
 		BaseUnitPrice:           unit,
-		GroupRateMultiplier:     groupMultiplier,
+		GroupRateMultiplier:     assetMultiplier,
 		AccountRateMultiplier:   accountMultiplier,
 		BatchDiscountMultiplier: discountMultiplier,
 		HoldMultiplier:          holdMultiplier,

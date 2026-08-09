@@ -15,18 +15,26 @@ func ProvideAdminPlatformHandler(platformService *service.PlatformService) *admi
 	return admin.NewPlatformHandler(platformService)
 }
 
+func ProvideAdminModelPricingHandler(catalog *service.ModelPricingCatalog) *admin.ModelPricingHandler {
+	return admin.NewModelPricingHandler(catalog)
+}
+
 // ProvideAPIKeyHandler adds the read-only platform selector used by API Key
 // authorization without coupling user routes to administrator handlers.
 func ProvideAPIKeyHandler(apiKeyService *service.APIKeyService, platformService *service.PlatformService) *APIKeyHandler {
 	return NewAPIKeyHandler(apiKeyService, platformService)
 }
 
+func ProvideModelPlazaHandler(catalog *service.PlatformCatalogService, settings *service.SettingService) *ModelPlazaHandler {
+	return NewModelPlazaHandler(catalog, settings)
+}
+
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
 	dashboardHandler *admin.DashboardHandler,
 	userHandler *admin.UserHandler,
-	groupHandler *admin.GroupHandler,
 	platformHandler *admin.PlatformHandler,
+	modelPricingHandler *admin.ModelPricingHandler,
 	accountHandler *admin.AccountHandler,
 	announcementHandler *admin.AnnouncementHandler,
 	dataManagementHandler *admin.DataManagementHandler,
@@ -47,9 +55,7 @@ func ProvideAdminHandlers(
 	userAttributeHandler *admin.UserAttributeHandler,
 	errorPassthroughHandler *admin.ErrorPassthroughHandler,
 	tlsFingerprintProfileHandler *admin.TLSFingerprintProfileHandler,
-	apiKeyHandler *admin.AdminAPIKeyHandler,
 	scheduledTestHandler *admin.ScheduledTestHandler,
-	channelHandler *admin.ChannelHandler,
 	channelMonitorHandler *admin.ChannelMonitorHandler,
 	channelMonitorTemplateHandler *admin.ChannelMonitorRequestTemplateHandler,
 	contentModerationHandler *admin.ContentModerationHandler,
@@ -66,8 +72,8 @@ func ProvideAdminHandlers(
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
 		User:                   userHandler,
-		Group:                  groupHandler,
 		Platform:               platformHandler,
+		ModelPricing:           modelPricingHandler,
 		Account:                accountHandler,
 		Announcement:           announcementHandler,
 		DataManagement:         dataManagementHandler,
@@ -88,9 +94,7 @@ func ProvideAdminHandlers(
 		UserAttribute:          userAttributeHandler,
 		ErrorPassthrough:       errorPassthroughHandler,
 		TLSFingerprintProfile:  tlsFingerprintProfileHandler,
-		APIKey:                 apiKeyHandler,
 		ScheduledTest:          scheduledTestHandler,
-		Channel:                channelHandler,
 		ChannelMonitor:         channelMonitorHandler,
 		ChannelMonitorTemplate: channelMonitorTemplateHandler,
 		ContentModeration:      contentModerationHandler,
@@ -197,7 +201,7 @@ func ProvideHandlers(
 	passkeyHandler *PasskeyHandler,
 	paymentHandler *PaymentHandler,
 	paymentWebhookHandler *PaymentWebhookHandler,
-	availableChannelHandler *AvailableChannelHandler,
+	availablePlatformHandler *AvailablePlatformHandler,
 	modelPlazaHandler *ModelPlazaHandler,
 	asyncImageHandler *AsyncImageHandler,
 	batchImageHandler *BatchImageHandler,
@@ -205,26 +209,26 @@ func ProvideHandlers(
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
 	return &Handlers{
-		Auth:             authHandler,
-		User:             userHandler,
-		APIKey:           apiKeyHandler,
-		Usage:            usageHandler,
-		Redeem:           redeemHandler,
-		Subscription:     subscriptionHandler,
-		Announcement:     announcementHandler,
-		ChannelMonitor:   channelMonitorUserHandler,
-		Admin:            adminHandlers,
-		Gateway:          gatewayHandler,
-		OpenAIGateway:    openaiGatewayHandler,
-		Setting:          settingHandler,
-		Totp:             totpHandler,
-		Passkey:          passkeyHandler,
-		Payment:          paymentHandler,
-		PaymentWebhook:   paymentWebhookHandler,
-		AvailableChannel: availableChannelHandler,
-		ModelPlaza:       modelPlazaHandler,
-		AsyncImage:       asyncImageHandler,
-		BatchImage:       batchImageHandler,
+		Auth:              authHandler,
+		User:              userHandler,
+		APIKey:            apiKeyHandler,
+		Usage:             usageHandler,
+		Redeem:            redeemHandler,
+		Subscription:      subscriptionHandler,
+		Announcement:      announcementHandler,
+		ChannelMonitor:    channelMonitorUserHandler,
+		Admin:             adminHandlers,
+		Gateway:           gatewayHandler,
+		OpenAIGateway:     openaiGatewayHandler,
+		Setting:           settingHandler,
+		Totp:              totpHandler,
+		Passkey:           passkeyHandler,
+		Payment:           paymentHandler,
+		PaymentWebhook:    paymentWebhookHandler,
+		AvailablePlatform: availablePlatformHandler,
+		ModelPlaza:        modelPlazaHandler,
+		AsyncImage:        asyncImageHandler,
+		BatchImage:        batchImageHandler,
 	}
 }
 
@@ -246,16 +250,16 @@ var ProviderSet = wire.NewSet(
 	ProvideSettingHandler,
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,
-	NewAvailableChannelHandler,
-	NewModelPlazaHandler,
+	NewAvailablePlatformHandler,
+	ProvideModelPlazaHandler,
 	NewAsyncImageHandler,
 	ProvideBatchImageHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,
 	admin.NewUserHandler,
-	admin.NewGroupHandler,
 	ProvideAdminPlatformHandler,
+	ProvideAdminModelPricingHandler,
 	admin.ProvideAccountHandler,
 	admin.NewAnnouncementHandler,
 	admin.NewDataManagementHandler,
@@ -276,9 +280,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewUserAttributeHandler,
 	admin.NewErrorPassthroughHandler,
 	admin.NewTLSFingerprintProfileHandler,
-	admin.NewAdminAPIKeyHandler,
 	admin.NewScheduledTestHandler,
-	admin.NewChannelHandler,
 	admin.NewChannelMonitorHandler,
 	admin.NewChannelMonitorRequestTemplateHandler,
 	admin.NewContentModerationHandler,

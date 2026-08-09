@@ -33,8 +33,8 @@ type contentModerationConfigRequest struct {
 	ClearAPIKey          bool                `json:"clear_api_key"`
 	TimeoutMS            *int                `json:"timeout_ms"`
 	SampleRate           *int                `json:"sample_rate"`
-	AllGroups            *bool               `json:"all_groups"`
-	GroupIDs             *[]int64            `json:"group_ids"`
+	AllPlatforms         *bool               `json:"all_platforms"`
+	PlatformIDs          *[]int64            `json:"platform_ids"`
 	RecordNonHits        *bool               `json:"record_non_hits"`
 	Thresholds           *map[string]float64 `json:"thresholds"`
 	WorkerCount          *int                `json:"worker_count"`
@@ -99,8 +99,8 @@ func (h *ContentModerationHandler) UpdateConfig(c *gin.Context) {
 		ClearAPIKey:                    req.ClearAPIKey,
 		TimeoutMS:                      req.TimeoutMS,
 		SampleRate:                     req.SampleRate,
-		AllGroups:                      req.AllGroups,
-		GroupIDs:                       req.GroupIDs,
+		AllPlatforms:                   req.AllPlatforms,
+		PlatformIDs:                    req.PlatformIDs,
 		RecordNonHits:                  req.RecordNonHits,
 		Thresholds:                     req.Thresholds,
 		WorkerCount:                    req.WorkerCount,
@@ -170,13 +170,13 @@ func (h *ContentModerationHandler) ListLogs(c *gin.Context) {
 		Endpoint: c.Query("endpoint"),
 		Search:   c.Query("search"),
 	}
-	if raw := strings.TrimSpace(c.Query("group_id")); raw != "" {
-		groupID, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || groupID <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+	if raw := strings.TrimSpace(c.Query("platform_id")); raw != "" {
+		platformID, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || platformID <= 0 {
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &groupID
+		filter.PlatformID = &platformID
 	}
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
 		t, _, err := parseContentModerationDate(raw)

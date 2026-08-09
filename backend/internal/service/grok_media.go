@@ -280,7 +280,7 @@ func GrokMediaVideoRequestSessionHash(requestID string, userID, apiKeyID int64) 
 
 func (s *OpenAIGatewayService) BindGrokMediaVideoRequestAccount(
 	ctx context.Context,
-	groupID *int64,
+	platformID *int64,
 	requestID string,
 	userID, apiKeyID, accountID int64,
 ) error {
@@ -296,12 +296,12 @@ func (s *OpenAIGatewayService) BindGrokMediaVideoRequestAccount(
 	if s.cfg != nil && s.cfg.Gateway.OpenAIWS.StickySessionTTLSeconds > 0 {
 		ttl = time.Duration(s.cfg.Gateway.OpenAIWS.StickySessionTTLSeconds) * time.Second
 	}
-	return s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), cacheKey, accountID, ttl)
+	return s.cache.SetSessionAccountID(ctx, derefPlatformID(platformID), cacheKey, accountID, ttl)
 }
 
 func (s *OpenAIGatewayService) ResolveGrokMediaVideoRequestAccount(
 	ctx context.Context,
-	groupID *int64,
+	platformID *int64,
 	requestID string,
 	userID, apiKeyID int64,
 ) (int64, error) {
@@ -312,7 +312,7 @@ func (s *OpenAIGatewayService) ResolveGrokMediaVideoRequestAccount(
 	if cacheKey == "" {
 		return 0, fmt.Errorf("grok video request binding is invalid")
 	}
-	return s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), cacheKey)
+	return s.cache.GetSessionAccountID(ctx, derefPlatformID(platformID), cacheKey)
 }
 
 func (s *OpenAIGatewayService) ForwardGrokMedia(

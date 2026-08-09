@@ -115,7 +115,7 @@ func TestHandleSmartRetry_503_LongDelay_SingleAccountRetry_RetryInPlace(t *testi
 		body:         []byte(`{"input":"test"}`),
 		httpUpstream: upstream,
 		accountRepo:  repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -179,7 +179,7 @@ func TestHandleSmartRetry_503_LongDelay_NoSingleAccountRetry_StillSwitches(t *te
 		action:      "generateContent",
 		body:        []byte(`{"input":"test"}`),
 		accountRepo: repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -238,7 +238,7 @@ func TestHandleSmartRetry_429_LongDelay_SingleAccountRetry_StillSwitches(t *test
 		action:      "generateContent",
 		body:        []byte(`{"input":"test"}`),
 		accountRepo: repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -320,7 +320,7 @@ func TestHandleSmartRetry_503_ShortDelay_SingleAccountRetry_NoRateLimit(t *testi
 		body:         []byte(`{"input":"test"}`),
 		httpUpstream: upstream,
 		accountRepo:  repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -399,7 +399,7 @@ func TestHandleSmartRetry_503_ShortDelay_NoSingleAccountRetry_SetsRateLimit(t *t
 		body:         []byte(`{"input":"test"}`),
 		httpUpstream: upstream,
 		accountRepo:  repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	}
@@ -710,7 +710,7 @@ func TestAntigravityRetryLoop_PreCheck_SingleAccountRetry_SkipsRateLimit(t *test
 		body:           []byte(`{"input":"test"}`),
 		httpUpstream:   upstream,
 		requestedModel: "claude-sonnet-4-5",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})
@@ -754,7 +754,7 @@ func TestAntigravityRetryLoop_PreCheck_NoSingleAccountRetry_SwitchesOnRateLimit(
 		body:           []byte(`{"input":"test"}`),
 		httpUpstream:   upstream,
 		requestedModel: "claude-sonnet-4-5",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})
@@ -895,7 +895,7 @@ func TestAntigravityRetryLoop_503_SingleAccount_InPlaceRetryUsed_E2E(t *testing.
 		body:         []byte(`{"input":"test"}`),
 		httpUpstream: upstream,
 		accountRepo:  repo,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})

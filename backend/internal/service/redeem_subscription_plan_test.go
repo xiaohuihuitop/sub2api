@@ -15,7 +15,6 @@ func TestApplySubscriptionPlanToRedeemCodeCapturesImmutableTerms(t *testing.T) {
 	monthlyLimit := 260.0
 	plan := &dbent.SubscriptionPlan{
 		ID:              15,
-		GroupID:         6,
 		Name:            "Professional",
 		ValidityDays:    2,
 		ValidityUnit:    "weeks",
@@ -28,7 +27,6 @@ func TestApplySubscriptionPlanToRedeemCodeCapturesImmutableTerms(t *testing.T) {
 
 	require.NoError(t, applySubscriptionPlanToRedeemCode(code, plan))
 	require.Equal(t, int64(15), *code.SubscriptionPlanID)
-	require.Nil(t, code.GroupID)
 	require.Equal(t, 14, code.ValidityDays)
 	require.Equal(t, "Professional", code.PlanNameSnapshot)
 	require.Equal(t, 18.0, *code.DailyLimitUSDSnapshot)
@@ -95,7 +93,6 @@ func TestGenerateRedeemCodesFromPlanCapturesPlanSnapshot(t *testing.T) {
 	require.Len(t, codes, 1)
 	require.Len(t, repo.created, 1)
 	require.Equal(t, plan.ID, *codes[0].SubscriptionPlanID)
-	require.Nil(t, codes[0].GroupID)
 	require.Equal(t, "Professional", codes[0].PlanNameSnapshot)
 	require.Equal(t, dailyLimit, *codes[0].DailyLimitUSDSnapshot)
 	require.Equal(t, 1.25, codes[0].RateMultiplierSnapshot)
@@ -122,7 +119,7 @@ func TestRedeemSubscriptionCodeCreatesNewSnapshotInstance(t *testing.T) {
 		},
 	}}
 	subscriptionRepo := newSubscriptionUserSubRepoStub()
-	subscriptionService := NewSubscriptionService(groupRepoNoop{}, subscriptionRepo, nil, nil, nil)
+	subscriptionService := NewSubscriptionService(subscriptionRepo, nil, nil, nil)
 	redeemService := NewRedeemService(
 		redeemRepo,
 		&userRepoStub{user: &User{ID: 42}},
@@ -140,7 +137,6 @@ func TestRedeemSubscriptionCodeCreatesNewSnapshotInstance(t *testing.T) {
 	require.Equal(t, 1, subscriptionRepo.createCalls)
 	created, err := subscriptionRepo.GetByID(ctx, 1)
 	require.NoError(t, err)
-	require.Zero(t, created.GroupID)
 	require.Equal(t, int64(15), *created.SubscriptionPlanID)
 	require.Equal(t, "Professional", created.PlanNameSnapshot)
 	require.Equal(t, dailyLimit, *created.DailyLimitUSDSnapshot)
@@ -164,7 +160,6 @@ func TestSubscriptionFromRedeemCodeCreatesIndependentSnapshot(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, int64(42), subscription.UserID)
-	require.Zero(t, subscription.GroupID)
 	require.Equal(t, int64(15), *subscription.SubscriptionPlanID)
 	require.Equal(t, "Professional", subscription.PlanNameSnapshot)
 	require.Equal(t, 18.0, *subscription.DailyLimitUSDSnapshot)

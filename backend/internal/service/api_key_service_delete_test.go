@@ -154,15 +154,6 @@ func filterAPIKeyStubKeys(userID int64, keys []APIKey, filters APIKeyListFilters
 		if filters.Status != "" && key.Status != filters.Status {
 			continue
 		}
-		if filters.GroupID != nil {
-			if *filters.GroupID == 0 {
-				if key.GroupID != nil {
-					continue
-				}
-			} else if key.GroupID == nil || *key.GroupID != *filters.GroupID {
-				continue
-			}
-		}
 		result = append(result, key)
 	}
 	return result
@@ -180,31 +171,31 @@ func (s *apiKeyRepoStub) ExistsByKey(ctx context.Context, key string) (bool, err
 	panic("unexpected ExistsByKey call")
 }
 
-func (s *apiKeyRepoStub) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]APIKey, *pagination.PaginationResult, error) {
-	panic("unexpected ListByGroupID call")
+func (s *apiKeyRepoStub) ListByPlatformID(ctx context.Context, platformID int64, params pagination.PaginationParams) ([]APIKey, *pagination.PaginationResult, error) {
+	panic("unexpected ListByPlatformID call")
 }
 
 func (s *apiKeyRepoStub) SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error) {
 	panic("unexpected SearchAPIKeys call")
 }
 
-func (s *apiKeyRepoStub) ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	panic("unexpected ClearGroupIDByGroupID call")
+func (s *apiKeyRepoStub) ClearPlatformIDByPlatformID(ctx context.Context, platformID int64) (int64, error) {
+	panic("unexpected ClearPlatformIDByPlatformID call")
 }
-func (s *apiKeyRepoStub) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
-	panic("unexpected UpdateGroupIDByUserAndGroup call")
+func (s *apiKeyRepoStub) UpdatePlatformIDByUserAndGroup(ctx context.Context, userID, oldPlatformID, newPlatformID int64) (int64, error) {
+	panic("unexpected UpdatePlatformIDByUserAndGroup call")
 }
 
-func (s *apiKeyRepoStub) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	panic("unexpected CountByGroupID call")
+func (s *apiKeyRepoStub) CountByPlatformID(ctx context.Context, platformID int64) (int64, error) {
+	panic("unexpected CountByPlatformID call")
 }
 
 func (s *apiKeyRepoStub) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
 	panic("unexpected ListKeysByUserID call")
 }
 
-func (s *apiKeyRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
-	panic("unexpected ListKeysByGroupID call")
+func (s *apiKeyRepoStub) ListKeysByPlatformID(ctx context.Context, platformID int64) ([]string, error) {
+	panic("unexpected ListKeysByPlatformID call")
 }
 
 func (s *apiKeyRepoStub) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {
@@ -374,21 +365,19 @@ func TestAPIKeyService_List_FillsCurrentConcurrency(t *testing.T) {
 }
 
 func TestAPIKeyService_List_SortByCurrentConcurrency(t *testing.T) {
-	groupID := int64(42)
 	keys := []APIKey{
-		{ID: 1, UserID: 7, Key: "sk-target-1", Name: "target-one", GroupID: &groupID, Status: StatusActive},
-		{ID: 2, UserID: 7, Key: "sk-target-2", Name: "target-two", GroupID: &groupID, Status: StatusActive},
-		{ID: 3, UserID: 7, Key: "sk-target-3", Name: "target-three", GroupID: &groupID, Status: StatusActive},
-		{ID: 4, UserID: 7, Key: "sk-target-4", Name: "target-four", GroupID: &groupID, Status: StatusActive},
-		{ID: 9, UserID: 7, Key: "sk-target-9", Name: "target-inactive", GroupID: &groupID, Status: StatusDisabled},
-		{ID: 10, UserID: 7, Key: "sk-other-10", Name: "other", GroupID: &groupID, Status: StatusActive},
-		{ID: 11, UserID: 7, Key: "sk-target-11", Name: "target-no-group", Status: StatusActive},
-		{ID: 12, UserID: 8, Key: "sk-target-12", Name: "target-other-user", GroupID: &groupID, Status: StatusActive},
+		{ID: 1, UserID: 7, Key: "sk-target-1", Name: "target-one", Status: StatusActive},
+		{ID: 2, UserID: 7, Key: "sk-target-2", Name: "target-two", Status: StatusActive},
+		{ID: 3, UserID: 7, Key: "sk-target-3", Name: "target-three", Status: StatusActive},
+		{ID: 4, UserID: 7, Key: "sk-target-4", Name: "target-four", Status: StatusActive},
+		{ID: 9, UserID: 7, Key: "sk-target-9", Name: "target-inactive", Status: StatusDisabled},
+		{ID: 10, UserID: 7, Key: "sk-other-10", Name: "other", Status: StatusActive},
+		{ID: 11, UserID: 7, Key: "sk-target-11", Name: "target-five", Status: StatusActive},
+		{ID: 12, UserID: 8, Key: "sk-target-12", Name: "target-other-user", Status: StatusActive},
 	}
 	filters := APIKeyListFilters{
-		Search:  "target",
-		Status:  StatusActive,
-		GroupID: &groupID,
+		Search: "target",
+		Status: StatusActive,
 	}
 	repo := &apiKeyRepoStub{
 		allowListAllByUserID: true,
@@ -415,18 +404,16 @@ func TestAPIKeyService_List_SortByCurrentConcurrency(t *testing.T) {
 		SortOrder: "desc",
 	}, filters)
 	require.NoError(t, err)
-	require.Equal(t, []int64{1, 3}, apiKeyTestIDs(got))
-	require.Equal(t, int64(4), page.Total)
+	require.Equal(t, []int64{2, 1}, apiKeyTestIDs(got))
+	require.Equal(t, int64(5), page.Total)
 	require.Equal(t, 2, page.Page)
 	require.Equal(t, 2, page.PageSize)
-	require.Equal(t, 2, page.Pages)
+	require.Equal(t, 3, page.Pages)
 	require.Empty(t, repo.listByUserIDCalls)
 	require.Equal(t, []int64{7}, repo.listAllByUserIDCalls)
 	require.Len(t, repo.listAllByUserIDFilters, 1)
 	require.Equal(t, filters.Search, repo.listAllByUserIDFilters[0].Search)
 	require.Equal(t, filters.Status, repo.listAllByUserIDFilters[0].Status)
-	require.NotNil(t, repo.listAllByUserIDFilters[0].GroupID)
-	require.Equal(t, groupID, *repo.listAllByUserIDFilters[0].GroupID)
 }
 
 func TestAPIKeyService_List_SortByCurrentConcurrencyAscTiesByID(t *testing.T) {

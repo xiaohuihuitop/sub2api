@@ -22,9 +22,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/cespare/xxhash/v2"
-	gocache "github.com/patrickmn/go-cache"
 	"github.com/tidwall/gjson"
-	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -54,8 +52,6 @@ IMPORTANT: You must NEVER generate or guess URLs for the user unless you are con
  - Do not use a colon before tool calls. Your tool calls may not be shown directly in the output, so text like "Let me read the file:" followed by a read tool call should just be "Let me read the file." with a period.`
 	maxCacheControlBlocks = 4 // Anthropic API 允许的最大 cache_control 块数量
 
-	defaultUserGroupRateCacheTTL           = 30 * time.Second
-	defaultModelsListCacheTTL              = 15 * time.Second
 	postUsageBillingTimeout                = 15 * time.Second
 	claudeCodeNoopDeltaKeepaliveMinVersion = "2.1.193"
 	debugGatewayBodyEnv                    = "SUB2API_DEBUG_GATEWAY_BODY"
@@ -91,16 +87,6 @@ var (
 	windowCostPrefetchFallbackTotal  atomic.Int64
 	windowCostPrefetchErrorTotal     atomic.Int64
 
-	userGroupRateCacheHitTotal      atomic.Int64
-	userGroupRateCacheMissTotal     atomic.Int64
-	userGroupRateCacheLoadTotal     atomic.Int64
-	userGroupRateCacheSFSharedTotal atomic.Int64
-	userGroupRateCacheFallbackTotal atomic.Int64
-
-	modelsListCacheHitTotal   atomic.Int64
-	modelsListCacheMissTotal  atomic.Int64
-	modelsListCacheStoreTotal atomic.Int64
-
 	// Deprecated: flusher_enabled=true 后不再增长(仅 flag=false 降级直写路径使用);新主路径见 FlusherMetrics。remove after 2026-09。
 	// userPlatformQuotaDBIncrErrorTotal 统计 finalizePostUsageBilling 异步 goroutine
 	// 中 IncrementUsageWithReset 失败次数。Redis 已成功累加 + DB 写失败意味着
@@ -123,18 +109,6 @@ func GatewayWindowCostPrefetchStats() (cacheHit, cacheMiss, batchSQL, fallback, 
 		windowCostPrefetchBatchSQLTotal.Load(),
 		windowCostPrefetchFallbackTotal.Load(),
 		windowCostPrefetchErrorTotal.Load()
-}
-
-func GatewayUserGroupRateCacheStats() (cacheHit, cacheMiss, load, singleflightShared, fallback int64) {
-	return userGroupRateCacheHitTotal.Load(),
-		userGroupRateCacheMissTotal.Load(),
-		userGroupRateCacheLoadTotal.Load(),
-		userGroupRateCacheSFSharedTotal.Load(),
-		userGroupRateCacheFallbackTotal.Load()
-}
-
-func GatewayModelsListCacheStats() (cacheHit, cacheMiss, store int64) {
-	return modelsListCacheHitTotal.Load(), modelsListCacheMissTotal.Load(), modelsListCacheStoreTotal.Load()
 }
 
 // GatewayUserPlatformQuotaIncrStats 返回 (mainPathErr, legacyPathErr, sentinelSetErr)。
@@ -209,15 +183,6 @@ func anthropicStreamEventIsTerminal(eventName, data string) bool {
 		return true
 	}
 	return gjson.Get(trimmed, "type").String() == "message_stop"
-}
-
-func cloneStringSlice(src []string) []string {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make([]string, len(src))
-	copy(dst, src)
-	return dst
 }
 
 // IsForceCacheBilling 检查是否启用强制缓存计费
@@ -416,9 +381,6 @@ var (
 // ErrNoAvailableAccounts 表示没有可用的账号
 var ErrNoAvailableAccounts = errors.New("no available accounts")
 
-// ErrClaudeCodeOnly 表示分组仅允许 Claude Code 客户端访问
-var ErrClaudeCodeOnly = errors.New("this group only allows Claude Code clients")
-
 // allowedHeaders 白名单headers（参考CRS项目）
 var allowedHeaders = map[string]bool{
 	"accept":                                    true,
@@ -452,51 +414,33 @@ var allowedHeaders = map[string]bool{
 type GatewayCache interface {
 	// GetSessionAccountID 获取粘性会话绑定的账号 ID
 	// Get the account ID bound to a sticky session
-	GetSessionAccountID(ctx context.Context, groupID int64, sessionHash string) (int64, error)
+	GetSessionAccountID(ctx context.Context, platformID int64, sessionHash string) (int64, error)
 	// SetSessionAccountID 设置粘性会话与账号的绑定关系
 	// Set the binding between sticky session and account
-	SetSessionAccountID(ctx context.Context, groupID int64, sessionHash string, accountID int64, ttl time.Duration) error
+	SetSessionAccountID(ctx context.Context, platformID int64, sessionHash string, accountID int64, ttl time.Duration) error
 	// RefreshSessionTTL 刷新粘性会话的过期时间
 	// Refresh the expiration time of a sticky session
-	RefreshSessionTTL(ctx context.Context, groupID int64, sessionHash string, ttl time.Duration) error
+	RefreshSessionTTL(ctx context.Context, platformID int64, sessionHash string, ttl time.Duration) error
 	// DeleteSessionAccountID 删除粘性会话绑定，用于账号不可用时主动清理
 	// Delete sticky session binding, used to proactively clean up when account becomes unavailable
-	DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error
+	DeleteSessionAccountID(ctx context.Context, platformID int64, sessionHash string) error
 }
 
-// derefGroupID safely dereferences *int64 to int64, returning 0 if nil
-func derefGroupID(groupID *int64) int64 {
-	if groupID == nil {
+// derefPlatformID safely dereferences *int64 to int64, returning 0 if nil
+func derefPlatformID(platformID *int64) int64 {
+	if platformID == nil {
 		return 0
 	}
-	return *groupID
+	return *platformID
 }
 
-func resolveUserGroupRateCacheTTL(cfg *config.Config) time.Duration {
-	if cfg == nil || cfg.Gateway.UserGroupRateCacheTTLSeconds <= 0 {
-		return defaultUserGroupRateCacheTTL
-	}
-	return time.Duration(cfg.Gateway.UserGroupRateCacheTTLSeconds) * time.Second
+func prefetchedStickyPlatformNamespaceIDFromContext(ctx context.Context) (int64, bool) {
+	return PrefetchedStickyPlatformNamespaceIDFromContext(ctx)
 }
 
-func resolveModelsListCacheTTL(cfg *config.Config) time.Duration {
-	if cfg == nil || cfg.Gateway.ModelsListCacheTTLSeconds <= 0 {
-		return defaultModelsListCacheTTL
-	}
-	return time.Duration(cfg.Gateway.ModelsListCacheTTLSeconds) * time.Second
-}
-
-func modelsListCacheKey(groupID *int64, platform string) string {
-	return fmt.Sprintf("%d|%s", derefGroupID(groupID), strings.TrimSpace(platform))
-}
-
-func prefetchedStickyGroupIDFromContext(ctx context.Context) (int64, bool) {
-	return PrefetchedStickyGroupIDFromContext(ctx)
-}
-
-func prefetchedStickyAccountIDFromContext(ctx context.Context, groupID *int64) int64 {
-	prefetchedGroupID, ok := prefetchedStickyGroupIDFromContext(ctx)
-	if !ok || prefetchedGroupID != derefGroupID(groupID) {
+func prefetchedStickyAccountIDFromContext(ctx context.Context, platformID *int64) int64 {
+	prefetchedPlatformNamespaceID, ok := prefetchedStickyPlatformNamespaceIDFromContext(ctx)
+	if !ok || prefetchedPlatformNamespaceID != derefPlatformID(platformID) {
 		return 0
 	}
 	if accountID, ok := PrefetchedStickyAccountIDFromContext(ctx); ok && accountID > 0 {
@@ -677,12 +621,10 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 // GatewayService handles API gateway operations
 type GatewayService struct {
 	accountRepo           AccountRepository
-	groupRepo             GroupRepository
 	usageLogRepo          UsageLogRepository
 	usageBillingRepo      UsageBillingRepository
 	userRepo              UserRepository
 	userSubRepo           UserSubscriptionRepository
-	userGroupRateRepo     UserGroupRateRepository
 	cache                 GatewayCache
 	digestStore           *DigestSessionStore
 	cfg                   *config.Config
@@ -697,18 +639,11 @@ type GatewayService struct {
 	claudeTokenProvider   *ClaudeTokenProvider
 	sessionLimitCache     SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
 	rpmCache              RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
-	userGroupRateResolver *userGroupRateResolver
-	userGroupRateCache    *gocache.Cache
-	userGroupRateSF       singleflight.Group
-	modelsListCache       *gocache.Cache
-	modelsListCacheTTL    time.Duration
 	settingService        *SettingService
 	responseHeaderFilter  *responseheaders.CompiledHeaderFilter
 	debugModelRouting     atomic.Bool
 	debugClaudeMimic      atomic.Bool
-	channelService        *ChannelService
 	resolver              *ModelPricingResolver
-	compositeResolver     *CompositeRouteResolver
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
@@ -718,12 +653,10 @@ type GatewayService struct {
 // NewGatewayService creates a new GatewayService
 func NewGatewayService(
 	accountRepo AccountRepository,
-	groupRepo GroupRepository,
 	usageLogRepo UsageLogRepository,
 	usageBillingRepo UsageBillingRepository,
 	userRepo UserRepository,
 	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
@@ -740,23 +673,16 @@ func NewGatewayService(
 	digestStore *DigestSessionStore,
 	settingService *SettingService,
 	tlsFPProfileService *TLSFingerprintProfileService,
-	channelService *ChannelService,
 	resolver *ModelPricingResolver,
-	compositeResolver *CompositeRouteResolver,
 	balanceNotifyService *BalanceNotifyService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *GatewayService {
-	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
-	modelsListTTL := resolveModelsListCacheTTL(cfg)
-
 	svc := &GatewayService{
 		accountRepo:           accountRepo,
-		groupRepo:             groupRepo,
 		usageLogRepo:          usageLogRepo,
 		usageBillingRepo:      usageBillingRepo,
 		userRepo:              userRepo,
 		userSubRepo:           userSubRepo,
-		userGroupRateRepo:     userGroupRateRepo,
 		cache:                 cache,
 		digestStore:           digestStore,
 		cfg:                   cfg,
@@ -771,25 +697,13 @@ func NewGatewayService(
 		claudeTokenProvider:   claudeTokenProvider,
 		sessionLimitCache:     sessionLimitCache,
 		rpmCache:              rpmCache,
-		userGroupRateCache:    gocache.New(userGroupRateTTL, time.Minute),
 		settingService:        settingService,
-		modelsListCache:       gocache.New(modelsListTTL, time.Minute),
-		modelsListCacheTTL:    modelsListTTL,
 		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
 		tlsFPProfileService:   tlsFPProfileService,
-		channelService:        channelService,
 		resolver:              resolver,
-		compositeResolver:     compositeResolver,
 		balanceNotifyService:  balanceNotifyService,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
 	}
-	svc.userGroupRateResolver = newUserGroupRateResolver(
-		userGroupRateRepo,
-		svc.userGroupRateCache,
-		userGroupRateTTL,
-		&svc.userGroupRateSF,
-		"service.gateway",
-	)
 	svc.debugModelRouting.Store(parseDebugEnvBool(os.Getenv("SUB2API_DEBUG_MODEL_ROUTING")))
 	svc.debugClaudeMimic.Store(parseDebugEnvBool(os.Getenv("SUB2API_DEBUG_CLAUDE_MIMIC")))
 	if path := strings.TrimSpace(os.Getenv(debugGatewayBodyEnv)); path != "" {
@@ -866,20 +780,20 @@ func (s *GatewayService) GenerateSessionHash(parsed *ParsedRequest) string {
 }
 
 // BindStickySession sets session -> account binding with standard TTL.
-func (s *GatewayService) BindStickySession(ctx context.Context, groupID *int64, sessionHash string, accountID int64) error {
+func (s *GatewayService) BindStickySession(ctx context.Context, platformID *int64, sessionHash string, accountID int64) error {
 	if sessionHash == "" || accountID <= 0 || s.cache == nil {
 		return nil
 	}
-	return s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
+	return s.cache.SetSessionAccountID(ctx, derefPlatformID(platformID), sessionHash, accountID, stickySessionTTL)
 }
 
 // GetCachedSessionAccountID retrieves the account ID bound to a sticky session.
 // Returns 0 if no binding exists or on error.
-func (s *GatewayService) GetCachedSessionAccountID(ctx context.Context, groupID *int64, sessionHash string) (int64, error) {
+func (s *GatewayService) GetCachedSessionAccountID(ctx context.Context, platformID *int64, sessionHash string) (int64, error) {
 	if sessionHash == "" || s.cache == nil {
 		return 0, nil
 	}
-	accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
+	accountID, err := s.cache.GetSessionAccountID(ctx, derefPlatformID(platformID), sessionHash)
 	if err != nil {
 		return 0, err
 	}
@@ -888,36 +802,36 @@ func (s *GatewayService) GetCachedSessionAccountID(ctx context.Context, groupID 
 
 // FindGeminiSession 查找 Gemini 会话（基于内容摘要链的 Fallback 匹配）
 // 返回最长匹配的会话信息（uuid, accountID）
-func (s *GatewayService) FindGeminiSession(_ context.Context, groupID int64, prefixHash, digestChain string) (uuid string, accountID int64, matchedChain string, found bool) {
+func (s *GatewayService) FindGeminiSession(_ context.Context, platformID int64, prefixHash, digestChain string) (uuid string, accountID int64, matchedChain string, found bool) {
 	if digestChain == "" || s.digestStore == nil {
 		return "", 0, "", false
 	}
-	return s.digestStore.Find(groupID, prefixHash, digestChain)
+	return s.digestStore.Find(platformID, prefixHash, digestChain)
 }
 
 // SaveGeminiSession 保存 Gemini 会话。oldDigestChain 为 Find 返回的 matchedChain，用于删旧 key。
-func (s *GatewayService) SaveGeminiSession(_ context.Context, groupID int64, prefixHash, digestChain, uuid string, accountID int64, oldDigestChain string) error {
+func (s *GatewayService) SaveGeminiSession(_ context.Context, platformID int64, prefixHash, digestChain, uuid string, accountID int64, oldDigestChain string) error {
 	if digestChain == "" || s.digestStore == nil {
 		return nil
 	}
-	s.digestStore.Save(groupID, prefixHash, digestChain, uuid, accountID, oldDigestChain)
+	s.digestStore.Save(platformID, prefixHash, digestChain, uuid, accountID, oldDigestChain)
 	return nil
 }
 
 // FindAnthropicSession 查找 Anthropic 会话（基于内容摘要链的 Fallback 匹配）
-func (s *GatewayService) FindAnthropicSession(_ context.Context, groupID int64, prefixHash, digestChain string) (uuid string, accountID int64, matchedChain string, found bool) {
+func (s *GatewayService) FindAnthropicSession(_ context.Context, platformID int64, prefixHash, digestChain string) (uuid string, accountID int64, matchedChain string, found bool) {
 	if digestChain == "" || s.digestStore == nil {
 		return "", 0, "", false
 	}
-	return s.digestStore.Find(groupID, prefixHash, digestChain)
+	return s.digestStore.Find(platformID, prefixHash, digestChain)
 }
 
 // SaveAnthropicSession 保存 Anthropic 会话
-func (s *GatewayService) SaveAnthropicSession(_ context.Context, groupID int64, prefixHash, digestChain, uuid string, accountID int64, oldDigestChain string) error {
+func (s *GatewayService) SaveAnthropicSession(_ context.Context, platformID int64, prefixHash, digestChain, uuid string, accountID int64, oldDigestChain string) error {
 	if digestChain == "" || s.digestStore == nil {
 		return nil
 	}
-	s.digestStore.Save(groupID, prefixHash, digestChain, uuid, accountID, oldDigestChain)
+	s.digestStore.Save(platformID, prefixHash, digestChain, uuid, accountID, oldDigestChain)
 	return nil
 }
 
@@ -1167,141 +1081,6 @@ func (s *GatewayService) getOAuthToken(ctx context.Context, account *Account) (s
 	}
 	// Token刷新由后台 TokenRefreshService 处理，此处只返回当前token
 	return accessToken, "oauth", nil
-}
-
-// GetAvailableModels returns the list of models available for a group
-// It aggregates model_mapping keys from all schedulable accounts in the group
-func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64, platform string) []string {
-	cacheKey := modelsListCacheKey(groupID, platform)
-	if s.modelsListCache != nil {
-		if cached, found := s.modelsListCache.Get(cacheKey); found {
-			if models, ok := cached.([]string); ok {
-				modelsListCacheHitTotal.Add(1)
-				return cloneStringSlice(models)
-			}
-		}
-	}
-	modelsListCacheMissTotal.Add(1)
-
-	var accounts []Account
-	var err error
-
-	if groupID != nil {
-		accounts, err = s.accountRepo.ListSchedulableByGroupID(ctx, *groupID)
-	} else {
-		accounts, err = s.accountRepo.ListSchedulable(ctx)
-	}
-
-	if err != nil || len(accounts) == 0 {
-		return nil
-	}
-
-	// Filter by platform if specified
-	if platform != "" {
-		filtered := make([]Account, 0)
-		for _, acc := range accounts {
-			if acc.Platform == platform {
-				filtered = append(filtered, acc)
-			}
-		}
-		accounts = filtered
-	}
-
-	// Collect unique models from all accounts
-	modelSet := make(map[string]struct{})
-	hasAnyMapping := false
-
-	for _, acc := range accounts {
-		mapping := acc.GetModelMapping()
-		if len(mapping) > 0 {
-			hasAnyMapping = true
-			for model := range mapping {
-				modelSet[model] = struct{}{}
-			}
-		}
-	}
-
-	// If no account has model_mapping, return nil (use default)
-	if !hasAnyMapping {
-		if s.modelsListCache != nil {
-			s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
-			modelsListCacheStoreTotal.Add(1)
-		}
-		return nil
-	}
-
-	// Convert to slice
-	models := make([]string, 0, len(modelSet))
-	for model := range modelSet {
-		models = append(models, model)
-	}
-	sort.Strings(models)
-
-	if s.modelsListCache != nil {
-		s.modelsListCache.Set(cacheKey, cloneStringSlice(models), s.modelsListCacheTTL)
-		modelsListCacheStoreTotal.Add(1)
-	}
-	return cloneStringSlice(models)
-}
-
-// GetSchedulablePlatforms returns the concrete platforms that currently have
-// schedulable accounts in the target group.
-func (s *GatewayService) GetSchedulablePlatforms(ctx context.Context, groupID *int64) map[string]struct{} {
-	platforms := make(map[string]struct{})
-	if s == nil || s.accountRepo == nil {
-		return platforms
-	}
-
-	var accounts []Account
-	var err error
-	if groupID != nil {
-		accounts, err = s.accountRepo.ListSchedulableByGroupID(ctx, *groupID)
-	} else {
-		accounts, err = s.accountRepo.ListSchedulable(ctx)
-	}
-	if err != nil {
-		return platforms
-	}
-
-	for _, acc := range accounts {
-		platform := strings.TrimSpace(acc.Platform)
-		if platform != "" {
-			platforms[platform] = struct{}{}
-		}
-	}
-	return platforms
-}
-
-func (s *GatewayService) InvalidateAvailableModelsCache(groupID *int64, platform string) {
-	if s == nil || s.modelsListCache == nil {
-		return
-	}
-
-	normalizedPlatform := strings.TrimSpace(platform)
-	// 完整匹配时精准失效；否则按维度批量失效。
-	if groupID != nil && normalizedPlatform != "" {
-		s.modelsListCache.Delete(modelsListCacheKey(groupID, normalizedPlatform))
-		return
-	}
-
-	targetGroup := derefGroupID(groupID)
-	for key := range s.modelsListCache.Items() {
-		parts := strings.SplitN(key, "|", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		groupPart, parseErr := strconv.ParseInt(parts[0], 10, 64)
-		if parseErr != nil {
-			continue
-		}
-		if groupID != nil && groupPart != targetGroup {
-			continue
-		}
-		if normalizedPlatform != "" && parts[1] != normalizedPlatform {
-			continue
-		}
-		s.modelsListCache.Delete(key)
-	}
 }
 
 const debugGatewayBodyDefaultFilename = "gateway_debug.log"

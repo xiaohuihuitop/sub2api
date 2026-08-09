@@ -82,13 +82,6 @@ type AuthService struct {
 }
 
 type DefaultSubscriptionAssigner interface {
-	AssignOrExtendSubscription(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error)
-}
-
-// DefaultSubscriptionPlanAssigner is implemented by SubscriptionService for
-// plan-backed defaults. It intentionally stays separate from the legacy
-// group-and-days assigner so older injected test doubles remain compatible.
-type DefaultSubscriptionPlanAssigner interface {
 	AssignSubscriptionFromPlan(ctx context.Context, input *AssignSubscriptionFromPlanInput) (*UserSubscription, error)
 }
 
@@ -802,30 +795,19 @@ func (s *AuthService) assignSubscriptions(ctx context.Context, userID int64, ite
 	}
 	for _, item := range items {
 		if err := assignDefaultSubscription(ctx, s.defaultSubAssigner, userID, item, notes); err != nil {
-			logger.LegacyPrintf("service.auth", "[Auth] Failed to assign default subscription: user_id=%d plan_id=%d group_id=%d err=%v", userID, item.PlanID, item.GroupID, err)
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to assign default subscription: user_id=%d plan_id=%d err=%v", userID, item.PlanID, err)
 		}
 	}
 }
 
 func assignDefaultSubscription(ctx context.Context, assigner DefaultSubscriptionAssigner, userID int64, item DefaultSubscriptionSetting, notes string) error {
-	if item.PlanID > 0 {
-		planAssigner, ok := assigner.(DefaultSubscriptionPlanAssigner)
-		if !ok {
-			return errors.New("default subscription plan assignment is unavailable")
-		}
-		_, err := planAssigner.AssignSubscriptionFromPlan(ctx, &AssignSubscriptionFromPlanInput{
-			UserID: userID,
-			PlanID: item.PlanID,
-			Notes:  notes,
-		})
-		return err
+	if assigner == nil || item.PlanID <= 0 {
+		return ErrSubscriptionPlanInvalid
 	}
-
-	_, _, err := assigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
-		UserID:       userID,
-		GroupID:      item.GroupID,
-		ValidityDays: item.ValidityDays,
-		Notes:        notes,
+	_, err := assigner.AssignSubscriptionFromPlan(ctx, &AssignSubscriptionFromPlanInput{
+		UserID: userID,
+		PlanID: item.PlanID,
+		Notes:  notes,
 	})
 	return err
 }

@@ -111,12 +111,6 @@ func (s *userHandlerRepoStub) ExistsByEmail(context.Context, string) (bool, erro
 func (s *userHandlerRepoStub) ExistsByEmailAlias(context.Context, string) (bool, error) {
 	return false, nil
 }
-func (s *userHandlerRepoStub) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
-	return 0, nil
-}
-func (s *userHandlerRepoStub) AddGroupToAllowedGroups(context.Context, int64, int64) error {
-	return nil
-}
 func (s *userHandlerRepoStub) GetLatestUsedAtByUserIDs(context.Context, []int64) (map[int64]*time.Time, error) {
 	return map[int64]*time.Time{}, nil
 }
@@ -127,9 +121,6 @@ func (s *userHandlerRepoStub) UpdateUserLastActiveAt(_ context.Context, _ int64,
 	if s.user != nil {
 		s.user.LastActiveAt = &activeAt
 	}
-	return nil
-}
-func (s *userHandlerRepoStub) RemoveGroupFromUserAllowedGroups(context.Context, int64, int64) error {
 	return nil
 }
 func (s *userHandlerRepoStub) UpdateTotpSecret(context.Context, int64, *string) error { return nil }

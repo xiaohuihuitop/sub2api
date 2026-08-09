@@ -216,16 +216,11 @@ func (m *mockUserRepo) ExistsByEmail(context.Context, string) (bool, error) { re
 func (m *mockUserRepo) ExistsByEmailAlias(context.Context, string) (bool, error) {
 	return false, nil
 }
-func (m *mockUserRepo) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
-	return 0, nil
-}
-
 func (m *mockUserRepo) BatchSetConcurrency(context.Context, []int64, int) (int, error) { return 0, nil }
 func (m *mockUserRepo) BatchAddConcurrency(context.Context, []int64, int) (int, error) { return 0, nil }
 func (m *mockUserRepo) BatchUpdateLimits(context.Context, []int64, *int, *int) (int, error) {
 	return 0, nil
 }
-func (m *mockUserRepo) AddGroupToAllowedGroups(context.Context, int64, int64) error { return nil }
 func (m *mockUserRepo) ListUserAuthIdentities(context.Context, int64) ([]UserAuthIdentityRecord, error) {
 	out := make([]UserAuthIdentityRecord, len(m.identities))
 	copy(out, m.identities)
@@ -240,9 +235,6 @@ func (m *mockUserRepo) GetLatestUsedAtByUserID(context.Context, int64) (*time.Ti
 func (m *mockUserRepo) UpdateTotpSecret(context.Context, int64, *string) error { return nil }
 func (m *mockUserRepo) EnableTotp(context.Context, int64) error                { return nil }
 func (m *mockUserRepo) DisableTotp(context.Context, int64) error               { return nil }
-func (m *mockUserRepo) RemoveGroupFromUserAllowedGroups(context.Context, int64, int64) error {
-	return nil
-}
 func (m *mockUserRepo) UnbindUserAuthProvider(_ context.Context, _ int64, provider string) error {
 	if m.unbindIdentityErr != nil {
 		return m.unbindIdentityErr
@@ -291,7 +283,7 @@ type mockAuthCacheInvalidator struct {
 }
 
 func (m *mockAuthCacheInvalidator) InvalidateAuthCacheByKey(context.Context, string)    {}
-func (m *mockAuthCacheInvalidator) InvalidateAuthCacheByGroupID(context.Context, int64) {}
+func (m *mockAuthCacheInvalidator) InvalidateAuthCacheByPlatformID(context.Context, int64) {}
 func (m *mockAuthCacheInvalidator) InvalidateAuthCacheByUserID(_ context.Context, userID int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -14,28 +14,28 @@ const (
 )
 
 type opsAccountStatsRepository interface {
-	ListOpsAccountsForStats(ctx context.Context, platformFilter string, groupIDFilter *int64) ([]Account, error)
+	ListOpsAccountsForStats(ctx context.Context, platformFilter string, platformIDFilter *int64) ([]Account, error)
 }
 
-func (s *OpsService) listAllAccountsForOps(ctx context.Context, platformFilter string, groupIDFilter *int64) ([]Account, error) {
+func (s *OpsService) listAllAccountsForOps(ctx context.Context, platformFilter string, platformIDFilter *int64) ([]Account, error) {
 	if s == nil || s.accountRepo == nil {
 		return []Account{}, nil
 	}
 	if repo, ok := s.accountRepo.(opsAccountStatsRepository); ok {
-		return repo.ListOpsAccountsForStats(ctx, platformFilter, groupIDFilter)
+		return repo.ListOpsAccountsForStats(ctx, platformFilter, platformIDFilter)
 	}
 
 	out := make([]Account, 0, 128)
 	page := 1
-	groupID := int64(0)
-	if groupIDFilter != nil {
-		groupID = *groupIDFilter
+	platformID := int64(0)
+	if platformIDFilter != nil {
+		platformID = *platformIDFilter
 	}
 	for {
 		accounts, pageInfo, err := s.accountRepo.ListWithFilters(ctx, pagination.PaginationParams{
 			Page:     page,
 			PageSize: opsAccountsPageSize,
-		}, platformFilter, "", "", "", groupID, "")
+		}, platformFilter, "", "", "", platformID, "")
 		if err != nil {
 			return nil, err
 		}
@@ -109,21 +109,21 @@ func (s *OpsService) getAccountsLoadMapBestEffort(ctx context.Context, accounts 
 	return out
 }
 
-// GetConcurrencyStats returns real-time concurrency usage aggregated by platform/group/account.
+// GetConcurrencyStats returns real-time concurrency usage aggregated by protocol platform, platform pool, and account.
 //
 // Optional filters:
 // - platformFilter: only include accounts in that platform (best-effort reduces DB load)
-// - groupIDFilter: only include accounts that belong to that group
+// - platformIDFilter: only include accounts that belong to that platform pool
 func (s *OpsService) GetConcurrencyStats(
 	ctx context.Context,
 	platformFilter string,
-	groupIDFilter *int64,
-) (map[string]*PlatformConcurrencyInfo, map[int64]*GroupConcurrencyInfo, map[int64]*AccountConcurrencyInfo, *time.Time, error) {
+	platformIDFilter *int64,
+) (map[string]*PlatformConcurrencyInfo, map[int64]*PlatformIDConcurrencyInfo, map[int64]*AccountConcurrencyInfo, *time.Time, error) {
 	if err := s.RequireMonitoringEnabled(ctx); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	accounts, err := s.listAllAccountsForOps(ctx, platformFilter, groupIDFilter)
+	accounts, err := s.listAllAccountsForOps(ctx, platformFilter, platformIDFilter)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -132,29 +132,12 @@ func (s *OpsService) GetConcurrencyStats(
 	loadMap := s.getAccountsLoadMapBestEffort(ctx, accounts)
 
 	platform := make(map[string]*PlatformConcurrencyInfo)
-	group := make(map[int64]*GroupConcurrencyInfo)
+	platformPools := make(map[int64]*PlatformIDConcurrencyInfo)
 	account := make(map[int64]*AccountConcurrencyInfo)
 
 	for _, acc := range accounts {
 		if acc.ID <= 0 {
 			continue
-		}
-
-		var matchedGroup *Group
-		if groupIDFilter != nil && *groupIDFilter > 0 {
-			for _, grp := range acc.Groups {
-				if grp == nil || grp.ID <= 0 {
-					continue
-				}
-				if grp.ID == *groupIDFilter {
-					matchedGroup = grp
-					break
-				}
-			}
-			// Group filter provided: skip accounts not in that group.
-			if matchedGroup == nil {
-				continue
-			}
 		}
 
 		load := loadMap[acc.ID]
@@ -165,32 +148,38 @@ func (s *OpsService) GetConcurrencyStats(
 			waiting = int64(load.WaitingCount)
 		}
 
-		// Account-level view picks one display group (the first group).
-		displayGroupID := int64(0)
-		displayGroupName := ""
-		if matchedGroup != nil {
-			displayGroupID = matchedGroup.ID
-			displayGroupName = matchedGroup.Name
-		} else if len(acc.Groups) > 0 && acc.Groups[0] != nil {
-			displayGroupID = acc.Groups[0].ID
-			displayGroupName = acc.Groups[0].Name
-		}
-
 		if _, ok := account[acc.ID]; !ok {
 			info := &AccountConcurrencyInfo{
 				AccountID:      acc.ID,
 				AccountName:    acc.Name,
 				Platform:       acc.Platform,
-				GroupID:        displayGroupID,
-				GroupName:      displayGroupName,
 				CurrentInUse:   currentInUse,
 				MaxCapacity:    int64(acc.Concurrency),
 				WaitingInQueue: waiting,
+			}
+			if acc.PlatformID != nil {
+				info.PlatformID = *acc.PlatformID
+				info.PlatformName = acc.PlatformName
 			}
 			if info.MaxCapacity > 0 {
 				info.LoadPercentage = float64(info.CurrentInUse) / float64(info.MaxCapacity) * 100
 			}
 			account[acc.ID] = info
+		}
+
+		if acc.PlatformID != nil && *acc.PlatformID > 0 {
+			poolID := *acc.PlatformID
+			if _, ok := platformPools[poolID]; !ok {
+				platformPools[poolID] = &PlatformIDConcurrencyInfo{
+					PlatformID:   poolID,
+					PlatformName: acc.PlatformName,
+					Platform:     acc.Platform,
+				}
+			}
+			pool := platformPools[poolID]
+			pool.MaxCapacity += int64(acc.Concurrency)
+			pool.CurrentInUse += currentInUse
+			pool.WaitingInQueue += waiting
 		}
 
 		// Platform aggregation.
@@ -206,52 +195,6 @@ func (s *OpsService) GetConcurrencyStats(
 			p.WaitingInQueue += waiting
 		}
 
-		// Group aggregation (one account may contribute to multiple groups).
-		if matchedGroup != nil {
-			grp := matchedGroup
-			if _, ok := group[grp.ID]; !ok {
-				group[grp.ID] = &GroupConcurrencyInfo{
-					GroupID:   grp.ID,
-					GroupName: grp.Name,
-					Platform:  grp.Platform,
-				}
-			}
-			g := group[grp.ID]
-			if g.GroupName == "" && grp.Name != "" {
-				g.GroupName = grp.Name
-			}
-			if g.Platform != "" && grp.Platform != "" && g.Platform != grp.Platform {
-				// Groups are expected to be platform-scoped. If mismatch is observed, avoid misleading labels.
-				g.Platform = ""
-			}
-			g.MaxCapacity += int64(acc.Concurrency)
-			g.CurrentInUse += currentInUse
-			g.WaitingInQueue += waiting
-		} else {
-			for _, grp := range acc.Groups {
-				if grp == nil || grp.ID <= 0 {
-					continue
-				}
-				if _, ok := group[grp.ID]; !ok {
-					group[grp.ID] = &GroupConcurrencyInfo{
-						GroupID:   grp.ID,
-						GroupName: grp.Name,
-						Platform:  grp.Platform,
-					}
-				}
-				g := group[grp.ID]
-				if g.GroupName == "" && grp.Name != "" {
-					g.GroupName = grp.Name
-				}
-				if g.Platform != "" && grp.Platform != "" && g.Platform != grp.Platform {
-					// Groups are expected to be platform-scoped. If mismatch is observed, avoid misleading labels.
-					g.Platform = ""
-				}
-				g.MaxCapacity += int64(acc.Concurrency)
-				g.CurrentInUse += currentInUse
-				g.WaitingInQueue += waiting
-			}
-		}
 	}
 
 	for _, info := range platform {
@@ -259,13 +202,13 @@ func (s *OpsService) GetConcurrencyStats(
 			info.LoadPercentage = float64(info.CurrentInUse) / float64(info.MaxCapacity) * 100
 		}
 	}
-	for _, info := range group {
+	for _, info := range platformPools {
 		if info.MaxCapacity > 0 {
 			info.LoadPercentage = float64(info.CurrentInUse) / float64(info.MaxCapacity) * 100
 		}
 	}
 
-	return platform, group, account, &collectedAt, nil
+	return platform, platformPools, account, &collectedAt, nil
 }
 
 // listAllActiveUsersForOps returns all active users with their concurrency settings.

@@ -35,6 +35,7 @@ func openPromptAuditIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS users (id BIGSERIAL PRIMARY KEY);
 		CREATE TABLE IF NOT EXISTS groups (id BIGSERIAL PRIMARY KEY);
+		CREATE TABLE IF NOT EXISTS platforms (id BIGSERIAL PRIMARY KEY);
 		CREATE TABLE IF NOT EXISTS api_keys (id BIGSERIAL PRIMARY KEY);
 		CREATE TABLE IF NOT EXISTS settings (
 			key VARCHAR(255) PRIMARY KEY,
@@ -43,7 +44,7 @@ func openPromptAuditIntegrationDB(t *testing.T) *sql.DB {
 		);
 	`)
 	require.NoError(t, err)
-	for _, name := range []string{"181_prompt_audit.sql", "182_prompt_audit_full_prompt.sql"} {
+	for _, name := range []string{"181_prompt_audit.sql", "182_prompt_audit_full_prompt.sql", "197_prompt_audit_platform_scope.sql"} {
 		migration, err := os.ReadFile(filepath.Join("..", "..", "migrations", name))
 		require.NoError(t, err)
 		// The migration runner can retry an interrupted deployment; the migration
@@ -60,7 +61,7 @@ func openPromptAuditIntegrationDB(t *testing.T) *sql.DB {
 
 func resetPromptAuditIntegrationDB(t *testing.T, db *sql.DB) {
 	t.Helper()
-	_, err := db.Exec(`TRUNCATE TABLE prompt_audit_events, prompt_audit_jobs, api_keys, users, groups, settings RESTART IDENTITY CASCADE`)
+	_, err := db.Exec(`TRUNCATE TABLE prompt_audit_events, prompt_audit_jobs, api_keys, users, groups, platforms, settings RESTART IDENTITY CASCADE`)
 	require.NoError(t, err)
 }
 
@@ -75,7 +76,7 @@ func integrationSnapshot(seed string) PromptSnapshot {
 	return PromptSnapshot{
 		RequestID: "request-" + seed, UsernameSnapshot: "user-" + seed,
 		UserEmailSnapshot: "user-" + seed + "@example.test", APIKeyNameSnapshot: "key-" + seed,
-		GroupName: "group-" + seed, Provider: "openai", Endpoint: "/v1/chat/completions",
+		PlatformName: "platform-" + seed, Provider: "openai", Endpoint: "/v1/chat/completions",
 		Protocol: "openai_chat", Model: "gpt-test", PromptHash: strings.Repeat(seed[:1], 64),
 		RedactedPreview: "redacted-" + seed, PromptLength: len([]rune(seed)), MessageCount: 1,
 	}
@@ -132,11 +133,11 @@ func TestPromptAuditMigrationSchemaAndLeakageGate(t *testing.T) {
 	}
 	for _, name := range []string{
 		"idx_prompt_audit_jobs_schedule", "idx_prompt_audit_jobs_request", "idx_prompt_audit_jobs_user_created",
-		"idx_prompt_audit_jobs_api_key_created", "idx_prompt_audit_jobs_group_created", "idx_prompt_audit_jobs_prompt_hash",
+		"idx_prompt_audit_jobs_api_key_created", "idx_prompt_audit_jobs_platform_created", "idx_prompt_audit_jobs_prompt_hash",
 		"idx_prompt_audit_jobs_created", "idx_prompt_audit_events_job", "idx_prompt_audit_events_request",
 		"idx_prompt_audit_events_decision_created", "idx_prompt_audit_events_risk_created",
 		"idx_prompt_audit_events_user_created", "idx_prompt_audit_events_api_key_created",
-		"idx_prompt_audit_events_group_created", "idx_prompt_audit_events_prompt_hash", "idx_prompt_audit_events_created",
+		"idx_prompt_audit_events_platform_created", "idx_prompt_audit_events_prompt_hash", "idx_prompt_audit_events_created",
 	} {
 		require.Truef(t, indexes[name], "missing index %s", name)
 	}
@@ -301,9 +302,9 @@ func TestPromptAuditRepositoryForeignKeysFiltersAndStableIdentitySnapshots(t *te
 	ctx := context.Background()
 	userID := insertIdentity(t, db, "users")
 	apiKeyID := insertIdentity(t, db, "api_keys")
-	groupID := insertIdentity(t, db, "groups")
+	platformID := insertIdentity(t, db, "groups")
 	snapshot := integrationSnapshot("identity")
-	snapshot.UserID, snapshot.APIKeyID, snapshot.GroupID = userID, apiKeyID, &groupID
+	snapshot.UserID, snapshot.APIKeyID, snapshot.PlatformID = userID, apiKeyID, &platformID
 	event, err := repo.RecordBlocking(ctx, snapshot, 7, integrationResult(EventCritical), true)
 	require.NoError(t, err)
 	require.NotNil(t, event)
@@ -311,7 +312,7 @@ func TestPromptAuditRepositoryForeignKeysFiltersAndStableIdentitySnapshots(t *te
 	start, end := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
 	page, err := repo.ListEvents(ctx, EventFilter{
 		Decision: string(EventCritical), RiskLevel: string(RiskCritical), Endpoint: snapshot.Endpoint,
-		GroupID: &groupID, UserID: &userID, APIKeyID: &apiKeyID, RequestID: snapshot.RequestID,
+		PlatformID: &platformID, UserID: &userID, APIKeyID: &apiKeyID, RequestID: snapshot.RequestID,
 		PromptHash: snapshot.PromptHash, Keyword: snapshot.UsernameSnapshot, StartAt: &start, EndAt: &end,
 	}, 1, 10)
 	require.NoError(t, err)
@@ -326,13 +327,13 @@ func TestPromptAuditRepositoryForeignKeysFiltersAndStableIdentitySnapshots(t *te
 	require.NoError(t, err)
 	_, err = db.Exec(`DELETE FROM api_keys WHERE id=$1`, apiKeyID)
 	require.NoError(t, err)
-	_, err = db.Exec(`DELETE FROM groups WHERE id=$1`, groupID)
+	_, err = db.Exec(`DELETE FROM groups WHERE id=$1`, platformID)
 	require.NoError(t, err)
 	stored, err := repo.GetEvent(ctx, event.ID)
 	require.NoError(t, err)
 	require.Zero(t, stored.Snapshot.UserID)
 	require.Zero(t, stored.Snapshot.APIKeyID)
-	require.Nil(t, stored.Snapshot.GroupID)
+	require.Nil(t, stored.Snapshot.PlatformID)
 	require.Equal(t, snapshot.UsernameSnapshot, stored.Snapshot.UsernameSnapshot)
 	require.Equal(t, snapshot.UserEmailSnapshot, stored.Snapshot.UserEmailSnapshot)
 	require.Equal(t, snapshot.APIKeyNameSnapshot, stored.Snapshot.APIKeyNameSnapshot)

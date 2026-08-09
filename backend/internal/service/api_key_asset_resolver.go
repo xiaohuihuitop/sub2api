@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"sort"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -28,8 +30,36 @@ type apiKeySubscriptionPlanCandidateLister interface {
 	ListActiveSubscriptionsByPlanIDs(ctx context.Context, userID int64, planIDs []int64) ([]UserSubscription, error)
 }
 
+type apiKeySubscriptionResolver interface {
+	ValidateAndCheckLimits(sub *UserSubscription) (bool, error)
+	EnsureWindowMaintenance(ctx context.Context, sub *UserSubscription) (*UserSubscription, error)
+}
+
+func hasSubscriptionResolver(resolver apiKeySubscriptionResolver) bool {
+	if resolver == nil {
+		return false
+	}
+	value := reflect.ValueOf(resolver)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return !value.IsNil()
+	default:
+		return true
+	}
+}
+
+func isSubscriptionCandidateUnavailableError(err error) bool {
+	return errors.Is(err, ErrDailyLimitExceeded) ||
+		errors.Is(err, ErrWeeklyLimitExceeded) ||
+		errors.Is(err, ErrMonthlyLimitExceeded) ||
+		errors.Is(err, ErrSubscriptionNotFound) ||
+		errors.Is(err, ErrSubscriptionInvalid) ||
+		errors.Is(err, ErrSubscriptionExpired) ||
+		errors.Is(err, ErrSubscriptionSuspended)
+}
+
 // ResolveBillingAssetForRequest selects a user asset after platform routing has
-// already succeeded. It intentionally does not inspect legacy groups.
+// already succeeded. It only inspects the selected platform and billing assets.
 func (s *APIKeyService) ResolveBillingAssetForRequest(
 	ctx context.Context,
 	apiKey *APIKey,
@@ -84,11 +114,11 @@ func (s *APIKeyService) firstUsableSubscriptionAsset(
 		if !subscriptionUsesAllowedPlan(subscription, allowed) {
 			continue
 		}
-		needsMaintenance, err := subscriptions.ValidateAndCheckLimits(subscription, nil)
+		needsMaintenance, err := subscriptions.ValidateAndCheckLimits(subscription)
 		if needsMaintenance {
 			subscription, err = subscriptions.EnsureWindowMaintenance(ctx, subscription)
 			if err == nil && subscription != nil {
-				_, err = subscriptions.ValidateAndCheckLimits(subscription, nil)
+				_, err = subscriptions.ValidateAndCheckLimits(subscription)
 			}
 		}
 		if err != nil || subscription == nil {

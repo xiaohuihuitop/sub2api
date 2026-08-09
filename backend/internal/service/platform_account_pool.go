@@ -80,16 +80,25 @@ func normalizePlatformSchedulingScope(scope PlatformSchedulingScope) (PlatformSc
 	return scope, scope.PlatformID > 0 && scope.AccountPlatform != ""
 }
 
-// platformSchedulingCacheGroupID keeps V2 sticky-session entries separate from
-// legacy group entries. Legacy IDs are positive and -1 is reserved by account
-// list filters, so -(platformID+1) is a stable non-colliding namespace.
-func platformSchedulingCacheGroupID(scope PlatformSchedulingScope) *int64 {
+// platformSchedulingCacheID maps a Platform to the existing numeric cache
+// namespace used by sticky sessions. Negative IDs cannot collide with accounts.
+func platformSchedulingCacheID(scope PlatformSchedulingScope) *int64 {
 	normalized, ok := normalizePlatformSchedulingScope(scope)
 	if !ok {
 		return nil
 	}
 	cacheID := -normalized.PlatformID - 1
 	return &cacheID
+}
+
+// PlatformSchedulingID returns the internal cache namespace for the Platform
+// selected for the current request. It is not a billing or persistence ID.
+func PlatformSchedulingID(ctx context.Context) *int64 {
+	scope, ok := PlatformSchedulingScopeFromContext(ctx)
+	if !ok {
+		return nil
+	}
+	return platformSchedulingCacheID(scope)
 }
 
 func accountMatchesPlatformSchedulingScope(ctx context.Context, account *Account) bool {

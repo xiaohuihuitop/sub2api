@@ -107,7 +107,7 @@ func (s *SubscriptionService) assignSubscriptionFromPlan(
 		return nil, fmt.Errorf("create subscription from plan: %w", err)
 	}
 
-	s.maybeInvalidateAssignmentCaches(sub.UserID, sub.GroupID, sub.ID, deferCacheInvalidation)
+	s.maybeInvalidateAssignmentCache(sub.UserID, sub.ID, deferCacheInvalidation)
 	return s.userSubRepo.GetByID(ctx, sub.ID)
 }
 

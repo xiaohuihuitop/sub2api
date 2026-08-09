@@ -141,7 +141,7 @@ func TestAntigravityRetryLoop_NoURLFallback_UsesConfiguredBaseURL(t *testing.T) 
 		body:           []byte(`{"input":"test"}`),
 		httpUpstream:   upstream,
 		requestedModel: "claude-sonnet-4-5",
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			handleErrorCalled = true
 			return nil
 		},
@@ -895,7 +895,7 @@ func TestAntigravityRetryLoop_PreCheck_SwitchesWhenRateLimited(t *testing.T) {
 		requestedModel:  "claude-sonnet-4-5",
 		httpUpstream:    upstream,
 		isStickySession: true,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})
@@ -938,7 +938,7 @@ func TestAntigravityRetryLoop_PreCheck_SwitchesWhenRemainingLong(t *testing.T) {
 		requestedModel:  "claude-sonnet-4-5",
 		httpUpstream:    upstream,
 		isStickySession: true,
-		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+		handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 			return nil
 		},
 	})

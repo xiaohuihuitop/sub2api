@@ -23,9 +23,9 @@ var validOpsAlertMetricTypes = []string{
 	"cpu_usage_percent",
 	"memory_usage_percent",
 	"concurrency_queue_depth",
-	"group_available_accounts",
-	"group_available_ratio",
-	"group_rate_limit_ratio",
+	"platform_pool_available_accounts",
+	"platform_pool_available_ratio",
+	"platform_pool_rate_limit_ratio",
 	"account_rate_limited_count",
 	"account_error_count",
 	"account_error_ratio",
@@ -93,8 +93,8 @@ func isPercentOrRateMetric(metricType string) bool {
 		"upstream_error_rate",
 		"cpu_usage_percent",
 		"memory_usage_percent",
-		"group_available_ratio",
-		"group_rate_limit_ratio",
+		"platform_pool_available_ratio",
+		"platform_pool_rate_limit_ratio",
 		"account_error_ratio":
 		return true
 	default:
@@ -473,12 +473,12 @@ func (h *OpsHandler) CreateAlertSilence(c *gin.Context) {
 	}
 
 	var payload struct {
-		RuleID   int64   `json:"rule_id"`
-		Platform string  `json:"platform"`
-		GroupID  *int64  `json:"group_id"`
-		Region   *string `json:"region"`
-		Until    string  `json:"until"`
-		Reason   string  `json:"reason"`
+		RuleID     int64   `json:"rule_id"`
+		Platform   string  `json:"platform"`
+		PlatformID *int64  `json:"platform_id"`
+		Region     *string `json:"region"`
+		Until      string  `json:"until"`
+		Reason     string  `json:"reason"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		response.BadRequest(c, "Invalid request body")
@@ -497,13 +497,13 @@ func (h *OpsHandler) CreateAlertSilence(c *gin.Context) {
 	}
 
 	silence := &service.OpsAlertSilence{
-		RuleID:    payload.RuleID,
-		Platform:  strings.TrimSpace(payload.Platform),
-		GroupID:   payload.GroupID,
-		Region:    payload.Region,
-		Until:     until,
-		Reason:    strings.TrimSpace(payload.Reason),
-		CreatedBy: createdBy,
+		RuleID:     payload.RuleID,
+		Platform:   strings.TrimSpace(payload.Platform),
+		PlatformID: payload.PlatformID,
+		Region:     payload.Region,
+		Until:      until,
+		Reason:     strings.TrimSpace(payload.Reason),
+		CreatedBy:  createdBy,
 	}
 
 	created, err := h.opsService.CreateAlertSilence(c.Request.Context(), silence)
@@ -583,17 +583,17 @@ func (h *OpsHandler) ListAlertEvents(c *gin.Context) {
 		filter.BeforeID = &id
 	}
 
-	// Optional global filter support (platform/group/time range).
+	// Optional global filter support (platform/time range).
 	if platform := strings.TrimSpace(c.Query("platform")); platform != "" {
 		filter.Platform = platform
 	}
-	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+	if v := strings.TrimSpace(c.Query("platform_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
 		if err != nil || id <= 0 {
-			response.BadRequest(c, "Invalid group_id")
+			response.BadRequest(c, "Invalid platform_id")
 			return
 		}
-		filter.GroupID = &id
+		filter.PlatformID = &id
 	}
 	if startTime, endTime, err := parseOpsTimeRange(c, "24h"); err == nil {
 		// Only apply when explicitly provided to avoid surprising default narrowing.

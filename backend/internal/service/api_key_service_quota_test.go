@@ -116,26 +116,26 @@ func (s *quotaBaseAPIKeyRepoStub) CountByUserID(context.Context, int64) (int64, 
 func (s *quotaBaseAPIKeyRepoStub) ExistsByKey(context.Context, string) (bool, error) {
 	panic("unexpected ExistsByKey call")
 }
-func (s *quotaBaseAPIKeyRepoStub) ListByGroupID(context.Context, int64, pagination.PaginationParams) ([]APIKey, *pagination.PaginationResult, error) {
-	panic("unexpected ListByGroupID call")
+func (s *quotaBaseAPIKeyRepoStub) ListByPlatformID(context.Context, int64, pagination.PaginationParams) ([]APIKey, *pagination.PaginationResult, error) {
+	panic("unexpected ListByPlatformID call")
 }
 func (s *quotaBaseAPIKeyRepoStub) SearchAPIKeys(context.Context, int64, string, int) ([]APIKey, error) {
 	panic("unexpected SearchAPIKeys call")
 }
-func (s *quotaBaseAPIKeyRepoStub) ClearGroupIDByGroupID(context.Context, int64) (int64, error) {
-	panic("unexpected ClearGroupIDByGroupID call")
+func (s *quotaBaseAPIKeyRepoStub) ClearPlatformIDByPlatformID(context.Context, int64) (int64, error) {
+	panic("unexpected ClearPlatformIDByPlatformID call")
 }
-func (s *quotaBaseAPIKeyRepoStub) UpdateGroupIDByUserAndGroup(context.Context, int64, int64, int64) (int64, error) {
-	panic("unexpected UpdateGroupIDByUserAndGroup call")
+func (s *quotaBaseAPIKeyRepoStub) UpdatePlatformIDByUserAndGroup(context.Context, int64, int64, int64) (int64, error) {
+	panic("unexpected UpdatePlatformIDByUserAndGroup call")
 }
-func (s *quotaBaseAPIKeyRepoStub) CountByGroupID(context.Context, int64) (int64, error) {
-	panic("unexpected CountByGroupID call")
+func (s *quotaBaseAPIKeyRepoStub) CountByPlatformID(context.Context, int64) (int64, error) {
+	panic("unexpected CountByPlatformID call")
 }
 func (s *quotaBaseAPIKeyRepoStub) ListKeysByUserID(context.Context, int64) ([]string, error) {
 	panic("unexpected ListKeysByUserID call")
 }
-func (s *quotaBaseAPIKeyRepoStub) ListKeysByGroupID(context.Context, int64) ([]string, error) {
-	panic("unexpected ListKeysByGroupID call")
+func (s *quotaBaseAPIKeyRepoStub) ListKeysByPlatformID(context.Context, int64) ([]string, error) {
+	panic("unexpected ListKeysByPlatformID call")
 }
 func (s *quotaBaseAPIKeyRepoStub) IncrementQuotaUsed(context.Context, int64, float64) (float64, error) {
 	panic("unexpected IncrementQuotaUsed call")

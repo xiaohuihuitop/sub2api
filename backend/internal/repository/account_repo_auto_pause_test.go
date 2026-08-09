@@ -41,7 +41,7 @@ func TestAutoPauseExpiredAccountsEnqueuesAffectedAccounts(t *testing.T) {
 	mock.ExpectQuery(`(?s)UPDATE accounts.*RETURNING id`).
 		WithArgs(now).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(11)).AddRow(int64(29)))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)")).
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO scheduler_outbox (event_type, account_id, platform_id, payload)")).
 		WithArgs(service.SchedulerOutboxEventAccountBulkChanged, nil, nil, accountIDsPayloadMatcher{want: []int64{11, 29}}).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 

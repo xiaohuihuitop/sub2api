@@ -13,7 +13,6 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
@@ -91,25 +90,6 @@ func (_c *PlatformCreate) SetNillableStatus(v *string) *PlatformCreate {
 func (_c *PlatformCreate) SetEndpointCapabilities(v []string) *PlatformCreate {
 	_c.mutation.SetEndpointCapabilities(v)
 	return _c
-}
-
-// SetLegacyGroupID sets the "legacy_group_id" field.
-func (_c *PlatformCreate) SetLegacyGroupID(v int64) *PlatformCreate {
-	_c.mutation.SetLegacyGroupID(v)
-	return _c
-}
-
-// SetNillableLegacyGroupID sets the "legacy_group_id" field if the given value is not nil.
-func (_c *PlatformCreate) SetNillableLegacyGroupID(v *int64) *PlatformCreate {
-	if v != nil {
-		_c.SetLegacyGroupID(*v)
-	}
-	return _c
-}
-
-// SetLegacyGroup sets the "legacy_group" edge to the Group entity.
-func (_c *PlatformCreate) SetLegacyGroup(v *Group) *PlatformCreate {
-	return _c.SetLegacyGroupID(v.ID)
 }
 
 // AddModelRuleIDs adds the "model_rules" edge to the PlatformModelRule entity by IDs.
@@ -323,23 +303,6 @@ func (_c *PlatformCreate) createSpec() (*Platform, *sqlgraph.CreateSpec) {
 		_spec.SetField(platform.FieldEndpointCapabilities, field.TypeJSON, value)
 		_node.EndpointCapabilities = value
 	}
-	if nodes := _c.mutation.LegacyGroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   platform.LegacyGroupTable,
-			Columns: []string{platform.LegacyGroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.LegacyGroupID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
 	if nodes := _c.mutation.ModelRulesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -528,24 +491,6 @@ func (u *PlatformUpsert) UpdateEndpointCapabilities() *PlatformUpsert {
 	return u
 }
 
-// SetLegacyGroupID sets the "legacy_group_id" field.
-func (u *PlatformUpsert) SetLegacyGroupID(v int64) *PlatformUpsert {
-	u.Set(platform.FieldLegacyGroupID, v)
-	return u
-}
-
-// UpdateLegacyGroupID sets the "legacy_group_id" field to the value that was provided on create.
-func (u *PlatformUpsert) UpdateLegacyGroupID() *PlatformUpsert {
-	u.SetExcluded(platform.FieldLegacyGroupID)
-	return u
-}
-
-// ClearLegacyGroupID clears the value of the "legacy_group_id" field.
-func (u *PlatformUpsert) ClearLegacyGroupID() *PlatformUpsert {
-	u.SetNull(platform.FieldLegacyGroupID)
-	return u
-}
-
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -672,27 +617,6 @@ func (u *PlatformUpsertOne) SetEndpointCapabilities(v []string) *PlatformUpsertO
 func (u *PlatformUpsertOne) UpdateEndpointCapabilities() *PlatformUpsertOne {
 	return u.Update(func(s *PlatformUpsert) {
 		s.UpdateEndpointCapabilities()
-	})
-}
-
-// SetLegacyGroupID sets the "legacy_group_id" field.
-func (u *PlatformUpsertOne) SetLegacyGroupID(v int64) *PlatformUpsertOne {
-	return u.Update(func(s *PlatformUpsert) {
-		s.SetLegacyGroupID(v)
-	})
-}
-
-// UpdateLegacyGroupID sets the "legacy_group_id" field to the value that was provided on create.
-func (u *PlatformUpsertOne) UpdateLegacyGroupID() *PlatformUpsertOne {
-	return u.Update(func(s *PlatformUpsert) {
-		s.UpdateLegacyGroupID()
-	})
-}
-
-// ClearLegacyGroupID clears the value of the "legacy_group_id" field.
-func (u *PlatformUpsertOne) ClearLegacyGroupID() *PlatformUpsertOne {
-	return u.Update(func(s *PlatformUpsert) {
-		s.ClearLegacyGroupID()
 	})
 }
 
@@ -988,27 +912,6 @@ func (u *PlatformUpsertBulk) SetEndpointCapabilities(v []string) *PlatformUpsert
 func (u *PlatformUpsertBulk) UpdateEndpointCapabilities() *PlatformUpsertBulk {
 	return u.Update(func(s *PlatformUpsert) {
 		s.UpdateEndpointCapabilities()
-	})
-}
-
-// SetLegacyGroupID sets the "legacy_group_id" field.
-func (u *PlatformUpsertBulk) SetLegacyGroupID(v int64) *PlatformUpsertBulk {
-	return u.Update(func(s *PlatformUpsert) {
-		s.SetLegacyGroupID(v)
-	})
-}
-
-// UpdateLegacyGroupID sets the "legacy_group_id" field to the value that was provided on create.
-func (u *PlatformUpsertBulk) UpdateLegacyGroupID() *PlatformUpsertBulk {
-	return u.Update(func(s *PlatformUpsert) {
-		s.UpdateLegacyGroupID()
-	})
-}
-
-// ClearLegacyGroupID clears the value of the "legacy_group_id" field.
-func (u *PlatformUpsertBulk) ClearLegacyGroupID() *PlatformUpsertBulk {
-	return u.Update(func(s *PlatformUpsert) {
-		s.ClearLegacyGroupID()
 	})
 }
 

@@ -272,7 +272,7 @@ func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 		AccountID:       11,
 		APIKeyID:        22,
 		UserID:          33,
-		GroupID:         44,
+		PlatformID:      44,
 		LeaseID:         "lease-1",
 		Model:           "gpt-live-test",
 		CreatedAt:       time.Now().Add(-time.Second),
@@ -311,13 +311,13 @@ func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 }
 
 func TestGetLiveCallForIdentityRejectsMismatchedCaller(t *testing.T) {
-	groupID := int64(44)
+	platformID := int64(44)
 	record := &LiveCallRecord{
 		CallID:     "call_identity",
 		CallHash:   hashLiveCallID("call_identity"),
 		APIKeyID:   22,
 		UserID:     33,
-		GroupID:    groupID,
+		PlatformID: platformID,
 		Controller: LiveControllerPending,
 	}
 	store := &liveTestStore{}
@@ -325,16 +325,16 @@ func TestGetLiveCallForIdentityRejectsMismatchedCaller(t *testing.T) {
 	service := &OpenAIGatewayService{cache: store}
 
 	_, err := service.GetLiveCallForIdentity(context.Background(), record.CallID, LiveCallIdentity{
-		APIKeyID: 99,
-		UserID:   record.UserID,
-		GroupID:  &groupID,
+		APIKeyID:   99,
+		UserID:     record.UserID,
+		PlatformID: &platformID,
 	})
 	require.ErrorIs(t, err, ErrLiveIdentityMismatch)
 
 	loaded, err := service.GetLiveCallForIdentity(context.Background(), record.CallID, LiveCallIdentity{
-		APIKeyID: record.APIKeyID,
-		UserID:   record.UserID,
-		GroupID:  &groupID,
+		APIKeyID:   record.APIKeyID,
+		UserID:     record.UserID,
+		PlatformID: &platformID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, record.AccountID, loaded.AccountID)

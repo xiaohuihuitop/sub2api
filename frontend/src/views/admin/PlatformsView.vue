@@ -5,7 +5,7 @@
         <button class="icon-button" type="button" :disabled="loading" :title="t('common.refresh')" :aria-label="t('common.refresh')" @click="loadPlatforms">
           <Icon name="refresh" size="sm" :class="loading && 'animate-spin'" />
         </button>
-        <button class="btn btn-primary gap-1.5" type="button" data-test="create-platform" @click="openCreate">
+        <button class="btn btn-primary gap-1.5" type="button" data-test="create-platform" data-tour="platforms-create-btn" @click="openCreate">
           <Icon name="plus" size="sm" />
           <span>{{ t('admin.platforms.create') }}</span>
         </button>

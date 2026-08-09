@@ -369,7 +369,6 @@ func (s *AuthService) loadOAuthRegistrationInvitation(ctx context.Context, invit
 			Notes:        oauthEmailFlowStringValue(entity.Notes),
 			CreatedAt:    entity.CreatedAt,
 			ExpiresAt:    entity.ExpiresAt,
-			GroupID:      entity.GroupID,
 			ValidityDays: entity.ValidityDays,
 		}, nil
 	}
@@ -425,11 +424,6 @@ func (s *AuthService) updateOAuthRegistrationInvitation(ctx context.Context, cod
 			update = update.SetUsedAt(*code.UsedAt)
 		} else {
 			update = update.ClearUsedAt()
-		}
-		if code.GroupID != nil {
-			update = update.SetGroupID(*code.GroupID)
-		} else {
-			update = update.ClearGroupID()
 		}
 		_, err := update.Save(ctx)
 		return err

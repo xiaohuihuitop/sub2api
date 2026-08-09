@@ -9,33 +9,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 )
-
-// getUserGroupRateMultiplier is retained for legacy API key compatibility.
-// V2 platform-asset requests override every multiplier with their resolved
-// subscription snapshot or the global balance multiplier before pricing.
-func (s *GatewayService) getUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
-	if s == nil {
-		return groupDefaultMultiplier
-	}
-	resolver := s.userGroupRateResolver
-	if resolver == nil {
-		resolver = newUserGroupRateResolver(
-			s.userGroupRateRepo,
-			s.userGroupRateCache,
-			resolveUserGroupRateCacheTTL(s.cfg),
-			&s.userGroupRateSF,
-			"service.gateway",
-		)
-	}
-	return resolver.Resolve(ctx, userID, groupID, groupDefaultMultiplier)
-}
-
-// ResolveUserGroupRateMultiplier exposes the legacy compatibility helper.
-func (s *GatewayService) ResolveUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
-	return s.getUserGroupRateMultiplier(ctx, userID, groupID, groupDefaultMultiplier)
-}
 
 // RecordUsageInput 记录使用量的输入参数。
 // 异步 worker 只接收计费所需快照，不能持有 ParsedRequest/RequestBodyRef 这类大请求体引用。
@@ -55,7 +29,7 @@ type RecordUsageInput struct {
 	APIKeyService      APIKeyQuotaUpdater // 可选：用于更新API Key配额
 	QuotaPlatform      string             // user×platform 配额计量平台：handler 在请求 ctx 内经 QuotaPlatform() 算定后传入（后扣运行在 worker 池 background ctx 上，取不到 ForcePlatform）
 
-	ChannelUsageFields // 渠道映射信息（由 handler 在 Forward 前解析）
+	ModelRoutingUsageFields // 渠道映射信息（由 handler 在 Forward 前解析）
 }
 
 // APIKeyQuotaUpdater defines the interface for updating API Key quota and rate limit usage
@@ -83,17 +57,16 @@ type postUsageBillingParams struct {
 	IsSubscriptionBill    bool
 	AccountRateMultiplier float64
 	APIKeyService         APIKeyQuotaUpdater
-	Platform              string // 来自 APIKey 关联 Group 的平台标识
+	Platform              string
 }
 
-// PlatformFromAPIKey 从 APIKey 关联的 Group 推导 platform 名称。
-// apiKey 为 nil 或 Group 信息缺失时返回空串（调用方据此 short-circuit quota 累加）。
-// 导出供 handler 层调用。
+// PlatformFromAPIKey returns the adapter only when one authorized Platform is
+// unambiguous. Request routing should normally use PlatformSchedulingScope.
 func PlatformFromAPIKey(apiKey *APIKey) string {
-	if apiKey == nil || apiKey.Group == nil {
+	if apiKey == nil || len(apiKey.AllowedPlatforms) != 1 {
 		return ""
 	}
-	return apiKey.Group.Platform
+	return apiKey.AllowedPlatforms[0].AccountPlatform
 }
 
 // QuotaPlatform 返回 user×platform 配额计量使用的平台标识。
@@ -146,8 +119,8 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 		if cost.ActualCost > 0 {
 			if err := deps.userSubRepo.IncrementUsage(billingCtx, p.Subscription.ID, cost.ActualCost); err != nil {
 				slog.Error("increment subscription usage failed", "subscription_id", p.Subscription.ID, "error", err)
-			} else if deps.billingCacheService != nil && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil && p.Subscription != nil {
-				deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Subscription.ID, cost.ActualCost)
+			} else if deps.billingCacheService != nil && p.User != nil && p.Subscription != nil {
+				deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, p.Subscription.ID, cost.ActualCost)
 			}
 		}
 	} else {
@@ -334,8 +307,8 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 	}
 
 	if p.IsSubscriptionBill {
-		if p.Cost.ActualCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil && p.Subscription != nil {
-			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Subscription.ID, p.Cost.ActualCost)
+		if p.Cost.ActualCost > 0 && p.User != nil && p.Subscription != nil {
+			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, p.Subscription.ID, p.Cost.ActualCost)
 		}
 	} else if p.Cost.ActualCost > 0 && p.User != nil {
 		syncBalanceCacheAfterDeduction(ctx, p, deps, result)
@@ -569,21 +542,21 @@ type recordUsageOpts struct {
 // RecordUsage 记录使用量并扣费（或更新订阅用量）
 func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInput) error {
 	return s.recordUsageCore(ctx, &recordUsageCoreInput{
-		Result:             input.Result,
-		APIKey:             input.APIKey,
-		User:               input.User,
-		Account:            input.Account,
-		Subscription:       input.Subscription,
-		InboundEndpoint:    input.InboundEndpoint,
-		UpstreamEndpoint:   input.UpstreamEndpoint,
-		UserAgent:          input.UserAgent,
-		IPAddress:          input.IPAddress,
-		SessionID:          input.SessionID,
-		RequestPayloadHash: input.RequestPayloadHash,
-		ForceCacheBilling:  input.ForceCacheBilling,
-		APIKeyService:      input.APIKeyService,
-		QuotaPlatform:      input.QuotaPlatform,
-		ChannelUsageFields: input.ChannelUsageFields,
+		Result:                  input.Result,
+		APIKey:                  input.APIKey,
+		User:                    input.User,
+		Account:                 input.Account,
+		Subscription:            input.Subscription,
+		InboundEndpoint:         input.InboundEndpoint,
+		UpstreamEndpoint:        input.UpstreamEndpoint,
+		UserAgent:               input.UserAgent,
+		IPAddress:               input.IPAddress,
+		SessionID:               input.SessionID,
+		RequestPayloadHash:      input.RequestPayloadHash,
+		ForceCacheBilling:       input.ForceCacheBilling,
+		APIKeyService:           input.APIKeyService,
+		QuotaPlatform:           input.QuotaPlatform,
+		ModelRoutingUsageFields: input.ModelRoutingUsageFields,
 	}, &recordUsageOpts{})
 }
 
@@ -606,27 +579,27 @@ type RecordUsageLongContextInput struct {
 	APIKeyService         APIKeyQuotaUpdater // API Key 配额服务（可选）
 	QuotaPlatform         string             // user×platform 配额计量平台：handler 在请求 ctx 内经 QuotaPlatform() 算定后传入（后扣运行在 worker 池 background ctx 上，取不到 ForcePlatform）
 
-	ChannelUsageFields // 渠道映射信息（由 handler 在 Forward 前解析）
+	ModelRoutingUsageFields // 渠道映射信息（由 handler 在 Forward 前解析）
 }
 
 // RecordUsageWithLongContext 记录使用量并扣费，支持长上下文双倍计费（用于 Gemini）
 func (s *GatewayService) RecordUsageWithLongContext(ctx context.Context, input *RecordUsageLongContextInput) error {
 	return s.recordUsageCore(ctx, &recordUsageCoreInput{
-		Result:             input.Result,
-		APIKey:             input.APIKey,
-		User:               input.User,
-		Account:            input.Account,
-		Subscription:       input.Subscription,
-		InboundEndpoint:    input.InboundEndpoint,
-		UpstreamEndpoint:   input.UpstreamEndpoint,
-		UserAgent:          input.UserAgent,
-		IPAddress:          input.IPAddress,
-		SessionID:          input.SessionID,
-		RequestPayloadHash: input.RequestPayloadHash,
-		ForceCacheBilling:  input.ForceCacheBilling,
-		APIKeyService:      input.APIKeyService,
-		QuotaPlatform:      input.QuotaPlatform,
-		ChannelUsageFields: input.ChannelUsageFields,
+		Result:                  input.Result,
+		APIKey:                  input.APIKey,
+		User:                    input.User,
+		Account:                 input.Account,
+		Subscription:            input.Subscription,
+		InboundEndpoint:         input.InboundEndpoint,
+		UpstreamEndpoint:        input.UpstreamEndpoint,
+		UserAgent:               input.UserAgent,
+		IPAddress:               input.IPAddress,
+		SessionID:               input.SessionID,
+		RequestPayloadHash:      input.RequestPayloadHash,
+		ForceCacheBilling:       input.ForceCacheBilling,
+		APIKeyService:           input.APIKeyService,
+		QuotaPlatform:           input.QuotaPlatform,
+		ModelRoutingUsageFields: input.ModelRoutingUsageFields,
 	}, &recordUsageOpts{
 		LongContextThreshold:  input.LongContextThreshold,
 		LongContextMultiplier: input.LongContextMultiplier,
@@ -649,7 +622,7 @@ type recordUsageCoreInput struct {
 	ForceCacheBilling  bool
 	APIKeyService      APIKeyQuotaUpdater
 	QuotaPlatform      string
-	ChannelUsageFields
+	ModelRoutingUsageFields
 }
 
 // recordUsageCore 是 RecordUsage 和 RecordUsageWithLongContext 的统一实现。
@@ -679,30 +652,21 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		cacheTTLOverridden = (result.Usage.CacheCreation5mTokens + result.Usage.CacheCreation1hTokens) > 0
 	}
 
-	// 旧 API Key 仍按历史分组资料取倍率；V2 平台资产请求会在下方统一覆盖为
-	// 套餐实例快照或全局余额倍率。
 	fallbackMultiplier := 1.0
 	if s.cfg != nil {
 		fallbackMultiplier = s.cfg.Default.RateMultiplier
 	}
-	multiplier, imageMultiplier, _ := resolveBillingMultipliers(apiKey, subscription, fallbackMultiplier, timezone.Now())
+	multiplier, imageMultiplier, _ := resolveBillingMultipliers(subscription, fallbackMultiplier)
 	multiplier, imageMultiplier, _ = overridePlatformAssetBillingMultipliers(ctx, multiplier, imageMultiplier, imageMultiplier)
 
 	// 确定计费模型
 	concreteBillingModel := forwardResultBillingModel(result.Model, result.UpstreamModel)
 	billingModel := concreteBillingModel
-	if input.BillingModelSource == BillingModelSourceChannelMapped && input.ChannelMappedModel != "" {
-		billingModel = input.ChannelMappedModel
+	if input.BillingModelSource == BillingModelSourceMapped && input.MappedModel != "" {
+		billingModel = input.MappedModel
 	}
 	if input.BillingModelSource == BillingModelSourceRequested && input.OriginalModel != "" {
 		billingModel = input.OriginalModel
-	}
-	// composite 分组的公开别名（如 all/claude）会经 OriginalModel/ChannelMappedModel
-	// 进入上面的来源覆盖：任意别名查无价会静默落 $0，含家族词的别名则被价格表的
-	// 家族模糊匹配错计（如 Opus 流量按 Sonnet 兜底价）。除非管理员为别名显式配置了
-	// 渠道定价（OpenRouter 式自定价），composite 请求一律按实际转发的具体模型计费。
-	if apiKey.Group != nil && apiKey.Group.Platform == PlatformComposite {
-		billingModel = s.compositeBillableModel(ctx, apiKey, billingModel, concreteBillingModel)
 	}
 	// 通用兜底（与 OpenAI 路径的 usageBillingModelCandidates 语义对齐）：
 	// 选定模型查不到任何价格时回退到实际转发的具体模型。已定价流量不受影响。
@@ -729,35 +693,6 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	usageLog := s.buildRecordUsageLog(ctx, input, result, apiKey, user, account, subscription,
 		requestedModel, multiplier, imageMultiplier, accountRateMultiplier, billingType, cacheTTLOverridden, cost, opts)
 	applyPlatformAssetUsageAttribution(ctx, usageLog)
-
-	// V2 使用解析后的适配器定价；历史 API Key 才使用旧分组统计定价。
-	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.Platform != nil {
-		applyPlatformAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
-			route.Platform.AccountPlatform, result.UpstreamModel, result.Model,
-			UsageTokens{
-				InputTokens:         result.Usage.InputTokens,
-				OutputTokens:        result.Usage.OutputTokens,
-				CacheCreationTokens: result.Usage.CacheCreationInputTokens,
-				CacheReadTokens:     result.Usage.CacheReadInputTokens,
-				ImageOutputTokens:   result.Usage.ImageOutputTokens,
-			},
-			cost.TotalCost,
-		)
-	} else if pricingGroupID := effectivePricingGroupID(ctx, apiKey); pricingGroupID != nil {
-		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
-			account.ID, *pricingGroupID, result.UpstreamModel, result.Model,
-			// Anthropic's input_tokens excludes cache_read and cache_creation (billed separately);
-			// OpenAI gateway uses actualInputTokens which also excludes cache_read for the same reason.
-			UsageTokens{
-				InputTokens:         result.Usage.InputTokens,
-				OutputTokens:        result.Usage.OutputTokens,
-				CacheCreationTokens: result.Usage.CacheCreationInputTokens,
-				CacheReadTokens:     result.Usage.CacheReadInputTokens,
-				ImageOutputTokens:   result.Usage.ImageOutputTokens,
-			},
-			cost.TotalCost,
-		)
-	}
 
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
@@ -808,9 +743,9 @@ func (s *GatewayService) calculateRecordUsageCost(
 	imageMultiplier float64,
 	opts *recordUsageOpts,
 ) *CostBreakdown {
-	// 图片生成：渠道定价为 token 计费时走 token 路径，否则走图片计费
+	// 图片生成：模型覆盖价为 token 计费时走 token 路径，否则走图片计费。
 	if result.ImageCount > 0 {
-		if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken {
+		if resolved := s.resolveModelPricingOverride(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken {
 			return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, opts)
 		}
 		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier)
@@ -820,23 +755,8 @@ func (s *GatewayService) calculateRecordUsageCost(
 	return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, opts)
 }
 
-// compositeBillableModel 决定 composite 分组请求的计费模型：来源覆盖把计费模型
-// 换成公开别名等非具体模型时，只有管理员为该名字显式配置了渠道定价才按其计费
-// （OpenRouter 式自定价），否则回退到实际转发的具体模型，避免别名落入价格表的
-// 家族模糊匹配（错价）或查无价（$0）。未发生来源覆盖时原样返回。
-func (s *GatewayService) compositeBillableModel(ctx context.Context, apiKey *APIKey, billingModel, concreteBillingModel string) string {
-	if concreteBillingModel == "" || billingModel == concreteBillingModel {
-		return billingModel
-	}
-	if s.resolveChannelPricing(ctx, billingModel, apiKey) != nil {
-		return billingModel
-	}
-	logger.LegacyPrintf("service.gateway", "[Billing] composite billing model %q has no explicit channel pricing, billing by concrete model %q", billingModel, concreteBillingModel)
-	return concreteBillingModel
-}
-
-// billableModelWithFallback 在选定计费模型（可能是 composite 公开别名或未定价的映射名）
-// 查不到任何价格（渠道价与全局价均无）时，按序回退到实际转发的具体模型，避免静默 $0 计费。
+// billableModelWithFallback 在选定计费模型（可能是未定价的平台映射名）
+// 查不到任何价格（模型覆盖价与全局价均无）时，按序回退到实际转发的具体模型，避免静默 $0 计费。
 // 所有候选都无价时保持原值，走既有的 warn + 零成本路径。
 func (s *GatewayService) billableModelWithFallback(ctx context.Context, apiKey *APIKey, billingModel string, fallbacks ...string) string {
 	if s.hasResolvableTokenPricing(ctx, billingModel, apiKey) {
@@ -855,12 +775,12 @@ func (s *GatewayService) billableModelWithFallback(ctx context.Context, apiKey *
 	return billingModel
 }
 
-// hasResolvableTokenPricing 判断模型是否能在渠道定价或全局价格表中解析出 token 价格。
+// hasResolvableTokenPricing 判断模型是否能在模型覆盖价或全局价格表中解析出 token 价格。
 func (s *GatewayService) hasResolvableTokenPricing(ctx context.Context, model string, apiKey *APIKey) bool {
 	if strings.TrimSpace(model) == "" {
 		return false
 	}
-	if s.resolveChannelPricing(ctx, model, apiKey) != nil {
+	if s.resolveModelPricingOverride(ctx, model, apiKey) != nil {
 		return true
 	}
 	if s.billingService == nil {
@@ -870,14 +790,13 @@ func (s *GatewayService) hasResolvableTokenPricing(ctx context.Context, model st
 	return err == nil
 }
 
-// resolveChannelPricing 检查指定模型是否存在渠道级别定价。
-// 返回非 nil 的 ResolvedPricing 表示有渠道定价，nil 表示走默认定价路径。
-func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
+// resolveModelPricingOverride 检查指定模型是否存在管理员价格覆盖。
+func (s *GatewayService) resolveModelPricingOverride(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
 	if s.resolver == nil {
 		return nil
 	}
 	resolved := s.resolver.Resolve(ctx, pricingInputForRequest(ctx, apiKey, billingModel))
-	if resolved.Source == PricingSourceChannel {
+	if resolved.Source == PricingSourceOverride {
 		return resolved
 	}
 	return nil
@@ -892,11 +811,7 @@ func (s *GatewayService) calculateImageCost(
 	multiplier float64,
 ) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
-	groupConfig := imagePriceConfigFromAPIKey(apiKey)
-	if apiKeyHasConfiguredImagePrice(apiKey, sizeTier) {
-		return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, groupConfig, multiplier)
-	}
-	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
+	if resolved := s.resolveModelPricingOverride(ctx, billingModel, apiKey); resolved != nil {
 		tokens := UsageTokens{
 			InputTokens:       result.Usage.InputTokens,
 			OutputTokens:      result.Usage.OutputTokens,
@@ -907,7 +822,6 @@ func (s *GatewayService) calculateImageCost(
 			Ctx:            ctx,
 			Model:          billingModel,
 			Adapter:        pricingInput.Adapter,
-			GroupID:        pricingInput.GroupID,
 			Tokens:         tokens,
 			RequestCount:   result.ImageCount,
 			SizeTier:       sizeTier,
@@ -922,7 +836,7 @@ func (s *GatewayService) calculateImageCost(
 		return cost
 	}
 
-	return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, groupConfig, multiplier)
+	return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, nil, multiplier)
 }
 
 // calculateTokenCost 计算 Token 计费：根据 opts 决定走普通/长上下文/渠道统一计费。
@@ -948,13 +862,12 @@ func (s *GatewayService) calculateTokenCost(
 	var err error
 
 	// 优先尝试渠道定价 → CalculateCostUnified
-	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
+	if resolved := s.resolveModelPricingOverride(ctx, billingModel, apiKey); resolved != nil {
 		pricingInput := pricingInputForRequest(ctx, apiKey, billingModel)
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
 			Model:          billingModel,
 			Adapter:        pricingInput.Adapter,
-			GroupID:        pricingInput.GroupID,
 			Tokens:         tokens,
 			RequestCount:   1,
 			RateMultiplier: multiplier,
@@ -1026,12 +939,10 @@ func (s *GatewayService) buildRecordUsageLog(
 		ImageSizeSource:       optionalTrimmedStringPtr(result.ImageSizeSource),
 		ImageSizeBreakdown:    result.ImageSizeBreakdown,
 		CacheTTLOverridden:    cacheTTLOverridden,
-		ChannelID:             optionalInt64Ptr(input.ChannelID),
 		ModelMappingChain:     optionalTrimmedStringPtr(input.ModelMappingChain),
 		UserAgent:             optionalTrimmedStringPtr(input.UserAgent),
 		IPAddress:             optionalTrimmedStringPtr(input.IPAddress),
 		SessionID:             optionalTrimmedStringPtr(input.SessionID),
-		GroupID:               apiKey.GroupID,
 		SubscriptionID:        optionalSubscriptionID(subscription),
 		CreatedAt:             time.Now(),
 	}

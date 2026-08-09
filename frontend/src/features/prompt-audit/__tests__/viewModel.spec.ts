@@ -20,8 +20,8 @@ const config = (): PromptAuditConfig => ({
   worker_count: 4,
   queue_capacity: 100,
   scanners: SCANNER_CATALOG.map((item) => item.id),
-  all_groups: true,
-  group_ids: [],
+  all_platforms: true,
+  platform_ids: [],
   endpoints: [{
     id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', base_url: 'http://127.0.0.1:8000',
     model: 'sileader/qwen3guard:0.6b', timeout_ms: 3000, input_limit: 4000, enabled: true,
@@ -34,9 +34,9 @@ const config = (): PromptAuditConfig => ({
 })
 
 describe('Prompt Audit view model', () => {
-  it('normalizes legacy null collections from the public config', () => {
-    const legacy = { ...config(), group_ids: null, scanners: null, endpoints: null } as unknown as PromptAuditConfig
-    expect(configToDraft(legacy)).toMatchObject({ group_ids: [], scanners: [], endpoints: [] })
+  it('normalizes null collections from the public config', () => {
+    const incomplete = { ...config(), platform_ids: null, scanners: null, endpoints: null } as unknown as PromptAuditConfig
+    expect(configToDraft(incomplete)).toMatchObject({ platform_ids: [], scanners: [], endpoints: [] })
   })
 
   it('models all nine official input scanners', () => {
@@ -76,10 +76,10 @@ describe('Prompt Audit view model', () => {
     expect(hasExplicitDeleteRange(filters)).toBe(false)
     filters.start_at = '2026-07-15T10:00'
     filters.end_at = '2026-07-16T10:00'
-    filters.group_id = '9'
+    filters.platform_id = '9'
     expect(hasExplicitDeleteRange(filters)).toBe(true)
     expect(eventFilterPayload(filters)).toMatchObject({
-      group_id: 9,
+      platform_id: 9,
       start_at: new Date(filters.start_at).toISOString(),
       end_at: new Date(filters.end_at).toISOString(),
     })

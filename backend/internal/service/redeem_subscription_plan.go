@@ -16,7 +16,6 @@ func applySubscriptionPlanToRedeemCode(code *RedeemCode, plan *dbent.Subscriptio
 	planID := plan.ID
 	code.Type = RedeemTypeSubscription
 	code.SubscriptionPlanID = &planID
-	code.GroupID = nil
 	code.ValidityDays = validityDays
 	code.PlanNameSnapshot = plan.Name
 	code.DailyLimitUSDSnapshot = copyFloat64(plan.DailyLimitUsd)

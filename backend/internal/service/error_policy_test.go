@@ -479,7 +479,7 @@ func TestApplyErrorPolicy(t *testing.T) {
 				prefix:         "[test]",
 				account:        tt.account,
 				requestedModel: "claude-sonnet-4-5",
-				handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, groupID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
+				handleError: func(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte, requestedModel string, platformID int64, sessionHash string, isStickySession bool) *handleModelRateLimitResult {
 					handleErrorCount++
 					return nil
 				},
@@ -539,7 +539,7 @@ func TestApplyErrorPolicy_GeminiRateLimitBypassesCustomSkip(t *testing.T) {
 		prefix:      "[test]",
 		account:     account,
 		accountRepo: repo,
-		groupID:     42,
+		platformID:  42,
 		sessionHash: "gemini:sticky",
 		handleError: func(context.Context, string, *Account, int, http.Header, []byte, string, int64, string, bool) *handleModelRateLimitResult {
 			t.Fatal("model rate limit should be handled before custom error fallback")
@@ -556,7 +556,7 @@ func TestApplyErrorPolicy_GeminiRateLimitBypassesCustomSkip(t *testing.T) {
 	require.Equal(t, "gemini-3-flash", repo.modelRateLimitCalls[0].modelKey)
 	require.Equal(t, antigravityGeminiModelRateLimitKey, repo.modelRateLimitCalls[1].modelKey)
 	require.Len(t, cache.deleteCalls, 1)
-	require.Equal(t, int64(42), cache.deleteCalls[0].groupID)
+	require.Equal(t, int64(42), cache.deleteCalls[0].platformID)
 	require.Equal(t, "gemini:sticky", cache.deleteCalls[0].sessionHash)
 }
 

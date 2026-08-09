@@ -30,8 +30,8 @@ export interface PromptAuditConfig {
   worker_count: number
   queue_capacity: number
   scanners: string[]
-  all_groups: boolean
-  group_ids: number[]
+	all_platforms: boolean
+	platform_ids: number[]
   endpoints: PromptAuditEndpoint[]
   config_version: number
   updated_at: string
@@ -53,8 +53,8 @@ export interface PromptAuditUpdateRequest {
   worker_count: number
   queue_capacity: number
   scanners: string[]
-  all_groups: boolean
-  group_ids: number[]
+	all_platforms: boolean
+	platform_ids: number[]
   endpoints: Array<{
     id: string
     name: string
@@ -141,8 +141,8 @@ export interface PromptSnapshot {
   user_email: string
   api_key_id: number
   api_key_name: string
-  group_id?: number
-  group_name: string
+	platform_id?: number
+	platform_name: string
   provider: string
   endpoint: string
   protocol: string
@@ -199,7 +199,7 @@ export interface PromptEventFilters {
   decision: string
   risk_level: string
   endpoint: string
-  group_id: string
+	platform_id: string
   user_id: string
   api_key_id: string
   request_id: string
@@ -231,16 +231,17 @@ export interface PromptDeletePreview {
   expires_at: string
 }
 
-export interface PromptAuditGroup {
-  id: number
-  name: string
-  status: 'active' | 'inactive'
-  platform: string
+export interface PromptAuditPlatform {
+	id: number
+	code: string
+	name: string
+	account_platform: string
+	status: 'active' | 'inactive' | string
 }
 
 export interface PromptLoadErrors {
   config: string
   runtime: string
-  groups: string
+	platforms: string
   events: string
 }

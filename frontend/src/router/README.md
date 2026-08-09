@@ -36,7 +36,8 @@ This directory contains the Vue Router configuration for the Sub2API frontend ap
 | `/admin`           | -                  | Redirects to `/admin/dashboard` |
 | `/admin/dashboard` | AdminDashboardView | Admin dashboard                 |
 | `/admin/users`     | AdminUsersView     | User management                 |
-| `/admin/groups`    | AdminGroupsView    | Group management                |
+| `/admin/platforms` | AdminPlatformsView | Platform and model routing      |
+| `/admin/model-pricing` | AdminModelPricingView | Model pricing overrides     |
 | `/admin/accounts`  | AdminAccountsView  | Account management              |
 | `/admin/proxies`   | AdminProxiesView   | Proxy management                |
 | `/admin/redeem`    | AdminRedeemView    | Redeem code management          |

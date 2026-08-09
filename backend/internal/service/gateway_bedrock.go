@@ -21,8 +21,8 @@ import (
 // ApplyBedrockCCCompat 应用 Bedrock CC 兼容转换（渠道级模型映射后调用）
 // 清理 body 中 Anthropic API 专有字段、修复 thinking/tool_use ID、过滤 beta token，
 // 同时过滤 HTTP header 中的 anthropic-beta（防止 Passthrough 路径透传不支持的 token）。
-func (s *GatewayService) ApplyBedrockCCCompat(c *gin.Context, body []byte, model string, account *Account, groupID *int64) []byte {
-	if !s.isBedrockCCCompatEnabled(c.Request.Context(), account, groupID) {
+func (s *GatewayService) ApplyBedrockCCCompat(c *gin.Context, body []byte, model string, account *Account, platformID *int64) []byte {
+	if !s.isBedrockCCCompatEnabled(c.Request.Context(), account, platformID) {
 		return body
 	}
 	body = sanitizeBedrockCCFields(body)
@@ -41,15 +41,8 @@ func (s *GatewayService) ApplyBedrockCCCompat(c *gin.Context, body []byte, model
 }
 
 // isBedrockCCCompatEnabled 检查渠道是否启用了 Bedrock CC 兼容模式
-func (s *GatewayService) isBedrockCCCompatEnabled(ctx context.Context, account *Account, groupID *int64) bool {
-	if groupID == nil || s.channelService == nil {
-		return false
-	}
-	ch, err := s.channelService.GetChannelForGroup(ctx, *groupID)
-	if err != nil || ch == nil {
-		return false
-	}
-	return ch.IsBedrockCCCompatEnabled(account.Platform)
+func (s *GatewayService) isBedrockCCCompatEnabled(ctx context.Context, account *Account, platformID *int64) bool {
+	return false
 }
 
 // forwardBedrock 转发请求到 AWS Bedrock

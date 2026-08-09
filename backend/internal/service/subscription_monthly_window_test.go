@@ -35,7 +35,7 @@ func (r *activateWindowUserSubRepo) ActivateWindows(_ context.Context, _ int64, 
 
 func TestDelayedFirstUseAnchorsMonthlyWindowAtActivation(t *testing.T) {
 	repo := &activateWindowUserSubRepo{}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(repo, nil, nil, nil)
 	startsAt := time.Date(2026, 7, 1, 9, 0, 0, 0, time.UTC)
 	activatedAt := time.Date(2026, 7, 10, 23, 30, 0, 0, time.UTC)
 	svc.now = func() time.Time { return activatedAt }
@@ -58,7 +58,7 @@ func TestDelayedFirstUseAnchorsMonthlyWindowAtActivation(t *testing.T) {
 func TestThirtyDaySubscriptionDoesNotResetMonthlyQuotaBeforeExpiry(t *testing.T) {
 	startsAt := time.Date(2026, 7, 1, 23, 30, 0, 0, time.UTC)
 	expiresAt := startsAt.Add(30 * 24 * time.Hour)
-	renewed := renewedSubscriptionTerm(&UserSubscription{}, "", startsAt, expiresAt)
+	renewed := &UserSubscription{StartsAt: startsAt, ExpiresAt: expiresAt, MonthlyWindowStart: &startsAt}
 
 	require.Equal(t, startsAt, *renewed.MonthlyWindowStart)
 	require.False(t, renewed.NeedsMonthlyResetAt(expiresAt.Add(-time.Second)))
@@ -72,7 +72,7 @@ func TestCheckAndResetWindowsDoesNotResetExactThirtyDayLegacyMonthlyWindow(t *te
 	startsAt := time.Date(2026, 7, 1, 23, 30, 0, 0, time.UTC)
 	now := startsAt.Add(30 * 24 * time.Hour)
 	repo := &monthlyResetUserSubRepo{}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(repo, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 	sub := &UserSubscription{
 		ID:                 1,
@@ -95,7 +95,7 @@ func TestCheckAndResetWindowsResetsPartialFinalMonthlySubscriptions(t *testing.T
 			startsAt := time.Date(2026, 7, 1, 23, 30, 0, 0, time.UTC)
 			now := startsAt.Add(30 * 24 * time.Hour)
 			repo := &monthlyResetUserSubRepo{}
-			svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+			svc := NewSubscriptionService(repo, nil, nil, nil)
 			svc.now = func() time.Time { return now }
 			sub := &UserSubscription{
 				ID:                 2,
@@ -153,16 +153,17 @@ func TestValidateAndCheckLimitsKeepsLegacyMonthlyUsageBeforeExpiry(t *testing.T)
 	now := windowStart.Add(30 * 24 * time.Hour)
 	limit := 10.0
 	sub := &UserSubscription{
-		Status:             SubscriptionStatusActive,
-		StartsAt:           startsAt,
-		ExpiresAt:          startsAt.Add(30 * 24 * time.Hour),
-		MonthlyWindowStart: &windowStart,
-		MonthlyUsageUSD:    12,
+		Status:                  SubscriptionStatusActive,
+		StartsAt:                startsAt,
+		ExpiresAt:               startsAt.Add(30 * 24 * time.Hour),
+		MonthlyWindowStart:      &windowStart,
+		MonthlyUsageUSD:         12,
+		MonthlyLimitUSDSnapshot: &limit,
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
-	needsMaintenance, err := svc.ValidateAndCheckLimits(sub, &Group{MonthlyLimitUSD: &limit})
+	needsMaintenance, err := svc.ValidateAndCheckLimits(sub)
 
 	require.ErrorIs(t, err, ErrMonthlyLimitExceeded)
 	require.False(t, needsMaintenance)
@@ -175,16 +176,17 @@ func TestValidateAndCheckLimitsResetsMonthlyUsageWithPartialFinalPeriod(t *testi
 	now := startsAt.Add(30 * 24 * time.Hour)
 	limit := 10.0
 	sub := &UserSubscription{
-		Status:             SubscriptionStatusActive,
-		StartsAt:           startsAt,
-		ExpiresAt:          startsAt.Add(45 * 24 * time.Hour),
-		MonthlyWindowStart: &windowStart,
-		MonthlyUsageUSD:    12,
+		Status:                  SubscriptionStatusActive,
+		StartsAt:                startsAt,
+		ExpiresAt:               startsAt.Add(45 * 24 * time.Hour),
+		MonthlyWindowStart:      &windowStart,
+		MonthlyUsageUSD:         12,
+		MonthlyLimitUSDSnapshot: &limit,
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
-	needsMaintenance, err := svc.ValidateAndCheckLimits(sub, &Group{MonthlyLimitUSD: &limit})
+	needsMaintenance, err := svc.ValidateAndCheckLimits(sub)
 
 	require.NoError(t, err)
 	require.True(t, needsMaintenance)
@@ -194,10 +196,10 @@ func TestValidateAndCheckLimitsResetsMonthlyUsageWithPartialFinalPeriod(t *testi
 func TestValidateAndCheckLimitsRejectsExactExpiry(t *testing.T) {
 	now := time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)
 	sub := &UserSubscription{Status: SubscriptionStatusActive, ExpiresAt: now}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
-	needsMaintenance, err := svc.ValidateAndCheckLimits(sub, &Group{})
+	needsMaintenance, err := svc.ValidateAndCheckLimits(sub)
 
 	require.ErrorIs(t, err, ErrSubscriptionExpired)
 	require.False(t, needsMaintenance)

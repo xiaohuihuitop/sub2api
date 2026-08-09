@@ -36,7 +36,6 @@ func (UserSubscription) Mixin() []ent.Mixin {
 func (UserSubscription) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("user_id"),
-		field.Int64("group_id").Optional(),
 		field.Int64("subscription_plan_id").
 			Optional().
 			Nillable(),
@@ -110,10 +109,6 @@ func (UserSubscription) Edges() []ent.Edge {
 			Field("user_id").
 			Unique().
 			Required(),
-		edge.From("group", Group.Type).
-			Ref("subscriptions").
-			Field("group_id").
-			Unique(),
 		edge.From("subscription_plan", SubscriptionPlan.Type).
 			Ref("subscriptions").
 			Field("subscription_plan_id").
@@ -129,15 +124,13 @@ func (UserSubscription) Edges() []ent.Edge {
 func (UserSubscription) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("user_id"),
-		index.Fields("group_id"),
 		index.Fields("status"),
 		index.Fields("expires_at"),
 		// 活跃订阅查询复合索引（线上由 SQL 迁移创建部分索引，schema 仅用于模型可读性对齐）
 		index.Fields("user_id", "status", "expires_at"),
 		index.Fields("assigned_by"),
-		// 活跃候选按用户、分组、状态、到期和创建时间排序；迁移 192 移除了
-		// 旧的活跃用户/分组唯一索引，以支持同一分组的并行订阅实例。
-		index.Fields("user_id", "group_id", "status", "expires_at", "created_at").
+		// 活跃候选按用户、套餐、状态、到期和创建时间排序。
+		index.Fields("user_id", "subscription_plan_id", "status", "expires_at", "created_at").
 			StorageKey("idx_user_subscriptions_active_candidates").
 			Annotations(entsql.IndexWhere("deleted_at IS NULL")),
 		index.Fields("subscription_plan_id"),

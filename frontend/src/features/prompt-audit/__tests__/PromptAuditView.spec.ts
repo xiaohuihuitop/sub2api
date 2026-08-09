@@ -7,7 +7,7 @@ import PromptAuditView from '../PromptAuditView.vue'
 
 const mocks = vi.hoisted(() => ({
   getConfig: vi.fn(), updateConfig: vi.fn(), probeEndpoint: vi.fn(), getRuntime: vi.fn(), listEvents: vi.fn(),
-  getEvent: vi.fn(), deleteEvent: vi.fn(), batchDeleteEvents: vi.fn(), previewDelete: vi.fn(), deleteEventsByFilter: vi.fn(), listGroups: vi.fn(),
+  getEvent: vi.fn(), deleteEvent: vi.fn(), batchDeleteEvents: vi.fn(), previewDelete: vi.fn(), deleteEventsByFilter: vi.fn(), listPlatforms: vi.fn(),
   showSuccess: vi.fn(), showError: vi.fn(),
 }))
 
@@ -20,7 +20,7 @@ vi.mock('vue-i18n', async () => {
 
 const baseConfig = (): PromptAuditConfig => ({
   enabled: true, blocking_enabled: false, blocking_latest_turn_only: false, store_pass_events: false, effective_mode: 'async_audit', strategy: 'priority',
-  worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_groups: true, group_ids: [],
+  worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_platforms: true, platform_ids: [],
   endpoints: [{ id: 'guard-1', name: 'Guard One', protocol: 'openai_compatible', base_url: 'http://127.0.0.1:8000', model: 'guard-model', timeout_ms: 3000, input_limit: 4000, enabled: true, has_token: true, token_status: 'configured' }],
   config_version: 7, updated_at: '2026-07-16T00:00:00Z', updated_by: 1, change_summary: '{}',
 })
@@ -38,7 +38,7 @@ const EndpointStub = defineComponent({
   props: ['endpoints', 'probeResults', 'probingIds'], emits: ['update:endpoints', 'probe'],
   template: '<div data-test="endpoint"><button data-test="inject-secret" @click="$emit(\'update:endpoints\', endpoints.map((e) => ({ ...e, token: \'PROMPT_AUDIT_CANARY_SECRET_DO_NOT_PERSIST\' })))">secret</button><button data-test="probe" @click="$emit(\'probe\', endpoints[0])">probe</button></div>',
 })
-const PolicyStub = defineComponent({ props: ['draft', 'groups'], emits: ['update:draft'], template: '<div data-test="policy" />' })
+const PolicyStub = defineComponent({ props: ['draft', 'platforms'], emits: ['update:draft'], template: '<div data-test="policy" />' })
 const EventsStub = defineComponent({
   props: ['events', 'filters', 'selectedIds', 'loading', 'error', 'total', 'page', 'pageSize'],
   emits: ['filters-change', 'search', 'selection', 'page', 'page-size', 'view', 'delete', 'batch-delete', 'preview-delete'],
@@ -63,7 +63,7 @@ describe('PromptAuditView', () => {
     Object.values(mocks).forEach((mock) => mock.mockReset())
     mocks.getConfig.mockResolvedValue(baseConfig())
     mocks.getRuntime.mockResolvedValue(runtime())
-    mocks.listGroups.mockResolvedValue([])
+    mocks.listPlatforms.mockResolvedValue([])
     mocks.listEvents.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
     mocks.updateConfig.mockImplementation(async () => ({ ...baseConfig(), config_version: 8 }))
     mocks.probeEndpoint.mockResolvedValue({ ok: true, status: 'healthy', message: 'ok', latency_ms: 2, http_status: 200, retryable: false, checked_at: '2026-07-16T00:00:00Z', token_applied: true })
@@ -73,12 +73,12 @@ describe('PromptAuditView', () => {
     mocks.batchDeleteEvents.mockResolvedValue({ deleted_events: 2, deleted_jobs: 2 })
   })
 
-  it('starts config, runtime, groups, and events loads independently', async () => {
+  it('starts config, runtime, platforms, and events loads independently', async () => {
     mocks.getRuntime.mockRejectedValue(new Error('runtime offline'))
     const wrapper = mountView()
     expect(mocks.getConfig).toHaveBeenCalledOnce()
     expect(mocks.getRuntime).toHaveBeenCalledOnce()
-    expect(mocks.listGroups).toHaveBeenCalledOnce()
+    expect(mocks.listPlatforms).toHaveBeenCalledOnce()
     expect(mocks.listEvents).toHaveBeenCalledOnce()
     await flushPromises()
     expect(wrapper.get('[data-test="runtime"]').text()).toContain('runtime offline')

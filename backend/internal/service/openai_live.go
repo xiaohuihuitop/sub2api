@@ -58,11 +58,11 @@ func hashLiveCallID(callID string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func liveGroupID(groupID *int64) int64 {
-	if groupID == nil {
+func livePlatformID(platformID *int64) int64 {
+	if platformID == nil {
 		return 0
 	}
-	return *groupID
+	return *platformID
 }
 
 func liveOptionalID(value int64) *int64 {
@@ -148,7 +148,7 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 	for attempt := 0; attempt <= 3; attempt++ {
 		selection, _, selectErr := s.SelectAccountWithSchedulerForCapability(
 			ctx,
-			identity.GroupID,
+			identity.PlatformID,
 			"",
 			uuid.NewString(),
 			"",
@@ -215,8 +215,8 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 			AccountID:             account.ID,
 			APIKeyID:              identity.APIKeyID,
 			UserID:                identity.UserID,
-			GroupID:               liveGroupID(identity.GroupID),
-			SubscriptionID:        liveGroupID(identity.SubscriptionID),
+			PlatformID:            livePlatformID(identity.PlatformID),
+			SubscriptionID:        livePlatformID(identity.SubscriptionID),
 			LeaseID:               leaseID,
 			Model:                 model,
 			CreatedAt:             now,
@@ -476,7 +476,7 @@ func (s *OpenAIGatewayService) GetLiveCallForIdentity(
 	if record.CallID != callID ||
 		record.APIKeyID != identity.APIKeyID ||
 		record.UserID != identity.UserID ||
-		record.GroupID != liveGroupID(identity.GroupID) {
+		record.PlatformID != livePlatformID(identity.PlatformID) {
 		return nil, ErrLiveIdentityMismatch
 	}
 	if record.Controller == LiveControllerClosed {
@@ -836,7 +836,6 @@ func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) {
 		RequestID:        record.CallHash,
 		Model:            record.Model,
 		RequestedModel:   record.Model,
-		GroupID:          liveOptionalID(record.GroupID),
 		SubscriptionID:   liveOptionalID(record.SubscriptionID),
 		RateMultiplier:   1,
 		BillingType:      billingType,

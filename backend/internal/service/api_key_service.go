@@ -24,7 +24,6 @@ import (
 
 var (
 	ErrAPIKeyNotFound       = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
-	ErrGroupNotAllowed      = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
 	ErrAPIKeyExists         = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
 	ErrAPIKeyTooShort       = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
 	ErrAPIKeyInvalidChars   = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
@@ -60,13 +59,9 @@ const (
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
-	Name   bool
-	Status bool
-	Quota  bool
-	// GroupID remains an internal persistence bit until the legacy domain is
-	// removed in the schema/admin cleanup task. It is not part of any API Key
-	// request or response contract.
-	GroupID   bool
+	Name      bool
+	Status    bool
+	Quota     bool
 	ExpiresAt bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
 	QuotaUsed bool
@@ -104,14 +99,8 @@ type APIKeyRepository interface {
 	VerifyOwnership(ctx context.Context, userID int64, apiKeyIDs []int64) ([]int64, error)
 	CountByUserID(ctx context.Context, userID int64) (int64, error)
 	ExistsByKey(ctx context.Context, key string) (bool, error)
-	ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]APIKey, *pagination.PaginationResult, error)
 	SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error)
-	ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error)
-	// UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
-	UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error)
-	CountByGroupID(ctx context.Context, groupID int64) (int64, error)
 	ListKeysByUserID(ctx context.Context, userID int64) ([]string, error)
-	ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error)
 
 	// Quota methods
 	IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error)
@@ -123,12 +112,8 @@ type APIKeyRepository interface {
 	GetRateLimitData(ctx context.Context, id int64) (*APIKeyRateLimitData, error)
 }
 
-type APIKeyAllowedGroupRepository interface {
-	ReplaceAllowedGroups(ctx context.Context, keyID int64, groupIDs []int64) error
-}
-
-// APIKeyAssetPermissionRepository is deliberately optional while old API key
-// repositories remain compatible with the legacy group-only read path.
+// APIKeyAssetPermissionRepository persists the complete Platform/Plan/balance
+// authorization contract for an API key.
 type APIKeyAssetPermissionRepository interface {
 	ReplaceAssetPermissions(ctx context.Context, keyID int64, permissions APIKeyAssetPermissions) error
 }
@@ -216,7 +201,6 @@ func NotifyAuthCacheSubscriptionReady(ctx context.Context) {
 type APIKeyAuthCacheInvalidator interface {
 	InvalidateAuthCacheByKey(ctx context.Context, key string)
 	InvalidateAuthCacheByUserID(ctx context.Context, userID int64)
-	InvalidateAuthCacheByGroupID(ctx context.Context, groupID int64)
 }
 
 // CreateAPIKeyRequest 创建API Key请求
@@ -271,9 +255,7 @@ type RateLimitCacheInvalidator interface {
 type APIKeyService struct {
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
-	groupRepo                 GroupRepository
 	userSubRepo               UserSubscriptionRepository
-	userGroupRateRepo         UserGroupRateRepository
 	cache                     APIKeyCache
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
@@ -321,20 +303,16 @@ func (s *APIKeyService) AuthLookupMetrics() APIKeyAuthLookupMetrics {
 func NewAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
-	groupRepo GroupRepository,
 	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
 	svc := &APIKeyService{
-		apiKeyRepo:        apiKeyRepo,
-		userRepo:          userRepo,
-		groupRepo:         groupRepo,
-		userSubRepo:       userSubRepo,
-		userGroupRateRepo: userGroupRateRepo,
-		cache:             cache,
-		cfg:               cfg,
+		apiKeyRepo:  apiKeyRepo,
+		userRepo:    userRepo,
+		userSubRepo: userSubRepo,
+		cache:       cache,
+		cfg:         cfg,
 	}
 	svc.initAuthCache(cfg)
 	lookupConcurrency := defaultAuthLookupConcurrency
@@ -435,56 +413,6 @@ func (s *APIKeyService) incrementAPIKeyErrorCount(ctx context.Context, userID in
 	}
 
 	_ = s.cache.IncrementCreateAttemptCount(ctx, userID)
-}
-
-// canUserBindGroup 检查用户是否可以绑定指定分组
-// 对于订阅类型分组：检查用户是否有有效订阅
-// 对于标准类型分组：使用原有的 AllowedGroups 和 IsExclusive 逻辑
-func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group *Group) bool {
-	// 订阅类型分组：需要有效订阅
-	if group.IsSubscriptionType() {
-		_, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, user.ID, group.ID)
-		return err == nil // 有有效订阅则允许
-	}
-	// 标准类型分组：使用原有逻辑
-	return user.CanBindGroup(group.ID, group.IsExclusive)
-}
-
-func (s *APIKeyService) validateAPIKeyAllowedGroups(
-	ctx context.Context,
-	user *User,
-	groupIDs []int64,
-	existingGroupIDs map[int64]struct{},
-) ([]Group, error) {
-	groups := make([]Group, 0, len(groupIDs))
-	for _, groupID := range groupIDs {
-		group, err := s.groupRepo.GetByID(ctx, groupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-		_, wasAlreadyBound := existingGroupIDs[groupID]
-		if !s.canUserBindGroup(ctx, user, group) && (!wasAlreadyBound || !group.IsSubscriptionType()) {
-			return nil, ErrGroupNotAllowed
-		}
-		groups = append(groups, *group)
-	}
-	return sortAPIKeyAllowedGroups(groups), nil
-}
-
-func apiKeyExistingGroupIDs(apiKey *APIKey) map[int64]struct{} {
-	ids := make(map[int64]struct{})
-	if apiKey == nil {
-		return ids
-	}
-	for _, id := range apiKey.AllowedGroupIDs {
-		if id > 0 {
-			ids[id] = struct{}{}
-		}
-	}
-	if len(ids) == 0 && apiKey.GroupID != nil && *apiKey.GroupID > 0 {
-		ids[*apiKey.GroupID] = struct{}{}
-	}
-	return ids
 }
 
 // Create 创建API Key
@@ -1022,78 +950,12 @@ func (s *APIKeyService) IncrementUsage(ctx context.Context, keyID int64) error {
 	return nil
 }
 
-// GetAvailableGroups 获取用户有权限绑定的分组列表
-// 返回用户可以选择的分组：
-// - 标准类型分组：公开的（非专属）或用户被明确允许的
-// - 订阅类型分组：用户有有效订阅的
-func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([]Group, error) {
-	// 获取用户信息
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get user: %w", err)
-	}
-
-	// 获取所有活跃分组
-	allGroups, err := s.groupRepo.ListActive(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list active groups: %w", err)
-	}
-
-	// 获取用户的所有有效订阅
-	activeSubscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list active subscriptions: %w", err)
-	}
-
-	// 构建订阅分组 ID 集合
-	subscribedGroupIDs := make(map[int64]bool)
-	for _, sub := range activeSubscriptions {
-		subscribedGroupIDs[sub.GroupID] = true
-	}
-
-	// 过滤出用户有权限的分组
-	availableGroups := make([]Group, 0)
-	for _, group := range allGroups {
-		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
-			availableGroups = append(availableGroups, group)
-		}
-	}
-
-	return availableGroups, nil
-}
-
-// canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）
-func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subscribedGroupIDs map[int64]bool) bool {
-	// 订阅类型分组：需要有效订阅
-	if group.IsSubscriptionType() {
-		return subscribedGroupIDs[group.ID]
-	}
-	// 标准类型分组：使用原有逻辑
-	return user.CanBindGroup(group.ID, group.IsExclusive)
-}
-
 func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error) {
 	keys, err := s.apiKeyRepo.SearchAPIKeys(ctx, userID, keyword, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search api keys: %w", err)
 	}
 	return keys, nil
-}
-
-// GetUserAllowedGroupIDSet 返回 user_allowed_groups 授权给该用户的专属分组 ID 集合。
-//
-// 与 GetAvailableGroups 的区别：这里是「橱窗」语义（模型广场用），不检查订阅有效性，
-// 也不关心分组是否活跃——仅回答"哪些专属分组对该用户可见"。返回值恒非 nil。
-func (s *APIKeyService) GetUserAllowedGroupIDSet(ctx context.Context, userID int64) (map[int64]struct{}, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get user: %w", err)
-	}
-	allowed := make(map[int64]struct{}, len(user.AllowedGroups))
-	for _, id := range user.AllowedGroups {
-		allowed[id] = struct{}{}
-	}
-	return allowed, nil
 }
 
 // CheckAPIKeyQuotaAndExpiry checks if the API key is valid for use (not expired, quota not exhausted)

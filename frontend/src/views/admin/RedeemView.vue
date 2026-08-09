@@ -132,8 +132,8 @@
             <span class="text-sm font-medium text-gray-900 dark:text-white">
               <template v-if="row.type === 'balance'">${{ value.toFixed(2) }}</template>
               <template v-else-if="row.type === 'subscription'">
-                <span v-if="row.plan_name_snapshot || row.group" class="mr-1">
-                  {{ row.plan_name_snapshot || row.group?.name }}
+                <span v-if="row.plan_name_snapshot" class="mr-1">
+                  {{ row.plan_name_snapshot }}
                 </span>
                 <span class="text-xs text-gray-500 dark:text-gray-400">
                   {{ row.validity_days || 30 }} {{ t('admin.redeem.days') }}
@@ -313,7 +313,7 @@
                 {{ t('admin.redeem.invitationHint') }}
               </p>
             </div>
-            <!-- 订阅类型：显示分组选择和有效天数 -->
+            <!-- 订阅类型：选择套餐 -->
             <template v-if="generateForm.type === 'subscription'">
               <div>
                 <label class="input-label">{{ t('admin.redeem.selectPlan') }}</label>
@@ -593,13 +593,13 @@ const showResultDialog = ref(false)
 const generatedCodes = ref<RedeemCode[]>([])
 const subscriptionPlans = ref<SubscriptionPlan[]>([])
 
-// 订阅类型分组选项
+// 订阅套餐选项
 const subscriptionPlanOptions = computed(() =>
   [...subscriptionPlans.value]
     .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
     .map((plan) => ({
       value: plan.id,
-      label: plan.group_name ? `${plan.name} (${plan.group_name})` : plan.name
+      label: plan.name
     }))
 )
 
@@ -940,7 +940,7 @@ const buildBatchUpdateFields = (): BatchUpdateRedeemCodeFields | null => {
 }
 
 const handleGenerateCodes = async () => {
-  // 订阅类型必须选择分组
+  // 订阅类型必须选择套餐
   if (generateForm.type === 'subscription' && !generateForm.subscription_plan_id) {
     appStore.showError(t('admin.redeem.planRequired'))
     return
@@ -1086,7 +1086,7 @@ const handleBatchUpdate = async () => {
   }
 }
 
-// 加载订阅类型分组
+// 加载可用订阅套餐
 const loadSubscriptionPlans = async () => {
   try {
     const response = await adminPaymentAPI.getPlans()

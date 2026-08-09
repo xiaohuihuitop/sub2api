@@ -20,9 +20,6 @@ const (
 	// RequestedPublicModel 是客户端原始请求中的公开模型名。
 	RequestedPublicModel Key = "ctx_requested_public_model"
 
-	// CompositeRouteSource 标识 composite 解析结果来自显式路由还是内置模型探测。
-	CompositeRouteSource Key = "ctx_composite_route_source"
-
 	// RequestID 为服务端生成/透传的请求 ID。
 	RequestID Key = "ctx_request_id"
 
@@ -53,9 +50,6 @@ const (
 	// OpenAIImageGenerationIntent 标识 OpenAI 请求会触发生图能力（用于图片能力维度限流）
 	OpenAIImageGenerationIntent Key = "ctx_openai_image_generation_intent"
 
-	// Group 认证后的分组信息，由 API Key 认证中间件设置
-	Group Key = "ctx_group"
-
 	// UserID 认证后的 Sub2API 用户 ID，由 API Key 认证中间件设置。
 	// 供 service 层执行用户级策略，不能使用客户端请求体中的 user 标识替代。
 	UserID Key = "ctx_user_id"
@@ -72,9 +66,9 @@ const (
 	// Service 层可复用该值，避免同请求链路重复读取 Redis。
 	PrefetchedStickyAccountID Key = "ctx_prefetched_sticky_account_id"
 
-	// PrefetchedStickyGroupID 标识上游预取 sticky session 时所使用的分组 ID。
-	// Service 层仅在分组匹配时复用 PrefetchedStickyAccountID，避免分组切换重试误用旧 sticky。
-	PrefetchedStickyGroupID Key = "ctx_prefetched_sticky_group_id"
+	// PrefetchedStickyPlatformNamespaceID 标识上游预取 sticky session 时所使用的平台调度命名空间 ID。
+	// Service 层仅在平台调度命名空间匹配时复用 PrefetchedStickyAccountID，避免平台切换重试误用旧 sticky。
+	PrefetchedStickyPlatformNamespaceID Key = "ctx_prefetched_sticky_platform_namespace_id"
 
 	// ClaudeCodeVersion stores the extracted Claude Code version from User-Agent (e.g. "2.1.22")
 	ClaudeCodeVersion Key = "ctx_claude_code_version"

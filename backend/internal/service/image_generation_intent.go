@@ -12,8 +12,12 @@ const (
 	responsesLiteHeader              = "X-OpenAI-Internal-Codex-Responses-Lite"
 	responsesLiteHeaderKey           = "x-openai-internal-codex-responses-lite"
 	responsesLiteWSMetadataKey       = "ws_request_header_x_openai_internal_codex_responses_lite"
-	imageGenerationPermissionMessage = "Image generation is not enabled for this group"
+	imageGenerationPermissionMessage = "Image generation is not enabled for the selected platform"
 )
+
+func ImageGenerationPermissionMessage() string {
+	return imageGenerationPermissionMessage
+}
 
 func isOpenAIResponsesLiteHeader(value string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), "true")
@@ -24,16 +28,6 @@ func isOpenAIResponsesLiteWebSocketPayload(body []byte) bool {
 		return false
 	}
 	return isOpenAIResponsesLiteHeader(gjson.GetBytes(body, "client_metadata."+responsesLiteWSMetadataKey).String())
-}
-
-// ImageGenerationPermissionMessage returns the stable end-user error text for disabled groups.
-func ImageGenerationPermissionMessage() string {
-	return imageGenerationPermissionMessage
-}
-
-// GroupAllowsImageGeneration preserves ungrouped-key behavior and enforces the flag when a group is present.
-func GroupAllowsImageGeneration(group *Group) bool {
-	return group == nil || group.AllowImageGeneration
 }
 
 // IsImageGenerationIntent classifies requests that can produce generated images.
@@ -404,13 +398,6 @@ func getAPIKeyFromContext(c interface{ Get(string) (any, bool) }) *APIKey {
 	}
 	apiKey, _ := v.(*APIKey)
 	return apiKey
-}
-
-func apiKeyGroup(apiKey *APIKey) *Group {
-	if apiKey == nil {
-		return nil
-	}
-	return apiKey.Group
 }
 
 type OpenAIResponsesImageBillingConfig struct {

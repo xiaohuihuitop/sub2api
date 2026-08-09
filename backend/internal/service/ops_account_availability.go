@@ -8,10 +8,10 @@ import (
 
 // GetAccountAvailabilityStats returns current account availability stats.
 //
-// Query-level filtering is intentionally limited to platform/group to match the dashboard scope.
-func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFilter string, groupIDFilter *int64) (
+// Query-level filtering is intentionally limited to protocol platform and platform pool.
+func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFilter string, platformIDFilter *int64) (
 	map[string]*PlatformAvailability,
-	map[int64]*GroupAvailability,
+	map[int64]*PlatformIDAvailability,
 	map[int64]*AccountAvailability,
 	*time.Time,
 	error,
@@ -20,29 +20,16 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 		return nil, nil, nil, nil, err
 	}
 
-	accounts, err := s.listAllAccountsForOps(ctx, platformFilter, groupIDFilter)
+	accounts, err := s.listAllAccountsForOps(ctx, platformFilter, platformIDFilter)
 	if err != nil {
 		return nil, nil, nil, nil, err
-	}
-
-	if groupIDFilter != nil && *groupIDFilter > 0 {
-		filtered := make([]Account, 0, len(accounts))
-		for _, acc := range accounts {
-			for _, grp := range acc.Groups {
-				if grp != nil && grp.ID == *groupIDFilter {
-					filtered = append(filtered, acc)
-					break
-				}
-			}
-		}
-		accounts = filtered
 	}
 
 	now := time.Now()
 	collectedAt := now
 
 	platform := make(map[string]*PlatformAvailability)
-	group := make(map[int64]*GroupAvailability)
+	platformPools := make(map[int64]*PlatformIDAvailability)
 	account := make(map[int64]*AccountAvailability)
 
 	for _, acc := range accounts {
@@ -86,43 +73,10 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 			}
 		}
 
-		for _, grp := range acc.Groups {
-			if grp == nil || grp.ID <= 0 {
-				continue
-			}
-			if _, ok := group[grp.ID]; !ok {
-				group[grp.ID] = &GroupAvailability{
-					GroupID:   grp.ID,
-					GroupName: grp.Name,
-					Platform:  grp.Platform,
-				}
-			}
-			g := group[grp.ID]
-			g.TotalAccounts++
-			if isAvailable {
-				g.AvailableCount++
-			}
-			if isRateLimited {
-				g.RateLimitCount++
-			}
-			if hasError {
-				g.ErrorCount++
-			}
-		}
-
-		displayGroupID := int64(0)
-		displayGroupName := ""
-		if len(acc.Groups) > 0 && acc.Groups[0] != nil {
-			displayGroupID = acc.Groups[0].ID
-			displayGroupName = acc.Groups[0].Name
-		}
-
 		item := &AccountAvailability{
 			AccountID:   acc.ID,
 			AccountName: acc.Name,
 			Platform:    acc.Platform,
-			GroupID:     displayGroupID,
-			GroupName:   displayGroupName,
 			Status:      acc.Status,
 
 			IsAvailable:   isAvailable,
@@ -131,6 +85,32 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 			HasError:      hasError,
 
 			ErrorMessage: acc.ErrorMessage,
+		}
+		if acc.PlatformID != nil {
+			item.PlatformID = *acc.PlatformID
+			item.PlatformName = acc.PlatformName
+		}
+
+		if acc.PlatformID != nil && *acc.PlatformID > 0 {
+			poolID := *acc.PlatformID
+			if _, ok := platformPools[poolID]; !ok {
+				platformPools[poolID] = &PlatformIDAvailability{
+					PlatformID:   poolID,
+					PlatformName: acc.PlatformName,
+					Platform:     acc.Platform,
+				}
+			}
+			pool := platformPools[poolID]
+			pool.TotalAccounts++
+			if isAvailable {
+				pool.AvailableCount++
+			}
+			if isRateLimited {
+				pool.RateLimitCount++
+			}
+			if hasError {
+				pool.ErrorCount++
+			}
 		}
 
 		if isRateLimited && acc.RateLimitResetAt != nil {
@@ -154,32 +134,32 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 		account[acc.ID] = item
 	}
 
-	return platform, group, account, &collectedAt, nil
+	return platform, platformPools, account, &collectedAt, nil
 }
 
 type OpsAccountAvailability struct {
-	Group       *GroupAvailability
-	Accounts    map[int64]*AccountAvailability
-	CollectedAt *time.Time
+	PlatformPool *PlatformIDAvailability
+	Accounts     map[int64]*AccountAvailability
+	CollectedAt  *time.Time
 }
 
-func (s *OpsService) GetAccountAvailability(ctx context.Context, platformFilter string, groupIDFilter *int64) (*OpsAccountAvailability, error) {
+func (s *OpsService) GetAccountAvailability(ctx context.Context, platformFilter string, platformIDFilter *int64) (*OpsAccountAvailability, error) {
 	if s == nil {
 		return nil, errors.New("ops service is nil")
 	}
 
 	if s.getAccountAvailability != nil {
-		return s.getAccountAvailability(ctx, platformFilter, groupIDFilter)
+		return s.getAccountAvailability(ctx, platformFilter, platformIDFilter)
 	}
 
-	_, groupStats, accountStats, collectedAt, err := s.GetAccountAvailabilityStats(ctx, platformFilter, groupIDFilter)
+	_, platformIDStats, accountStats, collectedAt, err := s.GetAccountAvailabilityStats(ctx, platformFilter, platformIDFilter)
 	if err != nil {
 		return nil, err
 	}
 
-	var group *GroupAvailability
-	if groupIDFilter != nil && *groupIDFilter > 0 {
-		group = groupStats[*groupIDFilter]
+	var platformPool *PlatformIDAvailability
+	if platformIDFilter != nil && *platformIDFilter > 0 {
+		platformPool = platformIDStats[*platformIDFilter]
 	}
 
 	if accountStats == nil {
@@ -187,8 +167,8 @@ func (s *OpsService) GetAccountAvailability(ctx context.Context, platformFilter 
 	}
 
 	return &OpsAccountAvailability{
-		Group:       group,
-		Accounts:    accountStats,
-		CollectedAt: collectedAt,
+		PlatformPool: platformPool,
+		Accounts:     accountStats,
+		CollectedAt:  collectedAt,
 	}, nil
 }

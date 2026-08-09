@@ -12,14 +12,11 @@ var (
 	ErrPlatformEndpointUnsupported = infraerrors.Forbidden("PLATFORM_ENDPOINT_UNSUPPORTED", "the resolved platform does not support this endpoint")
 )
 
-// GatewayPlatformAssetContext carries the explicit V2 route for one request.
-// PricingGroupID is a read-only compatibility reference only; schedulers must
-// use SchedulingScope rather than this legacy group ID.
+// GatewayPlatformAssetContext carries the explicit route for one request.
 type GatewayPlatformAssetContext struct {
 	Platform        *ResolvedPlatformModel
 	BillingAsset    *ResolvedBillingAsset
 	SchedulingScope PlatformSchedulingScope
-	PricingGroupID  *int64
 }
 
 // UsesPlatformAssetPermissions reports whether an API Key has at least one
@@ -56,7 +53,6 @@ func cloneResolvedPlatformModel(value *ResolvedPlatformModel) *ResolvedPlatformM
 	}
 	cloned := *value
 	cloned.EndpointCapabilities = append([]string(nil), value.EndpointCapabilities...)
-	cloned.LegacyGroupID = clonePlatformInt64Pointer(value.LegacyGroupID)
 	return &cloned
 }
 
@@ -77,34 +73,6 @@ func cloneResolvedBillingAsset(value *ResolvedBillingAsset) *ResolvedBillingAsse
 	return &cloned
 }
 
-// PlatformAssetPricingGroupIDFromContext exposes the optional legacy pricing
-// reference without making it part of account selection or billing eligibility.
-func PlatformAssetPricingGroupIDFromContext(ctx context.Context) (*int64, bool) {
-	route, ok := GatewayPlatformAssetContextFromContext(ctx)
-	if !ok || route.PricingGroupID == nil {
-		return nil, false
-	}
-	return clonePlatformInt64Pointer(route.PricingGroupID), true
-}
-
-func effectivePricingGroupID(ctx context.Context, apiKey *APIKey) *int64 {
-	if _, ok := GatewayPlatformAssetContextFromContext(ctx); ok {
-		// A V2 route is priced by its resolved adapter. Never fall back to the
-		// API key's historical GroupID after the route has been resolved.
-		if groupID, ok := PlatformAssetPricingGroupIDFromContext(ctx); ok {
-			return groupID
-		}
-		return nil
-	}
-	if groupID, ok := PlatformAssetPricingGroupIDFromContext(ctx); ok {
-		return groupID
-	}
-	if apiKey == nil {
-		return nil
-	}
-	return clonePlatformInt64Pointer(apiKey.GroupID)
-}
-
 func effectivePricingAdapter(ctx context.Context, apiKey *APIKey) string {
 	if route, ok := GatewayPlatformAssetContextFromContext(ctx); ok && route.Platform != nil {
 		if adapter := strings.TrimSpace(route.Platform.AccountPlatform); adapter != "" {
@@ -114,9 +82,6 @@ func effectivePricingAdapter(ctx context.Context, apiKey *APIKey) string {
 	if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok {
 		return strings.TrimSpace(platform)
 	}
-	// Legacy API keys continue to resolve pricing through GroupID. Their group
-	// platform is a routing hint only and must not silently become a new
-	// independent pricing selector.
 	return ""
 }
 
@@ -124,10 +89,6 @@ func pricingInputForRequest(ctx context.Context, apiKey *APIKey, model string) P
 	input := PricingInput{
 		Model:   model,
 		Adapter: effectivePricingAdapter(ctx, apiKey),
-		GroupID: effectivePricingGroupID(ctx, apiKey),
-	}
-	if input.Adapter != "" {
-		input.GroupID = nil
 	}
 	return input
 }

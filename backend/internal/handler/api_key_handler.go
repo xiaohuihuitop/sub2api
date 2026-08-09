@@ -41,10 +41,17 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService, platformPools platfo
 }
 
 type availablePlatformPoolResponse struct {
-	ID              int64  `json:"id"`
-	Code            string `json:"code"`
-	Name            string `json:"name"`
-	AccountPlatform string `json:"account_platform"`
+	ID              int64                            `json:"id"`
+	Code            string                           `json:"code"`
+	Name            string                           `json:"name"`
+	AccountPlatform string                           `json:"account_platform"`
+	Models          []availablePlatformModelResponse `json:"models,omitempty"`
+}
+
+type availablePlatformModelResponse struct {
+	Pattern              string   `json:"pattern"`
+	UpstreamModel        string   `json:"upstream_model,omitempty"`
+	EndpointCapabilities []string `json:"endpoint_capabilities,omitempty"`
 }
 
 // CreateAPIKeyRequest represents the create API key request payload
@@ -291,8 +298,9 @@ func (h *APIKeyHandler) Delete(c *gin.Context) {
 }
 
 // GetAvailablePlatforms returns active platform-pool metadata for API Key
-// authorization. It intentionally excludes model rules, legacy groups, and
-// account details.
+// authorization and the user-facing platform catalog. It exposes only active
+// model patterns and endpoint capabilities; account details
+// never leave the service boundary.
 // GET /api/v1/platforms/available
 func (h *APIKeyHandler) GetAvailablePlatforms(c *gin.Context) {
 	if _, ok := middleware2.GetAuthSubjectFromContext(c); !ok {
@@ -321,7 +329,23 @@ func (h *APIKeyHandler) GetAvailablePlatforms(c *gin.Context) {
 			Code:            platform.Code,
 			Name:            platform.Name,
 			AccountPlatform: platform.AccountPlatform,
+			Models:          availablePlatformModels(platform.ModelRules),
 		})
 	}
 	response.Success(c, available)
+}
+
+func availablePlatformModels(rules []service.PlatformModelRule) []availablePlatformModelResponse {
+	models := make([]availablePlatformModelResponse, 0, len(rules))
+	for _, rule := range rules {
+		if !rule.Enabled || strings.TrimSpace(rule.ModelPattern) == "" {
+			continue
+		}
+		models = append(models, availablePlatformModelResponse{
+			Pattern:              rule.ModelPattern,
+			UpstreamModel:        rule.UpstreamModel,
+			EndpointCapabilities: append([]string(nil), rule.EndpointCapabilities...),
+		})
+	}
+	return models
 }

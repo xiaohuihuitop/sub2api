@@ -32,7 +32,6 @@ func (s *UserRepoSuite) SetupTest() {
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM auth_identity_channels")
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM auth_identities")
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM user_subscriptions")
-	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM user_allowed_groups")
 	_, _ = integrationDB.ExecContext(s.ctx, "DELETE FROM users")
 }
 
@@ -63,24 +62,15 @@ func (s *UserRepoSuite) mustCreateUser(u *service.User) *service.User {
 	return u
 }
 
-func (s *UserRepoSuite) mustCreateGroup(name string) *service.Group {
-	s.T().Helper()
-
-	g, err := s.client.Group.Create().
-		SetName(name).
-		SetStatus(service.StatusActive).
-		Save(s.ctx)
-	s.Require().NoError(err, "create group")
-	return groupEntityToService(g)
-}
-
-func (s *UserRepoSuite) mustCreateSubscription(userID, groupID int64, mutate func(*dbent.UserSubscriptionCreate)) *dbent.UserSubscription {
+func (s *UserRepoSuite) mustCreateSubscription(userID, planID int64, mutate func(*dbent.UserSubscriptionCreate)) *dbent.UserSubscription {
 	s.T().Helper()
 
 	now := time.Now()
 	create := s.client.UserSubscription.Create().
 		SetUserID(userID).
-		SetGroupID(groupID).
+		SetSubscriptionPlanID(planID).
+		SetPlanNameSnapshot("test-plan").
+		SetRateMultiplierSnapshot(1).
 		SetStartsAt(now.Add(-1 * time.Hour)).
 		SetExpiresAt(now.Add(24 * time.Hour)).
 		SetStatus(service.SubscriptionStatusActive).
@@ -336,14 +326,16 @@ func (s *UserRepoSuite) TestListWithFilters_SearchByUsername() {
 
 func (s *UserRepoSuite) TestListWithFilters_LoadsActiveSubscriptions() {
 	user := s.mustCreateUser(&service.User{Email: "sub@test.com", Status: service.StatusActive})
-	groupActive := s.mustCreateGroup("g-sub-active")
-	groupExpired := s.mustCreateGroup("g-sub-expired")
+	planActive := createSubscriptionPlanForTest(s.T(), s.client, "active-plan")
+	planExpired := createSubscriptionPlanForTest(s.T(), s.client, "expired-plan")
 
-	_ = s.mustCreateSubscription(user.ID, groupActive.ID, func(c *dbent.UserSubscriptionCreate) {
+	_ = s.mustCreateSubscription(user.ID, planActive, func(c *dbent.UserSubscriptionCreate) {
+		c.SetPlanNameSnapshot("active-plan")
 		c.SetStatus(service.SubscriptionStatusActive)
 		c.SetExpiresAt(time.Now().Add(1 * time.Hour))
 	})
-	_ = s.mustCreateSubscription(user.ID, groupExpired.ID, func(c *dbent.UserSubscriptionCreate) {
+	_ = s.mustCreateSubscription(user.ID, planExpired, func(c *dbent.UserSubscriptionCreate) {
+		c.SetPlanNameSnapshot("expired-plan")
 		c.SetStatus(service.SubscriptionStatusExpired)
 		c.SetExpiresAt(time.Now().Add(-1 * time.Hour))
 	})
@@ -352,8 +344,9 @@ func (s *UserRepoSuite) TestListWithFilters_LoadsActiveSubscriptions() {
 	s.Require().NoError(err, "ListWithFilters")
 	s.Require().Len(users, 1, "expected 1 user")
 	s.Require().Len(users[0].Subscriptions, 1, "expected 1 active subscription")
-	s.Require().NotNil(users[0].Subscriptions[0].Group, "expected subscription group preload")
-	s.Require().Equal(groupActive.ID, users[0].Subscriptions[0].Group.ID, "group ID mismatch")
+	s.Require().NotNil(users[0].Subscriptions[0].SubscriptionPlanID)
+	s.Require().Equal(planActive, *users[0].Subscriptions[0].SubscriptionPlanID)
+	s.Require().Equal("active-plan", users[0].Subscriptions[0].PlanNameSnapshot)
 }
 
 func (s *UserRepoSuite) TestListWithFilters_CombinedFilters() {
@@ -538,45 +531,6 @@ func (s *UserRepoSuite) TestExistsByEmail() {
 	notExists, err := s.repo.ExistsByEmail(s.ctx, "notexists@test.com")
 	s.Require().NoError(err)
 	s.Require().False(notExists)
-}
-
-// --- RemoveGroupFromAllowedGroups ---
-
-func (s *UserRepoSuite) TestRemoveGroupFromAllowedGroups() {
-	target := s.mustCreateGroup("target-42")
-	other := s.mustCreateGroup("other-7")
-
-	userA := s.mustCreateUser(&service.User{
-		Email:         "a1@example.com",
-		AllowedGroups: []int64{target.ID, other.ID},
-	})
-	s.mustCreateUser(&service.User{
-		Email:         "a2@example.com",
-		AllowedGroups: []int64{other.ID},
-	})
-
-	affected, err := s.repo.RemoveGroupFromAllowedGroups(s.ctx, target.ID)
-	s.Require().NoError(err, "RemoveGroupFromAllowedGroups")
-	s.Require().Equal(int64(1), affected, "expected 1 affected row")
-
-	got, err := s.repo.GetByID(s.ctx, userA.ID)
-	s.Require().NoError(err, "GetByID")
-	s.Require().NotContains(got.AllowedGroups, target.ID)
-	s.Require().Contains(got.AllowedGroups, other.ID)
-}
-
-func (s *UserRepoSuite) TestRemoveGroupFromAllowedGroups_NoMatch() {
-	groupA := s.mustCreateGroup("nomatch-a")
-	groupB := s.mustCreateGroup("nomatch-b")
-
-	s.mustCreateUser(&service.User{
-		Email:         "nomatch@test.com",
-		AllowedGroups: []int64{groupA.ID, groupB.ID},
-	})
-
-	affected, err := s.repo.RemoveGroupFromAllowedGroups(s.ctx, 999999)
-	s.Require().NoError(err)
-	s.Require().Zero(affected, "expected no affected rows")
 }
 
 // --- GetFirstAdmin ---

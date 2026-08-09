@@ -18,7 +18,6 @@ type RedeemCode struct {
 	CreatedAt time.Time
 	ExpiresAt *time.Time
 
-	GroupID                 *int64
 	SubscriptionPlanID      *int64
 	PlanNameSnapshot        string
 	DailyLimitUSDSnapshot   *float64
@@ -27,8 +26,7 @@ type RedeemCode struct {
 	RateMultiplierSnapshot  float64
 	ValidityDays            int
 
-	User  *User
-	Group *Group
+	User *User
 }
 
 func (r *RedeemCode) IsUsed() bool {

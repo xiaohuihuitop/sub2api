@@ -16,16 +16,17 @@ import (
 )
 
 const (
-	SettingPaymentEnabled      = "payment_enabled"
-	SettingMinRechargeAmount   = "MIN_RECHARGE_AMOUNT"
-	SettingMaxRechargeAmount   = "MAX_RECHARGE_AMOUNT"
-	SettingDailyRechargeLimit  = "DAILY_RECHARGE_LIMIT"
-	SettingOrderTimeoutMinutes = "ORDER_TIMEOUT_MINUTES"
-	SettingMaxPendingOrders    = "MAX_PENDING_ORDERS"
-	SettingEnabledPaymentTypes = "ENABLED_PAYMENT_TYPES"
-	SettingLoadBalanceStrategy = "LOAD_BALANCE_STRATEGY"
-	SettingBalancePayDisabled  = "BALANCE_PAYMENT_DISABLED"
-	SettingBalanceRechargeMult = "BALANCE_RECHARGE_MULTIPLIER"
+	SettingKeyGlobalBalanceRateMultiplier = "global_balance_rate_multiplier"
+	SettingPaymentEnabled                 = "payment_enabled"
+	SettingMinRechargeAmount              = "MIN_RECHARGE_AMOUNT"
+	SettingMaxRechargeAmount              = "MAX_RECHARGE_AMOUNT"
+	SettingDailyRechargeLimit             = "DAILY_RECHARGE_LIMIT"
+	SettingOrderTimeoutMinutes            = "ORDER_TIMEOUT_MINUTES"
+	SettingMaxPendingOrders               = "MAX_PENDING_ORDERS"
+	SettingEnabledPaymentTypes            = "ENABLED_PAYMENT_TYPES"
+	SettingLoadBalanceStrategy            = "LOAD_BALANCE_STRATEGY"
+	SettingBalancePayDisabled             = "BALANCE_PAYMENT_DISABLED"
+	SettingBalanceRechargeMult            = "BALANCE_RECHARGE_MULTIPLIER"
 	// SettingSubscriptionUSDToCNYRate 是订阅 CNY 换算汇率（1 USD = X CNY）。
 	// 0/未配置 = 关闭换算（订阅按 price 数值直付），显式配置后 CNY 通道订阅按 price × rate 收款。
 	SettingSubscriptionUSDToCNYRate      = "SUBSCRIPTION_USD_TO_CNY_RATE"
@@ -164,7 +165,6 @@ type UpdateProviderInstanceRequest struct {
 	AllowUserRefund *bool             `json:"allow_user_refund"`
 }
 type CreatePlanRequest struct {
-	GroupID         int64    `json:"group_id"`
 	Name            string   `json:"name"`
 	Description     string   `json:"description"`
 	Price           float64  `json:"price"`
@@ -183,7 +183,6 @@ type CreatePlanRequest struct {
 }
 
 type UpdatePlanRequest struct {
-	GroupID         *int64   `json:"group_id"`
 	Name            *string  `json:"name"`
 	Description     *string  `json:"description"`
 	Price           *float64 `json:"price"`

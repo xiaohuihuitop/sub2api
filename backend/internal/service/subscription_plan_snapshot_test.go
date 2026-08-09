@@ -14,7 +14,6 @@ func TestSubscriptionFromPlanCopiesImmutableTerms(t *testing.T) {
 	monthlyLimit := 260.0
 	plan := &dbent.SubscriptionPlan{
 		ID:              17,
-		GroupID:         9,
 		Name:            "Professional",
 		ValidityDays:    30,
 		DailyLimitUsd:   &dailyLimit,
@@ -32,7 +31,6 @@ func TestSubscriptionFromPlanCopiesImmutableTerms(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, int64(42), sub.UserID)
-	require.Zero(t, sub.GroupID)
 	require.Equal(t, int64(17), *sub.SubscriptionPlanID)
 	require.Equal(t, "Professional", sub.PlanNameSnapshot)
 	require.Equal(t, 25.0, *sub.DailyLimitUSDSnapshot)
@@ -53,7 +51,7 @@ func TestSubscriptionFromPlanCopiesImmutableTerms(t *testing.T) {
 }
 
 func TestSubscriptionFromPlanRejectsMissingValidity(t *testing.T) {
-	_, err := subscriptionFromPlan(&dbent.SubscriptionPlan{ID: 1, GroupID: 2}, AssignSubscriptionFromPlanInput{UserID: 3}, time.Now())
+	_, err := subscriptionFromPlan(&dbent.SubscriptionPlan{ID: 1}, AssignSubscriptionFromPlanInput{UserID: 3}, time.Now())
 	require.Error(t, err)
 }
 
@@ -61,7 +59,6 @@ func TestSubscriptionFromPlanConvertsWeeklyValidityToDays(t *testing.T) {
 	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
 	plan := &dbent.SubscriptionPlan{
 		ID:           1,
-		GroupID:      2,
 		Name:         "Two weeks",
 		ValidityDays: 2,
 		ValidityUnit: "weeks",
@@ -75,7 +72,6 @@ func TestSubscriptionFromPlanConvertsWeeklyValidityToDays(t *testing.T) {
 
 func TestValidateAndCheckLimitsPrefersSubscriptionSnapshot(t *testing.T) {
 	now := time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)
-	groupLimit := 100.0
 	snapshotLimit := 10.0
 	subscription := &UserSubscription{
 		Status:                SubscriptionStatusActive,
@@ -83,24 +79,23 @@ func TestValidateAndCheckLimitsPrefersSubscriptionSnapshot(t *testing.T) {
 		DailyUsageUSD:         snapshotLimit,
 		DailyLimitUSDSnapshot: &snapshotLimit,
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 	svc.now = func() time.Time { return now }
 
-	_, err := svc.ValidateAndCheckLimits(subscription, &Group{DailyLimitUSD: &groupLimit})
+	_, err := svc.ValidateAndCheckLimits(subscription)
 
 	require.ErrorIs(t, err, ErrDailyLimitExceeded)
 }
 
 func TestCheckUsageLimitsPrefersSubscriptionSnapshot(t *testing.T) {
-	groupLimit := 100.0
 	snapshotLimit := 10.0
 	subscription := &UserSubscription{
 		DailyUsageUSD:         9,
 		DailyLimitUSDSnapshot: &snapshotLimit,
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 
-	err := svc.CheckUsageLimits(nil, subscription, &Group{DailyLimitUSD: &groupLimit}, 2)
+	err := svc.CheckUsageLimits(nil, subscription, 2)
 
 	require.ErrorIs(t, err, ErrDailyLimitExceeded)
 }

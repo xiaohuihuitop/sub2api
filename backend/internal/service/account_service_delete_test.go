@@ -83,11 +83,11 @@ func (s *accountRepoStub) ListAllWithFilters(context.Context, string, string, st
 	return nil, nil
 }
 
-func (s *accountRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, *pagination.PaginationResult, error) {
+func (s *accountRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, platformID int64, privacyMode string) ([]Account, *pagination.PaginationResult, error) {
 	panic("unexpected ListWithFilters call")
 }
 
-func (s *accountRepoStub) ListByGroup(ctx context.Context, groupID int64) ([]Account, error) {
+func (s *accountRepoStub) ListByGroup(ctx context.Context, platformID int64) ([]Account, error) {
 	panic("unexpected ListByGroup call")
 }
 
@@ -123,7 +123,7 @@ func (s *accountRepoStub) AutoPauseExpiredAccounts(ctx context.Context, now time
 	panic("unexpected AutoPauseExpiredAccounts call")
 }
 
-func (s *accountRepoStub) BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error {
+func (s *accountRepoStub) BindGroups(ctx context.Context, accountID int64, platformIDs []int64) error {
 	panic("unexpected BindGroups call")
 }
 
@@ -131,24 +131,28 @@ func (s *accountRepoStub) ListSchedulable(ctx context.Context) ([]Account, error
 	panic("unexpected ListSchedulable call")
 }
 
-func (s *accountRepoStub) ListSchedulableByGroupID(ctx context.Context, groupID int64) ([]Account, error) {
-	panic("unexpected ListSchedulableByGroupID call")
+func (s *accountRepoStub) ListSchedulableByPlatformID(ctx context.Context, platformID int64) ([]Account, error) {
+	panic("unexpected ListSchedulableByPlatformID call")
 }
 
 func (s *accountRepoStub) ListSchedulableByPlatform(ctx context.Context, platform string) ([]Account, error) {
 	panic("unexpected ListSchedulableByPlatform call")
 }
 
-func (s *accountRepoStub) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]Account, error) {
-	panic("unexpected ListSchedulableByGroupIDAndPlatform call")
+func (s *accountRepoStub) ListSchedulableByPlatformIDAndPlatform(ctx context.Context, platformID int64, platform string) ([]Account, error) {
+	panic("unexpected ListSchedulableByPlatformIDAndPlatform call")
 }
 
 func (s *accountRepoStub) ListSchedulableByPlatforms(ctx context.Context, platforms []string) ([]Account, error) {
 	panic("unexpected ListSchedulableByPlatforms call")
 }
 
-func (s *accountRepoStub) ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]Account, error) {
-	panic("unexpected ListSchedulableByGroupIDAndPlatforms call")
+func (s *accountRepoStub) ListSchedulableByPlatformPool(ctx context.Context, platformID int64, platform string) ([]Account, error) {
+	panic("unexpected ListSchedulableByPlatformPool call")
+}
+
+func (s *accountRepoStub) ListSchedulableByPlatformIDAndPlatforms(ctx context.Context, platformID int64, platforms []string) ([]Account, error) {
+	panic("unexpected ListSchedulableByPlatformIDAndPlatforms call")
 }
 
 func (s *accountRepoStub) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]Account, error) {
@@ -159,7 +163,7 @@ func (s *accountRepoStub) ListSchedulableUngroupedByPlatforms(ctx context.Contex
 	panic("unexpected ListSchedulableUngroupedByPlatforms call")
 }
 
-func (s *accountRepoStub) ListModelAvailabilityCandidates(ctx context.Context, groupID *int64, platforms []string, includeGrouped bool) ([]Account, error) {
+func (s *accountRepoStub) ListModelAvailabilityCandidates(ctx context.Context, platformID int64, accountPlatform string) ([]Account, error) {
 	panic("unexpected ListModelAvailabilityCandidates call")
 }
 

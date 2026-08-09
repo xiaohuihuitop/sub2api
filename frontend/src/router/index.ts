@@ -265,15 +265,15 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/available-channels',
-    name: 'UserAvailableChannels',
-    component: () => import('@/views/user/AvailableChannelsView.vue'),
+    path: '/available-platforms',
+    name: 'UserAvailablePlatforms',
+    component: () => import('@/views/user/AvailablePlatformsView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Available Channels',
-      titleKey: 'availableChannels.title',
-      descriptionKey: 'availableChannels.description'
+      title: 'Available Platforms',
+      titleKey: 'availablePlatforms.title',
+      descriptionKey: 'availablePlatforms.description'
     }
   },
   {
@@ -450,18 +450,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/admin/groups',
-    name: 'AdminGroups',
-    component: () => import('@/views/admin/GroupsView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      title: 'Group Management',
-      titleKey: 'admin.groups.title',
-      descriptionKey: 'admin.groups.description'
-    }
-  },
-  {
     path: '/admin/platforms',
     name: 'AdminPlatforms',
     component: () => import('@/views/admin/PlatformsView.vue'),
@@ -474,19 +462,15 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/admin/channels',
-    redirect: '/admin/channels/pricing'
-  },
-  {
-    path: '/admin/channels/pricing',
-    name: 'AdminChannels',
-    component: () => import('@/views/admin/ChannelsView.vue'),
+    path: '/admin/model-pricing',
+    name: 'AdminModelPricing',
+    component: () => import('@/views/admin/ModelPricingView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Channel Management',
-      titleKey: 'admin.channels.title',
-      descriptionKey: 'admin.channels.description'
+      title: 'Model Pricing',
+      titleKey: 'admin.modelPricing.title',
+      descriptionKey: 'admin.modelPricing.description'
     }
   },
   {
@@ -937,7 +921,6 @@ router.beforeEach(async (to, _from, next) => {
   // 简易模式下限制访问某些页面
   if (authStore.isSimpleMode) {
     const restrictedPaths = [
-      '/admin/groups',
       '/admin/platforms',
       '/admin/subscriptions',
       '/admin/redeem',

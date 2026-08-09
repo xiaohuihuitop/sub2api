@@ -548,34 +548,6 @@ func TestClassifyOpsAuthClientErrorsExcludedFromSLA(t *testing.T) {
 			status:  http.StatusUnauthorized,
 		},
 		{
-			name:    "deleted local API key group",
-			errType: "api_error",
-			message: "API Key 所属分组已删除",
-			code:    "GROUP_DELETED",
-			status:  http.StatusForbidden,
-		},
-		{
-			name:    "disabled local API key group",
-			errType: "api_error",
-			message: "API Key 所属分组已停用",
-			code:    "GROUP_DISABLED",
-			status:  http.StatusForbidden,
-		},
-		{
-			name:    "google deleted API key group message without semantic code",
-			errType: "api_error",
-			message: "API Key 所属分组已删除",
-			code:    "403",
-			status:  http.StatusForbidden,
-		},
-		{
-			name:    "anthropic unassigned API key group",
-			errType: "permission_error",
-			message: "API Key is not assigned to any group and cannot be used. Please contact the administrator to assign it to a group.",
-			code:    "",
-			status:  http.StatusForbidden,
-		},
-		{
 			name:    "google invalid API key",
 			errType: "api_error",
 			message: "Invalid API key",
@@ -668,15 +640,6 @@ func TestClassifyOpsLocalBusinessLimitErrorsExcludedFromSLA(t *testing.T) {
 			wantPhase:   "request",
 		},
 		{
-			name:        "google no active subscription",
-			errType:     "api_error",
-			message:     "No active subscription found for this group",
-			code:        "403",
-			status:      http.StatusForbidden,
-			wantErrType: "api_error",
-			wantPhase:   "request",
-		},
-		{
 			name:        "gateway subscription invalid cache recheck",
 			errType:     "billing_error",
 			message:     "subscription is invalid or expired",
@@ -704,9 +667,9 @@ func TestClassifyOpsLocalBusinessLimitErrorsExcludedFromSLA(t *testing.T) {
 			wantPhase:   "request",
 		},
 		{
-			name:        "gemini group platform mismatch",
+			name:        "gemini platform authorization mismatch",
 			errType:     "api_error",
-			message:     "API key group platform is not gemini",
+			message:     "API key is not authorized for a Gemini platform",
 			code:        "400",
 			status:      http.StatusBadRequest,
 			wantErrType: "api_error",
@@ -722,9 +685,9 @@ func TestClassifyOpsLocalBusinessLimitErrorsExcludedFromSLA(t *testing.T) {
 			wantPhase:   "request",
 		},
 		{
-			name:        "gateway group RPM limit",
+			name:        "gateway RPM limit",
 			errType:     "api_error",
-			message:     "group requests-per-minute limit exceeded",
+			message:     "requests-per-minute limit exceeded",
 			code:        "rate_limit_exceeded",
 			status:      http.StatusTooManyRequests,
 			wantErrType: "api_error",
@@ -764,24 +727,6 @@ func TestClassifyOpsLocalBusinessLimitErrorsExcludedFromSLA(t *testing.T) {
 			code:        "",
 			status:      http.StatusTooManyRequests,
 			wantErrType: "rate_limit_error",
-			wantPhase:   "request",
-		},
-		{
-			name:        "group claude code only feature gate",
-			errType:     "permission_error",
-			message:     "This group is restricted to Claude Code clients (/v1/messages only)",
-			code:        "",
-			status:      http.StatusForbidden,
-			wantErrType: "api_error",
-			wantPhase:   "request",
-		},
-		{
-			name:        "group image generation feature gate",
-			errType:     "permission_error",
-			message:     "Image generation is not enabled for this group",
-			code:        "",
-			status:      http.StatusForbidden,
-			wantErrType: "api_error",
 			wantPhase:   "request",
 		},
 		{
@@ -1200,12 +1145,9 @@ func TestGetOpsAPIKeyFallsBackToOpsFallbackKey(t *testing.T) {
 	require.Nil(t, getOpsAPIKey(c))
 
 	// 写入 ops 专用 fallback key 后应能取到，且带齐 user/group。
-	groupID := int64(55)
 	apiKey := &service.APIKey{
-		ID:      100,
-		GroupID: &groupID,
-		User:    &service.User{ID: 7},
-		Group:   &service.Group{ID: groupID, Platform: service.PlatformAnthropic},
+		ID:   100,
+		User: &service.User{ID: 7},
 	}
 	c.Set(string(middleware2.ContextKeyOpsFallbackAPIKey), apiKey)
 
@@ -1214,8 +1156,6 @@ func TestGetOpsAPIKeyFallsBackToOpsFallbackKey(t *testing.T) {
 	require.Equal(t, int64(100), got.ID)
 	require.NotNil(t, got.User)
 	require.Equal(t, int64(7), got.User.ID)
-	require.NotNil(t, got.Group)
-	require.Equal(t, service.PlatformAnthropic, got.Group.Platform)
 }
 
 func TestGetOpsAPIKeyPrefersPrimaryContextKey(t *testing.T) {

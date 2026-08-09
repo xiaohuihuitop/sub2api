@@ -50,10 +50,10 @@ func (r *platformRepository) Create(ctx context.Context, platform *service.Platf
 	var platformID int64
 	var createdAt, updatedAt sql.NullTime
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO platforms (code, name, account_platform, status, endpoint_capabilities, legacy_group_id)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO platforms (code, name, account_platform, status, endpoint_capabilities)
+		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, created_at, updated_at`,
-		platform.Code, platform.Name, platform.AccountPlatform, platform.Status, capabilities, platform.LegacyGroupID,
+		platform.Code, platform.Name, platform.AccountPlatform, platform.Status, capabilities,
 	).Scan(&platformID, &createdAt, &updatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -64,7 +64,7 @@ func (r *platformRepository) Create(ctx context.Context, platform *service.Platf
 
 	createdRules := make([]service.PlatformModelRule, len(platform.ModelRules))
 	for index := range platform.ModelRules {
-		rule, err := insertPlatformModelRule(ctx, tx, platformID, platform.Code, platform.LegacyGroupID, platform.ModelRules[index])
+		rule, err := insertPlatformModelRule(ctx, tx, platformID, platform.Code, platform.ModelRules[index])
 		if err != nil {
 			return err
 		}
@@ -104,9 +104,9 @@ func (r *platformRepository) Update(ctx context.Context, platform *service.Platf
 	}
 	updated, err := tx.ExecContext(ctx,
 		`UPDATE platforms
-		 SET code = $1, name = $2, account_platform = $3, status = $4, endpoint_capabilities = $5, legacy_group_id = $6, updated_at = NOW()
-		 WHERE id = $7`,
-		platform.Code, platform.Name, platform.AccountPlatform, platform.Status, capabilities, platform.LegacyGroupID, platform.ID,
+		 SET code = $1, name = $2, account_platform = $3, status = $4, endpoint_capabilities = $5, updated_at = NOW()
+		 WHERE id = $6`,
+		platform.Code, platform.Name, platform.AccountPlatform, platform.Status, capabilities, platform.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -127,7 +127,7 @@ func (r *platformRepository) Update(ctx context.Context, platform *service.Platf
 
 	updatedRules := make([]service.PlatformModelRule, len(platform.ModelRules))
 	for index := range platform.ModelRules {
-		rule, err := insertPlatformModelRule(ctx, tx, platform.ID, platform.Code, platform.LegacyGroupID, platform.ModelRules[index])
+		rule, err := insertPlatformModelRule(ctx, tx, platform.ID, platform.Code, platform.ModelRules[index])
 		if err != nil {
 			return err
 		}
@@ -142,10 +142,9 @@ func (r *platformRepository) Update(ctx context.Context, platform *service.Platf
 
 func (r *platformRepository) GetByID(ctx context.Context, id int64) (*service.Platform, error) {
 	platform := &service.Platform{}
-	var legacyGroupID sql.NullInt64
 	var capabilities []byte
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, code, name, account_platform, status, endpoint_capabilities, legacy_group_id, created_at, updated_at
+		`SELECT id, code, name, account_platform, status, endpoint_capabilities, created_at, updated_at
 		 FROM platforms WHERE id = $1`, id,
 	).Scan(
 		&platform.ID,
@@ -154,7 +153,6 @@ func (r *platformRepository) GetByID(ctx context.Context, id int64) (*service.Pl
 		&platform.AccountPlatform,
 		&platform.Status,
 		&capabilities,
-		&legacyGroupID,
 		&platform.CreatedAt,
 		&platform.UpdatedAt,
 	)
@@ -168,10 +166,7 @@ func (r *platformRepository) GetByID(ctx context.Context, id int64) (*service.Pl
 	if err != nil {
 		return nil, err
 	}
-	if legacyGroupID.Valid {
-		platform.LegacyGroupID = &legacyGroupID.Int64
-	}
-	rules, err := r.listPlatformRules(ctx, platform.ID, platform.Code, platform.AccountPlatform, platform.LegacyGroupID, platform.EndpointCapabilities)
+	rules, err := r.listPlatformRules(ctx, platform.ID, platform.Code, platform.AccountPlatform, platform.EndpointCapabilities)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +179,7 @@ func (r *platformRepository) GetByID(ctx context.Context, id int64) (*service.Pl
 // narrower ListModelRules query instead.
 func (r *platformRepository) List(ctx context.Context) ([]service.Platform, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, code, name, account_platform, status, endpoint_capabilities, legacy_group_id, created_at, updated_at
+		`SELECT id, code, name, account_platform, status, endpoint_capabilities, created_at, updated_at
 		 FROM platforms ORDER BY code ASC, id ASC`,
 	)
 	if err != nil {
@@ -195,7 +190,6 @@ func (r *platformRepository) List(ctx context.Context) ([]service.Platform, erro
 	platforms := make([]service.Platform, 0)
 	for rows.Next() {
 		var platform service.Platform
-		var legacyGroupID sql.NullInt64
 		var capabilities []byte
 		if err := rows.Scan(
 			&platform.ID,
@@ -204,7 +198,6 @@ func (r *platformRepository) List(ctx context.Context) ([]service.Platform, erro
 			&platform.AccountPlatform,
 			&platform.Status,
 			&capabilities,
-			&legacyGroupID,
 			&platform.CreatedAt,
 			&platform.UpdatedAt,
 		); err != nil {
@@ -214,10 +207,7 @@ func (r *platformRepository) List(ctx context.Context) ([]service.Platform, erro
 		if err != nil {
 			return nil, err
 		}
-		if legacyGroupID.Valid {
-			platform.LegacyGroupID = &legacyGroupID.Int64
-		}
-		rules, err := r.listPlatformRules(ctx, platform.ID, platform.Code, platform.AccountPlatform, platform.LegacyGroupID, platform.EndpointCapabilities)
+		rules, err := r.listPlatformRules(ctx, platform.ID, platform.Code, platform.AccountPlatform, platform.EndpointCapabilities)
 		if err != nil {
 			return nil, err
 		}
@@ -235,7 +225,6 @@ func insertPlatformModelRule(
 	tx *sql.Tx,
 	platformID int64,
 	platformCode string,
-	legacyGroupID *int64,
 	rule service.PlatformModelRule,
 ) (service.PlatformModelRule, error) {
 	status := service.StatusDisabled
@@ -258,7 +247,6 @@ func insertPlatformModelRule(
 	}
 	rule.PlatformID = platformID
 	rule.PlatformCode = platformCode
-	rule.LegacyGroupID = cloneInt64Pointer(legacyGroupID)
 	if createdAt.Valid {
 		rule.CreatedAt = createdAt.Time
 	}
@@ -272,7 +260,7 @@ func insertPlatformModelRule(
 // pool cannot claim a model name or be selected by the request path.
 func (r *platformRepository) ListModelRules(ctx context.Context) ([]service.PlatformModelRule, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT r.id, r.platform_id, p.code, p.account_platform, p.legacy_group_id, r.model_pattern, r.upstream_model,
+		`SELECT r.id, r.platform_id, p.code, p.account_platform, r.model_pattern, r.upstream_model,
 		        p.endpoint_capabilities, r.created_at, r.updated_at
 		 FROM platform_model_rules r
 		 JOIN platforms p ON p.id = r.platform_id
@@ -288,14 +276,12 @@ func (r *platformRepository) ListModelRules(ctx context.Context) ([]service.Plat
 	rules := make([]service.PlatformModelRule, 0)
 	for rows.Next() {
 		var rule service.PlatformModelRule
-		var legacyGroupID sql.NullInt64
 		var capabilities []byte
 		if err := rows.Scan(
 			&rule.ID,
 			&rule.PlatformID,
 			&rule.PlatformCode,
 			&rule.AccountPlatform,
-			&legacyGroupID,
 			&rule.ModelPattern,
 			&rule.UpstreamModel,
 			&capabilities,
@@ -309,9 +295,6 @@ func (r *platformRepository) ListModelRules(ctx context.Context) ([]service.Plat
 			return nil, err
 		}
 		rule.EndpointCapabilities = endpointCapabilities
-		if legacyGroupID.Valid {
-			rule.LegacyGroupID = &legacyGroupID.Int64
-		}
 		rule.Enabled = true
 		rules = append(rules, rule)
 	}
@@ -321,7 +304,7 @@ func (r *platformRepository) ListModelRules(ctx context.Context) ([]service.Plat
 	return rules, nil
 }
 
-func (r *platformRepository) listPlatformRules(ctx context.Context, platformID int64, platformCode, accountPlatform string, legacyGroupID *int64, platformCapabilities []string) ([]service.PlatformModelRule, error) {
+func (r *platformRepository) listPlatformRules(ctx context.Context, platformID int64, platformCode, accountPlatform string, platformCapabilities []string) ([]service.PlatformModelRule, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, platform_id, model_pattern, upstream_model, status, created_at, updated_at
 		 FROM platform_model_rules WHERE platform_id = $1 ORDER BY id ASC`, platformID,
@@ -348,7 +331,6 @@ func (r *platformRepository) listPlatformRules(ctx context.Context, platformID i
 		}
 		rule.PlatformCode = platformCode
 		rule.AccountPlatform = accountPlatform
-		rule.LegacyGroupID = cloneInt64Pointer(legacyGroupID)
 		rule.EndpointCapabilities = append([]string(nil), platformCapabilities...)
 		rule.Enabled = status == service.StatusActive
 		rules = append(rules, rule)

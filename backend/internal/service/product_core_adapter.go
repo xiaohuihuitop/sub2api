@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/productcore"
 )
@@ -137,6 +138,18 @@ func productCoreRequest(model, endpoint string, skipBilling bool) productcore.Re
 		Model:              model,
 		EndpointCapability: string(billingEndpointCapability(endpoint)),
 		SkipBilling:        skipBilling,
+	}
+}
+
+func billingEndpointCapability(endpoint string) OpenAIEndpointCapability {
+	normalized := strings.ToLower(endpoint)
+	switch {
+	case strings.Contains(normalized, "/chat/completions"):
+		return OpenAIEndpointCapabilityChatCompletions
+	case strings.Contains(normalized, "/responses"):
+		return OpenAIEndpointCapabilityResponses
+	default:
+		return ""
 	}
 }
 

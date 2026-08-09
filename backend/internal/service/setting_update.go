@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -393,9 +392,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		updates[SettingKeyChannelMonitorDefaultIntervalSeconds] = strconv.Itoa(v)
 	}
 
-	// Available channels feature switch
-	updates[SettingKeyAvailableChannelsEnabled] = strconv.FormatBool(settings.AvailableChannelsEnabled)
-
 	// Model plaza feature switches + description
 	updates[SettingKeyModelPlazaEnabled] = strconv.FormatBool(settings.ModelPlazaEnabled)
 	updates[SettingKeyModelPlazaRequireAuth] = strconv.FormatBool(settings.ModelPlazaRequireAuth)
@@ -416,9 +412,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	// Claude Code version check
 	updates[SettingKeyMinClaudeCodeVersion] = settings.MinClaudeCodeVersion
 	updates[SettingKeyMaxClaudeCodeVersion] = settings.MaxClaudeCodeVersion
-
-	// 分组隔离
-	updates[SettingKeyAllowUngroupedKeyScheduling] = strconv.FormatBool(settings.AllowUngroupedKeyScheduling)
 
 	// Backend Mode
 	updates[SettingKeyBackendModeEnabled] = strconv.FormatBool(settings.BackendModeEnabled)
@@ -663,51 +656,23 @@ func (s *SettingService) validateDefaultSubscriptions(ctx context.Context, items
 		return nil
 	}
 
-	checkedGroupIDs := make(map[int64]struct{}, len(items))
 	checkedPlanIDs := make(map[int64]struct{}, len(items))
 	for _, item := range items {
-		if item.PlanID > 0 {
-			if _, ok := checkedPlanIDs[item.PlanID]; ok {
-				return ErrDefaultSubPlanDuplicate.WithMetadata(map[string]string{
-					"plan_id": strconv.FormatInt(item.PlanID, 10),
-				})
-			}
-			checkedPlanIDs[item.PlanID] = struct{}{}
-			if s.defaultSubPlanReader == nil {
-				continue
-			}
-			if _, err := s.defaultSubPlanReader.GetPlan(ctx, item.PlanID); err != nil {
-				return ErrDefaultSubPlanInvalid.WithMetadata(map[string]string{
-					"plan_id": strconv.FormatInt(item.PlanID, 10),
-				})
-			}
-			continue
+		if item.PlanID <= 0 {
+			return ErrDefaultSubPlanInvalid
 		}
-		if item.GroupID <= 0 {
-			continue
-		}
-		if _, ok := checkedGroupIDs[item.GroupID]; ok {
-			return ErrDefaultSubGroupDuplicate.WithMetadata(map[string]string{
-				"group_id": strconv.FormatInt(item.GroupID, 10),
+		if _, ok := checkedPlanIDs[item.PlanID]; ok {
+			return ErrDefaultSubPlanDuplicate.WithMetadata(map[string]string{
+				"plan_id": strconv.FormatInt(item.PlanID, 10),
 			})
 		}
-		checkedGroupIDs[item.GroupID] = struct{}{}
-		if s.defaultSubGroupReader == nil {
+		checkedPlanIDs[item.PlanID] = struct{}{}
+		if s.defaultSubPlanReader == nil {
 			continue
 		}
-
-		group, err := s.defaultSubGroupReader.GetByID(ctx, item.GroupID)
-		if err != nil {
-			if errors.Is(err, ErrGroupNotFound) {
-				return ErrDefaultSubGroupInvalid.WithMetadata(map[string]string{
-					"group_id": strconv.FormatInt(item.GroupID, 10),
-				})
-			}
-			return fmt.Errorf("get default subscription group %d: %w", item.GroupID, err)
-		}
-		if !group.IsSubscriptionType() {
-			return ErrDefaultSubGroupInvalid.WithMetadata(map[string]string{
-				"group_id": strconv.FormatInt(item.GroupID, 10),
+		if _, err := s.defaultSubPlanReader.GetPlan(ctx, item.PlanID); err != nil {
+			return ErrDefaultSubPlanInvalid.WithMetadata(map[string]string{
+				"plan_id": strconv.FormatInt(item.PlanID, 10),
 			})
 		}
 	}

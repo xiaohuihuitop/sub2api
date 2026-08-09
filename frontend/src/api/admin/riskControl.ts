@@ -22,8 +22,8 @@ export interface ContentModerationConfig {
   api_key_statuses: ContentModerationAPIKeyStatus[]
   timeout_ms: number
   sample_rate: number
-  all_groups: boolean
-  group_ids: number[]
+  all_platforms: boolean
+  platform_ids: number[]
   record_non_hits: boolean
   thresholds: Record<string, number>
   worker_count: number
@@ -102,8 +102,8 @@ export interface UpdateContentModerationConfig {
   clear_api_key?: boolean
   timeout_ms?: number
   sample_rate?: number
-  all_groups?: boolean
-  group_ids?: number[]
+  all_platforms?: boolean
+  platform_ids?: number[]
   record_non_hits?: boolean
   thresholds?: Record<string, number>
   worker_count?: number
@@ -177,8 +177,8 @@ export interface ContentModerationLog {
   user_email: string
   api_key_id: number | null
   api_key_name: string
-  group_id: number | null
-  group_name: string
+  platform_id: number | null
+  platform_name: string
   endpoint: string
   provider: string
   model: string
@@ -205,7 +205,7 @@ export interface ListContentModerationLogsParams {
   page?: number
   page_size?: number
   result?: string
-  group_id?: number
+  platform_id?: number
   endpoint?: string
   search?: string
   from?: string

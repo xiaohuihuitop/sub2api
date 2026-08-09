@@ -24,7 +24,7 @@ import (
 // ForwardAsResponses accepts an OpenAI Responses API request body, converts it
 // to Anthropic Messages format, forwards to the Anthropic upstream, and converts
 // the response back to Responses format. This enables OpenAI Responses API
-// clients to access Anthropic models through Anthropic platform groups.
+// clients to access Anthropic models through Anthropic platform accounts.
 //
 // The method follows the same pattern as OpenAIGatewayService.ForwardAsAnthropic
 // but in reverse direction: Responses → Anthropic upstream → Responses.

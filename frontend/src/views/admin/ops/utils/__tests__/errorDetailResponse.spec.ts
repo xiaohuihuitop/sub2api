@@ -20,7 +20,7 @@ function makeDetail(overrides: Partial<OpsErrorDetail>): OpsErrorDetail {
     message: 'Upstream request failed',
     user_email: 'user@example.com',
     account_name: 'acc',
-    group_name: 'group',
+    platform_name: 'group',
     error_body: '',
     user_agent: '',
     is_business_limited: false,

@@ -46,21 +46,21 @@ type openAIWSSessionConnBinding struct {
 // response_id -> account_id 优先走 GatewayCache（Redis），同时维护本地热缓存。
 // response_id -> conn_id 仅在本进程内有效。
 type OpenAIWSStateStore interface {
-	BindResponseAccount(ctx context.Context, groupID int64, responseID string, accountID int64, ttl time.Duration) error
-	GetResponseAccount(ctx context.Context, groupID int64, responseID string) (int64, error)
-	DeleteResponseAccount(ctx context.Context, groupID int64, responseID string) error
+	BindResponseAccount(ctx context.Context, platformID int64, responseID string, accountID int64, ttl time.Duration) error
+	GetResponseAccount(ctx context.Context, platformID int64, responseID string) (int64, error)
+	DeleteResponseAccount(ctx context.Context, platformID int64, responseID string) error
 
 	BindResponseConn(responseID, connID string, ttl time.Duration)
 	GetResponseConn(responseID string) (string, bool)
 	DeleteResponseConn(responseID string)
 
-	BindSessionTurnState(groupID int64, sessionHash, turnState string, ttl time.Duration)
-	GetSessionTurnState(groupID int64, sessionHash string) (string, bool)
-	DeleteSessionTurnState(groupID int64, sessionHash string)
+	BindSessionTurnState(platformID int64, sessionHash, turnState string, ttl time.Duration)
+	GetSessionTurnState(platformID int64, sessionHash string) (string, bool)
+	DeleteSessionTurnState(platformID int64, sessionHash string)
 
-	BindSessionConn(groupID int64, sessionHash, connID string, ttl time.Duration)
-	GetSessionConn(groupID int64, sessionHash string) (string, bool)
-	DeleteSessionConn(groupID int64, sessionHash string)
+	BindSessionConn(platformID int64, sessionHash, connID string, ttl time.Duration)
+	GetSessionConn(platformID int64, sessionHash string) (string, bool)
+	DeleteSessionConn(platformID int64, sessionHash string)
 }
 
 type defaultOpenAIWSStateStore struct {
@@ -91,7 +91,7 @@ func NewOpenAIWSStateStore(cache GatewayCache) OpenAIWSStateStore {
 	return store
 }
 
-func (s *defaultOpenAIWSStateStore) BindResponseAccount(ctx context.Context, groupID int64, responseID string, accountID int64, ttl time.Duration) error {
+func (s *defaultOpenAIWSStateStore) BindResponseAccount(ctx context.Context, platformID int64, responseID string, accountID int64, ttl time.Duration) error {
 	id := normalizeOpenAIWSResponseID(responseID)
 	if id == "" || accountID <= 0 {
 		return nil
@@ -100,7 +100,7 @@ func (s *defaultOpenAIWSStateStore) BindResponseAccount(ctx context.Context, gro
 	s.maybeCleanup()
 
 	expiresAt := time.Now().Add(ttl)
-	mapKey := openAIWSResponseAccountMapKey(groupID, id)
+	mapKey := openAIWSResponseAccountMapKey(platformID, id)
 	s.responseToAccountMu.Lock()
 	ensureBindingCapacity(s.responseToAccount, mapKey, openAIWSStateStoreMaxEntriesPerMap)
 	s.responseToAccount[mapKey] = openAIWSAccountBinding{accountID: accountID, expiresAt: expiresAt}
@@ -112,10 +112,10 @@ func (s *defaultOpenAIWSStateStore) BindResponseAccount(ctx context.Context, gro
 	cacheKey := openAIWSResponseAccountCacheKey(id)
 	cacheCtx, cancel := withOpenAIWSStateStoreRedisTimeout(ctx)
 	defer cancel()
-	return s.cache.SetSessionAccountID(cacheCtx, groupID, cacheKey, accountID, ttl)
+	return s.cache.SetSessionAccountID(cacheCtx, platformID, cacheKey, accountID, ttl)
 }
 
-func (s *defaultOpenAIWSStateStore) GetResponseAccount(ctx context.Context, groupID int64, responseID string) (int64, error) {
+func (s *defaultOpenAIWSStateStore) GetResponseAccount(ctx context.Context, platformID int64, responseID string) (int64, error) {
 	id := normalizeOpenAIWSResponseID(responseID)
 	if id == "" {
 		return 0, nil
@@ -123,7 +123,7 @@ func (s *defaultOpenAIWSStateStore) GetResponseAccount(ctx context.Context, grou
 	s.maybeCleanup()
 
 	now := time.Now()
-	mapKey := openAIWSResponseAccountMapKey(groupID, id)
+	mapKey := openAIWSResponseAccountMapKey(platformID, id)
 	s.responseToAccountMu.RLock()
 	if binding, ok := s.responseToAccount[mapKey]; ok {
 		if now.Before(binding.expiresAt) {
@@ -141,7 +141,7 @@ func (s *defaultOpenAIWSStateStore) GetResponseAccount(ctx context.Context, grou
 	cacheKey := openAIWSResponseAccountCacheKey(id)
 	cacheCtx, cancel := withOpenAIWSStateStoreRedisTimeout(ctx)
 	defer cancel()
-	accountID, err := s.cache.GetSessionAccountID(cacheCtx, groupID, cacheKey)
+	accountID, err := s.cache.GetSessionAccountID(cacheCtx, platformID, cacheKey)
 	if err != nil || accountID <= 0 {
 		// 缓存读取失败不阻断主流程，按未命中降级。
 		return 0, nil
@@ -149,13 +149,13 @@ func (s *defaultOpenAIWSStateStore) GetResponseAccount(ctx context.Context, grou
 	return accountID, nil
 }
 
-func (s *defaultOpenAIWSStateStore) DeleteResponseAccount(ctx context.Context, groupID int64, responseID string) error {
+func (s *defaultOpenAIWSStateStore) DeleteResponseAccount(ctx context.Context, platformID int64, responseID string) error {
 	id := normalizeOpenAIWSResponseID(responseID)
 	if id == "" {
 		return nil
 	}
 	s.responseToAccountMu.Lock()
-	delete(s.responseToAccount, openAIWSResponseAccountMapKey(groupID, id))
+	delete(s.responseToAccount, openAIWSResponseAccountMapKey(platformID, id))
 	s.responseToAccountMu.Unlock()
 
 	if s.cache == nil {
@@ -163,7 +163,7 @@ func (s *defaultOpenAIWSStateStore) DeleteResponseAccount(ctx context.Context, g
 	}
 	cacheCtx, cancel := withOpenAIWSStateStoreRedisTimeout(ctx)
 	defer cancel()
-	return s.cache.DeleteSessionAccountID(cacheCtx, groupID, openAIWSResponseAccountCacheKey(id))
+	return s.cache.DeleteSessionAccountID(cacheCtx, platformID, openAIWSResponseAccountCacheKey(id))
 }
 
 func (s *defaultOpenAIWSStateStore) BindResponseConn(responseID, connID string, ttl time.Duration) {
@@ -211,8 +211,8 @@ func (s *defaultOpenAIWSStateStore) DeleteResponseConn(responseID string) {
 	s.responseToConnMu.Unlock()
 }
 
-func (s *defaultOpenAIWSStateStore) BindSessionTurnState(groupID int64, sessionHash, turnState string, ttl time.Duration) {
-	key := openAIWSSessionTurnStateKey(groupID, sessionHash)
+func (s *defaultOpenAIWSStateStore) BindSessionTurnState(platformID int64, sessionHash, turnState string, ttl time.Duration) {
+	key := openAIWSSessionTurnStateKey(platformID, sessionHash)
 	state := strings.TrimSpace(turnState)
 	if key == "" || state == "" {
 		return
@@ -229,8 +229,8 @@ func (s *defaultOpenAIWSStateStore) BindSessionTurnState(groupID int64, sessionH
 	s.sessionToTurnStateMu.Unlock()
 }
 
-func (s *defaultOpenAIWSStateStore) GetSessionTurnState(groupID int64, sessionHash string) (string, bool) {
-	key := openAIWSSessionTurnStateKey(groupID, sessionHash)
+func (s *defaultOpenAIWSStateStore) GetSessionTurnState(platformID int64, sessionHash string) (string, bool) {
+	key := openAIWSSessionTurnStateKey(platformID, sessionHash)
 	if key == "" {
 		return "", false
 	}
@@ -246,8 +246,8 @@ func (s *defaultOpenAIWSStateStore) GetSessionTurnState(groupID int64, sessionHa
 	return binding.turnState, true
 }
 
-func (s *defaultOpenAIWSStateStore) DeleteSessionTurnState(groupID int64, sessionHash string) {
-	key := openAIWSSessionTurnStateKey(groupID, sessionHash)
+func (s *defaultOpenAIWSStateStore) DeleteSessionTurnState(platformID int64, sessionHash string) {
+	key := openAIWSSessionTurnStateKey(platformID, sessionHash)
 	if key == "" {
 		return
 	}
@@ -256,8 +256,8 @@ func (s *defaultOpenAIWSStateStore) DeleteSessionTurnState(groupID int64, sessio
 	s.sessionToTurnStateMu.Unlock()
 }
 
-func (s *defaultOpenAIWSStateStore) BindSessionConn(groupID int64, sessionHash, connID string, ttl time.Duration) {
-	key := openAIWSSessionTurnStateKey(groupID, sessionHash)
+func (s *defaultOpenAIWSStateStore) BindSessionConn(platformID int64, sessionHash, connID string, ttl time.Duration) {
+	key := openAIWSSessionTurnStateKey(platformID, sessionHash)
 	conn := strings.TrimSpace(connID)
 	if key == "" || conn == "" {
 		return
@@ -274,8 +274,8 @@ func (s *defaultOpenAIWSStateStore) BindSessionConn(groupID int64, sessionHash, 
 	s.sessionToConnMu.Unlock()
 }
 
-func (s *defaultOpenAIWSStateStore) GetSessionConn(groupID int64, sessionHash string) (string, bool) {
-	key := openAIWSSessionTurnStateKey(groupID, sessionHash)
+func (s *defaultOpenAIWSStateStore) GetSessionConn(platformID int64, sessionHash string) (string, bool) {
+	key := openAIWSSessionTurnStateKey(platformID, sessionHash)
 	if key == "" {
 		return "", false
 	}
@@ -291,8 +291,8 @@ func (s *defaultOpenAIWSStateStore) GetSessionConn(groupID int64, sessionHash st
 	return binding.connID, true
 }
 
-func (s *defaultOpenAIWSStateStore) DeleteSessionConn(groupID int64, sessionHash string) {
-	key := openAIWSSessionTurnStateKey(groupID, sessionHash)
+func (s *defaultOpenAIWSStateStore) DeleteSessionConn(platformID int64, sessionHash string) {
+	key := openAIWSSessionTurnStateKey(platformID, sessionHash)
 	if key == "" {
 		return
 	}
@@ -420,8 +420,8 @@ func openAIWSResponseAccountCacheKey(responseID string) string {
 }
 
 // openAIWSResponseAccountMapKey 本地热缓存按分组隔离的 key，与 Redis 层保持一致，避免跨组命中。
-func openAIWSResponseAccountMapKey(groupID int64, responseID string) string {
-	return fmt.Sprintf("%d:%s", groupID, responseID)
+func openAIWSResponseAccountMapKey(platformID int64, responseID string) string {
+	return fmt.Sprintf("%d:%s", platformID, responseID)
 }
 
 func normalizeOpenAIWSTTL(ttl time.Duration) time.Duration {
@@ -431,12 +431,12 @@ func normalizeOpenAIWSTTL(ttl time.Duration) time.Duration {
 	return ttl
 }
 
-func openAIWSSessionTurnStateKey(groupID int64, sessionHash string) string {
+func openAIWSSessionTurnStateKey(platformID int64, sessionHash string) string {
 	hash := strings.TrimSpace(sessionHash)
 	if hash == "" {
 		return ""
 	}
-	return fmt.Sprintf("%d:%s", groupID, hash)
+	return fmt.Sprintf("%d:%s", platformID, hash)
 }
 
 func withOpenAIWSStateStoreRedisTimeout(ctx context.Context) (context.Context, context.CancelFunc) {

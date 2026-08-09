@@ -23,24 +23,24 @@ func NewGatewayCache(rdb *redis.Client) service.GatewayCache {
 	return &gatewayCache{rdb: rdb}
 }
 
-// buildSessionKey 构建 session key，包含 groupID 实现分组隔离
-// 格式: sticky_session:{groupID}:{sessionHash}
-func buildSessionKey(groupID int64, sessionHash string) string {
-	return fmt.Sprintf("%s%d:%s", stickySessionPrefix, groupID, sessionHash)
+// buildSessionKey 构建 session key，包含 platformID 实现分组隔离
+// 格式: sticky_session:{platformID}:{sessionHash}
+func buildSessionKey(platformID int64, sessionHash string) string {
+	return fmt.Sprintf("%s%d:%s", stickySessionPrefix, platformID, sessionHash)
 }
 
-func (c *gatewayCache) GetSessionAccountID(ctx context.Context, groupID int64, sessionHash string) (int64, error) {
-	key := buildSessionKey(groupID, sessionHash)
+func (c *gatewayCache) GetSessionAccountID(ctx context.Context, platformID int64, sessionHash string) (int64, error) {
+	key := buildSessionKey(platformID, sessionHash)
 	return c.rdb.Get(ctx, key).Int64()
 }
 
-func (c *gatewayCache) SetSessionAccountID(ctx context.Context, groupID int64, sessionHash string, accountID int64, ttl time.Duration) error {
-	key := buildSessionKey(groupID, sessionHash)
+func (c *gatewayCache) SetSessionAccountID(ctx context.Context, platformID int64, sessionHash string, accountID int64, ttl time.Duration) error {
+	key := buildSessionKey(platformID, sessionHash)
 	return c.rdb.Set(ctx, key, accountID, ttl).Err()
 }
 
-func (c *gatewayCache) RefreshSessionTTL(ctx context.Context, groupID int64, sessionHash string, ttl time.Duration) error {
-	key := buildSessionKey(groupID, sessionHash)
+func (c *gatewayCache) RefreshSessionTTL(ctx context.Context, platformID int64, sessionHash string, ttl time.Duration) error {
+	key := buildSessionKey(platformID, sessionHash)
 	return c.rdb.Expire(ctx, key, ttl).Err()
 }
 
@@ -51,8 +51,8 @@ func (c *gatewayCache) RefreshSessionTTL(ctx context.Context, groupID int64, ses
 // DeleteSessionAccountID removes the sticky session binding for the given session.
 // Called when the bound account becomes unavailable (e.g., error status, disabled,
 // or unschedulable), allowing subsequent requests to select a new available account.
-func (c *gatewayCache) DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error {
-	key := buildSessionKey(groupID, sessionHash)
+func (c *gatewayCache) DeleteSessionAccountID(ctx context.Context, platformID int64, sessionHash string) error {
+	key := buildSessionKey(platformID, sessionHash)
 	return c.rdb.Del(ctx, key).Err()
 }
 
@@ -133,22 +133,22 @@ func (c *gatewayCache) SaveLiveCall(ctx context.Context, record *service.LiveCal
 		return fmt.Errorf("invalid live call record")
 	}
 	values := map[string]any{
-		"call_id":          record.CallID,
-		"account_id":       record.AccountID,
-		"api_key_id":       record.APIKeyID,
-		"user_id":          record.UserID,
-		"group_id":         record.GroupID,
-		"subscription_id":  record.SubscriptionID,
-		"lease_id":         record.LeaseID,
-		"model":            record.Model,
-		"created_at":       record.CreatedAt.UnixMilli(),
-		"expires_at":       record.ExpiresAt.UnixMilli(),
-		"controller":       record.Controller,
-		"controller_owner": record.ControllerOwner,
-		"user_agent":       record.UserAgent,
-		"ip_address":       record.IPAddress,
-		"inbound_endpoint": record.InboundEndpoint,
-		"attestation":      record.AttestationCiphertext,
+		"call_id":               record.CallID,
+		"account_id":            record.AccountID,
+		"api_key_id":            record.APIKeyID,
+		"user_id":               record.UserID,
+		"platform_namespace_id": record.PlatformID,
+		"subscription_id":       record.SubscriptionID,
+		"lease_id":              record.LeaseID,
+		"model":                 record.Model,
+		"created_at":            record.CreatedAt.UnixMilli(),
+		"expires_at":            record.ExpiresAt.UnixMilli(),
+		"controller":            record.Controller,
+		"controller_owner":      record.ControllerOwner,
+		"user_agent":            record.UserAgent,
+		"ip_address":            record.IPAddress,
+		"inbound_endpoint":      record.InboundEndpoint,
+		"attestation":           record.AttestationCiphertext,
 	}
 	key := liveCallKey(record.CallHash)
 	pipe := c.rdb.TxPipeline()
@@ -178,7 +178,7 @@ func (c *gatewayCache) GetLiveCall(ctx context.Context, callHash string) (*servi
 		AccountID:             parseInt("account_id"),
 		APIKeyID:              parseInt("api_key_id"),
 		UserID:                parseInt("user_id"),
-		GroupID:               parseInt("group_id"),
+		PlatformID:            parseInt("platform_namespace_id"),
 		SubscriptionID:        parseInt("subscription_id"),
 		LeaseID:               values["lease_id"],
 		Model:                 values["model"],

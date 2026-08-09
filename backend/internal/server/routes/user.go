@@ -82,22 +82,10 @@ func RegisterUserRoutes(
 			keys.DELETE("/:id", h.APIKey.Delete)
 		}
 
-		// 用户可用分组（非管理员接口）
-		groups := authenticated.Group("/groups")
-		{
-			groups.GET("/available", h.APIKey.GetAvailableGroups)
-		}
-
 		// API Key authorization may select only active platform pools.
 		platforms := authenticated.Group("/platforms")
 		{
-			platforms.GET("/available", h.APIKey.GetAvailablePlatforms)
-		}
-
-		// 用户可用渠道（非管理员接口）
-		channels := authenticated.Group("/channels")
-		{
-			channels.GET("/available", h.AvailableChannel.List)
+			platforms.GET("/available", h.AvailablePlatform.List)
 		}
 
 		// 使用记录（聚合统计属重查询，叠加更严格的按用户限流）

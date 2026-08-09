@@ -12,9 +12,7 @@ import type {
 } from "@/types";
 
 export interface DefaultSubscriptionSetting {
-  plan_id?: number;
-  group_id?: number;
-  validity_days?: number;
+  plan_id: number;
 }
 
 // ── 平台限额类型 ──────────────────────────────────────────────────
@@ -204,16 +202,7 @@ export function normalizeDefaultSubscriptionSettings(
       return [{ plan_id: planID }];
     }
 
-    const groupID = Math.floor(Number(item.group_id));
-    const validityDays = Math.floor(Number(item.validity_days));
-    if (!Number.isFinite(groupID) || groupID <= 0 || !Number.isFinite(validityDays) || validityDays <= 0) {
-      return [];
-    }
-
-    return [{
-      group_id: groupID,
-      validity_days: Math.min(36500, Math.max(1, validityDays)),
-    }];
+    return [];
   });
 }
 
@@ -569,7 +558,6 @@ export interface SystemSettings {
   max_claude_code_version: string;
 
   // 分组隔离
-  allow_ungrouped_key_scheduling: boolean;
 
   // Gateway forwarding behavior
   enable_fingerprint_unification: boolean;
@@ -665,9 +653,6 @@ export interface SystemSettings {
   // Channel Monitor feature switch
   channel_monitor_enabled: boolean;
   channel_monitor_default_interval_seconds: number;
-
-  // Available Channels feature switch
-  available_channels_enabled: boolean;
 
   // Model Plaza feature switches + description
   model_plaza_enabled: boolean;
@@ -862,7 +847,6 @@ export interface UpdateSettingsRequest {
   ops_metrics_interval_seconds?: number;
   min_claude_code_version?: string;
   max_claude_code_version?: string;
-  allow_ungrouped_key_scheduling?: boolean;
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;
   enable_cch_signing?: boolean;
@@ -942,9 +926,6 @@ export interface UpdateSettingsRequest {
   // Channel Monitor feature switch
   channel_monitor_enabled?: boolean;
   channel_monitor_default_interval_seconds?: number;
-
-  // Available Channels feature switch
-  available_channels_enabled?: boolean;
 
   // Model Plaza feature switches + description
   model_plaza_enabled?: boolean;

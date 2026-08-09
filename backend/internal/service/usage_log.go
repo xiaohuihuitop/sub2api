@@ -114,8 +114,6 @@ type UsageLog struct {
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Nil means no mapping was applied (requested model was used as-is).
 	UpstreamModel *string
-	// ChannelID 渠道 ID
-	ChannelID *int64
 	// ModelMappingChain 模型映射链，如 "a→b→c"
 	ModelMappingChain *string
 	// BillingTier 计费层级标签（per_request/image 模式）
@@ -133,7 +131,6 @@ type UsageLog struct {
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string
 
-	GroupID        *int64
 	SubscriptionID *int64
 	PlatformID     *int64
 	// PlatformCode and PlatformName are hydrated for usage-record display.
@@ -205,7 +202,6 @@ type UsageLog struct {
 	User         *User
 	APIKey       *APIKey
 	Account      *Account
-	Group        *Group
 	Subscription *UserSubscription
 }
 

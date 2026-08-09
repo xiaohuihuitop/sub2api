@@ -89,20 +89,17 @@ func TestUsageBillingRepositoryApply_DeduplicatesSubscriptionBilling(t *testing.
 		Email:        fmt.Sprintf("usage-billing-sub-user-%d@example.com", time.Now().UnixNano()),
 		PasswordHash: "hash",
 	})
-	group := mustCreateGroup(t, client, &service.Group{
-		Name:             "usage-billing-group-" + uuid.NewString(),
-		Platform:         service.PlatformAnthropic,
-		SubscriptionType: service.SubscriptionTypeSubscription,
-	})
+	planID := createSubscriptionPlanForTest(t, client, "usage-billing-plan")
 	apiKey := mustCreateApiKey(t, client, &service.APIKey{
-		UserID:  user.ID,
-		GroupID: &group.ID,
-		Key:     "sk-usage-billing-sub-" + uuid.NewString(),
-		Name:    "billing-sub",
+		UserID: user.ID,
+		Key:    "sk-usage-billing-sub-" + uuid.NewString(),
+		Name:   "billing-sub",
 	})
 	subscription := mustCreateSubscription(t, client, &service.UserSubscription{
-		UserID:  user.ID,
-		GroupID: group.ID,
+		UserID:                 user.ID,
+		SubscriptionPlanID:     &planID,
+		PlanNameSnapshot:       "usage-billing-plan",
+		RateMultiplierSnapshot: 1,
 	})
 
 	requestID := uuid.NewString()

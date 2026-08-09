@@ -102,10 +102,7 @@ const { t } = useI18n()
 
 const isRenewal = computed(() =>
   props.activeSubscriptions?.some(s =>
-    s.status === 'active' && (
-      s.subscription_plan_id === props.plan.id ||
-      (s.subscription_plan_id == null && props.plan.group_id != null && s.group_id === props.plan.group_id)
-    )
+    s.status === 'active' && s.subscription_plan_id === props.plan.id
   ) ?? false
 )
 

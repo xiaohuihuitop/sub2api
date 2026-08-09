@@ -1,183 +1,158 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-
 	"github.com/gin-gonic/gin"
 )
 
-// ModelPlazaHandler 处理「模型广场」查询。
-//
-// 广场路由挂 OptionalJWT 中间件：匿名可访问（除非 require_auth 开启），带 token 则
-// 识别用户。可见性规则（橱窗语义，与「可用渠道」的可绑定语义不同）：
-//   - 匿名：仅非专属分组（订阅型照常展示）；
-//   - 登录：非专属分组 + user_allowed_groups 授权的专属分组（不检查订阅有效性）。
+type modelPlazaSettings interface {
+	GetModelPlazaRuntime(context.Context) service.ModelPlazaRuntime
+}
+
+// ModelPlazaHandler exposes the administrator-owned Platform catalog. The
+// response deliberately contains no user, Group or Channel visibility data.
 type ModelPlazaHandler struct {
-	channelService *service.ChannelService
-	apiKeyService  *service.APIKeyService
-	settingService *service.SettingService
+	catalog  *service.PlatformCatalogService
+	settings modelPlazaSettings
 }
 
-// NewModelPlazaHandler 创建模型广场 handler。
-func NewModelPlazaHandler(
-	channelService *service.ChannelService,
-	apiKeyService *service.APIKeyService,
-	settingService *service.SettingService,
-) *ModelPlazaHandler {
-	return &ModelPlazaHandler{
-		channelService: channelService,
-		apiKeyService:  apiKeyService,
-		settingService: settingService,
-	}
+func NewModelPlazaHandler(catalog *service.PlatformCatalogService, settings modelPlazaSettings) *ModelPlazaHandler {
+	return &ModelPlazaHandler{catalog: catalog, settings: settings}
 }
 
-// modelPlazaOfficialPricing LiteLLM 官方参考价（USD per token）。
-type modelPlazaOfficialPricing struct {
-	InputPrice        *float64 `json:"input_price"`
-	OutputPrice       *float64 `json:"output_price"`
-	CacheWritePrice   *float64 `json:"cache_write_price"`
-	CacheWrite1hPrice *float64 `json:"cache_write_1h_price,omitempty"`
-	CacheReadPrice    *float64 `json:"cache_read_price"`
+type modelPlazaPricing struct {
+	BillingMode      string                  `json:"billing_mode"`
+	InputPrice       *float64                `json:"input_price"`
+	OutputPrice      *float64                `json:"output_price"`
+	CacheWritePrice  *float64                `json:"cache_write_price"`
+	CacheReadPrice   *float64                `json:"cache_read_price"`
+	ImageInputPrice  *float64                `json:"image_input_price"`
+	ImageOutputPrice *float64                `json:"image_output_price"`
+	PerRequestPrice  *float64                `json:"per_request_price"`
+	Intervals        []modelPlazaPricingTier `json:"intervals"`
 }
 
-// modelPlazaModel 广场模型条目：渠道定价（白名单形态）+ 官方参考价。
+type modelPlazaPricingTier struct {
+	MinTokens       int      `json:"min_tokens"`
+	MaxTokens       *int     `json:"max_tokens"`
+	TierLabel       string   `json:"tier_label,omitempty"`
+	InputPrice      *float64 `json:"input_price"`
+	OutputPrice     *float64 `json:"output_price"`
+	CacheWritePrice *float64 `json:"cache_write_price"`
+	CacheReadPrice  *float64 `json:"cache_read_price"`
+	PerRequestPrice *float64 `json:"per_request_price"`
+}
+
 type modelPlazaModel struct {
-	Name            string                     `json:"name"`
-	Platform        string                     `json:"platform"`
-	Pricing         *userSupportedModelPricing `json:"pricing"`
-	OfficialPricing *modelPlazaOfficialPricing `json:"official_pricing"`
+	Pattern              string             `json:"pattern"`
+	UpstreamModel        string             `json:"upstream_model,omitempty"`
+	EndpointCapabilities []string           `json:"endpoint_capabilities"`
+	Pricing              *modelPlazaPricing `json:"pricing"`
 }
 
-// modelPlazaGroup 广场分组条目（白名单字段）。
-type modelPlazaGroup struct {
-	ID                        int64             `json:"id"`
-	Name                      string            `json:"name"`
-	Description               string            `json:"description"`
-	Platform                  string            `json:"platform"`
-	BalanceRateMultiplier     float64           `json:"balance_rate_multiplier"`
-	BalancePeakRateEnabled    bool              `json:"balance_peak_rate_enabled"`
-	BalancePeakStart          string            `json:"balance_peak_start"`
-	BalancePeakEnd            string            `json:"balance_peak_end"`
-	BalancePeakRateMultiplier float64           `json:"balance_peak_rate_multiplier"`
-	IsExclusive               bool              `json:"is_exclusive"`
-	Models                    []modelPlazaModel `json:"models"`
+type modelPlazaPlatform struct {
+	ID                   int64             `json:"id"`
+	Code                 string            `json:"code"`
+	Name                 string            `json:"name"`
+	AccountPlatform      string            `json:"account_platform"`
+	EndpointCapabilities []string          `json:"endpoint_capabilities"`
+	Models               []modelPlazaModel `json:"models"`
 }
 
-// modelPlazaResponse 广场页响应。
 type modelPlazaResponse struct {
-	Description string            `json:"description"`
-	Groups      []modelPlazaGroup `json:"groups"`
+	Description string               `json:"description"`
+	Platforms   []modelPlazaPlatform `json:"platforms"`
 }
 
-// Get 返回模型广场数据。
-// GET /api/v1/model-plaza
 func (h *ModelPlazaHandler) Get(c *gin.Context) {
-	if h.settingService == nil {
+	if h == nil || h.settings == nil || h.catalog == nil {
 		response.NotFound(c, "Model plaza is not enabled")
 		return
 	}
-	rt := h.settingService.GetModelPlazaRuntime(c.Request.Context())
-	if !rt.Enabled {
+	runtime := h.settings.GetModelPlazaRuntime(c.Request.Context())
+	if !runtime.Enabled {
 		response.NotFound(c, "Model plaza is not enabled")
 		return
 	}
-
-	subject, authed := middleware.GetAuthSubjectFromContext(c)
-	if rt.RequireAuth && !authed {
+	if runtime.RequireAuth && !hasAuthenticatedSubject(c) {
 		response.Unauthorized(c, "Authentication required")
 		return
 	}
-
-	groups, err := h.channelService.ListPlazaGroups(c.Request.Context())
+	platforms, err := h.catalog.ListPlaza(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-
-	// allowedExclusive == nil 表示匿名；登录用户恒为非 nil（可能为空集合）。
-	var allowedExclusive map[int64]struct{}
-	if authed {
-		allowedExclusive, err = h.apiKeyService.GetUserAllowedGroupIDSet(c.Request.Context(), subject.UserID)
-		if err != nil {
-			// 可见性数据拿不到时不能静默降级成匿名视图（会错漏专属分组），直接报错。
-			response.ErrorFrom(c, err)
-			return
+	out := make([]modelPlazaPlatform, 0, len(platforms))
+	for i := range platforms {
+		platform := &platforms[i]
+		models := make([]modelPlazaModel, 0, len(platform.Models))
+		for j := range platform.Models {
+			model := &platform.Models[j]
+			models = append(models, modelPlazaModel{
+				Pattern:              model.Pattern,
+				UpstreamModel:        model.UpstreamModel,
+				EndpointCapabilities: append([]string(nil), model.EndpointCapabilities...),
+				Pricing:              platformPricingResponse(model.Pricing),
+			})
 		}
-	}
-
-	visible := filterPlazaVisibleGroups(groups, allowedExclusive)
-
-	out := make([]modelPlazaGroup, 0, len(visible))
-	for i := range visible {
-		out = append(out, toModelPlazaGroupDTO(&visible[i]))
-	}
-	response.Success(c, modelPlazaResponse{
-		Description: rt.Description,
-		Groups:      out,
-	})
-}
-
-// filterPlazaVisibleGroups 按登录态裁剪分组可见性。
-// allowedExclusive == nil 表示匿名（仅非专属）；非 nil 表示登录（非专属 + 授权专属）。
-func filterPlazaVisibleGroups(
-	groups []service.PlazaGroup,
-	allowedExclusive map[int64]struct{},
-) []service.PlazaGroup {
-	visible := make([]service.PlazaGroup, 0, len(groups))
-	for _, g := range groups {
-		if g.IsExclusive {
-			if allowedExclusive == nil {
-				continue
-			}
-			if _, ok := allowedExclusive[g.ID]; !ok {
-				continue
-			}
-		}
-		visible = append(visible, g)
-	}
-	return visible
-}
-
-// toModelPlazaGroupDTO 将 service 层广场分组映射为白名单 DTO。
-func toModelPlazaGroupDTO(g *service.PlazaGroup) modelPlazaGroup {
-	models := make([]modelPlazaModel, 0, len(g.Models))
-	for i := range g.Models {
-		m := &g.Models[i]
-		models = append(models, modelPlazaModel{
-			Name:            m.Name,
-			Platform:        m.Platform,
-			Pricing:         toUserPricing(m.Pricing),
-			OfficialPricing: toModelPlazaOfficialPricing(m.OfficialPricing),
+		out = append(out, modelPlazaPlatform{
+			ID:                   platform.ID,
+			Code:                 platform.Code,
+			Name:                 platform.Name,
+			AccountPlatform:      platform.AccountPlatform,
+			EndpointCapabilities: append([]string(nil), platform.EndpointCapabilities...),
+			Models:               models,
 		})
 	}
-	dto := modelPlazaGroup{
-		ID:                        g.ID,
-		Name:                      g.Name,
-		Description:               g.Description,
-		Platform:                  g.Platform,
-		BalanceRateMultiplier:     g.BalanceRateMultiplier,
-		BalancePeakRateEnabled:    g.BalancePeakRateEnabled,
-		BalancePeakStart:          g.BalancePeakStart,
-		BalancePeakEnd:            g.BalancePeakEnd,
-		BalancePeakRateMultiplier: g.BalancePeakRateMultiplier,
-		IsExclusive:               g.IsExclusive,
-		Models:                    models,
-	}
-	return dto
+	response.Success(c, modelPlazaResponse{Description: runtime.Description, Platforms: out})
 }
 
-// toModelPlazaOfficialPricing 转换官方参考价；nil 透传（前端显示 "-"）。
-func toModelPlazaOfficialPricing(p *service.PlazaOfficialPricing) *modelPlazaOfficialPricing {
-	if p == nil {
+func hasAuthenticatedSubject(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	_, ok := middleware.GetAuthSubjectFromContext(c)
+	return ok
+}
+
+func platformPricingResponse(pricing *service.ResolvedPricing) *modelPlazaPricing {
+	if pricing == nil {
 		return nil
 	}
-	return &modelPlazaOfficialPricing{
-		InputPrice:        p.InputPrice,
-		OutputPrice:       p.OutputPrice,
-		CacheWritePrice:   p.CacheWritePrice,
-		CacheWrite1hPrice: p.CacheWrite1hPrice,
-		CacheReadPrice:    p.CacheReadPrice,
+	result := &modelPlazaPricing{BillingMode: string(pricing.Mode), Intervals: []modelPlazaPricingTier{}}
+	if result.BillingMode == "" {
+		result.BillingMode = string(service.BillingModeToken)
 	}
+	if base := pricing.BasePricing; base != nil {
+		result.InputPrice = nonZeroFloatPointer(base.InputPricePerToken)
+		result.OutputPrice = nonZeroFloatPointer(base.OutputPricePerToken)
+		result.CacheWritePrice = nonZeroFloatPointer(base.CacheCreationPricePerToken)
+		result.CacheReadPrice = nonZeroFloatPointer(base.CacheReadPricePerToken)
+		result.ImageInputPrice = nonZeroFloatPointer(base.ImageInputPricePerToken)
+		result.ImageOutputPrice = nonZeroFloatPointer(base.ImageOutputPricePerToken)
+	}
+	if pricing.DefaultPerRequestPrice > 0 {
+		result.PerRequestPrice = &pricing.DefaultPerRequestPrice
+	}
+	for _, interval := range pricing.Intervals {
+		result.Intervals = append(result.Intervals, modelPlazaPricingTier{
+			MinTokens: interval.MinTokens, MaxTokens: interval.MaxTokens, TierLabel: interval.TierLabel,
+			InputPrice: interval.InputPrice, OutputPrice: interval.OutputPrice,
+			CacheWritePrice: interval.CacheWritePrice, CacheReadPrice: interval.CacheReadPrice,
+			PerRequestPrice: interval.PerRequestPrice,
+		})
+	}
+	return result
+}
+
+func nonZeroFloatPointer(value float64) *float64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
 }

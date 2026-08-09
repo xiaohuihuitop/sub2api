@@ -904,7 +904,7 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"verification_code":   "123456",
 			"expires_in_minutes":  "15",
 			"reset_url":           "https://example.com/reset-password?token=preview",
-			"subscription_group":  "Claude Pro",
+			"subscription_plan":   "Claude Pro",
 			"subscription_days":   "30",
 			"expiry_time":         "2026-06-18 12:00",
 			"days_remaining":      "3",
@@ -923,7 +923,7 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"quota_remaining":     "20.00",
 			"quota_threshold":     "20%",
 			"triggered_at":        "2026-05-20 12:00:00",
-			"group_name":          "默认分组",
+			"platform_name":       "OpenAI",
 			"moderation_category": "violence",
 			"moderation_score":    "0.982",
 			"violation_count":     "2",
@@ -952,7 +952,7 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		"verification_code":   "123456",
 		"expires_in_minutes":  "15",
 		"reset_url":           "https://example.com/reset-password?token=preview",
-		"subscription_group":  "Claude Pro",
+		"subscription_plan":   "Claude Pro",
 		"subscription_days":   "30",
 		"expiry_time":         "2026-06-18 12:00",
 		"days_remaining":      "3",
@@ -971,7 +971,7 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		"quota_remaining":     "20.00",
 		"quota_threshold":     "20%",
 		"triggered_at":        "2026-05-20 12:00:00",
-		"group_name":          "Default group",
+		"platform_name":       "OpenAI",
 		"moderation_category": "violence",
 		"moderation_score":    "0.982",
 		"violation_count":     "2",
@@ -1067,7 +1067,7 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Description:  "Sent after a subscription purchase is fulfilled.",
 		Category:     "subscription",
 		Optional:     false,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "subscription_group", "subscription_days", "expiry_time", "order_id"),
+		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "subscription_plan", "subscription_days", "expiry_time", "order_id"),
 	},
 	NotificationEmailEventSubscriptionExpiryReminder: {
 		Event:        NotificationEmailEventSubscriptionExpiryReminder,
@@ -1075,7 +1075,7 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Description:  "Optional reminder sent before an active subscription expires.",
 		Category:     "subscription",
 		Optional:     true,
-		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "subscription_group", "expiry_time", "days_remaining", "unsubscribe_url"),
+		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "subscription_plan", "expiry_time", "days_remaining", "unsubscribe_url"),
 	},
 	NotificationEmailEventBalanceLow: {
 		Event:        NotificationEmailEventBalanceLow,
@@ -1109,7 +1109,7 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Category:    "risk_control",
 		Optional:    false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
-			"triggered_at", "group_name", "moderation_category", "moderation_score", "violation_count", "ban_threshold"),
+			"triggered_at", "platform_name", "moderation_category", "moderation_score", "violation_count", "ban_threshold"),
 	},
 	NotificationEmailEventContentModerationDisabled: {
 		Event:       NotificationEmailEventContentModerationDisabled,
@@ -1118,7 +1118,7 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Category:    "risk_control",
 		Optional:    false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
-			"triggered_at", "group_name", "moderation_category", "moderation_score", "violation_count", "ban_threshold"),
+			"triggered_at", "platform_name", "moderation_category", "moderation_score", "violation_count", "ban_threshold"),
 	},
 	NotificationEmailEventCyberPolicyNotice: {
 		Event:       NotificationEmailEventCyberPolicyNotice,
@@ -1127,7 +1127,7 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Category:    "risk_control",
 		Optional:    false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
-			"triggered_at", "model", "group_name", "upstream_message"),
+			"triggered_at", "model", "platform_name", "upstream_message"),
 	},
 	NotificationEmailEventOpsAlert: {
 		Event:       NotificationEmailEventOpsAlert,
@@ -1223,7 +1223,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] Subscription purchase successful",
 			HTML: notificationEmailCard("#2563eb", "Subscription activated", `
 <p>Hello {{recipient_name}},</p>
-<p>Your subscription for <strong>{{subscription_group}}</strong> has been activated for <strong>{{subscription_days}}</strong> days.</p>
+<p>Your subscription for <strong>{{subscription_plan}}</strong> has been activated for <strong>{{subscription_days}}</strong> days.</p>
 <p>Expiry time: <strong>{{expiry_time}}</strong></p>
 <p>Order ID: {{order_id}}</p>`),
 		},
@@ -1231,7 +1231,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] 订阅购买成功",
 			HTML: notificationEmailCard("#2563eb", "订阅已开通", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的 <strong>{{subscription_group}}</strong> 订阅已成功开通，有效期 <strong>{{subscription_days}}</strong> 天。</p>
+<p>您的 <strong>{{subscription_plan}}</strong> 订阅已成功开通，有效期 <strong>{{subscription_days}}</strong> 天。</p>
 <p>到期时间：<strong>{{expiry_time}}</strong></p>
 <p>订单号：{{order_id}}</p>`),
 		},
@@ -1241,7 +1241,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] Subscription expires in {{days_remaining}} day(s)",
 			HTML: notificationEmailCard("#f97316", "Subscription expiry reminder", `
 <p>Hello {{recipient_name}},</p>
-<p>Your <strong>{{subscription_group}}</strong> subscription will expire in <strong>{{days_remaining}}</strong> day(s).</p>
+<p>Your <strong>{{subscription_plan}}</strong> subscription will expire in <strong>{{days_remaining}}</strong> day(s).</p>
 <p>Expiry time: <strong>{{expiry_time}}</strong></p>
 <p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from optional subscription reminders</a></p>`),
 		},
@@ -1249,7 +1249,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 			Subject: "[{{site_name}}] 订阅将在 {{days_remaining}} 天后到期",
 			HTML: notificationEmailCard("#f97316", "订阅到期提醒", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的 <strong>{{subscription_group}}</strong> 订阅将在 <strong>{{days_remaining}}</strong> 天后到期。</p>
+<p>您的 <strong>{{subscription_plan}}</strong> 订阅将在 <strong>{{days_remaining}}</strong> 天后到期。</p>
 <p>到期时间：<strong>{{expiry_time}}</strong></p>
 <p class="muted"><a href="{{unsubscribe_url}}">退订此类订阅提醒</a></p>`),
 		},
@@ -1328,7 +1328,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>Your API request triggered the platform content moderation/risk-control policy.</p>
 <table style="width:100%;border-collapse:collapse;">
   <tr><td>Triggered at</td><td>{{triggered_at}}</td></tr>
-  <tr><td>Group</td><td>{{group_name}}</td></tr>
+  <tr><td>Platform</td><td>{{platform_name}}</td></tr>
   <tr><td>Category / Score</td><td>{{moderation_category}} / {{moderation_score}}</td></tr>
   <tr><td>Violation count</td><td>{{violation_count}} / {{ban_threshold}}</td></tr>
 </table>
@@ -1341,7 +1341,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>您的 API 请求触发了平台内容审核/风控策略。</p>
 <table style="width:100%;border-collapse:collapse;">
   <tr><td>触发时间</td><td>{{triggered_at}}</td></tr>
-  <tr><td>所属分组</td><td>{{group_name}}</td></tr>
+  <tr><td>平台</td><td>{{platform_name}}</td></tr>
   <tr><td>命中类别 / 分数</td><td>{{moderation_category}} / {{moderation_score}}</td></tr>
   <tr><td>累计触发次数</td><td>{{violation_count}} / {{ban_threshold}}</td></tr>
 </table>
@@ -1356,7 +1356,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>Your account has repeatedly triggered platform content moderation/risk-control rules and has been automatically disabled.</p>
 <table style="width:100%;border-collapse:collapse;">
   <tr><td>Disabled at</td><td>{{triggered_at}}</td></tr>
-  <tr><td>Group</td><td>{{group_name}}</td></tr>
+  <tr><td>Platform</td><td>{{platform_name}}</td></tr>
   <tr><td>Category / Score</td><td>{{moderation_category}} / {{moderation_score}}</td></tr>
   <tr><td>Violation count</td><td>{{violation_count}} / {{ban_threshold}}</td></tr>
 </table>
@@ -1369,7 +1369,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>您的账户在统计周期内多次触发平台内容审核/风控规则，系统已自动禁用该账户。</p>
 <table style="width:100%;border-collapse:collapse;">
   <tr><td>禁用时间</td><td>{{triggered_at}}</td></tr>
-  <tr><td>所属分组</td><td>{{group_name}}</td></tr>
+  <tr><td>平台</td><td>{{platform_name}}</td></tr>
   <tr><td>命中类别 / 分数</td><td>{{moderation_category}} / {{moderation_score}}</td></tr>
   <tr><td>累计触发次数</td><td>{{violation_count}} / {{ban_threshold}}</td></tr>
 </table>
@@ -1385,7 +1385,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
   <tr><td style="width:128px;vertical-align:top;">Triggered at</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{triggered_at}}</td></tr>
   <tr><td style="width:128px;vertical-align:top;">Model</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{model}}</td></tr>
-  <tr><td style="width:128px;vertical-align:top;">Group</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{group_name}}</td></tr>
+  <tr><td style="width:128px;vertical-align:top;">Platform</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{platform_name}}</td></tr>
   <tr><td style="width:128px;vertical-align:top;">Upstream message</td><td style="overflow-wrap:anywhere;word-break:break-all;white-space:pre-wrap;">{{upstream_message}}</td></tr>
 </table>
 <p>If you believe this is a mistake, try rephrasing your request, or apply for authorized security access.</p>`),
@@ -1398,7 +1398,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
   <tr><td style="width:128px;vertical-align:top;">触发时间</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{triggered_at}}</td></tr>
   <tr><td style="width:128px;vertical-align:top;">模型</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{model}}</td></tr>
-  <tr><td style="width:128px;vertical-align:top;">所属分组</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{group_name}}</td></tr>
+  <tr><td style="width:128px;vertical-align:top;">平台</td><td style="overflow-wrap:anywhere;word-break:break-word;">{{platform_name}}</td></tr>
   <tr><td style="width:128px;vertical-align:top;">上游说明</td><td style="overflow-wrap:anywhere;word-break:break-all;white-space:pre-wrap;">{{upstream_message}}</td></tr>
 </table>
 <p>如认为系误判，可调整请求措辞后重试，或申请获得授权的安全访问权限。</p>`),

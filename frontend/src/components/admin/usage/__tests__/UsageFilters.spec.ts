@@ -29,7 +29,6 @@ const messages: Record<string, string> = {
   'admin.usage.billingModePerRequest': 'Per Request',
   'admin.usage.billingModeImage': 'Image',
   'admin.usage.group': 'Group',
-  'admin.usage.allGroups': 'All Groups',
   'common.refresh': 'Refresh',
   'common.reset': 'Reset',
   'admin.usage.cleanup.button': 'Cleanup',
@@ -75,7 +74,7 @@ const defaultFilters = () => ({
   request_type: null,
   billing_type: null,
   billing_mode: null,
-  group_id: null,
+	platform_id: null,
   start_date: '',
   end_date: '',
 })

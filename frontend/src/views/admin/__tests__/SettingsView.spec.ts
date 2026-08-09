@@ -458,7 +458,6 @@ const baseSettingsResponse = {
   ops_metrics_interval_seconds: 60,
   min_claude_code_version: "",
   max_claude_code_version: "",
-  allow_ungrouped_key_scheduling: false,
   enable_fingerprint_unification: true,
   enable_metadata_passthrough: false,
   enable_cch_signing: false,
@@ -686,8 +685,6 @@ describe("admin SettingsView payment visible method controls", () => {
       data: [
         {
           id: 77,
-          group_id: 9,
-          group_name: "Pro group",
           name: "Starter plan",
           description: "",
           rate_multiplier: 1,

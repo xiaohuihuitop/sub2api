@@ -85,11 +85,6 @@ func Status(v string) predicate.Platform {
 	return predicate.Platform(sql.FieldEQ(FieldStatus, v))
 }
 
-// LegacyGroupID applies equality check predicate on the "legacy_group_id" field. It's identical to LegacyGroupIDEQ.
-func LegacyGroupID(v int64) predicate.Platform {
-	return predicate.Platform(sql.FieldEQ(FieldLegacyGroupID, v))
-}
-
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Platform {
 	return predicate.Platform(sql.FieldEQ(FieldCreatedAt, v))
@@ -428,59 +423,6 @@ func StatusEqualFold(v string) predicate.Platform {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.Platform {
 	return predicate.Platform(sql.FieldContainsFold(FieldStatus, v))
-}
-
-// LegacyGroupIDEQ applies the EQ predicate on the "legacy_group_id" field.
-func LegacyGroupIDEQ(v int64) predicate.Platform {
-	return predicate.Platform(sql.FieldEQ(FieldLegacyGroupID, v))
-}
-
-// LegacyGroupIDNEQ applies the NEQ predicate on the "legacy_group_id" field.
-func LegacyGroupIDNEQ(v int64) predicate.Platform {
-	return predicate.Platform(sql.FieldNEQ(FieldLegacyGroupID, v))
-}
-
-// LegacyGroupIDIn applies the In predicate on the "legacy_group_id" field.
-func LegacyGroupIDIn(vs ...int64) predicate.Platform {
-	return predicate.Platform(sql.FieldIn(FieldLegacyGroupID, vs...))
-}
-
-// LegacyGroupIDNotIn applies the NotIn predicate on the "legacy_group_id" field.
-func LegacyGroupIDNotIn(vs ...int64) predicate.Platform {
-	return predicate.Platform(sql.FieldNotIn(FieldLegacyGroupID, vs...))
-}
-
-// LegacyGroupIDIsNil applies the IsNil predicate on the "legacy_group_id" field.
-func LegacyGroupIDIsNil() predicate.Platform {
-	return predicate.Platform(sql.FieldIsNull(FieldLegacyGroupID))
-}
-
-// LegacyGroupIDNotNil applies the NotNil predicate on the "legacy_group_id" field.
-func LegacyGroupIDNotNil() predicate.Platform {
-	return predicate.Platform(sql.FieldNotNull(FieldLegacyGroupID))
-}
-
-// HasLegacyGroup applies the HasEdge predicate on the "legacy_group" edge.
-func HasLegacyGroup() predicate.Platform {
-	return predicate.Platform(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, LegacyGroupTable, LegacyGroupColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasLegacyGroupWith applies the HasEdge predicate on the "legacy_group" edge with a given conditions (other predicates).
-func HasLegacyGroupWith(preds ...predicate.Group) predicate.Platform {
-	return predicate.Platform(func(s *sql.Selector) {
-		step := newLegacyGroupStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
 }
 
 // HasModelRules applies the HasEdge predicate on the "model_rules" edge.

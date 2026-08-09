@@ -67,7 +67,6 @@ type emailCacheStub struct {
 }
 
 type defaultSubscriptionAssignerStub struct {
-	calls     []AssignSubscriptionInput
 	planCalls []AssignSubscriptionFromPlanInput
 	err       error
 }
@@ -108,16 +107,6 @@ func (s *userPlatformQuotaRepoStub) ResetExpiredWindow(context.Context, int64, s
 
 func (s *userPlatformQuotaRepoStub) BatchSnapshotUsage(_ context.Context, _ []UserPlatformQuotaSnapshot, _ time.Time) error {
 	return nil
-}
-
-func (s *defaultSubscriptionAssignerStub) AssignOrExtendSubscription(_ context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error) {
-	if input != nil {
-		s.calls = append(s.calls, *input)
-	}
-	if s.err != nil {
-		return nil, false, s.err
-	}
-	return &UserSubscription{UserID: input.UserID, GroupID: input.GroupID}, false, nil
 }
 
 func (s *defaultSubscriptionAssignerStub) AssignSubscriptionFromPlan(_ context.Context, input *AssignSubscriptionFromPlanInput) (*UserSubscription, error) {
@@ -638,7 +627,7 @@ func TestAuthService_Register_AssignsDefaultSubscriptions(t *testing.T) {
 	assigner := &defaultSubscriptionAssignerStub{}
 	service := newAuthService(repo, map[string]string{
 		SettingKeyRegistrationEnabled:                 "true",
-		SettingKeyDefaultSubscriptions:                `[{"group_id":11,"validity_days":30},{"group_id":12,"validity_days":7}]`,
+		SettingKeyDefaultSubscriptions:                `[{"plan_id":11},{"plan_id":12}]`,
 		SettingKeyAuthSourceDefaultEmailGrantOnSignup: "false",
 	}, nil, nil)
 	service.defaultSubAssigner = assigner
@@ -646,12 +635,10 @@ func TestAuthService_Register_AssignsDefaultSubscriptions(t *testing.T) {
 	_, user, err := service.Register(context.Background(), "default-sub@test.com", "password")
 	require.NoError(t, err)
 	require.NotNil(t, user)
-	require.Len(t, assigner.calls, 2)
-	require.Equal(t, int64(42), assigner.calls[0].UserID)
-	require.Equal(t, int64(11), assigner.calls[0].GroupID)
-	require.Equal(t, 30, assigner.calls[0].ValidityDays)
-	require.Equal(t, int64(12), assigner.calls[1].GroupID)
-	require.Equal(t, 7, assigner.calls[1].ValidityDays)
+	require.Len(t, assigner.planCalls, 2)
+	require.Equal(t, int64(42), assigner.planCalls[0].UserID)
+	require.Equal(t, int64(11), assigner.planCalls[0].PlanID)
+	require.Equal(t, int64(12), assigner.planCalls[1].PlanID)
 }
 
 func TestAuthService_Register_AssignsDefaultPlanSubscriptions(t *testing.T) {
@@ -667,7 +654,6 @@ func TestAuthService_Register_AssignsDefaultPlanSubscriptions(t *testing.T) {
 	_, user, err := service.Register(context.Background(), "default-plan@test.com", "password")
 	require.NoError(t, err)
 	require.NotNil(t, user)
-	require.Empty(t, assigner.calls)
 	require.Equal(t, []AssignSubscriptionFromPlanInput{{
 		UserID: 43,
 		PlanID: 81,
@@ -680,10 +666,10 @@ func TestAuthService_Register_UsesEmailAuthSourceDefaultsWhenGrantEnabled(t *tes
 	assigner := &defaultSubscriptionAssignerStub{}
 	service := newAuthService(repo, map[string]string{
 		SettingKeyRegistrationEnabled:                 "true",
-		SettingKeyDefaultSubscriptions:                `[{"group_id":91,"validity_days":3}]`,
+		SettingKeyDefaultSubscriptions:                `[{"plan_id":91}]`,
 		SettingKeyAuthSourceDefaultEmailBalance:       "12.5",
 		SettingKeyAuthSourceDefaultEmailConcurrency:   "7",
-		SettingKeyAuthSourceDefaultEmailSubscriptions: `[{"group_id":11,"validity_days":30}]`,
+		SettingKeyAuthSourceDefaultEmailSubscriptions: `[{"plan_id":11}]`,
 		SettingKeyAuthSourceDefaultEmailGrantOnSignup: "true",
 	}, nil, nil)
 	service.defaultSubAssigner = assigner
@@ -693,9 +679,8 @@ func TestAuthService_Register_UsesEmailAuthSourceDefaultsWhenGrantEnabled(t *tes
 	require.NotNil(t, user)
 	require.Equal(t, 12.5, user.Balance)
 	require.Equal(t, 7, user.Concurrency)
-	require.Len(t, assigner.calls, 1)
-	require.Equal(t, int64(11), assigner.calls[0].GroupID)
-	require.Equal(t, 30, assigner.calls[0].ValidityDays)
+	require.Len(t, assigner.planCalls, 1)
+	require.Equal(t, int64(11), assigner.planCalls[0].PlanID)
 }
 
 func TestAuthService_Register_GrantOnSignupFalseFallsBackToGlobalDefaults(t *testing.T) {
@@ -703,10 +688,10 @@ func TestAuthService_Register_GrantOnSignupFalseFallsBackToGlobalDefaults(t *tes
 	assigner := &defaultSubscriptionAssignerStub{}
 	service := newAuthService(repo, map[string]string{
 		SettingKeyRegistrationEnabled:                 "true",
-		SettingKeyDefaultSubscriptions:                `[{"group_id":31,"validity_days":5}]`,
+		SettingKeyDefaultSubscriptions:                `[{"plan_id":31}]`,
 		SettingKeyAuthSourceDefaultEmailBalance:       "99",
 		SettingKeyAuthSourceDefaultEmailConcurrency:   "88",
-		SettingKeyAuthSourceDefaultEmailSubscriptions: `[{"group_id":32,"validity_days":9}]`,
+		SettingKeyAuthSourceDefaultEmailSubscriptions: `[{"plan_id":32}]`,
 		SettingKeyAuthSourceDefaultEmailGrantOnSignup: "false",
 	}, nil, nil)
 	service.defaultSubAssigner = assigner
@@ -716,9 +701,8 @@ func TestAuthService_Register_GrantOnSignupFalseFallsBackToGlobalDefaults(t *tes
 	require.NotNil(t, user)
 	require.Equal(t, 3.5, user.Balance)
 	require.Equal(t, 2, user.Concurrency)
-	require.Len(t, assigner.calls, 1)
-	require.Equal(t, int64(31), assigner.calls[0].GroupID)
-	require.Equal(t, 5, assigner.calls[0].ValidityDays)
+	require.Len(t, assigner.planCalls, 1)
+	require.Equal(t, int64(31), assigner.planCalls[0].PlanID)
 }
 
 func TestAuthService_Register_GrantOnSignupMergesSourceOverridesWithGlobalDefaults(t *testing.T) {
@@ -726,7 +710,7 @@ func TestAuthService_Register_GrantOnSignupMergesSourceOverridesWithGlobalDefaul
 	assigner := &defaultSubscriptionAssignerStub{}
 	service := newAuthService(repo, map[string]string{
 		SettingKeyRegistrationEnabled:                 "true",
-		SettingKeyDefaultSubscriptions:                `[{"group_id":31,"validity_days":5}]`,
+		SettingKeyDefaultSubscriptions:                `[{"plan_id":31}]`,
 		SettingKeyAuthSourceDefaultEmailBalance:       "9.5",
 		SettingKeyAuthSourceDefaultEmailConcurrency:   "5",
 		SettingKeyAuthSourceDefaultEmailSubscriptions: `[]`,
@@ -739,9 +723,8 @@ func TestAuthService_Register_GrantOnSignupMergesSourceOverridesWithGlobalDefaul
 	require.NotNil(t, user)
 	require.Equal(t, 9.5, user.Balance)
 	require.Equal(t, 5, user.Concurrency)
-	require.Len(t, assigner.calls, 1)
-	require.Equal(t, int64(31), assigner.calls[0].GroupID)
-	require.Equal(t, 5, assigner.calls[0].ValidityDays)
+	require.Len(t, assigner.planCalls, 1)
+	require.Equal(t, int64(31), assigner.planCalls[0].PlanID)
 }
 
 func TestAuthService_LoginOrRegisterOAuthWithTokenPair_UsesLinuxDoAuthSourceDefaultsOnSignup(t *testing.T) {
@@ -749,10 +732,10 @@ func TestAuthService_LoginOrRegisterOAuthWithTokenPair_UsesLinuxDoAuthSourceDefa
 	assigner := &defaultSubscriptionAssignerStub{}
 	service := newAuthService(repo, map[string]string{
 		SettingKeyRegistrationEnabled:                   "true",
-		SettingKeyDefaultSubscriptions:                  `[{"group_id":81,"validity_days":1}]`,
+		SettingKeyDefaultSubscriptions:                  `[{"plan_id":81}]`,
 		SettingKeyAuthSourceDefaultLinuxDoBalance:       "21.75",
 		SettingKeyAuthSourceDefaultLinuxDoConcurrency:   "9",
-		SettingKeyAuthSourceDefaultLinuxDoSubscriptions: `[{"group_id":22,"validity_days":14}]`,
+		SettingKeyAuthSourceDefaultLinuxDoSubscriptions: `[{"plan_id":22}]`,
 		SettingKeyAuthSourceDefaultLinuxDoGrantOnSignup: "true",
 	}, nil, nil)
 	service.defaultSubAssigner = assigner
@@ -766,9 +749,8 @@ func TestAuthService_LoginOrRegisterOAuthWithTokenPair_UsesLinuxDoAuthSourceDefa
 	require.Equal(t, 21.75, user.Balance)
 	require.Equal(t, 9, user.Concurrency)
 	require.Len(t, repo.created, 1)
-	require.Len(t, assigner.calls, 1)
-	require.Equal(t, int64(22), assigner.calls[0].GroupID)
-	require.Equal(t, 14, assigner.calls[0].ValidityDays)
+	require.Len(t, assigner.planCalls, 1)
+	require.Equal(t, int64(22), assigner.planCalls[0].PlanID)
 }
 
 func TestAuthService_LoginOrRegisterOAuthWithTokenPair_ExistingUserDoesNotGrantAgain(t *testing.T) {
@@ -788,7 +770,7 @@ func TestAuthService_LoginOrRegisterOAuthWithTokenPair_ExistingUserDoesNotGrantA
 		SettingKeyRegistrationEnabled:                   "true",
 		SettingKeyAuthSourceDefaultLinuxDoBalance:       "21.75",
 		SettingKeyAuthSourceDefaultLinuxDoConcurrency:   "9",
-		SettingKeyAuthSourceDefaultLinuxDoSubscriptions: `[{"group_id":22,"validity_days":14}]`,
+		SettingKeyAuthSourceDefaultLinuxDoSubscriptions: `[{"plan_id":22}]`,
 		SettingKeyAuthSourceDefaultLinuxDoGrantOnSignup: "true",
 	}, nil, nil)
 	service.defaultSubAssigner = assigner
@@ -801,7 +783,7 @@ func TestAuthService_LoginOrRegisterOAuthWithTokenPair_ExistingUserDoesNotGrantA
 	require.Equal(t, 4.0, user.Balance)
 	require.Equal(t, 1, user.Concurrency)
 	require.Empty(t, repo.created)
-	require.Empty(t, assigner.calls)
+	require.Empty(t, assigner.planCalls)
 }
 
 // newAuthServiceWithDingTalkCfg 构建一个含完整 DingTalk config 的 AuthService，

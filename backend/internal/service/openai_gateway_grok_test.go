@@ -1396,7 +1396,7 @@ func TestGrokMediaVideoRequestBindingIsScopedToUserAndAPIKey(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodGet, "/v1/videos/video-request-123", nil)
 	c.Request.Header.Set("session_id", "shared-client-session")
-	groupID := int64(7)
+	platformID := int64(7)
 	cache := &stubGatewayCache{}
 	svc := &OpenAIGatewayService{cache: cache}
 	const userID int64 = 41
@@ -1406,17 +1406,17 @@ func TestGrokMediaVideoRequestBindingIsScopedToUserAndAPIKey(t *testing.T) {
 
 	hash := GrokMediaVideoRequestSessionHash("video-request-123", userID, apiKeyID)
 	require.NotEmpty(t, hash)
-	require.NoError(t, svc.BindGrokMediaVideoRequestAccount(ctx, &groupID, "video-request-123", userID, apiKeyID, 63))
+	require.NoError(t, svc.BindGrokMediaVideoRequestAccount(ctx, &platformID, "video-request-123", userID, apiKeyID, 63))
 
-	accountID, err := svc.ResolveGrokMediaVideoRequestAccount(ctx, &groupID, "video-request-123", userID, apiKeyID)
+	accountID, err := svc.ResolveGrokMediaVideoRequestAccount(ctx, &platformID, "video-request-123", userID, apiKeyID)
 	require.NoError(t, err)
 	require.Equal(t, int64(63), accountID)
 
-	accountID, err = svc.ResolveGrokMediaVideoRequestAccount(ctx, &groupID, "video-request-123", userID+1, apiKeyID)
+	accountID, err = svc.ResolveGrokMediaVideoRequestAccount(ctx, &platformID, "video-request-123", userID+1, apiKeyID)
 	require.Error(t, err)
 	require.Zero(t, accountID)
 
-	accountID, err = svc.ResolveGrokMediaVideoRequestAccount(ctx, &groupID, "video-request-123", userID, apiKeyID+1)
+	accountID, err = svc.ResolveGrokMediaVideoRequestAccount(ctx, &platformID, "video-request-123", userID, apiKeyID+1)
 	require.Error(t, err)
 	require.Zero(t, accountID)
 }

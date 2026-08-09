@@ -14,7 +14,6 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/platform"
 	"github.com/Wei-Shaw/sub2api/ent/platformmodelrule"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
@@ -108,31 +107,6 @@ func (_u *PlatformUpdate) AppendEndpointCapabilities(v []string) *PlatformUpdate
 	return _u
 }
 
-// SetLegacyGroupID sets the "legacy_group_id" field.
-func (_u *PlatformUpdate) SetLegacyGroupID(v int64) *PlatformUpdate {
-	_u.mutation.SetLegacyGroupID(v)
-	return _u
-}
-
-// SetNillableLegacyGroupID sets the "legacy_group_id" field if the given value is not nil.
-func (_u *PlatformUpdate) SetNillableLegacyGroupID(v *int64) *PlatformUpdate {
-	if v != nil {
-		_u.SetLegacyGroupID(*v)
-	}
-	return _u
-}
-
-// ClearLegacyGroupID clears the value of the "legacy_group_id" field.
-func (_u *PlatformUpdate) ClearLegacyGroupID() *PlatformUpdate {
-	_u.mutation.ClearLegacyGroupID()
-	return _u
-}
-
-// SetLegacyGroup sets the "legacy_group" edge to the Group entity.
-func (_u *PlatformUpdate) SetLegacyGroup(v *Group) *PlatformUpdate {
-	return _u.SetLegacyGroupID(v.ID)
-}
-
 // AddModelRuleIDs adds the "model_rules" edge to the PlatformModelRule entity by IDs.
 func (_u *PlatformUpdate) AddModelRuleIDs(ids ...int64) *PlatformUpdate {
 	_u.mutation.AddModelRuleIDs(ids...)
@@ -196,12 +170,6 @@ func (_u *PlatformUpdate) AddUsageLogs(v ...*UsageLog) *PlatformUpdate {
 // Mutation returns the PlatformMutation object of the builder.
 func (_u *PlatformUpdate) Mutation() *PlatformMutation {
 	return _u.mutation
-}
-
-// ClearLegacyGroup clears the "legacy_group" edge to the Group entity.
-func (_u *PlatformUpdate) ClearLegacyGroup() *PlatformUpdate {
-	_u.mutation.ClearLegacyGroup()
-	return _u
 }
 
 // ClearModelRules clears all "model_rules" edges to the PlatformModelRule entity.
@@ -383,35 +351,6 @@ func (_u *PlatformUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, platform.FieldEndpointCapabilities, value)
 		})
-	}
-	if _u.mutation.LegacyGroupCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   platform.LegacyGroupTable,
-			Columns: []string{platform.LegacyGroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.LegacyGroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   platform.LegacyGroupTable,
-			Columns: []string{platform.LegacyGroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.ModelRulesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -687,31 +626,6 @@ func (_u *PlatformUpdateOne) AppendEndpointCapabilities(v []string) *PlatformUpd
 	return _u
 }
 
-// SetLegacyGroupID sets the "legacy_group_id" field.
-func (_u *PlatformUpdateOne) SetLegacyGroupID(v int64) *PlatformUpdateOne {
-	_u.mutation.SetLegacyGroupID(v)
-	return _u
-}
-
-// SetNillableLegacyGroupID sets the "legacy_group_id" field if the given value is not nil.
-func (_u *PlatformUpdateOne) SetNillableLegacyGroupID(v *int64) *PlatformUpdateOne {
-	if v != nil {
-		_u.SetLegacyGroupID(*v)
-	}
-	return _u
-}
-
-// ClearLegacyGroupID clears the value of the "legacy_group_id" field.
-func (_u *PlatformUpdateOne) ClearLegacyGroupID() *PlatformUpdateOne {
-	_u.mutation.ClearLegacyGroupID()
-	return _u
-}
-
-// SetLegacyGroup sets the "legacy_group" edge to the Group entity.
-func (_u *PlatformUpdateOne) SetLegacyGroup(v *Group) *PlatformUpdateOne {
-	return _u.SetLegacyGroupID(v.ID)
-}
-
 // AddModelRuleIDs adds the "model_rules" edge to the PlatformModelRule entity by IDs.
 func (_u *PlatformUpdateOne) AddModelRuleIDs(ids ...int64) *PlatformUpdateOne {
 	_u.mutation.AddModelRuleIDs(ids...)
@@ -775,12 +689,6 @@ func (_u *PlatformUpdateOne) AddUsageLogs(v ...*UsageLog) *PlatformUpdateOne {
 // Mutation returns the PlatformMutation object of the builder.
 func (_u *PlatformUpdateOne) Mutation() *PlatformMutation {
 	return _u.mutation
-}
-
-// ClearLegacyGroup clears the "legacy_group" edge to the Group entity.
-func (_u *PlatformUpdateOne) ClearLegacyGroup() *PlatformUpdateOne {
-	_u.mutation.ClearLegacyGroup()
-	return _u
 }
 
 // ClearModelRules clears all "model_rules" edges to the PlatformModelRule entity.
@@ -992,35 +900,6 @@ func (_u *PlatformUpdateOne) sqlSave(ctx context.Context) (_node *Platform, err 
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, platform.FieldEndpointCapabilities, value)
 		})
-	}
-	if _u.mutation.LegacyGroupCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   platform.LegacyGroupTable,
-			Columns: []string{platform.LegacyGroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.LegacyGroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   platform.LegacyGroupTable,
-			Columns: []string{platform.LegacyGroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.ModelRulesCleared() {
 		edge := &sqlgraph.EdgeSpec{

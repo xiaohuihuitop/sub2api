@@ -37,7 +37,7 @@
 - 不保留可配置的旧 Group/Channel 实体。
 - 活跃旧订阅、兑换码和未完成订阅订单必须先绑定到迁移生成的 `for_sale=false` 套餐，再删除旧分组引用。
 - 历史用量、支付和安全审计可以保留金额、Token、时间、请求、平台和套餐快照；不能继续通过旧分组表查询或回填。
-- 已执行的旧 SQL migration 不修改；只新增 `196_remove_legacy_configuration.sql`。
+- 已执行的旧 SQL migration 不修改；只新增未占用编号的清理 migration（当前分支已使用 196/197/198，最终清理需使用后续空闲编号）。
 - migration 必须幂等，并在无法安全转换仍有效的用户资产时 `RAISE EXCEPTION`，禁止静默丢失资产。
 
 ### 执行与提交安全规则
@@ -57,8 +57,8 @@
 - `backend/internal/service/model_pricing_catalog.go`：模型价格覆盖领域对象和解析接口。
 - `backend/internal/repository/model_pricing_override_repo.go`：价格覆盖持久化。
 - `backend/internal/handler/admin/model_pricing_handler.go`：管理员价格 CRUD 与 LiteLLM 同步接口。
-- `backend/migrations/196_remove_legacy_configuration.sql`：一次性转换和物理清理。
-- `backend/migrations/196_remove_legacy_configuration_test.go`：迁移顺序、保护条件和删除项测试。
+- `backend/migrations/<next_free>_remove_legacy_configuration.sql`：一次性转换和物理清理。
+- `backend/migrations/<next_free>_remove_legacy_configuration_test.go`：迁移顺序、保护条件和删除项测试。
 - `frontend/src/api/admin/modelPricing.ts`：独立价格 API。
 - `frontend/src/views/admin/ModelPricingView.vue`：模型价格维护页。
 - `frontend/src/views/admin/__tests__/ModelPricingView.spec.ts`：价格页回归。
@@ -1003,6 +1003,13 @@ Key 未授权请求模型：model_not_found
 
 ## 计划自审结果
 
+## 2026-08-09 发布前审计结论
+
+- 已完成：运行时 Platform 鉴权收口、API Key 外部旧字段删除、账号普通模型策略写入净化、Plan-only 资产路径、独立模型价格目录、平台管理/模型价格 UI、前端全量校验和后端 `internal/...` unit 全量校验。
+- 未完成且不得标记为完成：Task 6 的 Ops/Usage/安全审计维度迁移、Task 8 的旧 Group/Channel 管理域与依赖注入物理删除、Task 9 的 `196_remove_legacy_configuration.sql` 数据回填/旧列旧表删除/Ent 重新生成、Task 10 的架构守卫和真实环境验收。
+- 当前静态残留扫描仍命中活动源码，且计划要求的物理迁移与架构守卫文件尚不存在。直接创建删除旧表的迁移会让仍引用旧实体的内部路径在启动或请求阶段失败，因此本审计结论不允许提交正式发布 Tag。
+- 后续必须先完成上述迁移并通过数据库集成测试、全量后端/前端验证和服务器只读盘点，再进入提交、Tag、镜像和部署步骤。
+
 ### 需求覆盖
 
 - 旧运行时回退：Task 1。
@@ -1035,4 +1042,13 @@ Key 未授权请求模型：model_not_found
 - 计划不含 `TBD`、`TODO`、`implement later` 或“类似前一步”的省略描述。
 - `PlatformID`、`SubscriptionPlanID`、`billing_source_type`、`adapter/model_pattern` 在各阶段含义一致。
 - Channel Monitor 与 Auth Identity Channel 明确排除，不会因名称相同被误删。
-- 旧 migration 保持不可变，只新增 migration 196。
+- 旧 migration 保持不可变，只新增未占用编号的清理 migration。
+
+## 最终执行记录（2026-08-10）
+
+- 状态：本地实现与验证完成，旧配置清理由 migration 200 和架构守卫收口；服务器备份、部署与真实验收待执行。
+- 运行时：Platform 是唯一调度与模型权威；SubscriptionPlan/UserSubscription 和全局余额倍率是唯一资产计费来源。
+- 控制面：旧 Group/Channel/BillingProfile/Composite API、页面、注入和设置均已删除；Ops、Usage、风控、通知和模型广场已平台化。
+- 数据层：Ent 已重新生成；migration 200 先保护并转换有效资产，再物理删除旧列、旧表、旧凭据键和旧设置。
+- 本地验证：后端 internal unit、Ent/migrations/cmd、Repository integration 编译、server build；前端 198/198 Vitest 文件（1340 用例）、typecheck、lint、production build；`git diff --check` 与禁用词扫描通过。
+- 发布与部署：用户已明确授权提交、Tag、推送和腾讯云部署；进入 `my2-v0.2.10` 发布阶段，服务器迁移前仍必须完成备份和只读盘点。

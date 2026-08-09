@@ -7,10 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUsageLogEffectivePlatformExprUsesAccountPlatformForCompositeGroups(t *testing.T) {
+func TestUsageLogEffectivePlatformExprUsesPlatformCatalog(t *testing.T) {
 	expr := strings.ToLower(usageLogEffectivePlatformExpr)
 
-	require.Contains(t, expr, "g.platform = 'composite'")
-	require.Contains(t, expr, "then a.platform")
+	require.Contains(t, expr, "p.code")
 	require.Contains(t, expr, "coalesce")
+	require.NotContains(t, expr, "g.platform")
+	require.NotContains(t, expr, "a.platform")
 }

@@ -76,7 +76,7 @@ func TestPromptServiceBlockingLatestTurnOnlyUsesNarrowSnapshot(t *testing.T) {
 	}), nil, NewAtomicMetrics(), 2, 2)
 	service := &PromptService{
 		config: &fakeConfigStore{active: true, cfg: ActiveConfig{
-			RiskControlEnabled: true, Enabled: true, BlockingEnabled: true, BlockingLatestTurnOnly: true, AllGroups: true,
+			RiskControlEnabled: true, Enabled: true, BlockingEnabled: true, BlockingLatestTurnOnly: true, AllPlatforms: true,
 			Scanners: AllScannerIDs, Endpoints: []ActiveEndpoint{{ID: "guard-1", Enabled: true, TimeoutMS: 1000, InputLimit: 4096}},
 		}},
 		evaluator: evaluator,

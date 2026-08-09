@@ -454,15 +454,9 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 		openaiWSPool:     pool,
 	}
 
-	groupID := int64(3)
 	apiKey := &APIKey{
-		ID:      1,
-		UserID:  1,
-		GroupID: &groupID,
-		Group: &Group{
-			ID:                   groupID,
-			AllowImageGeneration: true,
-		},
+		ID:     1,
+		UserID: 1,
 	}
 	account := &Account{
 		ID:          31,

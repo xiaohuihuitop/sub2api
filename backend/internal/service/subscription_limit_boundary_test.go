@@ -14,25 +14,25 @@ func TestValidateAndCheckLimitsRejectsUsageAtLimit(t *testing.T) {
 	limit := 10.0
 	tests := []struct {
 		name     string
-		group    Group
+		setLimit func(*UserSubscription)
 		setUsage func(*UserSubscription)
 		expected error
 	}{
 		{
 			name:     "daily",
-			group:    Group{DailyLimitUSD: &limit},
+			setLimit: func(sub *UserSubscription) { sub.DailyLimitUSDSnapshot = &limit },
 			setUsage: func(sub *UserSubscription) { sub.DailyUsageUSD = limit },
 			expected: ErrDailyLimitExceeded,
 		},
 		{
 			name:     "weekly",
-			group:    Group{WeeklyLimitUSD: &limit},
+			setLimit: func(sub *UserSubscription) { sub.WeeklyLimitUSDSnapshot = &limit },
 			setUsage: func(sub *UserSubscription) { sub.WeeklyUsageUSD = limit },
 			expected: ErrWeeklyLimitExceeded,
 		},
 		{
 			name:     "monthly",
-			group:    Group{MonthlyLimitUSD: &limit},
+			setLimit: func(sub *UserSubscription) { sub.MonthlyLimitUSDSnapshot = &limit },
 			setUsage: func(sub *UserSubscription) { sub.MonthlyUsageUSD = limit },
 			expected: ErrMonthlyLimitExceeded,
 		},
@@ -50,10 +50,11 @@ func TestValidateAndCheckLimitsRejectsUsageAtLimit(t *testing.T) {
 				MonthlyWindowStart: &windowStart,
 			}
 			tt.setUsage(sub)
-			svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+			tt.setLimit(sub)
+			svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 			svc.now = func() time.Time { return now }
 
-			needsMaintenance, err := svc.ValidateAndCheckLimits(sub, &tt.group)
+			needsMaintenance, err := svc.ValidateAndCheckLimits(sub)
 
 			require.ErrorIs(t, err, tt.expected)
 			require.False(t, needsMaintenance)

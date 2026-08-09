@@ -4,7 +4,7 @@ import {
   OPENAI_CC_SWITCH_CODEX_MODEL,
   buildCcSwitchImportDeeplink
 } from '@/utils/ccswitchImport'
-import type { GroupPlatform } from '@/types'
+import type { AccountPlatform } from '@/types'
 
 function paramsFromDeeplink(deeplink: string): URLSearchParams {
   const query = deeplink.split('?')[1] || ''
@@ -64,8 +64,8 @@ describe('ccswitchImport utils', () => {
   })
 
   it.each([
-    { platform: 'anthropic' as GroupPlatform, clientType: 'claude' as const, app: 'claude' },
-    { platform: 'gemini' as GroupPlatform, clientType: 'gemini' as const, app: 'gemini' }
+    { platform: 'anthropic' as AccountPlatform, clientType: 'claude' as const, app: 'claude' },
+    { platform: 'gemini' as AccountPlatform, clientType: 'gemini' as const, app: 'gemini' }
   ])('does not add a model parameter for $platform imports', ({ platform, clientType, app }) => {
     const params = paramsFromDeeplink(
       buildCcSwitchImportDeeplink({

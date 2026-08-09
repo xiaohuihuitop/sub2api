@@ -569,21 +569,21 @@ func (s *OpsScheduledReportService) generateReportContent(ctx context.Context, r
 	switch strings.TrimSpace(report.ReportType) {
 	case "daily_summary", "weekly_summary":
 		overview, err := s.opsService.GetDashboardOverview(ctx, &OpsDashboardFilter{
-			StartTime: start,
-			EndTime:   end,
-			Platform:  "",
-			GroupID:   nil,
-			QueryMode: OpsQueryModeAuto,
+			StartTime:  start,
+			EndTime:    end,
+			Platform:   "",
+			PlatformID: nil,
+			QueryMode:  OpsQueryModeAuto,
 		})
 		if err != nil {
 			// If pre-aggregation isn't ready but the report is requested, fall back to raw.
 			if strings.TrimSpace(report.ReportType) == "daily_summary" || strings.TrimSpace(report.ReportType) == "weekly_summary" {
 				overview, err = s.opsService.GetDashboardOverview(ctx, &OpsDashboardFilter{
-					StartTime: start,
-					EndTime:   end,
-					Platform:  "",
-					GroupID:   nil,
-					QueryMode: OpsQueryModeRaw,
+					StartTime:  start,
+					EndTime:    end,
+					Platform:   "",
+					PlatformID: nil,
+					QueryMode:  OpsQueryModeRaw,
 				})
 			}
 			if err != nil {

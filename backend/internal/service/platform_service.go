@@ -43,7 +43,6 @@ type CreatePlatformInput struct {
 	AccountPlatform      string
 	Status               string
 	EndpointCapabilities []string
-	LegacyGroupID        *int64
 	ModelRules           []PlatformModelRule
 }
 
@@ -56,8 +55,6 @@ type UpdatePlatformInput struct {
 	AccountPlatform      *string
 	Status               *string
 	EndpointCapabilities *[]string
-	LegacyGroupID        *int64
-	ClearLegacyGroup     bool
 	ModelRules           *[]PlatformModelRule
 }
 
@@ -138,6 +135,9 @@ func (s *PlatformService) ResolveModel(ctx context.Context, requestedModel strin
 	candidates, err := s.ResolveModelCandidates(ctx, requestedModel)
 	if err != nil {
 		return nil, err
+	}
+	if len(candidates) == 0 {
+		return nil, ErrPlatformModelNotFound
 	}
 	if len(candidates) > 1 {
 		bestPriority := candidates[0].MatchPriority
@@ -253,7 +253,6 @@ func platformFromCreateInput(input CreatePlatformInput) (*Platform, error) {
 		AccountPlatform:      accountPlatform,
 		Status:               status,
 		EndpointCapabilities: endpointCapabilities,
-		LegacyGroupID:        clonePlatformInt64Pointer(input.LegacyGroupID),
 		ModelRules:           clonePlatformModelRules(input.ModelRules),
 	}, nil
 }
@@ -289,11 +288,6 @@ func applyPlatformUpdate(platform *Platform, input UpdatePlatformInput) error {
 	}
 	if input.EndpointCapabilities != nil {
 		platform.EndpointCapabilities = normalizeEndpointCapabilities(*input.EndpointCapabilities)
-	}
-	if input.ClearLegacyGroup {
-		platform.LegacyGroupID = nil
-	} else if input.LegacyGroupID != nil {
-		platform.LegacyGroupID = clonePlatformInt64Pointer(input.LegacyGroupID)
 	}
 	if input.ModelRules != nil {
 		platform.ModelRules = clonePlatformModelRules(*input.ModelRules)
@@ -393,7 +387,6 @@ func clonePlatform(platform *Platform) *Platform {
 		return nil
 	}
 	cloned := *platform
-	cloned.LegacyGroupID = clonePlatformInt64Pointer(platform.LegacyGroupID)
 	cloned.ModelRules = clonePlatformModelRules(platform.ModelRules)
 	cloned.EndpointCapabilities = append([]string(nil), platform.EndpointCapabilities...)
 	if platform.SchedulingConfig != nil {

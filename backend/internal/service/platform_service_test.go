@@ -176,6 +176,12 @@ func TestPlatformServiceResolveModelUsesActiveRepositoryRules(t *testing.T) {
 	require.Equal(t, "gpt-4o-2024-08-06", resolved.UpstreamModel)
 }
 
+func TestPlatformServiceResolveModelReturnsNotFoundWithoutCandidates(t *testing.T) {
+	_, err := NewPlatformService(&platformRepositoryStub{}).ResolveModel(context.Background(), "unknown-model")
+
+	require.ErrorIs(t, err, ErrPlatformModelNotFound)
+}
+
 func TestPlatformServiceUpdateReplacesOwnRuleWithoutSelfConflict(t *testing.T) {
 	repo := &platformManagementRepositoryStub{
 		platformRepositoryStub: platformRepositoryStub{

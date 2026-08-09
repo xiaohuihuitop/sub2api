@@ -111,10 +111,10 @@ FROM combined`
 	tpsPeak := roundTo1DP(float64(peakTokensPerMin) / 60.0)
 
 	return &service.OpsRealtimeTrafficSummary{
-		StartTime: start,
-		EndTime:   end,
-		Platform:  strings.TrimSpace(filter.Platform),
-		GroupID:   filter.GroupID,
+		StartTime:  start,
+		EndTime:    end,
+		Platform:   strings.TrimSpace(filter.Platform),
+		PlatformID: filter.PlatformID,
 		QPS: service.OpsRateSummary{
 			Current: qpsCurrent,
 			Peak:    qpsPeak,

@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/subscriptionplan"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -143,20 +142,6 @@ func (_c *RedeemCodeCreate) SetNillableExpiresAt(v *time.Time) *RedeemCodeCreate
 	return _c
 }
 
-// SetGroupID sets the "group_id" field.
-func (_c *RedeemCodeCreate) SetGroupID(v int64) *RedeemCodeCreate {
-	_c.mutation.SetGroupID(v)
-	return _c
-}
-
-// SetNillableGroupID sets the "group_id" field if the given value is not nil.
-func (_c *RedeemCodeCreate) SetNillableGroupID(v *int64) *RedeemCodeCreate {
-	if v != nil {
-		_c.SetGroupID(*v)
-	}
-	return _c
-}
-
 // SetSubscriptionPlanID sets the "subscription_plan_id" field.
 func (_c *RedeemCodeCreate) SetSubscriptionPlanID(v int64) *RedeemCodeCreate {
 	_c.mutation.SetSubscriptionPlanID(v)
@@ -272,11 +257,6 @@ func (_c *RedeemCodeCreate) SetNillableUserID(id *int64) *RedeemCodeCreate {
 // SetUser sets the "user" edge to the User entity.
 func (_c *RedeemCodeCreate) SetUser(v *User) *RedeemCodeCreate {
 	return _c.SetUserID(v.ID)
-}
-
-// SetGroup sets the "group" edge to the Group entity.
-func (_c *RedeemCodeCreate) SetGroup(v *Group) *RedeemCodeCreate {
-	return _c.SetGroupID(v.ID)
 }
 
 // SetSubscriptionPlan sets the "subscription_plan" edge to the SubscriptionPlan entity.
@@ -495,23 +475,6 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 		_node.UsedBy = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := _c.mutation.GroupIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   redeemcode.GroupTable,
-			Columns: []string{redeemcode.GroupColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.GroupID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
 	if nodes := _c.mutation.SubscriptionPlanIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -704,24 +667,6 @@ func (u *RedeemCodeUpsert) UpdateExpiresAt() *RedeemCodeUpsert {
 // ClearExpiresAt clears the value of the "expires_at" field.
 func (u *RedeemCodeUpsert) ClearExpiresAt() *RedeemCodeUpsert {
 	u.SetNull(redeemcode.FieldExpiresAt)
-	return u
-}
-
-// SetGroupID sets the "group_id" field.
-func (u *RedeemCodeUpsert) SetGroupID(v int64) *RedeemCodeUpsert {
-	u.Set(redeemcode.FieldGroupID, v)
-	return u
-}
-
-// UpdateGroupID sets the "group_id" field to the value that was provided on create.
-func (u *RedeemCodeUpsert) UpdateGroupID() *RedeemCodeUpsert {
-	u.SetExcluded(redeemcode.FieldGroupID)
-	return u
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (u *RedeemCodeUpsert) ClearGroupID() *RedeemCodeUpsert {
-	u.SetNull(redeemcode.FieldGroupID)
 	return u
 }
 
@@ -1052,27 +997,6 @@ func (u *RedeemCodeUpsertOne) UpdateExpiresAt() *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) ClearExpiresAt() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.ClearExpiresAt()
-	})
-}
-
-// SetGroupID sets the "group_id" field.
-func (u *RedeemCodeUpsertOne) SetGroupID(v int64) *RedeemCodeUpsertOne {
-	return u.Update(func(s *RedeemCodeUpsert) {
-		s.SetGroupID(v)
-	})
-}
-
-// UpdateGroupID sets the "group_id" field to the value that was provided on create.
-func (u *RedeemCodeUpsertOne) UpdateGroupID() *RedeemCodeUpsertOne {
-	return u.Update(func(s *RedeemCodeUpsert) {
-		s.UpdateGroupID()
-	})
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (u *RedeemCodeUpsertOne) ClearGroupID() *RedeemCodeUpsertOne {
-	return u.Update(func(s *RedeemCodeUpsert) {
-		s.ClearGroupID()
 	})
 }
 
@@ -1592,27 +1516,6 @@ func (u *RedeemCodeUpsertBulk) UpdateExpiresAt() *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) ClearExpiresAt() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.ClearExpiresAt()
-	})
-}
-
-// SetGroupID sets the "group_id" field.
-func (u *RedeemCodeUpsertBulk) SetGroupID(v int64) *RedeemCodeUpsertBulk {
-	return u.Update(func(s *RedeemCodeUpsert) {
-		s.SetGroupID(v)
-	})
-}
-
-// UpdateGroupID sets the "group_id" field to the value that was provided on create.
-func (u *RedeemCodeUpsertBulk) UpdateGroupID() *RedeemCodeUpsertBulk {
-	return u.Update(func(s *RedeemCodeUpsert) {
-		s.UpdateGroupID()
-	})
-}
-
-// ClearGroupID clears the value of the "group_id" field.
-func (u *RedeemCodeUpsertBulk) ClearGroupID() *RedeemCodeUpsertBulk {
-	return u.Update(func(s *RedeemCodeUpsert) {
-		s.ClearGroupID()
 	})
 }
 

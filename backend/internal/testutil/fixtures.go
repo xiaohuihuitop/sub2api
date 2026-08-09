@@ -46,13 +46,11 @@ func NewTestAccount(opts ...func(*service.Account)) *service.Account {
 
 // NewTestAPIKey 创建一个可用的测试 API Key，可通过 opts 覆盖默认值。
 func NewTestAPIKey(opts ...func(*service.APIKey)) *service.APIKey {
-	groupID := int64(1)
 	k := &service.APIKey{
 		ID:        1,
 		UserID:    1,
 		Key:       "sk-test-key-12345678",
 		Name:      "test-key",
-		GroupID:   &groupID,
 		Status:    service.StatusActive,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -61,18 +59,4 @@ func NewTestAPIKey(opts ...func(*service.APIKey)) *service.APIKey {
 		opt(k)
 	}
 	return k
-}
-
-// NewTestGroup 创建一个可用的测试分组，可通过 opts 覆盖默认值。
-func NewTestGroup(opts ...func(*service.Group)) *service.Group {
-	g := &service.Group{
-		ID:       1,
-		Platform: service.PlatformAnthropic,
-		Status:   service.StatusActive,
-		Hydrated: true,
-	}
-	for _, opt := range opts {
-		opt(g)
-	}
-	return g
 }

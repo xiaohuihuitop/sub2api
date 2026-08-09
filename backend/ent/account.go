@@ -92,8 +92,6 @@ type Account struct {
 
 // AccountEdges holds the relations/edges for other nodes in the graph.
 type AccountEdges struct {
-	// Groups holds the value of the groups edge.
-	Groups []*Group `json:"groups,omitempty"`
 	// PlatformPool holds the value of the platform_pool edge.
 	PlatformPool *Platform `json:"platform_pool,omitempty"`
 	// Proxy holds the value of the proxy edge.
@@ -104,20 +102,9 @@ type AccountEdges struct {
 	Children []*Account `json:"children,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
-	// AccountGroups holds the value of the account_groups edge.
-	AccountGroups []*AccountGroup `json:"account_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
-}
-
-// GroupsOrErr returns the Groups value or an error if the edge
-// was not loaded in eager-loading.
-func (e AccountEdges) GroupsOrErr() ([]*Group, error) {
-	if e.loadedTypes[0] {
-		return e.Groups, nil
-	}
-	return nil, &NotLoadedError{edge: "groups"}
+	loadedTypes [5]bool
 }
 
 // PlatformPoolOrErr returns the PlatformPool value or an error if the edge
@@ -125,7 +112,7 @@ func (e AccountEdges) GroupsOrErr() ([]*Group, error) {
 func (e AccountEdges) PlatformPoolOrErr() (*Platform, error) {
 	if e.PlatformPool != nil {
 		return e.PlatformPool, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[0] {
 		return nil, &NotFoundError{label: platform.Label}
 	}
 	return nil, &NotLoadedError{edge: "platform_pool"}
@@ -136,7 +123,7 @@ func (e AccountEdges) PlatformPoolOrErr() (*Platform, error) {
 func (e AccountEdges) ProxyOrErr() (*Proxy, error) {
 	if e.Proxy != nil {
 		return e.Proxy, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: proxy.Label}
 	}
 	return nil, &NotLoadedError{edge: "proxy"}
@@ -147,7 +134,7 @@ func (e AccountEdges) ProxyOrErr() (*Proxy, error) {
 func (e AccountEdges) ParentOrErr() (*Account, error) {
 	if e.Parent != nil {
 		return e.Parent, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: account.Label}
 	}
 	return nil, &NotLoadedError{edge: "parent"}
@@ -156,7 +143,7 @@ func (e AccountEdges) ParentOrErr() (*Account, error) {
 // ChildrenOrErr returns the Children value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) ChildrenOrErr() ([]*Account, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.Children, nil
 	}
 	return nil, &NotLoadedError{edge: "children"}
@@ -165,19 +152,10 @@ func (e AccountEdges) ChildrenOrErr() ([]*Account, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e AccountEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[4] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
-}
-
-// AccountGroupsOrErr returns the AccountGroups value or an error if the edge
-// was not loaded in eager-loading.
-func (e AccountEdges) AccountGroupsOrErr() ([]*AccountGroup, error) {
-	if e.loadedTypes[6] {
-		return e.AccountGroups, nil
-	}
-	return nil, &NotLoadedError{edge: "account_groups"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -445,11 +423,6 @@ func (_m *Account) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
-// QueryGroups queries the "groups" edge of the Account entity.
-func (_m *Account) QueryGroups() *GroupQuery {
-	return NewAccountClient(_m.config).QueryGroups(_m)
-}
-
 // QueryPlatformPool queries the "platform_pool" edge of the Account entity.
 func (_m *Account) QueryPlatformPool() *PlatformQuery {
 	return NewAccountClient(_m.config).QueryPlatformPool(_m)
@@ -473,11 +446,6 @@ func (_m *Account) QueryChildren() *AccountQuery {
 // QueryUsageLogs queries the "usage_logs" edge of the Account entity.
 func (_m *Account) QueryUsageLogs() *UsageLogQuery {
 	return NewAccountClient(_m.config).QueryUsageLogs(_m)
-}
-
-// QueryAccountGroups queries the "account_groups" edge of the Account entity.
-func (_m *Account) QueryAccountGroups() *AccountGroupQuery {
-	return NewAccountClient(_m.config).QueryAccountGroups(_m)
 }
 
 // Update returns a builder for updating this Account.

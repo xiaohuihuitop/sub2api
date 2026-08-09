@@ -85,11 +85,6 @@ func Name(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldName, v))
 }
 
-// GroupID applies equality check predicate on the "group_id" field. It's identical to GroupIDEQ.
-func GroupID(v int64) predicate.APIKey {
-	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
-}
-
 // AllowBalance applies equality check predicate on the "allow_balance" field. It's identical to AllowBalanceEQ.
 func AllowBalance(v bool) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldAllowBalance, v))
@@ -443,36 +438,6 @@ func NameEqualFold(v string) predicate.APIKey {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldContainsFold(FieldName, v))
-}
-
-// GroupIDEQ applies the EQ predicate on the "group_id" field.
-func GroupIDEQ(v int64) predicate.APIKey {
-	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
-}
-
-// GroupIDNEQ applies the NEQ predicate on the "group_id" field.
-func GroupIDNEQ(v int64) predicate.APIKey {
-	return predicate.APIKey(sql.FieldNEQ(FieldGroupID, v))
-}
-
-// GroupIDIn applies the In predicate on the "group_id" field.
-func GroupIDIn(vs ...int64) predicate.APIKey {
-	return predicate.APIKey(sql.FieldIn(FieldGroupID, vs...))
-}
-
-// GroupIDNotIn applies the NotIn predicate on the "group_id" field.
-func GroupIDNotIn(vs ...int64) predicate.APIKey {
-	return predicate.APIKey(sql.FieldNotIn(FieldGroupID, vs...))
-}
-
-// GroupIDIsNil applies the IsNil predicate on the "group_id" field.
-func GroupIDIsNil() predicate.APIKey {
-	return predicate.APIKey(sql.FieldIsNull(FieldGroupID))
-}
-
-// GroupIDNotNil applies the NotNil predicate on the "group_id" field.
-func GroupIDNotNil() predicate.APIKey {
-	return predicate.APIKey(sql.FieldNotNull(FieldGroupID))
 }
 
 // AllowBalanceEQ applies the EQ predicate on the "allow_balance" field.
@@ -1155,29 +1120,6 @@ func HasUser() predicate.APIKey {
 func HasUserWith(preds ...predicate.User) predicate.APIKey {
 	return predicate.APIKey(func(s *sql.Selector) {
 		step := newUserStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasGroup applies the HasEdge predicate on the "group" edge.
-func HasGroup() predicate.APIKey {
-	return predicate.APIKey(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasGroupWith applies the HasEdge predicate on the "group" edge with a given conditions (other predicates).
-func HasGroupWith(preds ...predicate.Group) predicate.APIKey {
-	return predicate.APIKey(func(s *sql.Selector) {
-		step := newGroupStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

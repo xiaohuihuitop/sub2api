@@ -67,7 +67,6 @@ export default {
     selectOption: '请选择',
     searchPlaceholder: '搜索...',
     noOptionsFound: '无匹配选项',
-    noGroupsAvailable: '无可用分组',
     unknownError: '发生未知错误',
     saving: '保存中...',
     selectedCount: '（已选 {count} 个）',
@@ -163,10 +162,9 @@ export default {
     affiliateTransferRecords: '提取记录',
     profile: '个人资料',
     users: '用户管理',
-    groups: '分组管理',
     platforms: '平台',
-    channels: '渠道管理',
-    availableChannels: '可用渠道',
+    modelPricing: '模型价格',
+    availablePlatforms: '可用平台',
     modelPlaza: '模型广场',
     subscriptions: '订阅管理',
     accounts: '账号管理',
@@ -199,6 +197,12 @@ export default {
     contentModeration: '内容审核',
     promptAudit: '提示词审计',
     auditLogs: '操作日志',
+  },
+
+  availablePlatforms: {
+    accountPlatform: '账号协议',
+    models: '可用模型',
+    empty: '暂无可用平台',
   },
 
   // Auth

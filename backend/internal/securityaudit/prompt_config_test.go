@@ -39,7 +39,7 @@ func TestDefaultConfigIsOff(t *testing.T) {
 	require.Equal(t, AllScannerIDs, storage.Scanners)
 	publicJSON, err := json.Marshal(PublicFromStorage(storage, true, nil))
 	require.NoError(t, err)
-	require.Contains(t, string(publicJSON), `"group_ids":[]`)
+	require.Contains(t, string(publicJSON), `"platform_ids":[]`)
 	require.Contains(t, string(publicJSON), `"endpoints":[]`)
 }
 
@@ -47,7 +47,7 @@ func TestBlockingLatestTurnOnlyConfigRoundTrip(t *testing.T) {
 	manager := &ConfigManager{encryptor: prefixEncryptor{}, encryptionKeyConfigured: true}
 	request := UpdateConfigRequest{
 		ExpectedConfigVersion: 1, Enabled: true, BlockingEnabled: true, BlockingLatestTurnOnly: true,
-		Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, Scanners: []string{"pii"}, AllGroups: true,
+		Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, Scanners: []string{"pii"}, AllPlatforms: true,
 		Endpoints: []UpdateEndpoint{{
 			ID: "guard-1", Name: "Guard", Protocol: "openai_compatible", BaseURL: "http://127.0.0.1:8080",
 			Model: DefaultGuardModel, TimeoutMS: 1000, InputLimit: 1000, Enabled: true,
@@ -207,7 +207,7 @@ func TestBuildNextStoragePreserveReplaceAndClearToken(t *testing.T) {
 	manager := &ConfigManager{encryptor: prefixEncryptor{}, encryptionKeyConfigured: true}
 	current := DefaultStorageConfig()
 	current.Endpoints = []StorageEndpoint{{ID: "one", Name: "One", Protocol: "openai_compatible", BaseURL: "http://127.0.0.1:8080", Model: DefaultGuardModel, TokenCiphertext: "enc:old", TimeoutMS: 1000, InputLimit: 1000}}
-	base := UpdateConfigRequest{ExpectedConfigVersion: 1, Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, Scanners: []string{"PII"}, AllGroups: true,
+	base := UpdateConfigRequest{ExpectedConfigVersion: 1, Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, Scanners: []string{"PII"}, AllPlatforms: true,
 		Endpoints: []UpdateEndpoint{{ID: "one", Name: "One", Protocol: "openai_compatible", BaseURL: "http://127.0.0.1:8080", TimeoutMS: 1000, InputLimit: 1000}}}
 	preserved, err := manager.buildNextStorage(current, base, 9)
 	require.NoError(t, err)
@@ -235,7 +235,7 @@ func TestBuildNextStorageRejectsNewTokenWithoutConfiguredEncryptionKey(t *testin
 	manager := &ConfigManager{encryptor: prefixEncryptor{}, encryptionKeyConfigured: false}
 	current := DefaultStorageConfig()
 	current.Endpoints = []StorageEndpoint{{ID: "one", Name: "One", Protocol: "openai_compatible", BaseURL: "http://127.0.0.1:8080", Model: DefaultGuardModel, TokenCiphertext: "enc:old", TimeoutMS: 1000, InputLimit: 1000}}
-	base := UpdateConfigRequest{ExpectedConfigVersion: 1, Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, Scanners: []string{"PII"}, AllGroups: true,
+	base := UpdateConfigRequest{ExpectedConfigVersion: 1, Strategy: "priority", WorkerCount: 1, QueueCapacity: 10, Scanners: []string{"PII"}, AllPlatforms: true,
 		Endpoints: []UpdateEndpoint{{ID: "one", Name: "One", Protocol: "openai_compatible", BaseURL: "http://127.0.0.1:8080", TimeoutMS: 1000, InputLimit: 1000}}}
 
 	newTokenReq := base
@@ -416,7 +416,7 @@ func TestParseLegacyConfigDefaultsMissingFieldsWithoutEnablingBlocking(t *testin
 	require.Equal(t, DefaultWorkerCount, storage.WorkerCount)
 	require.Equal(t, DefaultQueueCapacity, storage.QueueCapacity)
 	require.Equal(t, AllScannerIDs, storage.Scanners)
-	require.True(t, storage.AllGroups)
+	require.True(t, storage.AllPlatforms)
 }
 
 func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
@@ -434,8 +434,8 @@ func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
 		{name: "capacity low", mutate: func(req *UpdateConfigRequest) { req.QueueCapacity = 0 }, reason: "prompt_audit_invalid_queue_capacity"},
 		{name: "capacity high", mutate: func(req *UpdateConfigRequest) { req.QueueCapacity = MaxQueueCapacity + 1 }, reason: "prompt_audit_invalid_queue_capacity"},
 		{name: "unknown scanner", mutate: func(req *UpdateConfigRequest) { req.Scanners = []string{"made_up"} }, reason: "prompt_audit_invalid_scanner"},
-		{name: "group required", mutate: func(req *UpdateConfigRequest) { req.AllGroups = false; req.GroupIDs = nil }, reason: "prompt_audit_groups_required"},
-		{name: "group positive", mutate: func(req *UpdateConfigRequest) { req.AllGroups = false; req.GroupIDs = []int64{0} }, reason: "prompt_audit_invalid_group"},
+		{name: "platform required", mutate: func(req *UpdateConfigRequest) { req.AllPlatforms = false; req.PlatformIDs = nil }, reason: "prompt_audit_platforms_required"},
+		{name: "platform positive", mutate: func(req *UpdateConfigRequest) { req.AllPlatforms = false; req.PlatformIDs = []int64{0} }, reason: "prompt_audit_invalid_platform"},
 		{name: "timeout low", mutate: func(req *UpdateConfigRequest) { req.Endpoints[0].TimeoutMS = MinTimeoutMS - 1 }, reason: "prompt_audit_invalid_timeout"},
 		{name: "timeout high", mutate: func(req *UpdateConfigRequest) { req.Endpoints[0].TimeoutMS = MaxTimeoutMS + 1 }, reason: "prompt_audit_invalid_timeout"},
 		{name: "input low", mutate: func(req *UpdateConfigRequest) { req.Endpoints[0].InputLimit = MinInputLimit - 1 }, reason: "prompt_audit_invalid_input_limit"},
@@ -445,7 +445,7 @@ func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := valid
 			req.Scanners = append([]string(nil), valid.Scanners...)
-			req.GroupIDs = append([]int64(nil), valid.GroupIDs...)
+			req.PlatformIDs = append([]int64(nil), valid.PlatformIDs...)
 			req.Endpoints = append([]UpdateEndpoint(nil), valid.Endpoints...)
 			tt.mutate(&req)
 			err := validateUpdateConfigRequest(req)

@@ -57,6 +57,10 @@ func (r *epAccountRepo) SetError(_ context.Context, _ int64, _ string) error {
 	return nil
 }
 
+func (r *epAccountRepo) SetModelRateLimit(_ context.Context, _ int64, _ string, _ time.Time, _ ...string) error {
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

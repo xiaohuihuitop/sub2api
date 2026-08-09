@@ -32,7 +32,7 @@ func newSessionIDUsageLog(sessionID *string) *service.UsageLog {
 // arg slice / arg-type table so the five INSERT column lists stay in sync. session_id
 // is the penultimate arg (created_at is always last).
 func TestPrepareUsageLogInsert_SessionIDArgWiring(t *testing.T) {
-	require.Len(t, usageLogInsertArgTypes, 59, "arg-type table must include platform attribution and session_id")
+	require.Len(t, usageLogInsertArgTypes, 57, "arg-type table must include platform attribution and session_id")
 
 	sessionID := "sess-persisted-123"
 	prepared := prepareUsageLogInsert(newSessionIDUsageLog(&sessionID))
@@ -67,7 +67,7 @@ func TestPrepareUsageLogInsert_SessionIDNullWhenAbsent(t *testing.T) {
 }
 
 // TestPrepareUsageLogInsert_PlatformAssetAttributionWiring keeps the platform
-// and selected billing source next to the legacy group/subscription columns in
+// and selected billing source next to the subscription column in
 // every INSERT path. This prevents a V2 request from losing its actual asset
 // attribution when the usage log is persisted.
 func TestPrepareUsageLogInsert_PlatformAssetAttributionWiring(t *testing.T) {
@@ -80,8 +80,8 @@ func TestPrepareUsageLogInsert_PlatformAssetAttributionWiring(t *testing.T) {
 	prepared := prepareUsageLogInsert(log)
 
 	const (
-		platformIDArgIndex        = 9
-		billingSourceTypeArgIndex = 10
+		platformIDArgIndex        = 8
+		billingSourceTypeArgIndex = 9
 	)
 	require.Equal(t, "bigint", usageLogInsertArgTypes[platformIDArgIndex])
 	require.Equal(t, "text", usageLogInsertArgTypes[billingSourceTypeArgIndex])

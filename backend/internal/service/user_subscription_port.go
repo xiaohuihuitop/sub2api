@@ -11,19 +11,14 @@ type UserSubscriptionRepository interface {
 	Create(ctx context.Context, sub *UserSubscription) error
 	GetByID(ctx context.Context, id int64) (*UserSubscription, error)
 	GetByIDIncludeDeleted(ctx context.Context, id int64) (*UserSubscription, error)
-	GetByUserIDAndGroupID(ctx context.Context, userID, groupID int64) (*UserSubscription, error)
-	GetActiveByUserIDAndGroupID(ctx context.Context, userID, groupID int64) (*UserSubscription, error)
 	Update(ctx context.Context, sub *UserSubscription) error
 	Delete(ctx context.Context, id int64) error
 	Restore(ctx context.Context, subscriptionID int64, restoredStatus string) (*UserSubscription, error)
 
 	ListByUserID(ctx context.Context, userID int64) ([]UserSubscription, error)
 	ListActiveByUserID(ctx context.Context, userID int64) ([]UserSubscription, error)
-	ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]UserSubscription, *pagination.PaginationResult, error)
-	List(ctx context.Context, params pagination.PaginationParams, userID, groupID *int64, status, platform, sortBy, sortOrder string) ([]UserSubscription, *pagination.PaginationResult, error)
+	List(ctx context.Context, params pagination.PaginationParams, userID *int64, status, sortBy, sortOrder string) ([]UserSubscription, *pagination.PaginationResult, error)
 
-	ExistsByUserIDAndGroupID(ctx context.Context, userID, groupID int64) (bool, error)
-	ExistsActiveByUserIDAndGroupID(ctx context.Context, userID, groupID int64) (bool, error)
 	ExtendExpiry(ctx context.Context, subscriptionID int64, newExpiresAt time.Time) error
 	UpdateStatus(ctx context.Context, subscriptionID int64, status string) error
 	UpdateNotes(ctx context.Context, subscriptionID int64, notes string) error
@@ -38,22 +33,8 @@ type UserSubscriptionRepository interface {
 	BatchUpdateExpiredStatus(ctx context.Context) (int64, error)
 }
 
-// ActiveUserSubscriptionLister exposes ordered candidates for one routing
-// group. It is separate from the legacy repository contract so existing
-// callers can migrate without losing source compatibility.
-type ActiveUserSubscriptionLister interface {
-	ListActiveByUserIDAndGroupID(ctx context.Context, userID, groupID int64) ([]UserSubscription, error)
-}
-
-// ActiveUserSubscriptionGroupLister exposes ordered candidates across the
-// API key's eligible routing groups.
-type ActiveUserSubscriptionGroupLister interface {
-	ListActiveByUserIDAndGroupIDs(ctx context.Context, userID int64, groupIDs []int64) ([]UserSubscription, error)
-}
-
 // ActiveUserSubscriptionPlanLister exposes ordered candidates for the API
-// key's explicitly authorized subscription plans. It deliberately remains
-// separate from the legacy group contract while the V2 route is feature-gated.
+// key's explicitly authorized subscription plans.
 type ActiveUserSubscriptionPlanLister interface {
 	ListActiveByUserIDAndPlanIDs(ctx context.Context, userID int64, planIDs []int64) ([]UserSubscription, error)
 }

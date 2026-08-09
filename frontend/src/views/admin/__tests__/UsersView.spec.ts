@@ -179,10 +179,8 @@ describe('admin UsersView', () => {
           BulkEditUserModal: BulkEditUserModalStub,
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
-          UserAllowedGroupsModal: true,
           UserBalanceModal: true,
           UserBalanceHistoryModal: true,
-          GroupReplaceModal: true,
           Icon: true,
           Teleport: true
         }
@@ -265,10 +263,8 @@ describe('admin UsersView', () => {
           BulkEditUserModal: BulkEditUserModalStub,
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
-          UserAllowedGroupsModal: true,
           UserBalanceModal: true,
           UserBalanceHistoryModal: true,
-          GroupReplaceModal: true,
           Icon: true,
           Teleport: true
         }
@@ -343,10 +339,8 @@ describe('admin UsersView', () => {
           BulkEditUserModal: BulkEditUserModalStub,
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
-          UserAllowedGroupsModal: true,
           UserBalanceModal: true,
           UserBalanceHistoryModal: true,
-          GroupReplaceModal: true,
           Icon: true,
           Teleport: true
         }
@@ -381,7 +375,7 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="selected-keys"]').text()).toBe('')
   })
 
-  it('shows an authorized active routing group regardless of its legacy subscription type', async () => {
+  it('does not render legacy routing groups in the user table', async () => {
     localStorage.setItem('user-column-settings-version', '3')
     localStorage.setItem('user-hidden-columns', JSON.stringify([]))
     listUsers.mockResolvedValue({
@@ -413,10 +407,8 @@ describe('admin UsersView', () => {
           BulkEditUserModal: BulkEditUserModalStub,
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
-          UserAllowedGroupsModal: true,
           UserBalanceModal: true,
           UserBalanceHistoryModal: true,
-          GroupReplaceModal: true,
           Icon: true,
           Teleport: true
         }
@@ -425,6 +417,7 @@ describe('admin UsersView', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Legacy subscription routing group')
+    expect(wrapper.get('[data-test="columns"]').text()).not.toContain('groups')
+    expect(wrapper.text()).not.toContain('Legacy subscription routing group')
   })
 })

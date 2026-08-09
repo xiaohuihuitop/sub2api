@@ -116,15 +116,15 @@ func TestEntSoftDelete_ApiKey_HardDeleteViaSkipSoftDelete(t *testing.T) {
 
 // --- UserSubscription 软删除测试 ---
 
-func createEntGroup(t *testing.T, ctx context.Context, client *dbent.Client, name string) *dbent.Group {
+func createEntSubscriptionPlan(t *testing.T, ctx context.Context, client *dbent.Client, name string) *dbent.SubscriptionPlan {
 	t.Helper()
 
-	g, err := client.Group.Create().
+	plan, err := client.SubscriptionPlan.Create().
 		SetName(name).
-		SetStatus(service.StatusActive).
+		SetPrice(10).
 		Save(ctx)
-	require.NoError(t, err, "create ent group")
-	return g
+	require.NoError(t, err, "create subscription plan")
+	return plan
 }
 
 func TestEntSoftDelete_UserSubscription_DefaultFilterAndSkip(t *testing.T) {
@@ -132,14 +132,16 @@ func TestEntSoftDelete_UserSubscription_DefaultFilterAndSkip(t *testing.T) {
 	client := testEntClient(t)
 
 	u := createEntUser(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-user")+"@example.com")
-	g := createEntGroup(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-group"))
+	plan := createEntSubscriptionPlan(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-plan"))
+	planID := plan.ID
 
 	repo := NewUserSubscriptionRepository(client)
 	sub := &service.UserSubscription{
-		UserID:    u.ID,
-		GroupID:   g.ID,
-		Status:    service.SubscriptionStatusActive,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		UserID:             u.ID,
+		SubscriptionPlanID: &planID,
+		PlanNameSnapshot:   plan.Name,
+		Status:             service.SubscriptionStatusActive,
+		ExpiresAt:          time.Now().Add(24 * time.Hour),
 	}
 	require.NoError(t, repo.Create(ctx, sub), "create user subscription")
 
@@ -164,14 +166,16 @@ func TestEntSoftDelete_UserSubscription_DeleteIdempotent(t *testing.T) {
 	client := testEntClient(t)
 
 	u := createEntUser(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-user2")+"@example.com")
-	g := createEntGroup(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-group2"))
+	plan := createEntSubscriptionPlan(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-plan2"))
+	planID := plan.ID
 
 	repo := NewUserSubscriptionRepository(client)
 	sub := &service.UserSubscription{
-		UserID:    u.ID,
-		GroupID:   g.ID,
-		Status:    service.SubscriptionStatusActive,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		UserID:             u.ID,
+		SubscriptionPlanID: &planID,
+		PlanNameSnapshot:   plan.Name,
+		Status:             service.SubscriptionStatusActive,
+		ExpiresAt:          time.Now().Add(24 * time.Hour),
 	}
 	require.NoError(t, repo.Create(ctx, sub), "create user subscription")
 
@@ -184,24 +188,28 @@ func TestEntSoftDelete_UserSubscription_ListExcludesDeleted(t *testing.T) {
 	client := testEntClient(t)
 
 	u := createEntUser(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-user3")+"@example.com")
-	g1 := createEntGroup(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-group3a"))
-	g2 := createEntGroup(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-group3b"))
+	plan1 := createEntSubscriptionPlan(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-plan3a"))
+	plan2 := createEntSubscriptionPlan(t, ctx, client, uniqueSoftDeleteValue(t, "sd-sub-plan3b"))
+	planID1 := plan1.ID
+	planID2 := plan2.ID
 
 	repo := NewUserSubscriptionRepository(client)
 
 	sub1 := &service.UserSubscription{
-		UserID:    u.ID,
-		GroupID:   g1.ID,
-		Status:    service.SubscriptionStatusActive,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		UserID:             u.ID,
+		SubscriptionPlanID: &planID1,
+		PlanNameSnapshot:   plan1.Name,
+		Status:             service.SubscriptionStatusActive,
+		ExpiresAt:          time.Now().Add(24 * time.Hour),
 	}
 	require.NoError(t, repo.Create(ctx, sub1), "create subscription 1")
 
 	sub2 := &service.UserSubscription{
-		UserID:    u.ID,
-		GroupID:   g2.ID,
-		Status:    service.SubscriptionStatusActive,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		UserID:             u.ID,
+		SubscriptionPlanID: &planID2,
+		PlanNameSnapshot:   plan2.Name,
+		Status:             service.SubscriptionStatusActive,
+		ExpiresAt:          time.Now().Add(24 * time.Hour),
 	}
 	require.NoError(t, repo.Create(ctx, sub2), "create subscription 2")
 

@@ -5,13 +5,13 @@ import { opsAPI, type OpsAccountAvailabilityStatsResponse, type OpsConcurrencySt
 
 interface Props {
   platformFilter?: string
-  groupIdFilter?: number | null
+  platformIdFilter?: number | null
   refreshToken: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   platformFilter: '',
-  groupIdFilter: null
+  platformIdFilter: null
 })
 
 const { t } = useI18n()
@@ -34,15 +34,15 @@ function safeNumber(n: unknown): number {
 }
 
 // 计算显示维度
-const displayDimension = computed<'platform' | 'group' | 'account' | 'user'>(() => {
+const displayDimension = computed<'platform' | 'platformPool' | 'account' | 'user'>(() => {
   if (showByUser.value) {
     return 'user'
   }
-  if (typeof props.groupIdFilter === 'number' && props.groupIdFilter > 0) {
+  if (typeof props.platformIdFilter === 'number' && props.platformIdFilter > 0) {
     return 'account'
   }
   if (props.platformFilter) {
-    return 'group'
+    return 'platformPool'
   }
   return 'platform'
 })
@@ -71,7 +71,7 @@ interface AccountRow {
   key: string
   name: string
   platform: string
-  group_name: string
+  platform_name: string
   // 并发
   current_in_use: number
   max_capacity: number
@@ -132,14 +132,14 @@ const platformRows = computed((): SummaryRow[] => {
   }).sort((a, b) => b.concurrency_percentage - a.concurrency_percentage)
 })
 
-// 分组维度汇总
-const groupRows = computed((): SummaryRow[] => {
-  const concStats = concurrency.value?.group || {}
-  const availStats = availability.value?.group || {}
+// 平台池维度汇总
+const platformPoolRows = computed((): SummaryRow[] => {
+  const concStats = concurrency.value?.platform_pool || {}
+  const availStats = availability.value?.platform_pool || {}
 
-  const groupIds = new Set([...Object.keys(concStats), ...Object.keys(availStats)])
+  const platformIds = new Set([...Object.keys(concStats), ...Object.keys(availStats)])
 
-  const rows = Array.from(groupIds)
+  const rows = Array.from(platformIds)
     .map(gid => {
       const conc = concStats[gid] || {}
       const avail = availStats[gid] || {}
@@ -156,7 +156,7 @@ const groupRows = computed((): SummaryRow[] => {
 
       return {
         key: gid,
-        name: String(conc.group_name || avail.group_name || `Group ${gid}`),
+        name: String(conc.platform_name || avail.platform_name || `Platform ${gid}`),
         platform: String(conc.platform || avail.platform || ''),
         total_accounts: totalAccounts,
         available_accounts: availableAccounts,
@@ -188,8 +188,8 @@ const accountRows = computed((): AccountRow[] => {
       const avail = availStats[aid] || {}
 
       // 只显示匹配的分组
-      if (typeof props.groupIdFilter === 'number' && props.groupIdFilter > 0) {
-        if (conc.group_id !== props.groupIdFilter && avail.group_id !== props.groupIdFilter) {
+      if (typeof props.platformIdFilter === 'number' && props.platformIdFilter > 0) {
+        if (conc.platform_id !== props.platformIdFilter && avail.platform_id !== props.platformIdFilter) {
           return null
         }
       }
@@ -198,7 +198,7 @@ const accountRows = computed((): AccountRow[] => {
         key: aid,
         name: String(conc.account_name || avail.account_name || `Account ${aid}`),
         platform: String(conc.platform || avail.platform || ''),
-        group_name: String(conc.group_name || avail.group_name || ''),
+        platform_name: String(conc.platform_name || avail.platform_name || ''),
         current_in_use: safeNumber(conc.current_in_use),
         max_capacity: safeNumber(conc.max_capacity),
         waiting_in_queue: safeNumber(conc.waiting_in_queue),
@@ -248,14 +248,14 @@ const userRows = computed((): UserRow[] => {
 const displayRows = computed(() => {
   if (displayDimension.value === 'user') return userRows.value
   if (displayDimension.value === 'account') return accountRows.value
-  if (displayDimension.value === 'group') return groupRows.value
+  if (displayDimension.value === 'platformPool') return platformPoolRows.value
   return platformRows.value
 })
 
 const displayTitle = computed(() => {
   if (displayDimension.value === 'user') return t('admin.ops.concurrency.byUser')
   if (displayDimension.value === 'account') return t('admin.ops.concurrency.byAccount')
-  if (displayDimension.value === 'group') return t('admin.ops.concurrency.byGroup')
+  if (displayDimension.value === 'platformPool') return t('admin.ops.concurrency.byPlatformPool')
   return t('admin.ops.concurrency.byPlatform')
 })
 
@@ -270,8 +270,8 @@ async function loadData() {
     } else {
       // 常规模式加载账号/平台/分组数据
       const [concData, availData] = await Promise.all([
-        opsAPI.getConcurrencyStats(props.platformFilter, props.groupIdFilter),
-        opsAPI.getAccountAvailabilityStats(props.platformFilter, props.groupIdFilter)
+        opsAPI.getConcurrencyStats(props.platformFilter, props.platformIdFilter),
+        opsAPI.getAccountAvailabilityStats(props.platformFilter, props.platformIdFilter)
       ])
       concurrency.value = concData
       availability.value = availData
@@ -442,7 +442,7 @@ watch(
       </div>
 
       <!-- 汇总视图（平台/分组） -->
-      <div v-else-if="displayDimension === 'platform' || displayDimension === 'group'" class="custom-scrollbar max-h-[360px] flex-1 space-y-2 overflow-y-auto p-3">
+      <div v-else-if="displayDimension === 'platform' || displayDimension === 'platformPool'" class="custom-scrollbar max-h-[360px] flex-1 space-y-2 overflow-y-auto p-3">
         <div v-for="row in (displayRows as SummaryRow[])" :key="row.key" class="rounded-lg bg-gray-50 p-3 dark:bg-dark-900">
           <!-- 标题行 -->
           <div class="mb-2 flex items-center justify-between gap-2">
@@ -450,7 +450,7 @@ watch(
               <div class="truncate text-[11px] font-bold text-gray-900 dark:text-white" :title="row.name">
                 {{ row.name }}
               </div>
-              <span v-if="displayDimension === 'group' && row.platform" class="text-[10px] text-gray-400 dark:text-gray-500">
+              <span v-if="displayDimension === 'platformPool' && row.platform" class="text-[10px] text-gray-400 dark:text-gray-500">
                 {{ row.platform.toUpperCase() }}
               </span>
             </div>
@@ -525,7 +525,7 @@ watch(
                 {{ row.name }}
               </div>
               <div class="mt-0.5 text-[9px] text-gray-400 dark:text-gray-500">
-                {{ row.group_name }}
+                {{ row.platform_name }}
               </div>
             </div>
             <div class="flex shrink-0 items-center gap-2">

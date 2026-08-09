@@ -11,7 +11,6 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
@@ -32,8 +31,6 @@ type APIKey struct {
 	Key string `json:"key,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
-	// GroupID holds the value of the "group_id" field.
-	GroupID *int64 `json:"group_id,omitempty"`
 	// AllowBalance holds the value of the "allow_balance" field.
 	AllowBalance bool `json:"allow_balance,omitempty"`
 	// Status holds the value of the "status" field.
@@ -78,8 +75,6 @@ type APIKey struct {
 type APIKeyEdges struct {
 	// User holds the value of the user edge.
 	User *User `json:"user,omitempty"`
-	// Group holds the value of the group edge.
-	Group *Group `json:"group,omitempty"`
 	// Platforms holds the value of the platforms edge.
 	Platforms []*Platform `json:"platforms,omitempty"`
 	// SubscriptionPlans holds the value of the subscription_plans edge.
@@ -88,7 +83,7 @@ type APIKeyEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [4]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -102,21 +97,10 @@ func (e APIKeyEdges) UserOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "user"}
 }
 
-// GroupOrErr returns the Group value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e APIKeyEdges) GroupOrErr() (*Group, error) {
-	if e.Group != nil {
-		return e.Group, nil
-	} else if e.loadedTypes[1] {
-		return nil, &NotFoundError{label: group.Label}
-	}
-	return nil, &NotLoadedError{edge: "group"}
-}
-
 // PlatformsOrErr returns the Platforms value or an error if the edge
 // was not loaded in eager-loading.
 func (e APIKeyEdges) PlatformsOrErr() ([]*Platform, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[1] {
 		return e.Platforms, nil
 	}
 	return nil, &NotLoadedError{edge: "platforms"}
@@ -125,7 +109,7 @@ func (e APIKeyEdges) PlatformsOrErr() ([]*Platform, error) {
 // SubscriptionPlansOrErr returns the SubscriptionPlans value or an error if the edge
 // was not loaded in eager-loading.
 func (e APIKeyEdges) SubscriptionPlansOrErr() ([]*SubscriptionPlan, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[2] {
 		return e.SubscriptionPlans, nil
 	}
 	return nil, &NotLoadedError{edge: "subscription_plans"}
@@ -134,7 +118,7 @@ func (e APIKeyEdges) SubscriptionPlansOrErr() ([]*SubscriptionPlan, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e APIKeyEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -151,7 +135,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
+		case apikey.FieldID, apikey.FieldUserID:
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -214,13 +198,6 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				_m.Name = value.String
-			}
-		case apikey.FieldGroupID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field group_id", values[i])
-			} else if value.Valid {
-				_m.GroupID = new(int64)
-				*_m.GroupID = value.Int64
 			}
 		case apikey.FieldAllowBalance:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -351,11 +328,6 @@ func (_m *APIKey) QueryUser() *UserQuery {
 	return NewAPIKeyClient(_m.config).QueryUser(_m)
 }
 
-// QueryGroup queries the "group" edge of the APIKey entity.
-func (_m *APIKey) QueryGroup() *GroupQuery {
-	return NewAPIKeyClient(_m.config).QueryGroup(_m)
-}
-
 // QueryPlatforms queries the "platforms" edge of the APIKey entity.
 func (_m *APIKey) QueryPlatforms() *PlatformQuery {
 	return NewAPIKeyClient(_m.config).QueryPlatforms(_m)
@@ -413,11 +385,6 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
-	builder.WriteString(", ")
-	if v := _m.GroupID; v != nil {
-		builder.WriteString("group_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
 	builder.WriteString(", ")
 	builder.WriteString("allow_balance=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AllowBalance))

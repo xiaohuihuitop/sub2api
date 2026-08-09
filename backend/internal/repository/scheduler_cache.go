@@ -15,18 +15,18 @@ import (
 )
 
 const (
-	schedulerBucketSetKey          = "sched:buckets"
-	schedulerOutboxWatermarkKey    = "sched:outbox:watermark"
-	schedulerAccountPrefix         = "sched:acc:"
-	schedulerAccountMetaPrefix     = "sched:meta:"
-	schedulerAccountLastUsedPrefix = "sched:acc:last_used:"
-	schedulerActivePrefix          = "sched:active:"
-	schedulerReadyPrefix           = "sched:ready:"
-	schedulerVersionPrefix         = "sched:ver:"
-	schedulerEpochPrefix           = "sched:epoch:"
-	schedulerRetiredPrefix         = "sched:retired:"
-	schedulerSnapshotPrefix        = "sched:"
-	schedulerLockPrefix            = "sched:lock:"
+	schedulerBucketSetKey          = "sched:v2:buckets"
+	schedulerOutboxWatermarkKey    = "sched:v2:outbox:watermark"
+	schedulerAccountPrefix         = "sched:v2:acc:"
+	schedulerAccountMetaPrefix     = "sched:v2:meta:"
+	schedulerAccountLastUsedPrefix = "sched:v2:acc:last_used:"
+	schedulerActivePrefix          = "sched:v2:active:"
+	schedulerReadyPrefix           = "sched:v2:ready:"
+	schedulerVersionPrefix         = "sched:v2:ver:"
+	schedulerEpochPrefix           = "sched:v2:epoch:"
+	schedulerRetiredPrefix         = "sched:v2:retired:"
+	schedulerSnapshotPrefix        = "sched:v2:"
+	schedulerLockPrefix            = "sched:v2:lock:"
 
 	defaultSchedulerSnapshotMGetChunkSize  = 128
 	defaultSchedulerSnapshotWriteChunkSize = 256
@@ -38,8 +38,8 @@ const (
 )
 
 const (
-	schedulerGroupLifecycleLockPrefix      = "sched:group:lifecycle-lock:"
-	schedulerGroupLifecycleOwnerTokenBytes = 16
+	schedulerPlatformLifecycleLockPrefix      = "sched:v2:platform:lifecycle-lock:"
+	schedulerPlatformLifecycleOwnerTokenBytes = 16
 )
 
 var updateSchedulerLastUsedScript = redis.NewScript(`
@@ -159,7 +159,7 @@ return currentEpoch
 `)
 
 	// 释放租约必须先比较所有者令牌再删除，过期持有者的延迟释放不能误删继任租约。
-	releaseGroupLifecycleLeaseScript = redis.NewScript(`
+	releasePlatformLifecycleLeaseScript = redis.NewScript(`
 if redis.call('GET', KEYS[1]) == ARGV[1] then
     return redis.call('DEL', KEYS[1])
 end
@@ -324,7 +324,7 @@ func (c *schedulerCache) CaptureBucketWriteToken(ctx context.Context, bucket ser
 }
 
 func (c *schedulerCache) RetireBucket(ctx context.Context, bucket service.SchedulerBucket) error {
-	snapshotKeyPrefix := fmt.Sprintf("%s%d:%s:%s:v", schedulerSnapshotPrefix, bucket.GroupID, bucket.Platform, bucket.Mode)
+	snapshotKeyPrefix := fmt.Sprintf("%s%d:%s:%s:v", schedulerSnapshotPrefix, bucket.PlatformID, bucket.Platform, bucket.Mode)
 	result, err := retireBucketScript.Run(ctx, c.rdb, []string{
 		schedulerBucketKey(schedulerEpochPrefix, bucket),
 		schedulerBucketKey(schedulerRetiredPrefix, bucket),
@@ -342,7 +342,7 @@ func (c *schedulerCache) RetireBucket(ctx context.Context, bucket service.Schedu
 }
 
 func (c *schedulerCache) ReopenBucket(ctx context.Context, bucket service.SchedulerBucket) (service.SchedulerBucketWriteToken, error) {
-	snapshotKeyPrefix := fmt.Sprintf("%s%d:%s:%s:v", schedulerSnapshotPrefix, bucket.GroupID, bucket.Platform, bucket.Mode)
+	snapshotKeyPrefix := fmt.Sprintf("%s%d:%s:%s:v", schedulerSnapshotPrefix, bucket.PlatformID, bucket.Platform, bucket.Mode)
 	result, err := reopenBucketScript.Run(ctx, c.rdb, []string{
 		schedulerBucketKey(schedulerEpochPrefix, bucket),
 		schedulerBucketKey(schedulerRetiredPrefix, bucket),
@@ -359,53 +359,53 @@ func (c *schedulerCache) ReopenBucket(ctx context.Context, bucket service.Schedu
 	return service.SchedulerBucketWriteToken{Bucket: bucket, Epoch: result}, nil
 }
 
-func (c *schedulerCache) TryAcquireGroupLifecycleLease(ctx context.Context, groupID int64, ttl time.Duration) (service.SchedulerGroupLifecycleLease, bool, error) {
-	if groupID <= 0 {
-		return service.SchedulerGroupLifecycleLease{}, false, fmt.Errorf("%w: group id must be positive", service.ErrSchedulerGroupLifecycleLeaseInvalid)
+func (c *schedulerCache) TryAcquirePlatformLifecycleLease(ctx context.Context, platformID int64, ttl time.Duration) (service.SchedulerPlatformLifecycleLease, bool, error) {
+	if platformID <= 0 {
+		return service.SchedulerPlatformLifecycleLease{}, false, fmt.Errorf("%w: platform id must be positive", service.ErrSchedulerPlatformLifecycleLeaseInvalid)
 	}
 	if ttl <= 0 {
-		return service.SchedulerGroupLifecycleLease{}, false, fmt.Errorf("%w: ttl must be positive", service.ErrSchedulerGroupLifecycleLeaseInvalid)
+		return service.SchedulerPlatformLifecycleLease{}, false, fmt.Errorf("%w: ttl must be positive", service.ErrSchedulerPlatformLifecycleLeaseInvalid)
 	}
-	ownerToken, err := newSchedulerGroupLifecycleOwnerToken()
+	ownerToken, err := newSchedulerPlatformLifecycleOwnerToken()
 	if err != nil {
-		return service.SchedulerGroupLifecycleLease{}, false, err
+		return service.SchedulerPlatformLifecycleLease{}, false, err
 	}
-	acquired, err := c.rdb.SetNX(ctx, schedulerGroupLifecycleLockKey(groupID), ownerToken, ttl).Result()
+	acquired, err := c.rdb.SetNX(ctx, schedulerPlatformLifecycleLockKey(platformID), ownerToken, ttl).Result()
 	if err != nil {
-		return service.SchedulerGroupLifecycleLease{}, false, err
+		return service.SchedulerPlatformLifecycleLease{}, false, err
 	}
 	if !acquired {
-		return service.SchedulerGroupLifecycleLease{}, false, nil
+		return service.SchedulerPlatformLifecycleLease{}, false, nil
 	}
-	return service.SchedulerGroupLifecycleLease{GroupID: groupID, OwnerToken: ownerToken}, true, nil
+	return service.SchedulerPlatformLifecycleLease{PlatformID: platformID, OwnerToken: ownerToken}, true, nil
 }
 
-func (c *schedulerCache) ReleaseGroupLifecycleLease(ctx context.Context, lease service.SchedulerGroupLifecycleLease) error {
-	if !lease.ValidFor(lease.GroupID) {
-		return service.ErrSchedulerGroupLifecycleLeaseInvalid
+func (c *schedulerCache) ReleasePlatformLifecycleLease(ctx context.Context, lease service.SchedulerPlatformLifecycleLease) error {
+	if !lease.ValidFor(lease.PlatformID) {
+		return service.ErrSchedulerPlatformLifecycleLeaseInvalid
 	}
-	result, err := releaseGroupLifecycleLeaseScript.Run(
+	result, err := releasePlatformLifecycleLeaseScript.Run(
 		ctx,
 		c.rdb,
-		[]string{schedulerGroupLifecycleLockKey(lease.GroupID)},
+		[]string{schedulerPlatformLifecycleLockKey(lease.PlatformID)},
 		lease.OwnerToken,
 	).Int64()
 	if err != nil {
 		return err
 	}
 	if result == 0 {
-		return fmt.Errorf("%w: group=%d", service.ErrSchedulerGroupLifecycleLeaseLost, lease.GroupID)
+		return fmt.Errorf("%w: platform=%d", service.ErrSchedulerPlatformLifecycleLeaseLost, lease.PlatformID)
 	}
 	if result != 1 {
-		return fmt.Errorf("release scheduler group lifecycle lease returned %d", result)
+		return fmt.Errorf("release scheduler platform lifecycle lease returned %d", result)
 	}
 	return nil
 }
 
-func newSchedulerGroupLifecycleOwnerToken() (string, error) {
-	raw := make([]byte, schedulerGroupLifecycleOwnerTokenBytes)
+func newSchedulerPlatformLifecycleOwnerToken() (string, error) {
+	raw := make([]byte, schedulerPlatformLifecycleOwnerTokenBytes)
 	if _, err := rand.Read(raw); err != nil {
-		return "", fmt.Errorf("generate scheduler group lifecycle owner token: %w", err)
+		return "", fmt.Errorf("generate scheduler platform lifecycle owner token: %w", err)
 	}
 	return hex.EncodeToString(raw), nil
 }
@@ -536,7 +536,7 @@ func (c *schedulerCache) activateSnapshotVersion(ctx context.Context, bucket ser
 	// 旧快照使用 EXPIRE 宽限期而非立即 DEL，避免 reader 竞态。
 	activeKey := schedulerBucketKey(schedulerActivePrefix, bucket)
 	readyKey := schedulerBucketKey(schedulerReadyPrefix, bucket)
-	snapshotKeyPrefix := fmt.Sprintf("%s%d:%s:%s:v", schedulerSnapshotPrefix, bucket.GroupID, bucket.Platform, bucket.Mode)
+	snapshotKeyPrefix := fmt.Sprintf("%s%d:%s:%s:v", schedulerSnapshotPrefix, bucket.PlatformID, bucket.Platform, bucket.Mode)
 
 	keys := []string{
 		activeKey,
@@ -701,15 +701,15 @@ func (c *schedulerCache) SetOutboxWatermark(ctx context.Context, id int64) error
 }
 
 func schedulerBucketKey(prefix string, bucket service.SchedulerBucket) string {
-	return fmt.Sprintf("%s%d:%s:%s", prefix, bucket.GroupID, bucket.Platform, bucket.Mode)
+	return fmt.Sprintf("%s%d:%s:%s", prefix, bucket.PlatformID, bucket.Platform, bucket.Mode)
 }
 
-func schedulerGroupLifecycleLockKey(groupID int64) string {
-	return schedulerGroupLifecycleLockPrefix + strconv.FormatInt(groupID, 10)
+func schedulerPlatformLifecycleLockKey(platformID int64) string {
+	return schedulerPlatformLifecycleLockPrefix + strconv.FormatInt(platformID, 10)
 }
 
 func schedulerSnapshotKey(bucket service.SchedulerBucket, version string) string {
-	return fmt.Sprintf("%s%d:%s:%s:v%s", schedulerSnapshotPrefix, bucket.GroupID, bucket.Platform, bucket.Mode, version)
+	return fmt.Sprintf("%s%d:%s:%s:v%s", schedulerSnapshotPrefix, bucket.PlatformID, bucket.Platform, bucket.Mode, version)
 }
 
 func schedulerAccountKey(id string) string {
@@ -887,67 +887,9 @@ func buildSchedulerMetadataAccount(account service.Account) service.Account {
 		SessionWindowStatus:     account.SessionWindowStatus,
 		ParentAccountID:         account.ParentAccountID,
 		QuotaDimension:          account.QuotaDimension,
-		AccountGroups:           filterSchedulerAccountGroups(account.AccountGroups),
-		GroupIDs:                filterSchedulerGroupIDs(account.GroupIDs, account.AccountGroups),
 		Credentials:             filterSchedulerCredentials(account.Credentials),
 		Extra:                   filterSchedulerExtra(account.Extra),
 	}
-}
-
-func filterSchedulerAccountGroups(accountGroups []service.AccountGroup) []service.AccountGroup {
-	if len(accountGroups) == 0 {
-		return nil
-	}
-
-	filtered := make([]service.AccountGroup, 0, len(accountGroups))
-	for _, ag := range accountGroups {
-		if ag.GroupID <= 0 {
-			continue
-		}
-		filtered = append(filtered, service.AccountGroup{
-			AccountID: ag.AccountID,
-			GroupID:   ag.GroupID,
-			Priority:  ag.Priority,
-			CreatedAt: ag.CreatedAt,
-		})
-	}
-	if len(filtered) == 0 {
-		return nil
-	}
-	return filtered
-}
-
-func filterSchedulerGroupIDs(groupIDs []int64, accountGroups []service.AccountGroup) []int64 {
-	if len(groupIDs) == 0 && len(accountGroups) == 0 {
-		return nil
-	}
-
-	seen := make(map[int64]struct{}, len(groupIDs)+len(accountGroups))
-	filtered := make([]int64, 0, len(groupIDs)+len(accountGroups))
-	for _, id := range groupIDs {
-		if id <= 0 {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		filtered = append(filtered, id)
-	}
-	for _, ag := range accountGroups {
-		if ag.GroupID <= 0 {
-			continue
-		}
-		if _, ok := seen[ag.GroupID]; ok {
-			continue
-		}
-		seen[ag.GroupID] = struct{}{}
-		filtered = append(filtered, ag.GroupID)
-	}
-	if len(filtered) == 0 {
-		return nil
-	}
-	return filtered
 }
 
 func filterSchedulerCredentials(credentials map[string]any) map[string]any {

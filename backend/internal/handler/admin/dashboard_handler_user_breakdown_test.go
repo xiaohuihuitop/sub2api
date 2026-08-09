@@ -46,17 +46,17 @@ func newUserBreakdownRouter(repo *userBreakdownRepoCapture) *gin.Engine {
 
 // --- tests ---
 
-func TestGetUserBreakdown_GroupIDFilter(t *testing.T) {
+func TestGetUserBreakdown_PlatformIDFilter(t *testing.T) {
 	repo := &userBreakdownRepoCapture{}
 	router := newUserBreakdownRouter(repo)
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/admin/dashboard/user-breakdown?start_date=2026-03-01&end_date=2026-03-16&group_id=42", nil)
+		"/admin/dashboard/user-breakdown?start_date=2026-03-01&end_date=2026-03-16&platform_id=42", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
-	require.Equal(t, int64(42), repo.capturedDim.GroupID)
+	require.Equal(t, int64(42), repo.capturedDim.PlatformID)
 	require.Empty(t, repo.capturedDim.Model)
 	require.Empty(t, repo.capturedDim.Endpoint)
 	require.Equal(t, 50, repo.capturedLimit)  // default limit
@@ -88,7 +88,7 @@ func TestGetUserBreakdown_ModelFilter(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "claude-opus-4-6", repo.capturedDim.Model)
 	require.Equal(t, usagestats.ModelSourceRequested, repo.capturedDim.ModelType)
-	require.Equal(t, int64(0), repo.capturedDim.GroupID)
+	require.Equal(t, int64(0), repo.capturedDim.PlatformID)
 }
 
 func TestGetUserBreakdown_ModelSourceFilter(t *testing.T) {
@@ -180,7 +180,7 @@ func TestGetUserBreakdown_ResponseFormat(t *testing.T) {
 	router := newUserBreakdownRouter(repo)
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/admin/dashboard/user-breakdown?start_date=2026-03-01&end_date=2026-03-16&group_id=1", nil)
+		"/admin/dashboard/user-breakdown?start_date=2026-03-01&end_date=2026-03-16&platform_id=1", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -211,7 +211,7 @@ func TestGetUserBreakdown_EmptyResult(t *testing.T) {
 	router := newUserBreakdownRouter(repo)
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/admin/dashboard/user-breakdown?start_date=2026-03-01&end_date=2026-03-16&group_id=999", nil)
+		"/admin/dashboard/user-breakdown?start_date=2026-03-01&end_date=2026-03-16&platform_id=999", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -237,7 +237,7 @@ func TestGetUserBreakdown_NoFilters(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
-	require.Equal(t, int64(0), repo.capturedDim.GroupID)
+	require.Equal(t, int64(0), repo.capturedDim.PlatformID)
 	require.Empty(t, repo.capturedDim.Model)
 	require.Empty(t, repo.capturedDim.Endpoint)
 }

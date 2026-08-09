@@ -111,8 +111,8 @@ func TestEnqueueSchedulerOutbox_DoesNotDeduplicateDifferentPayload(t *testing.T)
 	_, _ = integrationDB.ExecContext(ctx, "TRUNCATE scheduler_outbox RESTART IDENTITY")
 
 	accountID := int64(32345)
-	payload1 := map[string]any{"group_ids": []int64{1}}
-	payload2 := map[string]any{"group_ids": []int64{2}}
+	payload1 := map[string]any{"platform_ids": []int64{1}}
+	payload2 := map[string]any{"platform_ids": []int64{2}}
 	require.NoError(t, enqueueSchedulerOutbox(ctx, integrationDB, service.SchedulerOutboxEventAccountChanged, &accountID, nil, payload1))
 	require.NoError(t, enqueueSchedulerOutbox(ctx, integrationDB, service.SchedulerOutboxEventAccountChanged, &accountID, nil, payload2))
 

@@ -30,54 +30,17 @@ type AdminService interface {
 	GetUserBalanceHistory(ctx context.Context, userID int64, page, pageSize int, codeType string) ([]RedeemCode, int64, float64, error)
 	BindUserAuthIdentity(ctx context.Context, userID int64, input AdminBindAuthIdentityInput) (*AdminBoundAuthIdentity, error)
 
-	// Group management
-	ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]Group, int64, error)
-	GetAllGroups(ctx context.Context) ([]Group, error)
-	GetAllGroupsByPlatform(ctx context.Context, platform string) ([]Group, error)
-	// GetAllGroupsIncludingInactive returns all groups regardless of status (active + disabled),
-	// ordered by sort_order then id. Used by the API Key group filter dropdown.
-	GetAllGroupsIncludingInactive(ctx context.Context) ([]Group, error)
-	GetGroup(ctx context.Context, id int64) (*Group, error)
-	GetGroupBillingProfile(ctx context.Context, groupID int64) (*BillingProfile, error)
-	UpdateGroupBillingProfile(ctx context.Context, groupID int64, input *UpdateBillingProfileInput) (*BillingProfile, error)
-	GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error)
-	CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error)
-	// DuplicateGroup creates an inactive independent copy of a group's configuration
-	// and account bindings while preserving each binding's priority.
-	DuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error)
-	// RecoverDuplicateGroup returns a previously committed copy for an ambiguous retry.
-	// It never creates a group.
-	RecoverDuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error)
-	UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error)
-	DeleteGroup(ctx context.Context, id int64) error
-	ListCompositeRoutes(ctx context.Context, groupID int64) ([]CompositeModelRoute, error)
-	CreateCompositeRoute(ctx context.Context, groupID int64, input CompositeRouteInput) (*CompositeModelRoute, error)
-	UpdateCompositeRoute(ctx context.Context, groupID, routeID int64, input CompositeRouteInput) (*CompositeModelRoute, error)
-	DeleteCompositeRoute(ctx context.Context, groupID, routeID int64) error
-	PreviewCompositeRoute(ctx context.Context, groupID int64, input CompositeRoutePreviewRequest) (*CompositeRouteDecision, error)
-	GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]APIKey, int64, error)
-	GetGroupRateMultipliers(ctx context.Context, groupID int64) ([]UserGroupRateEntry, error)
-	ClearGroupRateMultipliers(ctx context.Context, groupID int64) error
-	BatchSetGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error
-	ClearGroupRPMOverrides(ctx context.Context, groupID int64) error
-	BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error
-	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error
-
 	// API Key management (admin)
-	AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error)
 	AdminResetAPIKeyRateLimitUsage(ctx context.Context, keyID int64) (*APIKey, error)
 
-	// ReplaceUserGroup 替换用户的专属分组：授予新分组权限、迁移 Key、移除旧分组权限
-	ReplaceUserGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (*ReplaceUserGroupResult, error)
-
 	// Account management
-	ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode string, sortBy, sortOrder string) ([]Account, int64, error)
+	ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, platformID int64, privacyMode string, sortBy, sortOrder string) ([]Account, int64, error)
 	// ListAccountsForSchedulerScoreFilter 返回符合过滤条件的全部账号（不分页），
 	// 作为账号列表页计算 OpenAI 调度分数的过滤范围池。
-	ListAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, error)
+	ListAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, platformID int64, privacyMode string) ([]Account, error)
 	// ListOpenAISchedulableAccountsForSchedulerScore 返回指定分组（nil 为未分组）内
 	// 可调度的 OpenAI 账号，用于按组计算调度分数。
-	ListOpenAISchedulableAccountsForSchedulerScore(ctx context.Context, groupID *int64) ([]Account, error)
+	ListOpenAISchedulableAccountsForSchedulerScore(ctx context.Context, platformID *int64) ([]Account, error)
 	GetAccount(ctx context.Context, id int64) (*Account, error)
 	GetAccountsByIDs(ctx context.Context, ids []int64) ([]*Account, error)
 	CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error)
@@ -105,7 +68,6 @@ type AdminService interface {
 	ForceAntigravityPrivacy(ctx context.Context, account *Account) string
 	SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error)
 	BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error)
-	CheckMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error
 	// RevertAccountProxyFallback 将账号的 proxy_id 切回 proxy_fallback_origin_id，并清空 origin 字段。
 	// 若账号不存在返回 ErrAccountNotFound；若账号存在但不在 fallback 状态，返回 ErrAccountNotInFallback。
 	RevertAccountProxyFallback(ctx context.Context, id int64) error
@@ -141,30 +103,28 @@ type AdminService interface {
 
 // CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
-	Email         string
-	Password      string
-	Username      string
-	Notes         string
-	Role          string // 空字符串表示使用默认角色(user);合法值 admin/user
-	Balance       *float64
-	Concurrency   int
-	RPMLimit      int
-	AllowedGroups []int64
+	Email       string
+	Password    string
+	Username    string
+	Notes       string
+	Role        string // 空字符串表示使用默认角色(user);合法值 admin/user
+	Balance     *float64
+	Concurrency int
+	RPMLimit    int
 	// ActorAdminID 执行本次操作的管理员ID(来自JWT)，仅用于权限敏感操作的审计日志。
 	ActorAdminID int64
 }
 
 type UpdateUserInput struct {
-	Email         string
-	Password      string
-	Username      *string
-	Notes         *string
-	Role          string   // 空字符串表示"未提供"(不修改);合法值 admin/user
-	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
-	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
-	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
-	Status        string
-	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
+	Email       string
+	Password    string
+	Username    *string
+	Notes       *string
+	Role        string   // 空字符串表示"未提供"(不修改);合法值 admin/user
+	Balance     *float64 // 使用指针区分"未提供"和"设置为0"
+	Concurrency *int     // 使用指针区分"未提供"和"设置为0"
+	RPMLimit    *int     // 使用指针区分"未提供"和"设置为0"
+	Status      string
 	// ActorAdminID 执行本次操作的管理员ID(来自JWT)，仅用于权限敏感操作的审计日志。
 	ActorAdminID int64
 }
@@ -207,127 +167,6 @@ type AdminBoundAuthIdentityChannel struct {
 	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
-type CreateGroupInput struct {
-	Name             string
-	Description      string
-	Platform         string
-	RateMultiplier   float64
-	IsExclusive      bool
-	SubscriptionType string   // standard/subscription
-	DailyLimitUSD    *float64 // 日限额 (USD)
-	WeeklyLimitUSD   *float64 // 周限额 (USD)
-	MonthlyLimitUSD  *float64 // 月限额 (USD)
-	// 图片生成计费配置（仅 antigravity 平台使用）
-	AllowImageGeneration         bool
-	AllowBatchImageGeneration    bool
-	ImageRateIndependent         bool
-	ImageRateMultiplier          *float64
-	BatchImageDiscountMultiplier *float64
-	BatchImageHoldMultiplier     *float64
-	VideoRateIndependent         bool
-	VideoRateMultiplier          *float64
-	// 高峰时段倍率配置（PeakRateMultiplier 为 nil 时按 1.0 处理）
-	PeakRateEnabled    bool
-	PeakStart          string
-	PeakEnd            string
-	PeakRateMultiplier *float64
-	ImagePrice1K       *float64
-	ImagePrice2K       *float64
-	ImagePrice4K       *float64
-	VideoPrice480P     *float64
-	VideoPrice720P     *float64
-	VideoPrice1080P    *float64
-	// Codex alpha/search 网页搜索单次价格（USD/次，仅 openai 平台使用）；nil/负数按默认价 0.01 处理
-	WebSearchPricePerCall *float64
-	ClaudeCodeOnly        bool   // 仅允许 Claude Code 客户端
-	FallbackGroupID       *int64 // 降级分组 ID
-	// 无效请求兜底分组 ID（仅 anthropic 平台使用）
-	FallbackGroupIDOnInvalidRequest *int64
-	// 模型路由配置（仅 anthropic 平台使用）
-	ModelRouting        map[string][]int64
-	ModelRoutingEnabled bool // 是否启用模型路由
-	MCPXMLInject        *bool
-	// 支持的模型系列（仅 antigravity 平台使用）
-	SupportedModelScopes []string
-	// OpenAI Messages 调度配置（仅 openai 平台使用）
-	AllowMessagesDispatch       bool
-	AllowLive                   bool
-	DefaultMappedModel          string
-	RequireOAuthOnly            bool
-	RequirePrivacySet           bool
-	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
-	ModelsListConfig            GroupModelsListConfig
-	// RPMLimit 分组 RPM 上限（0 = 不限制）
-	RPMLimit int
-	// MaxReasoningEffort OpenAI/Codex 请求的推理强度上限，空字符串表示不限制。
-	MaxReasoningEffort string
-	// ReasoningEffortMappings OpenAI/Codex 推理强度精确映射。
-	ReasoningEffortMappings []ReasoningEffortMapping
-	// 从指定分组复制账号（创建分组后在同一事务内绑定）
-	CopyAccountsFromGroupIDs []int64
-}
-
-type UpdateGroupInput struct {
-	Name             string
-	Description      *string
-	Platform         string
-	RateMultiplier   *float64 // 使用指针以支持设置为0
-	IsExclusive      *bool
-	Status           string
-	SubscriptionType string   // standard/subscription
-	DailyLimitUSD    *float64 // 日限额 (USD)
-	WeeklyLimitUSD   *float64 // 周限额 (USD)
-	MonthlyLimitUSD  *float64 // 月限额 (USD)
-	// 图片生成计费配置（仅 antigravity 平台使用）
-	AllowImageGeneration         *bool
-	AllowBatchImageGeneration    *bool
-	ImageRateIndependent         *bool
-	ImageRateMultiplier          *float64
-	BatchImageDiscountMultiplier *float64
-	BatchImageHoldMultiplier     *float64
-	VideoRateIndependent         *bool
-	VideoRateMultiplier          *float64
-	// 高峰时段倍率配置（nil 表示不修改）
-	PeakRateEnabled    *bool
-	PeakStart          *string
-	PeakEnd            *string
-	PeakRateMultiplier *float64
-	ImagePrice1K       *float64
-	ImagePrice2K       *float64
-	ImagePrice4K       *float64
-	VideoPrice480P     *float64
-	VideoPrice720P     *float64
-	VideoPrice1080P    *float64
-	// Codex alpha/search 网页搜索单次价格（USD/次）；nil 表示不修改，负数表示清除回默认价 0.01
-	WebSearchPricePerCall *float64
-	ClaudeCodeOnly        *bool  // 仅允许 Claude Code 客户端
-	FallbackGroupID       *int64 // 降级分组 ID
-	// 无效请求兜底分组 ID（仅 anthropic 平台使用）
-	FallbackGroupIDOnInvalidRequest *int64
-	// 模型路由配置（仅 anthropic 平台使用）
-	ModelRouting        map[string][]int64
-	ModelRoutingEnabled *bool // 是否启用模型路由
-	MCPXMLInject        *bool
-	// 支持的模型系列（仅 antigravity 平台使用）
-	SupportedModelScopes *[]string
-	// OpenAI Messages 调度配置（仅 openai 平台使用）
-	AllowMessagesDispatch       *bool
-	AllowLive                   *bool
-	DefaultMappedModel          *string
-	RequireOAuthOnly            *bool
-	RequirePrivacySet           *bool
-	MessagesDispatchModelConfig *OpenAIMessagesDispatchModelConfig
-	ModelsListConfig            *GroupModelsListConfig
-	// RPMLimit 分组 RPM 上限（0 = 不限制），nil 表示未提供不改动。
-	RPMLimit *int
-	// MaxReasoningEffort 空字符串表示清除上限；nil 表示未提供不改动。
-	MaxReasoningEffort *string
-	// ReasoningEffortMappings nil 表示不修改，空数组表示清空，非空数组表示替换。
-	ReasoningEffortMappings *[]ReasoningEffortMapping
-	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
-	CopyAccountsFromGroupIDs []int64
-}
-
 type CreateAccountInput struct {
 	Name               string
 	Notes              *string
@@ -341,15 +180,9 @@ type CreateAccountInput struct {
 	Priority           int
 	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor         *int
-	GroupIDs           []int64
 	ExpiresAt          *int64
 	AutoPauseOnExpired *bool
 	ProbeEnabled       *bool
-	// SkipDefaultGroupBind prevents auto-binding to platform default group when GroupIDs is empty.
-	SkipDefaultGroupBind bool
-	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
-	// This should only be set when the caller has explicitly confirmed the risk.
-	SkipMixedChannelCheck bool
 }
 
 // ShadowOptions is the input for CreateShadow.
@@ -361,22 +194,20 @@ type ShadowOptions struct {
 }
 
 type UpdateAccountInput struct {
-	Name                  string
-	Notes                 *string
-	Type                  string // Account type: oauth, setup-token, apikey
-	PlatformID            *int64
-	Credentials           map[string]any
-	Extra                 map[string]any
-	ProxyID               *int64
-	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
-	Priority              *int     // 使用指针区分"未提供"和"设置为0"
-	RateMultiplier        *float64 // 账号计费倍率（>=0，允许 0）
-	LoadFactor            *int
-	Status                string
-	GroupIDs              *[]int64
-	ExpiresAt             *int64
-	AutoPauseOnExpired    *bool
-	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
+	Name               string
+	Notes              *string
+	Type               string // Account type: oauth, setup-token, apikey
+	PlatformID         *int64
+	Credentials        map[string]any
+	Extra              map[string]any
+	ProxyID            *int64
+	Concurrency        *int     // 使用指针区分"未提供"和"设置为0"
+	Priority           *int     // 使用指针区分"未提供"和"设置为0"
+	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
+	LoadFactor         *int
+	Status             string
+	ExpiresAt          *int64
+	AutoPauseOnExpired *bool
 }
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.
@@ -391,20 +222,16 @@ type BulkUpdateAccountsInput struct {
 	LoadFactor     *int
 	Status         string
 	Schedulable    *bool
-	GroupIDs       *[]int64
 	Credentials    map[string]any
 	Extra          map[string]any
 	ProbeEnabled   *bool
-	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
-	// This should only be set when the caller has explicitly confirmed the risk.
-	SkipMixedChannelCheck bool
 }
 
 type BulkUpdateAccountFilters struct {
 	Platform    string
 	Type        string
 	Status      string
-	Group       string
+	PlatformID  int64
 	Search      string
 	PrivacyMode string
 }
@@ -416,33 +243,10 @@ type BulkUpdateAccountResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// AdminUpdateAPIKeyGroupIDResult is the result of AdminUpdateAPIKeyGroupID.
-type AdminUpdateAPIKeyGroupIDResult struct {
-	APIKey                 *APIKey
-	AutoGrantedGroupAccess bool   // true if a new exclusive group permission was auto-added
-	GrantedGroupID         *int64 // the group ID that was auto-granted
-	GrantedGroupName       string // the group name that was auto-granted
-}
-
-// ReplaceUserGroupResult 分组替换操作的结果
-type ReplaceUserGroupResult struct {
-	MigratedKeys int64 // 迁移的 Key 数量
-}
-
 // UserRPMStatus describes a user's current per-minute RPM usage.
 type UserRPMStatus struct {
-	UserRPMUsed  int                  `json:"user_rpm_used"`
-	UserRPMLimit int                  `json:"user_rpm_limit"`
-	PerGroup     []UserGroupRPMStatus `json:"per_group"`
-}
-
-// UserGroupRPMStatus describes current per-minute RPM usage for one user/group pair.
-type UserGroupRPMStatus struct {
-	GroupID   int64  `json:"group_id"`
-	GroupName string `json:"group_name"`
-	Used      int    `json:"used"`
-	Limit     int    `json:"limit"`
-	Source    string `json:"source"` // "group" | "override"
+	UserRPMUsed  int `json:"user_rpm_used"`
+	UserRPMLimit int `json:"user_rpm_limit"`
 }
 
 // BulkUpdateAccountsResult is the aggregated response for bulk updates.
@@ -485,9 +289,7 @@ type GenerateRedeemCodesInput struct {
 	Count              int
 	Type               string
 	Value              float64
-	SubscriptionPlanID *int64 // 新订阅码：关联的套餐 ID
-	GroupID            *int64 // 兼容旧订阅码：关联的分组 ID
-	ValidityDays       int    // 兼容旧订阅码：有效天数
+	SubscriptionPlanID *int64
 	ExpiresAt          *time.Time
 }
 
@@ -614,14 +416,10 @@ var ErrRPMStatusUnavailable = infraerrors.New(http.StatusNotImplemented, "RPM_ST
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
 	userRepo             UserRepository
-	groupRepo            GroupRepository
-	groupDuplicateRepo   GroupDuplicateRepository
 	accountRepo          AccountRepository
-	accountDuplicateRepo AccountDuplicateRepository
 	proxyRepo            ProxyRepository
 	apiKeyRepo           APIKeyRepository
 	redeemCodeRepo       RedeemCodeRepository
-	userGroupRateRepo    UserGroupRateRepository
 	userRPMCache         UserRPMCache
 	billingCacheService  *BillingCacheService
 	proxyProber          ProxyExitInfoProber
@@ -634,27 +432,19 @@ type adminServiceImpl struct {
 	privacyClientFactory PrivacyClientFactory
 	runtimeBlocker       AccountRuntimeBlocker
 	affiliateService     adminRechargeAffiliateAccruer
-	compositeRouteRepo   CompositeModelRouteRepository
-	compositeResolver    *CompositeRouteResolver
 }
 
 type adminRechargeAffiliateAccruer interface {
 	AccrueInviteRebate(ctx context.Context, inviteeUserID int64, baseRechargeAmount float64) (float64, error)
 }
 
-type userGroupRateBatchReader interface {
-	GetByUserIDs(ctx context.Context, userIDs []int64) (map[int64]map[int64]float64, error)
-}
-
 // NewAdminService creates a new AdminService
 func NewAdminService(
 	userRepo UserRepository,
-	groupRepo AdminGroupRepository,
 	accountRepo AdminAccountRepository,
 	proxyRepo ProxyRepository,
 	apiKeyRepo APIKeyRepository,
 	redeemCodeRepo RedeemCodeRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	userRPMCache UserRPMCache,
 	billingCacheService *BillingCacheService,
 	proxyProber ProxyExitInfoProber,
@@ -667,19 +457,13 @@ func NewAdminService(
 	privacyClientFactory PrivacyClientFactory,
 	runtimeBlocker AccountRuntimeBlocker,
 	affiliateService *AffiliateService,
-	compositeRouteRepo CompositeModelRouteRepository,
-	compositeResolver *CompositeRouteResolver,
 ) AdminService {
 	return &adminServiceImpl{
 		userRepo:             userRepo,
-		groupRepo:            groupRepo,
-		groupDuplicateRepo:   groupRepo,
 		accountRepo:          accountRepo,
-		accountDuplicateRepo: accountRepo,
 		proxyRepo:            proxyRepo,
 		apiKeyRepo:           apiKeyRepo,
 		redeemCodeRepo:       redeemCodeRepo,
-		userGroupRateRepo:    userGroupRateRepo,
 		userRPMCache:         userRPMCache,
 		billingCacheService:  billingCacheService,
 		proxyProber:          proxyProber,
@@ -692,7 +476,5 @@ func NewAdminService(
 		privacyClientFactory: privacyClientFactory,
 		runtimeBlocker:       runtimeBlocker,
 		affiliateService:     affiliateService,
-		compositeRouteRepo:   compositeRouteRepo,
-		compositeResolver:    compositeResolver,
 	}
 }

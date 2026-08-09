@@ -26,8 +26,7 @@ var (
 	ErrSubscriptionInvalid       = infraerrors.Forbidden("SUBSCRIPTION_INVALID", "subscription is invalid or expired")
 	ErrBillingServiceUnavailable = infraerrors.ServiceUnavailable("BILLING_SERVICE_ERROR", "Billing service temporarily unavailable. Please retry later.")
 	// RPM 超限错误。gateway_handler 负责映射为 HTTP 429。
-	ErrGroupRPMExceeded = infraerrors.TooManyRequests("GROUP_RPM_EXCEEDED", "group requests-per-minute limit exceeded")
-	ErrUserRPMExceeded  = infraerrors.TooManyRequests("USER_RPM_EXCEEDED", "user requests-per-minute limit exceeded")
+	ErrUserRPMExceeded = infraerrors.TooManyRequests("USER_RPM_EXCEEDED", "user requests-per-minute limit exceeded")
 
 	// user × platform quota（HTTP 429 Too Many Requests + Retry-After header）。
 	// 选用 429 而非 403：限额耗尽属于"暂时性资源用尽，重试可恢复"的场景（RFC 6585），
@@ -89,7 +88,6 @@ const (
 type cacheWriteTask struct {
 	kind             cacheWriteKind
 	userID           int64
-	groupID          int64
 	subscriptionID   int64
 	apiKeyID         int64
 	balance          float64
@@ -115,20 +113,17 @@ type BillingCacheService struct {
 	subRepo               UserSubscriptionRepository
 	apiKeyRateLimitLoader apiKeyRateLimitLoader
 	userRPMCache          UserRPMCache
-	userGroupRateRepo     UserGroupRateRepository
 	cfg                   *config.Config
 	circuitBreaker        *billingCircuitBreaker
 	userPlatformQuotaRepo UserPlatformQuotaRepository
 
-	cacheWriteChan          chan cacheWriteTask
-	cacheWriteWg            sync.WaitGroup
-	cacheWriteStopOnce      sync.Once
-	cacheWriteMu            sync.RWMutex
-	subAuthCacheMu          sync.RWMutex
-	subAuthCacheInvalidator func(context.Context, int64, int64)
-	stopped                 atomic.Bool
-	balanceLoadSF           singleflight.Group
-	quotaLoadSF             singleflight.Group
+	cacheWriteChan     chan cacheWriteTask
+	cacheWriteWg       sync.WaitGroup
+	cacheWriteStopOnce sync.Once
+	cacheWriteMu       sync.RWMutex
+	stopped            atomic.Bool
+	balanceLoadSF      singleflight.Group
+	quotaLoadSF        singleflight.Group
 	// 丢弃日志节流计数器（减少高负载下日志噪音）
 	cacheWriteDropFullCount     uint64
 	cacheWriteDropFullLastLog   int64
@@ -143,7 +138,6 @@ func NewBillingCacheService(
 	subRepo UserSubscriptionRepository,
 	apiKeyRepo APIKeyRepository,
 	userRPMCache UserRPMCache,
-	userGroupRateRepo UserGroupRateRepository,
 	cfg *config.Config,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *BillingCacheService {
@@ -153,7 +147,6 @@ func NewBillingCacheService(
 		subRepo:               subRepo,
 		apiKeyRateLimitLoader: apiKeyRepo,
 		userRPMCache:          userRPMCache,
-		userGroupRateRepo:     userGroupRateRepo,
 		cfg:                   cfg,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
 	}
@@ -301,13 +294,12 @@ func (s *BillingCacheService) logCacheWriteDrop(task cacheWriteTask, reason stri
 	if dropped == 0 {
 		return
 	}
-	logger.LegacyPrintf("service.billing_cache", "Warning: cache write queue %s, dropped %d tasks in last %s (latest kind=%s user %d group %d)",
+	logger.LegacyPrintf("service.billing_cache", "Warning: cache write queue %s, dropped %d tasks in last %s (latest kind=%s user %d)",
 		reason,
 		dropped,
 		cacheWriteDropLogInterval,
 		cacheWriteKindName(task.kind),
 		task.userID,
-		task.groupID,
 	)
 }
 
@@ -527,8 +519,7 @@ func (s *BillingCacheService) UpdateSubscriptionUsage(ctx context.Context, userI
 }
 
 // QueueUpdateSubscriptionUsage 异步更新订阅用量缓存
-func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID, subscriptionID int64, costUSD float64) {
-	s.invalidateSubscriptionAuthCache(userID, groupID)
+func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, subscriptionID int64, costUSD float64) {
 	if s.cache == nil || subscriptionID <= 0 {
 		return
 	}
@@ -536,7 +527,6 @@ func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID, subs
 	if s.enqueueCacheWrite(cacheWriteTask{
 		kind:           cacheWriteUpdateSubscriptionUsage,
 		userID:         userID,
-		groupID:        groupID,
 		subscriptionID: subscriptionID,
 		amount:         costUSD,
 	}) {
@@ -546,29 +536,6 @@ func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID, subs
 	defer cancel()
 	if err := s.UpdateSubscriptionUsage(ctx, userID, subscriptionID, costUSD); err != nil {
 		logger.LegacyPrintf("service.billing_cache", "Warning: update subscription cache fallback failed for user %d subscription %d: %v", userID, subscriptionID, err)
-	}
-}
-
-// RegisterSubscriptionAuthCacheInvalidator 注册本机订阅认证缓存失效回调。
-// 订阅用量写入会先执行该回调，使下一次请求从最新订阅快照选择计费分组。
-func (s *BillingCacheService) RegisterSubscriptionAuthCacheInvalidator(invalidator func(context.Context, int64, int64)) {
-	if s == nil {
-		return
-	}
-	s.subAuthCacheMu.Lock()
-	s.subAuthCacheInvalidator = invalidator
-	s.subAuthCacheMu.Unlock()
-}
-
-func (s *BillingCacheService) invalidateSubscriptionAuthCache(userID, groupID int64) {
-	if s == nil || userID <= 0 || groupID <= 0 {
-		return
-	}
-	s.subAuthCacheMu.RLock()
-	invalidate := s.subAuthCacheInvalidator
-	s.subAuthCacheMu.RUnlock()
-	if invalidate != nil {
-		invalidate(context.Background(), userID, groupID)
 	}
 }
 
@@ -582,12 +549,6 @@ func (s *BillingCacheService) InvalidateSubscription(ctx context.Context, userID
 		return err
 	}
 	return nil
-}
-
-// InvalidateSubscriptionGroup clears only the user/group candidate selection
-// cache. Concrete subscription usage entries remain keyed by subscription ID.
-func (s *BillingCacheService) InvalidateSubscriptionGroup(userID, groupID int64) {
-	s.invalidateSubscriptionAuthCache(userID, groupID)
 }
 
 func (s *BillingCacheService) PublishSubscriptionCacheInvalidation(ctx context.Context, cacheKey string) error {
@@ -792,12 +753,7 @@ func (s *BillingCacheService) IncrementUserPlatformQuotaUsage(userID int64, plat
 // 余额模式：检查缓存余额 > 0
 // 订阅模式：检查缓存用量未超过限额（Group限额从参数传入）
 // platform 为请求的目标平台（如 "anthropic"），传空串 "" 时跳过 user × platform quota 检查。
-func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user *User, apiKey *APIKey, group *Group, subscription *UserSubscription, platform string) error {
-	// Explicit V2 requests may retain a group solely as a model-pricing
-	// compatibility reference. It must not affect RPM or billing eligibility.
-	if _, platformAssetRequest := GatewayPlatformAssetContextFromContext(ctx); platformAssetRequest {
-		group = nil
-	}
+func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user *User, apiKey *APIKey, subscription *UserSubscription, platform string) error {
 	// 简易模式：跳过所有计费检查
 	if s.cfg.RunMode == config.RunModeSimple {
 		return nil
@@ -810,7 +766,7 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 	isSubscriptionMode := subscription != nil
 
 	if isSubscriptionMode {
-		if err := s.checkSubscriptionEligibility(ctx, user.ID, group, subscription); err != nil {
+		if err := s.checkSubscriptionEligibility(ctx, user.ID, subscription); err != nil {
 			return err
 		}
 	} else {
@@ -834,79 +790,19 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 	}
 
 	// RPM 限流：级联回落（Override → Group → User），放在最后以避免为注定失败的请求增加计数。
-	if err := s.checkRPM(ctx, user, group); err != nil {
+	if err := s.checkRPM(ctx, user); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// checkRPM 执行并行 RPM 限流，所有适用的限制同时生效，任一超限即拒绝：
-//
-//  1. (用户, 分组) rpm_override       — 最细粒度：管理员为特定用户在特定分组设定的专属限额。
-//     override=0 表示该用户在该分组免检（绿灯），但 user 级全局上限仍然生效。
-//  2. group.rpm_limit                 — 分组级：该分组的统一 RPM 容量（仅当无 override 时生效）。
-//  3. user.rpm_limit                  — 用户级全局硬上限：无论 override/group 如何配置，始终生效。
-//
-// 与旧版"级联互斥"设计不同，新版确保 user.rpm_limit 作为全局天花板不会被 group 或 override 覆盖。
-// Redis 故障一律 fail-open（打 warning，不阻塞业务）。
-func (s *BillingCacheService) checkRPM(ctx context.Context, user *User, group *Group) error {
+// checkRPM enforces the user-level request ceiling. Redis failures fail open.
+func (s *BillingCacheService) checkRPM(ctx context.Context, user *User) error {
 	if s == nil || s.userRPMCache == nil || user == nil {
 		return nil
 	}
 
-	// ── 第一层：分组级检查（override 或 group.rpm_limit） ──
-	if group != nil {
-		// 解析 override：优先从 auth cache snapshot，nil 时回退 DB。
-		var override *int
-		if user.UserGroupRPMOverride != nil {
-			override = user.UserGroupRPMOverride
-		} else if s.userGroupRateRepo != nil {
-			dbOverride, err := s.userGroupRateRepo.GetRPMOverrideByUserAndGroup(ctx, user.ID, group.ID)
-			if err != nil {
-				logger.LegacyPrintf(
-					"service.billing_cache",
-					"Warning: rpm override lookup failed for user=%d group=%d: %v",
-					user.ID, group.ID, err,
-				)
-			} else {
-				override = dbOverride
-			}
-		}
-
-		if override != nil {
-			// override=0 → 该用户在该分组免检（但 user 级仍会在下面检查）。
-			if *override > 0 {
-				count, incErr := s.userRPMCache.IncrementUserGroupRPM(ctx, user.ID, group.ID)
-				if incErr != nil {
-					logger.LegacyPrintf(
-						"service.billing_cache",
-						"Warning: rpm increment (override) failed for user=%d group=%d: %v",
-						user.ID, group.ID, incErr,
-					)
-					// fail-open
-				} else if count > *override {
-					return ErrGroupRPMExceeded
-				}
-			}
-			// override 命中后跳过 group.rpm_limit（override 替代 group），但不 return——继续检查 user 级。
-		} else if group.RPMLimit > 0 {
-			// 无 override，检查 group.rpm_limit。
-			count, err := s.userRPMCache.IncrementUserGroupRPM(ctx, user.ID, group.ID)
-			if err != nil {
-				logger.LegacyPrintf(
-					"service.billing_cache",
-					"Warning: rpm increment (group) failed for user=%d group=%d: %v",
-					user.ID, group.ID, err,
-				)
-				// fail-open
-			} else if count > group.RPMLimit {
-				return ErrGroupRPMExceeded
-			}
-		}
-	}
-
-	// ── 第二层：用户级全局硬上限（始终生效） ──
 	if user.RPMLimit > 0 {
 		count, err := s.userRPMCache.IncrementUserRPM(ctx, user.ID)
 		if err != nil {
@@ -962,7 +858,7 @@ func (s *BillingCacheService) checkBalanceEligibility(ctx context.Context, userI
 }
 
 // checkSubscriptionEligibility 检查订阅模式资格
-func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, userID int64, group *Group, subscription *UserSubscription) error {
+func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, userID int64, subscription *UserSubscription) error {
 	if subscription == nil || subscription.ID <= 0 {
 		return ErrSubscriptionInvalid
 	}
@@ -989,18 +885,18 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 		return ErrSubscriptionInvalid
 	}
 
-	// 检查限额（使用传入的Group限额配置）
+	// Snapshot limits are the only subscription limit source.
 	dailyLimit := subData.DailyLimitUSD
 	if dailyLimit == nil {
-		dailyLimit = subscription.dailyLimitUSD(group)
+		dailyLimit = subscription.dailyLimitUSD()
 	}
 	weeklyLimit := subData.WeeklyLimitUSD
 	if weeklyLimit == nil {
-		weeklyLimit = subscription.weeklyLimitUSD(group)
+		weeklyLimit = subscription.weeklyLimitUSD()
 	}
 	monthlyLimit := subData.MonthlyLimitUSD
 	if monthlyLimit == nil {
-		monthlyLimit = subscription.monthlyLimitUSD(group)
+		monthlyLimit = subscription.monthlyLimitUSD()
 	}
 	if hasUsageLimit(dailyLimit) && subData.DailyUsage >= *dailyLimit {
 		return ErrDailyLimitExceeded

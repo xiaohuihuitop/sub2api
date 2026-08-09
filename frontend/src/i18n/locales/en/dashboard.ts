@@ -17,7 +17,6 @@ export default {
     day: 'Day',
     hour: 'Hour',
     modelDistribution: 'Model Distribution',
-    groupDistribution: 'Group Usage Distribution',
     platformBreakdown: 'Per-platform Breakdown',
     platformBreakdownEmpty: 'No platform usage yet',
     platformCount: '{count} platforms',
@@ -34,8 +33,6 @@ export default {
     tokenUsageTrend: 'Token Usage Trend',
     noDataAvailable: 'No data available',
     model: 'Model',
-    group: 'Group',
-    noGroup: 'No Group',
     requests: 'Requests',
     tokens: 'Tokens',
     actual: 'Actual',
@@ -64,11 +61,6 @@ export default {
     }
   },
 
-  // Groups (shared)
-  groups: {
-    subscription: 'Sub'
-  },
-
   // API Keys
   keys: {
     title: 'API Keys',
@@ -82,7 +74,6 @@ export default {
       clickToCopy: 'Click to copy this endpoint',
       speedTest: 'Speed Test',
     },
-    allGroups: 'All Groups',
     allStatus: 'All Status',
     columnSettings: 'Column Settings',
     columnAlwaysVisible: 'This column is always visible',
@@ -92,12 +83,8 @@ export default {
     deleteConfirmMessage: "Are you sure you want to delete '{name}'? This action cannot be undone.",
     id: 'ID',
     apiKey: 'API Key',
-    group: 'Group',
     authorization: 'Authorization',
     currentConcurrency: 'Current Concurrency',
-    noGroup: 'No group',
-    searchGroup: 'Search groups...',
-    noGroupFound: 'No groups found',
     created: 'Created',
     copyToClipboard: 'Copy to clipboard',
     copied: 'Copied!',
@@ -106,8 +93,6 @@ export default {
     disable: 'Disable',
     nameLabel: 'Name',
     namePlaceholder: 'My API Key',
-    groupLabel: 'Group',
-    selectGroup: 'Select a group',
     platformsLabel: 'Platforms',
     platformsHint: 'Select the platforms this key may schedule.',
     noPlatforms: 'No platforms are available for authorization',
@@ -122,7 +107,6 @@ export default {
     balanceHint: 'When subscriptions are unavailable or exhausted, allow balance charging at the global balance multiplier.',
     balanceEnabled: 'Balance',
     noBillingSource: 'No billing asset authorized',
-    legacyAuthorization: 'Legacy authorization requires selecting a platform again',
     platformRequired: 'Select at least one platform',
     billingSourceRequired: 'Select at least one subscription plan or enable balance charging',
     statusLabel: 'Status',
@@ -139,10 +123,6 @@ export default {
     failedToSave: 'Failed to save API key',
     failedToDelete: 'Failed to delete API key',
     failedToUpdateStatus: 'Failed to update API key status',
-    clickToChangeGroup: 'Click to change group',
-    groupChangedSuccess: 'Group changed successfully',
-    failedToChangeGroup: 'Failed to change group',
-    groupRequired: 'Please select a group',
     usage: 'Usage',
     today: 'Today',
     total: 'Last 30d',
@@ -180,7 +160,7 @@ export default {
         opencode: 'OpenCode',
       },
       antigravity: {
-        description: 'Configure API access for Antigravity group. Select the configuration method based on your client.',
+        description: 'Configure API access for the Antigravity platform. Select the configuration method based on your client.',
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
         claudeNote: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
@@ -192,9 +172,9 @@ export default {
         note: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
       },
       grok: {
-        description: 'Configure Grok Build, Claude Code, Codex, or OpenCode to send requests through your Sub2API Grok group.',
-        claudeDescription: 'Configure Claude Code to send Messages API traffic through your Sub2API Grok group.',
-        codexDescription: 'Configure Codex to send Responses API traffic through your Sub2API Grok group.',
+        description: 'Configure Grok Build, Claude Code, Codex, or OpenCode to send requests through your Sub2API Grok platform.',
+        claudeDescription: 'Configure Claude Code to send Messages API traffic through your Sub2API Grok platform.',
+        codexDescription: 'Configure Codex to send Responses API traffic through your Sub2API Grok platform.',
         configTomlHint: 'Back up an existing config.toml before merging this model entry. Run grok inspect after saving to verify the effective configuration.',
         codexConfigTomlHint: 'Back up an existing config.toml before merging this provider configuration.',
         note: 'Save the file as ~/.grok/config.toml, then run grok inspect and select grok from /model.',
@@ -413,7 +393,7 @@ export default {
     tabs: { usage: 'Usage', errors: 'Error Requests', ranking: 'User Ranking' },
     errors: {
       time: 'Time', model: 'Model', endpoint: 'Endpoint', status: 'Status',
-      category: 'Category', platform: 'Platform', message: 'Message',
+      category: 'Category', platform: 'Platform', routingPlatform: 'Routing Platform', accountPlatform: 'Account Platform', message: 'Message',
       keyName: 'Key Name', keyDeleted: 'Deleted', allKeys: 'All keys',
       modelPlaceholder: 'Search model', allCategories: 'All categories', allStatuses: 'All status codes',
       empty: 'No error requests', failedToLoad: 'Failed to load error requests',
@@ -509,67 +489,29 @@ export default {
     }
   },
 
-  // Available Channels (user-facing)
-  availableChannels: {
-    title: 'Available Channels',
-    description: 'Channels you can access, along with their supported models and pricing',
-    searchPlaceholder: 'Search channels or models...',
-    empty: 'No available channels',
-    noModels: 'No models configured',
-    noPricing: 'Pricing not configured',
-    exclusive: 'Exclusive',
-    public: 'Public',
-    exclusiveTooltip: 'Exclusive groups granted to you by an admin',
-    publicTooltip: 'Groups open to all users',
-    columns: {
-      name: 'Channel',
-      description: 'Description',
-      platform: 'Platform',
-      groups: 'Your Accessible Groups',
-      supportedModels: 'Supported Models'
-    },
-    pricing: {
-      billingMode: 'Billing Mode',
-      billingModeToken: 'Per Token',
-      billingModePerRequest: 'Per Request',
-      billingModeImage: 'Per Image',
-      billingModeVideo: 'Per Video',
-      inputPrice: 'Input',
-      outputPrice: 'Output',
-      cacheWritePrice: 'Cache Write',
-      cacheReadPrice: 'Cache Read',
-      imageInputPrice: 'Image Input',
-      imageOutputPrice: 'Image Output',
-      perRequestPrice: 'Per Request',
-      intervals: 'Tiered Pricing',
-      unitPerMillion: '/ 1M tokens',
-      unitPerRequest: '/ request'
-    }
-  },
 
-  // Model Plaza (public group/model pricing showcase)
+  // Model Plaza (public platform/model pricing showcase)
   modelPlaza: {
     title: 'Model Plaza',
-    description: 'Browse available models and balance pricing by group',
+    description: 'Browse available models and reference prices by platform',
     loading: 'Loading...',
-    empty: 'No groups to display',
+    empty: 'No platforms to display',
     loadFailed: 'Failed to load model plaza',
     noSearchResult: 'No matching models',
-    anonymousHint: 'Sign in to see your exclusive groups',
+    anonymousHint: 'Platform model rules are managed centrally',
     filters: {
       platformLabel: 'Platform',
-      groupLabel: 'Group',
-      rateLabel: 'Balance Rate',
+      rateLabel: 'Price',
       modelLabel: 'Model',
       searchPlaceholder: 'Search models',
       all: 'All'
     },
     badges: {
-      exclusive: 'Exclusive',
-      subscription: 'Subscription'
+      exclusive: 'Platform pool',
+      subscription: 'Plan'
     },
     detail: {
-      noModels: 'No models configured for this group',
+      noModels: 'No models configured for this platform',
       noPricing: 'Pricing not configured',
       peakNote: 'Balance peak hours {window}: billing rate ×{multiplier}'
     },
@@ -580,9 +522,9 @@ export default {
       cache: 'Cache',
       cacheWrite: 'Write',
       cacheRead: 'Read',
-      balancePrice: 'Balance Price',
+      balancePrice: 'Reference Price',
       officialPrice: 'Official Price',
-      balanceRate: 'Balance Rate',
+      balanceRate: 'Rate',
       unitPerMillion: '$ / 1M tokens',
       perUnitRequest: '/ request',
       perUnitImage: '/ image',
@@ -676,7 +618,6 @@ export default {
     concurrencyReducedAdmin: 'Concurrency Reduced (Admin)',
     adminAdjustment: 'Admin Adjustment',
     subscriptionAssigned: 'Subscription Assigned',
-    subscriptionAssignedDesc: 'You have been granted access to {groupName}',
     subscriptionDays: '{days} days',
     days: ' days',
     codeRedeemSuccess: 'Code redeemed successfully!',

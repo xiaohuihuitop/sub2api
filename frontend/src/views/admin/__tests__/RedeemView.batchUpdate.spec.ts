@@ -165,7 +165,6 @@ describe('admin RedeemView batch update', () => {
       data: [
         {
           id: 9,
-          group_id: 3,
           name: 'Professional',
           description: '',
           rate_multiplier: 1.25,

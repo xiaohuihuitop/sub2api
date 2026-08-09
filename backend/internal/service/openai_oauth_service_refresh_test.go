@@ -190,7 +190,8 @@ func TestOpenAITokenRefresher_Refresh_PATRemovesStaleOAuthFields(t *testing.T) {
 	require.NotContains(t, credentials, "expires_at")
 	require.NotContains(t, credentials, "expires_in")
 	require.NotContains(t, credentials, "client_id")
-	require.Equal(t, map[string]any{"gpt-5": "gpt-5-codex"}, credentials["model_mapping"])
+	// 普通账号模型映射属于已移除的旧配置；PAT 刷新不能把它重新写回。
+	require.NotContains(t, credentials, "model_mapping")
 }
 
 func TestOpenAITokenProvider_NoRefreshTokenExpiredAccessTokenReturnsError(t *testing.T) {

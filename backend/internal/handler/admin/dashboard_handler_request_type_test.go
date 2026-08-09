@@ -28,7 +28,7 @@ func (s *dashboardUsageRepoCapture) GetUsageTrendWithFilters(
 	ctx context.Context,
 	startTime, endTime time.Time,
 	granularity string,
-	userID, apiKeyID, accountID, groupID int64,
+	userID, apiKeyID, accountID, platformID int64,
 	model string,
 	requestType *int16,
 	stream *bool,
@@ -42,7 +42,7 @@ func (s *dashboardUsageRepoCapture) GetUsageTrendWithFilters(
 func (s *dashboardUsageRepoCapture) GetModelStatsWithFilters(
 	ctx context.Context,
 	startTime, endTime time.Time,
-	userID, apiKeyID, accountID, groupID int64,
+	userID, apiKeyID, accountID, platformID int64,
 	requestType *int16,
 	stream *bool,
 	billingType *int8,
