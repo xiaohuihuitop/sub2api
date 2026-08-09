@@ -31,7 +31,7 @@ func (r *opsRepository) UpsertHourlyMetrics(ctx context.Context, startTime, endT
 WITH usage_base AS (
   SELECT
     date_trunc('hour', ul.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS bucket_start,
-    g.platform AS platform,
+    g.account_platform AS platform,
     ul.platform_id AS platform_id,
     ul.duration_ms AS duration_ms,
     ul.first_token_ms AS first_token_ms,

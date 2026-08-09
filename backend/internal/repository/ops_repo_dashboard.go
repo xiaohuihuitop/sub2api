@@ -997,11 +997,11 @@ func buildUsageWhere(filter *service.OpsDashboardFilter, start, end time.Time, s
 		idx++
 	}
 	if platform != "" {
-		// Prefer the selected platform asset type; fall back to account.platform so we don't
+		// Prefer the selected platform asset adapter; fall back to account.platform so we don't
 		// drop rows where platform_id is NULL.
 		join = "LEFT JOIN platforms g ON g.id = ul.platform_id LEFT JOIN accounts a ON a.id = ul.account_id"
 		args = append(args, platform)
-		clauses = append(clauses, fmt.Sprintf("COALESCE(NULLIF(g.platform,''), a.platform) = $%d", idx))
+		clauses = append(clauses, fmt.Sprintf("COALESCE(NULLIF(g.account_platform,''), a.platform) = $%d", idx))
 		idx++
 	}
 

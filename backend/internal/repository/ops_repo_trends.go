@@ -187,7 +187,7 @@ ORDER BY bucket ASC`
 func (r *opsRepository) getThroughputBreakdownByPlatform(ctx context.Context, start, end time.Time) ([]*service.OpsThroughputPlatformBreakdownItem, error) {
 	q := `
 WITH usage_totals AS (
-  SELECT COALESCE(NULLIF(g.platform,''), a.platform) AS platform,
+  SELECT COALESCE(NULLIF(g.account_platform,''), a.platform) AS platform,
          COUNT(*) AS success_count,
          COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS token_consumed
   FROM usage_logs ul
@@ -265,7 +265,7 @@ WITH usage_totals AS (
   FROM usage_logs ul
   JOIN platforms g ON g.id = ul.platform_id
   WHERE ul.created_at >= $1 AND ul.created_at < $2
-    AND g.platform = $3
+    AND g.account_platform = $3
   GROUP BY 1, 2
 ),
 error_totals AS (
