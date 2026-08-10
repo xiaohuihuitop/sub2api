@@ -6,14 +6,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Wei-Shaw/sub2api/internal/productcore"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDispatchIntentContextRoundTripsIndependentCopies(t *testing.T) {
 	intent := &DispatchIntent{
-		Platform:     productcore.Platform{ID: 3, EndpointCapabilities: []string{"responses"}},
-		BillingAsset: &productcore.BillingAsset{Source: "balance", RateMultiplier: 1.25},
+		Platform: PlatformRoute{ID: 3, EndpointCapabilities: []string{"responses"}},
 	}
 	ctx := WithDispatchIntent(context.Background(), intent)
 	intent.Platform.EndpointCapabilities[0] = "mutated-before-read"
@@ -28,11 +26,11 @@ func TestDispatchIntentContextRoundTripsIndependentCopies(t *testing.T) {
 	require.Equal(t, "responses", second.Platform.EndpointCapabilities[0])
 }
 
-func TestDispatchIntentAllowsNilBillingAsset(t *testing.T) {
+func TestDispatchIntentCarriesOnlyRuntimeRoute(t *testing.T) {
 	ctx := WithDispatchIntent(context.Background(), &DispatchIntent{
-		Platform: productcore.Platform{ID: 3},
+		Platform: PlatformRoute{ID: 3},
 	})
 	got, ok := DispatchIntentFromContext(ctx)
 	require.True(t, ok)
-	require.Nil(t, got.BillingAsset)
+	require.Equal(t, int64(3), got.Platform.ID)
 }

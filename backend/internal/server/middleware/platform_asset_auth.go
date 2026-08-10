@@ -139,6 +139,7 @@ func platformAssetRequestCarriesModel(c *gin.Context) bool {
 		strings.Contains(path, "/alpha/search") ||
 		strings.Contains(path, "/images/") ||
 		strings.Contains(path, "/videos/") ||
+		strings.Contains(path, "/live") ||
 		strings.Contains(path, "/realtime/calls")
 }
 

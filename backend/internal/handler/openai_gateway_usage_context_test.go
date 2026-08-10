@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,21 @@ func TestOpenAISubmitUsageRecordTaskCopiesRequestContext(t *testing.T) {
 	require.Equal(t, "openai-client-request-123", gotClientRequestID)
 	require.Equal(t, "openai-request-456", gotRequestID)
 }
+
+func TestOpenAISubmitUsageRecordTaskPreservesRuntimeUsageSink(t *testing.T) {
+	parent := gatewayruntime.WithUsageSink(context.Background(), recordingUsageSink{})
+	var got gatewayruntime.UsageSink
+	h := &OpenAIGatewayHandler{}
+	h.submitUsageRecordTask(parent, func(ctx context.Context) {
+		got, _ = gatewayruntime.UsageSinkFromContext(ctx)
+	})
+
+	require.NotNil(t, got)
+}
+
+type recordingUsageSink struct{}
+
+func (recordingUsageSink) RecordFinal(context.Context, gatewayruntime.UsageEvent) error { return nil }
 
 func TestOpenAISubmitUsageRecordTaskPreservesPlatformAssetContext(t *testing.T) {
 	platformID := int64(42)

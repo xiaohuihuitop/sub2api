@@ -12,7 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/applicationgateway"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -42,11 +44,19 @@ type OpenAIGatewayHandler struct {
 	imageLimiter               *imageConcurrencyLimiter
 	maxAccountSwitches         int
 	cfg                        *config.Config
+	applicationGateway         *applicationgateway.Gateway
 }
 
 type openAIWSTurnModelMappingSnapshot struct {
 	turn    int
 	mapping service.ModelMappingResult
+}
+
+// SetApplicationGateway installs the shared production runtime entrypoint.
+func (h *OpenAIGatewayHandler) SetApplicationGateway(gateway *applicationgateway.Gateway) {
+	if h != nil {
+		h.applicationGateway = gateway
+	}
 }
 
 var errOpenAIWSUnsupportedModelSwitch = errors.New("selected account does not support websocket model switch")
@@ -153,6 +163,9 @@ func usageRecordContext(parent context.Context, base context.Context) context.Co
 	if requestID, _ := parent.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
 		base = context.WithValue(base, ctxkey.RequestID, strings.TrimSpace(requestID))
 	}
+	if sink, ok := gatewayruntime.UsageSinkFromContext(parent); ok {
+		base = gatewayruntime.WithUsageSink(base, sink)
+	}
 	return base
 }
 
@@ -229,6 +242,10 @@ func NewOpenAIGatewayHandler(
 // Responses handles OpenAI Responses API endpoint
 // POST /openai/v1/responses
 func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointResponses, h.legacyResponses)
+}
+
+func (h *OpenAIGatewayHandler) legacyResponses(c *gin.Context) {
 	// 局部兜底：确保该 handler 内部任何 panic 都不会击穿到进程级。
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
@@ -668,7 +685,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
 		cyberBlocked := service.GetOpsCyberPolicy(c) != nil
 		h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+			if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 				Result:                  result,
 				APIKey:                  apiKey,
 				User:                    apiKey.User,
@@ -853,6 +870,10 @@ func (h *OpenAIGatewayHandler) logOpenAIRemoteCompactOutcome(c *gin.Context, sta
 // Messages handles Anthropic Messages API requests routed to OpenAI platform.
 // POST /v1/messages (when the resolved account platform is OpenAI)
 func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointMessages, h.legacyMessages)
+}
+
+func (h *OpenAIGatewayHandler) legacyMessages(c *gin.Context) {
 	streamStarted := false
 	defer h.recoverAnthropicMessagesPanic(c, &streamStarted)
 
@@ -1173,7 +1194,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		cyberBlocked := service.GetOpsCyberPolicy(c) != nil
 		h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+			if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 				Result:                  result,
 				APIKey:                  apiKey,
 				User:                    apiKey.User,
@@ -1934,7 +1955,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				sessionID := service.ExtractClientSessionID(c)
 				cyberBlocked := service.GetOpsCyberPolicy(c) != nil
 				h.submitOpenAIUsageRecordTask(ctx, result, func(taskCtx context.Context) {
-					if err := h.gatewayService.RecordUsage(taskCtx, &service.OpenAIRecordUsageInput{
+					if err := recordOpenAIUsage(taskCtx, h.gatewayService, &service.OpenAIRecordUsageInput{
 						Result:                  result,
 						APIKey:                  apiKey,
 						User:                    apiKey.User,
@@ -2147,6 +2168,13 @@ func (h *OpenAIGatewayHandler) submitUsageRecordTask(parent context.Context, tas
 		return
 	}
 	task = wrapUsageRecordTaskContext(parent, task)
+	if sink, ok := gatewayruntime.UsageSinkFromContext(parent); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		ctx = gatewayruntime.WithUsageSink(ctx, sink)
+		task(ctx)
+		return
+	}
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); mode != service.UsageRecordSubmitModeDroppedStopped {
 			return
@@ -2184,6 +2212,12 @@ func (h *OpenAIGatewayHandler) submitMandatoryUsageRecordTask(parent context.Con
 		return
 	}
 	task = wrapUsageRecordTaskContext(parent, task)
+	if _, ok := gatewayruntime.UsageSinkFromContext(parent); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		task(ctx)
+		return
+	}
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); !mode.Dropped() {
 			return

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -19,6 +20,10 @@ import (
 
 // GrokImages handles xAI image generation/editing through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokImages(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointImages, h.legacyGrokImages)
+}
+
+func (h *OpenAIGatewayHandler) legacyGrokImages(c *gin.Context) {
 	endpoint := service.GrokMediaEndpointImagesGenerations
 	if strings.Contains(c.Request.URL.Path, "/images/edits") {
 		endpoint = service.GrokMediaEndpointImagesEdits
@@ -28,16 +33,28 @@ func (h *OpenAIGatewayHandler) GrokImages(c *gin.Context) {
 
 // GrokVideoGeneration handles xAI video generation through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoGeneration(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointVideos, h.legacyGrokVideoGeneration)
+}
+
+func (h *OpenAIGatewayHandler) legacyGrokVideoGeneration(c *gin.Context) {
 	h.handleGrokMedia(c, service.GrokMediaEndpointVideosGenerations, "")
 }
 
 // GrokVideoEdit handles asynchronous xAI video edits through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoEdit(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointVideos, h.legacyGrokVideoEdit)
+}
+
+func (h *OpenAIGatewayHandler) legacyGrokVideoEdit(c *gin.Context) {
 	h.handleGrokMedia(c, service.GrokMediaEndpointVideosEdits, "")
 }
 
 // GrokVideoExtension handles asynchronous xAI video extensions through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoExtension(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointVideos, h.legacyGrokVideoExtension)
+}
+
+func (h *OpenAIGatewayHandler) legacyGrokVideoExtension(c *gin.Context) {
 	h.handleGrokMedia(c, service.GrokMediaEndpointVideosExtensions, "")
 }
 
@@ -477,7 +494,7 @@ func recordGrokMediaUsage(
 		MappedModel:   requestModel,
 	}
 	h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
-		if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+		if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 			Result:                  result,
 			APIKey:                  apiKey,
 			User:                    apiKey.User,

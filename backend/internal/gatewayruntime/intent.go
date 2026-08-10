@@ -1,14 +1,9 @@
 package gatewayruntime
 
-import (
-	"context"
-
-	"github.com/Wei-Shaw/sub2api/internal/productcore"
-)
+import "context"
 
 type DispatchIntent struct {
-	Platform     productcore.Platform
-	BillingAsset *productcore.BillingAsset
+	Platform PlatformRoute
 }
 
 type dispatchIntentContextKey struct{}
@@ -36,32 +31,14 @@ func cloneIntent(intent *DispatchIntent) *DispatchIntent {
 		return nil
 	}
 	return &DispatchIntent{
-		Platform: productcore.Platform{
+		Platform: PlatformRoute{
 			ID:                   intent.Platform.ID,
 			Code:                 intent.Platform.Code,
-			AccountPlatform:      intent.Platform.AccountPlatform,
+			Adapter:              intent.Platform.Adapter,
 			RequestedModel:       intent.Platform.RequestedModel,
 			UpstreamModel:        intent.Platform.UpstreamModel,
 			EndpointCapabilities: append([]string(nil), intent.Platform.EndpointCapabilities...),
+			MatchPriority:        intent.Platform.MatchPriority,
 		},
-		BillingAsset: cloneBillingAsset(intent.BillingAsset),
 	}
-}
-
-func cloneBillingAsset(asset *productcore.BillingAsset) *productcore.BillingAsset {
-	if asset == nil {
-		return nil
-	}
-	cloned := *asset
-	cloned.SubscriptionID = cloneInt64(asset.SubscriptionID)
-	cloned.PlanID = cloneInt64(asset.PlanID)
-	return &cloned
-}
-
-func cloneInt64(value *int64) *int64 {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }

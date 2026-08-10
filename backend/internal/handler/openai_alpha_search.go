@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -20,6 +21,10 @@ import (
 
 // AlphaSearch proxies the standalone search endpoint used by Codex Responses Lite.
 func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointAlphaSearch, h.legacyAlphaSearch)
+}
+
+func (h *OpenAIGatewayHandler) legacyAlphaSearch(c *gin.Context) {
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
 	setOpenAIClientTransportHTTP(c)
@@ -240,7 +245,7 @@ func (h *OpenAIGatewayHandler) recordAlphaSearchUsage(
 	quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 
 	h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-		if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+		if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 			Result:                  result,
 			APIKey:                  apiKey,
 			User:                    apiKey.User,

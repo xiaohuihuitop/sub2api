@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -20,6 +21,21 @@ import (
 // This converts Responses API requests to Anthropic format, forwards to Anthropic
 // upstream, and converts responses back to Responses format.
 func (h *GatewayHandler) Responses(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointResponses, h.legacyResponses)
+}
+
+func (h *GatewayHandler) legacyResponses(c *gin.Context) {
+	(sub2APIMessagesExecutor{
+		gatewayHandler: h,
+		endpoint:       gatewayruntime.EndpointResponses,
+	}).executeResponses(c, nil)
+}
+
+func (e sub2APIMessagesExecutor) executeResponses(c *gin.Context, usageSink gatewayruntime.UsageSink) {
+	h := e.gatewayHandler
+	if h == nil {
+		return
+	}
 	streamStarted := false
 
 	requestStart := time.Now()
@@ -280,7 +296,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 		sessionID := service.ExtractClientSessionID(c)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+			if err := recordGatewayExecutorUsage(ctx, usageSink, h.gatewayService, &service.RecordUsageInput{
 				Result:                  result,
 				QuotaPlatform:           quotaPlatform,
 				APIKey:                  apiKey,

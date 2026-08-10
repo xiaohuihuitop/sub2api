@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/gemini"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
@@ -143,6 +144,10 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 // POST /v1beta/models/{model}:generateContent
 // POST /v1beta/models/{model}:streamGenerateContent?alt=sse
 func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointGeminiNative, h.legacyGeminiV1BetaModels)
+}
+
+func (h *GatewayHandler) legacyGeminiV1BetaModels(c *gin.Context) {
 	apiKey, ok := middleware.GetAPIKeyFromContext(c)
 	if !ok || apiKey == nil {
 		googleError(c, http.StatusUnauthorized, "Invalid API key")
@@ -542,7 +547,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 		sessionID := service.ExtractClientSessionID(c)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsageWithLongContext(ctx, &service.RecordUsageLongContextInput{
+			if err := recordGatewayLongContextUsage(ctx, h.gatewayService, &service.RecordUsageLongContextInput{
 				Result:                  result,
 				QuotaPlatform:           quotaPlatform,
 				APIKey:                  apiKey,

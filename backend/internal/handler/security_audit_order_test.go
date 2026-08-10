@@ -20,17 +20,17 @@ type promptAuditOrderCase struct {
 
 func TestPromptAuditGatePrecedesAccountBillingAndUpstreamSideEffects(t *testing.T) {
 	tests := []promptAuditOrderCase{
-		{file: "gateway_handler.go", function: "Messages", auditToken: "checkSecurityAudit"},
-		{file: "gateway_handler_chat_completions.go", function: "ChatCompletions", auditToken: "checkSecurityAudit"},
-		{file: "gateway_handler_responses.go", function: "Responses", auditToken: "checkSecurityAudit"},
-		{file: "gemini_v1beta_handler.go", function: "GeminiV1BetaModels", auditToken: "checkSecurityAudit"},
-		{file: "openai_gateway_handler.go", function: "Responses", auditToken: "checkSecurityAudit"},
-		{file: "openai_gateway_handler.go", function: "Messages", auditToken: "checkSecurityAudit"},
-		{file: "openai_chat_completions.go", function: "ChatCompletions", auditToken: "checkSecurityAudit"},
-		{file: "openai_images.go", function: "Images", auditToken: "checkSecurityAudit"},
+		{file: "gateway_handler.go", function: "executeMessages", auditToken: "checkSecurityAudit"},
+		{file: "gateway_handler_chat_completions.go", function: "executeChatCompletions", auditToken: "checkSecurityAudit"},
+		{file: "gateway_handler_responses.go", function: "executeResponses", auditToken: "checkSecurityAudit"},
+		{file: "gemini_v1beta_handler.go", function: "legacyGeminiV1BetaModels", auditToken: "checkSecurityAudit"},
+		{file: "openai_gateway_handler.go", function: "legacyResponses", auditToken: "checkSecurityAudit"},
+		{file: "openai_gateway_handler.go", function: "legacyMessages", auditToken: "checkSecurityAudit"},
+		{file: "openai_chat_completions.go", function: "legacyChatCompletions", auditToken: "checkSecurityAudit"},
+		{file: "openai_images.go", function: "legacyImages", auditToken: "checkSecurityAudit"},
 		{file: "grok_media.go", function: "handleGrokMedia", auditToken: "checkSecurityAudit"},
-		{file: "openai_embeddings.go", function: "Embeddings", auditToken: "checkSecurityAudit"},
-		{file: "openai_alpha_search.go", function: "AlphaSearch", auditToken: "checkSecurityAudit"},
+		{file: "openai_embeddings.go", function: "legacyEmbeddings", auditToken: "checkSecurityAudit"},
+		{file: "openai_alpha_search.go", function: "legacyAlphaSearch", auditToken: "checkSecurityAudit"},
 		{file: "image_task_handler.go", function: "Submit", auditToken: "checkSecurityAuditBeforeSubmit"},
 		{file: "batch_image_handler.go", function: "Submit", auditToken: "checkSecurityAuditBeforeSubmit"},
 	}

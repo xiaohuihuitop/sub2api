@@ -13,8 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/applicationgateway"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	pkgerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -62,6 +64,23 @@ type GatewayHandler struct {
 	cfg                       *config.Config
 	settingService            *service.SettingService
 	platformModels            authorizedPlatformModelLister
+	applicationGateway        *applicationgateway.Gateway
+}
+
+// Messages is the single public ApplicationGateway entry for the Claude
+// compatible endpoint. Authenticated Gateway execution is owned by the
+// sub2APIMessagesExecutor.
+func (h *GatewayHandler) Messages(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointMessages, h.legacyMessages)
+}
+
+// SetApplicationGateway installs the single production runtime entrypoint.
+// It is kept as a small composition hook so Wire can construct both protocol
+// handlers before sharing one adapter instance.
+func (h *GatewayHandler) SetApplicationGateway(gateway *applicationgateway.Gateway) {
+	if h != nil {
+		h.applicationGateway = gateway
+	}
 }
 
 // NewGatewayHandler creates a new GatewayHandler
@@ -126,7 +145,18 @@ func NewGatewayHandler(
 
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
-func (h *GatewayHandler) Messages(c *gin.Context) {
+func (h *GatewayHandler) legacyMessages(c *gin.Context) {
+	(sub2APIMessagesExecutor{
+		gatewayHandler: h,
+		endpoint:       gatewayruntime.EndpointMessages,
+	}).executeMessages(c, nil)
+}
+
+func (e sub2APIMessagesExecutor) executeMessages(c *gin.Context, usageSink gatewayruntime.UsageSink) {
+	h := e.gatewayHandler
+	if h == nil {
+		return
+	}
 	// 浠巆ontext鑾峰彇apiKey鍜寀ser锛圓piKeyAuth涓棿浠跺凡璁剧疆锛?
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
@@ -542,7 +572,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 			sessionID := service.ExtractClientSessionID(c)
 			h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+				if err := recordGatewayExecutorUsage(ctx, usageSink, h.gatewayService, &service.RecordUsageInput{
 					Result:                  result,
 					QuotaPlatform:           quotaPlatform,
 					APIKey:                  apiKey,
@@ -856,7 +886,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				quotaPlatform := service.QuotaPlatform(c.Request.Context(), currentAPIKey)
 				sessionID := service.ExtractClientSessionID(c)
 				h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+					if err := recordGatewayExecutorUsage(ctx, usageSink, h.gatewayService, &service.RecordUsageInput{
 						Result:                  result,
 						QuotaPlatform:           quotaPlatform,
 						APIKey:                  currentAPIKey,
@@ -1783,6 +1813,10 @@ func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, mess
 // POST /v1/messages/count_tokens
 // 鐗圭偣锛氭牎楠岃闃?浣欓锛屼絾涓嶈绠楀苟鍙戙€佷笉璁板綍浣跨敤閲?
 func (h *GatewayHandler) CountTokens(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointCountTokens, h.legacyCountTokens)
+}
+
+func (h *GatewayHandler) legacyCountTokens(c *gin.Context) {
 	// 浠巆ontext鑾峰彇apiKey鍜寀ser锛圓piKeyAuth涓棿浠跺凡璁剧疆锛?
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
@@ -2200,6 +2234,13 @@ func (h *GatewayHandler) submitUsageRecordTask(parent context.Context, task serv
 		return
 	}
 	task = wrapUsageRecordTaskContext(parent, task)
+	if sink, ok := gatewayruntime.UsageSinkFromContext(parent); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		ctx = gatewayruntime.WithUsageSink(ctx, sink)
+		task(ctx)
+		return
+	}
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); mode != service.UsageRecordSubmitModeDroppedStopped {
 			return

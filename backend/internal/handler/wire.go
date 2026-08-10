@@ -208,6 +208,9 @@ func ProvideHandlers(
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
+	productionGateway := NewSub2APIProductionApplicationGateway(gatewayHandler, openaiGatewayHandler, apiKeyHandler.apiKeyService)
+	gatewayHandler.SetApplicationGateway(productionGateway)
+	openaiGatewayHandler.SetApplicationGateway(productionGateway)
 	return &Handlers{
 		Auth:              authHandler,
 		User:              userHandler,

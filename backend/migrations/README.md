@@ -12,6 +12,22 @@ Format: `NNN_description.sql`
 
 Example: `017_add_gemini_tier_id.sql`
 
+## My2.0 namespace boundary
+
+Migration files `001-200` are published history and are immutable. Do not
+edit, rename, or reuse those files; the architecture test pins the SHA256
+checksums for `192-200`.
+
+When synchronizing upstream Sub2API changes, first classify the change and
+adapt it to the current Platform schema. Runtime-only changes use the
+`8000-8999` namespace and should include the upstream short hash in the file
+name. ProductCore-owned schema changes use `9000-9999`. Numbers `201-7999`
+are reserved. New migrations must not recreate the removed Group/Channel
+tables or their authorization join tables.
+
+This namespace is a synchronization boundary, not a second migration runner:
+the existing runner still applies all SQL files in numeric order.
+
 ### `_notx.sql` 命名与执行语义（并发索引专用）
 
 当迁移包含 `CREATE INDEX CONCURRENTLY` 或 `DROP INDEX CONCURRENTLY` 时，必须使用 `_notx.sql` 后缀，例如：

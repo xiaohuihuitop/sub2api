@@ -295,6 +295,16 @@ func SetActualOpenAIUpstreamEndpoint(c *gin.Context, endpoint string) {
 	}
 }
 
+// ClearActualOpenAIUpstreamEndpoint prevents a failed protocol attempt from
+// leaking its marker into the next account or conversion path on the same Gin
+// context. Each forwarding entrypoint sets the marker again before sending.
+func ClearActualOpenAIUpstreamEndpoint(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	c.Set(openAIUpstreamEndpointContextKey, "")
+}
+
 // GetActualOpenAIUpstreamEndpoint returns the endpoint recorded by the latest
 // forwarding attempt in this request.
 func GetActualOpenAIUpstreamEndpoint(c *gin.Context) string {

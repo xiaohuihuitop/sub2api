@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
@@ -21,6 +22,14 @@ import (
 // ChatCompletions handles OpenAI Chat Completions API requests.
 // POST /v1/chat/completions
 func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
+	if shouldPreserveDirectImageRejection(c) {
+		h.legacyChatCompletions(c)
+		return
+	}
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointChatCompletions, h.legacyChatCompletions)
+}
+
+func (h *OpenAIGatewayHandler) legacyChatCompletions(c *gin.Context) {
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
 
@@ -339,7 +348,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 
 		cyberBlocked := service.GetOpsCyberPolicy(c) != nil
 		h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+			if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 				Result:                  result,
 				APIKey:                  apiKey,
 				User:                    apiKey.User,

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -21,6 +22,10 @@ import (
 // Embeddings handles the OpenAI-compatible Embeddings API.
 // POST /v1/embeddings
 func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointEmbeddings, h.legacyEmbeddings)
+}
+
+func (h *OpenAIGatewayHandler) legacyEmbeddings(c *gin.Context) {
 	streamStarted := false
 	requestStart := time.Now()
 
@@ -246,7 +251,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 		sessionID := service.ExtractClientSessionID(c)
 
 		h.submitOpenAIUsageRecordTask(c.Request.Context(), result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+			if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 				Result:                  result,
 				APIKey:                  apiKey,
 				User:                    apiKey.User,

@@ -119,6 +119,15 @@ func TestPlatformAssetAuthorizationBuildsExplicitPlatformRouteAndPreservesBody(t
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
+func TestPlatformAssetRequestCarriesModelForLiveCreateOnly(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/live", strings.NewReader(`{"model":"gpt-5.6"}`))
+	require.True(t, platformAssetRequestCarriesModel(c))
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/live/call-1", nil)
+	require.False(t, platformAssetRequestCarriesModel(c))
+}
+
 func TestPlatformAssetAuthorizationRejectsKeyWithoutPlatformGrant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{RunMode: config.RunModeStandard}

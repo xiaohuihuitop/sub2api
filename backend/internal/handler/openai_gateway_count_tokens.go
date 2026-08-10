@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -17,6 +18,10 @@ import (
 // The route middleware already authenticates the API key and resolves the
 // group; this handler intentionally does not select an account or check billing.
 func (h *OpenAIGatewayHandler) GrokCountTokens(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointCountTokens, h.legacyGrokCountTokens)
+}
+
+func (h *OpenAIGatewayHandler) legacyGrokCountTokens(c *gin.Context) {
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
@@ -59,6 +64,10 @@ func (h *OpenAIGatewayHandler) GrokCountTokens(c *gin.Context) {
 // It validates billing and routes to an OpenAI token-count bridge without taking concurrency slots
 // or recording usage.
 func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointCountTokens, h.legacyCountTokens)
+}
+
+func (h *OpenAIGatewayHandler) legacyCountTokens(c *gin.Context) {
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
 		h.anthropicErrorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -20,6 +21,25 @@ import (
 // This converts Chat Completions requests to Anthropic format (via Responses format chain),
 // forwards to Anthropic upstream, and converts responses back to Chat Completions format.
 func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
+	if shouldPreserveDirectImageRejection(c) {
+		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "This model is not supported on the Chat Completions endpoint")
+		return
+	}
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointChatCompletions, h.legacyChatCompletions)
+}
+
+func (h *GatewayHandler) legacyChatCompletions(c *gin.Context) {
+	(sub2APIMessagesExecutor{
+		gatewayHandler: h,
+		endpoint:       gatewayruntime.EndpointChatCompletions,
+	}).executeChatCompletions(c, nil)
+}
+
+func (e sub2APIMessagesExecutor) executeChatCompletions(c *gin.Context, usageSink gatewayruntime.UsageSink) {
+	h := e.gatewayHandler
+	if h == nil {
+		return
+	}
 	streamStarted := false
 
 	requestStart := time.Now()
@@ -304,7 +324,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 		sessionID := service.ExtractClientSessionID(c)
 		h.submitUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+			if err := recordGatewayExecutorUsage(ctx, usageSink, h.gatewayService, &service.RecordUsageInput{
 				Result:                  result,
 				QuotaPlatform:           quotaPlatform,
 				APIKey:                  apiKey,

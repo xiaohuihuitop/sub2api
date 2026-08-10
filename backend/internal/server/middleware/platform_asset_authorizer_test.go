@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/productcore"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -72,9 +71,9 @@ func TestPlatformAssetAuthorizationUsesFacadeAndKeepsSubscriptionContext(t *test
 		body, err := io.ReadAll(c.Request.Body)
 		require.NoError(t, err)
 		require.JSONEq(t, `{"model":"gpt-4o"}`, string(body))
-		intent, ok := gatewayruntime.DispatchIntentFromContext(c.Request.Context())
+		route, ok := service.GatewayPlatformAssetContextFromContext(c.Request.Context())
 		require.True(t, ok)
-		require.Equal(t, int64(3), intent.Platform.ID)
+		require.Equal(t, int64(3), route.Platform.PlatformID)
 		gotSubscription, ok := GetSubscriptionFromContext(c)
 		require.True(t, ok)
 		require.Same(t, subscription, gotSubscription)

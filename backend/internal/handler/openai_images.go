@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -21,6 +22,10 @@ import (
 // POST /v1/images/generations
 // POST /v1/images/edits
 func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
+	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointImages, h.legacyImages)
+}
+
+func (h *OpenAIGatewayHandler) legacyImages(c *gin.Context) {
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
 
@@ -374,7 +379,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		}
 		sessionID := service.ExtractClientSessionID(c)
 		h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+			if err := recordOpenAIUsage(ctx, h.gatewayService, &service.OpenAIRecordUsageInput{
 				Result:                  result,
 				APIKey:                  apiKey,
 				User:                    apiKey.User,

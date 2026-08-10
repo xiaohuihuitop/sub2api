@@ -201,3 +201,76 @@ func scanFrontendProductionSource(root string) []string {
 	})
 	return violations
 }
+
+func TestProductCoreAndRuntimeContractsDoNotImportApplicationFrameworks(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve architecture test path")
+	}
+	backendRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
+	forbiddenBase := map[string]struct{}{
+		"github.com/gin-gonic/gin":                     {},
+		"entgo.io/ent":                                 {},
+		"github.com/Wei-Shaw/sub2api/ent":              {},
+		"github.com/Wei-Shaw/sub2api/internal/service": {},
+		"github.com/Wei-Shaw/sub2api/internal/server":  {},
+	}
+	forbiddenByRoot := map[string]map[string]struct{}{
+		"internal/productcore":        forbiddenBase,
+		"internal/gatewayruntime":     withForbidden(forbiddenBase, "github.com/Wei-Shaw/sub2api/internal/productcore"),
+		"internal/applicationgateway": forbiddenBase,
+	}
+
+	for _, relativeRoot := range []string{"internal/productcore", "internal/gatewayruntime", "internal/applicationgateway"} {
+		root := filepath.Join(backendRoot, relativeRoot)
+		forbidden := forbiddenByRoot[relativeRoot]
+		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return walkErr
+			}
+			file, parseErr := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+			if parseErr != nil {
+				return parseErr
+			}
+			for _, imported := range file.Imports {
+				pathValue, unquoteErr := strconv.Unquote(imported.Path.Value)
+				if unquoteErr != nil {
+					return unquoteErr
+				}
+				if _, blocked := forbidden[pathValue]; blocked {
+					t.Errorf("%s imports forbidden boundary package %s", path, pathValue)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("scan %s: %v", root, err)
+		}
+	}
+}
+
+func withForbidden(base map[string]struct{}, values ...string) map[string]struct{} {
+	result := make(map[string]struct{}, len(base)+len(values))
+	for key := range base {
+		result[key] = struct{}{}
+	}
+	for _, value := range values {
+		result[value] = struct{}{}
+	}
+	return result
+}
+
+func TestRuntimeRouteDoesNotDualWriteDispatchIntent(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve architecture test path")
+	}
+	path := filepath.Join(filepath.Dir(filename), "..", "service", "gateway_runtime_bridge.go")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(content), "WithDispatchIntent") || strings.Contains(string(content), "DispatchIntentFromContext") {
+		t.Fatal("gateway runtime bridge still dual-writes or reconstructs legacy DispatchIntent")
+	}
+}
