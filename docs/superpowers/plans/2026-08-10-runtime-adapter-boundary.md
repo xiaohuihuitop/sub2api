@@ -832,7 +832,7 @@ Expected: workflow success；tar 可加载；镜像架构为 `linux/amd64`。
 - Task 5-8：Messages、Chat/Responses 兼容入口、Gemini/媒体/CountTokens/Live 等模型相关入口已接入统一 Adapter；账号探测保留为独立能力适配器。
 - Task 9-10：生产入口统一走 ApplicationGateway，迁移命名空间与已发布 migration checksum 守卫已验证；无模型的 Live sideband、WebSocket 和视频状态查询保留专用控制状态机，不通过需要模型决策的产品入口。
 - Task 11：Go、前端、迁移、cmd 和构建验证已完成；独立审计修复了安全审计静态测试与新 executor 方法名不一致的问题。
-- Task 12：尚未执行，等待本次提交、递增 Tag、GitHub 离线镜像、腾讯云部署和两轮真实验收。
+- Task 12：已完成。commit `866daf195`、Tag `my2-v0.2.16` 已推送；GitHub Actions `31407266992` 成功生成并发布离线镜像，服务器校验 SHA-256 后加载 `sub2api:my2-0.2.16`。部署前备份为 `/opt/sub2api/backups/my2-v0.2.16-pre-20260810T161503Z`，仅应用容器重建，PostgreSQL/Redis 保持原容器且三者均健康。两轮真实验收中 GPT Chat/Responses 共 4 次均 HTTP 200 并产生 `platform_id/account_id/subscription_id` 用量记录；GLM Chat 共 2 次均由上游 HTTP 502，服务记录失败切换与账号冷却，未产生成功用量/扣费。
 
 ## 最终验收矩阵
 
