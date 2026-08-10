@@ -96,7 +96,7 @@ func TestUserSubscriptionRepository_UsageWindowsAndSoftDelete(t *testing.T) {
 	sub := mustCreateSubscription(t, client, &service.UserSubscription{UserID: user.ID, SubscriptionPlanID: &planID, PlanNameSnapshot: "usage", RateMultiplierSnapshot: 1})
 	windowStart := time.Now().Add(-time.Hour).Truncate(time.Second)
 
-	require.NoError(t, repo.ActivateWindows(ctx, sub.ID, windowStart))
+	require.NoError(t, repo.ActivateWindows(ctx, sub.ID, windowStart, windowStart))
 	require.NoError(t, repo.IncrementUsage(ctx, sub.ID, 1.25))
 	got, err := repo.GetByID(ctx, sub.ID)
 	require.NoError(t, err)

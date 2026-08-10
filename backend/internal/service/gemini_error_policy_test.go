@@ -453,6 +453,23 @@ func TestGeminiErrorPolicy_NilRateLimitService(t *testing.T) {
 	})
 }
 
+func TestHandleGeminiUpstreamErrorPoolMode429DoesNotLimitAccount(t *testing.T) {
+	repo := &rateLimit429AccountRepoStub{}
+	svc := &GeminiMessagesCompatService{
+		accountRepo:      repo,
+		rateLimitService: NewRateLimitService(repo, nil, &config.Config{}, nil, nil),
+	}
+	account := &Account{
+		ID: 600, Platform: PlatformGemini, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"pool_mode": true},
+	}
+	body := []byte(`{"error":{"code":429,"message":"capacity exhausted"}}`)
+
+	svc.handleGeminiUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{}, body)
+
+	require.Zero(t, repo.rateLimitCalls)
+}
+
 // ---------------------------------------------------------------------------
 // geminiErrorPolicyRepo — minimal AccountRepository stub for Gemini error
 // policy tests. Embeds mockAccountRepoForGemini and adds tracking.

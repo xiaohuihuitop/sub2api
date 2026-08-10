@@ -164,10 +164,15 @@ func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMess
 				Content: blockJSON,
 			})
 
+		case item.Type == "reasoning":
+
 		case item.Role == "user":
 			content, err := convertResponsesUserToAnthropicContent(item.Content)
 			if err != nil {
 				return nil, nil, err
+			}
+			if anthropicContentIsEmpty(content) {
+				continue
 			}
 			messages = append(messages, AnthropicMessage{
 				Role:    "user",
@@ -179,6 +184,9 @@ func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMess
 			if err != nil {
 				return nil, nil, err
 			}
+			if anthropicContentIsEmpty(content) || anthropicContentIsOnlyBlankText(content) {
+				continue
+			}
 			messages = append(messages, AnthropicMessage{
 				Role:    "assistant",
 				Content: content,
@@ -186,12 +194,17 @@ func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMess
 
 		default:
 			// Unknown role/type — attempt as user message
-			if item.Content != nil {
-				messages = append(messages, AnthropicMessage{
-					Role:    "user",
-					Content: item.Content,
-				})
+			if item.Content == nil {
+				continue
 			}
+			content, err := convertResponsesUserToAnthropicContent(item.Content)
+			if err != nil {
+				return nil, nil, err
+			}
+			if anthropicContentIsEmpty(content) {
+				continue
+			}
+			messages = append(messages, AnthropicMessage{Role: "user", Content: content})
 		}
 	}
 
@@ -210,6 +223,28 @@ func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMess
 	}
 
 	return system, messages, nil
+}
+
+func anthropicContentIsEmpty(content json.RawMessage) bool {
+	switch strings.TrimSpace(string(content)) {
+	case "", "null", `""`, "[]":
+		return true
+	default:
+		return false
+	}
+}
+
+func anthropicContentIsOnlyBlankText(content json.RawMessage) bool {
+	blocks := parseContentBlocks(content)
+	if len(blocks) == 0 {
+		return false
+	}
+	for _, block := range blocks {
+		if block.Type != "text" || strings.TrimSpace(block.Text) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func responsesFunctionOutputToAnthropicContent(item ResponsesInputItem) json.RawMessage {
