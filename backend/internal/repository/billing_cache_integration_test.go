@@ -150,7 +150,7 @@ func (s *BillingCacheSuite) TestSubscriptionCache() {
 			fn: func(ctx context.Context, rdb *redis.Client, cache service.BillingCache) {
 				userID := int64(11)
 				platformID := int64(21)
-				subKey := fmt.Sprintf("%s%d:%d", billingSubKeyPrefix, userID, platformID)
+				subKey := billingSubKey(userID, platformID)
 
 				require.NoError(s.T(), cache.UpdateSubscriptionUsage(ctx, userID, platformID, 1.0), "UpdateSubscriptionUsage should not error")
 
@@ -164,7 +164,7 @@ func (s *BillingCacheSuite) TestSubscriptionCache() {
 			fn: func(ctx context.Context, rdb *redis.Client, cache service.BillingCache) {
 				userID := int64(12)
 				platformID := int64(22)
-				subKey := fmt.Sprintf("%s%d:%d", billingSubKeyPrefix, userID, platformID)
+				subKey := billingSubKey(userID, platformID)
 
 				data := &service.SubscriptionCacheData{
 					Status:       "active",
@@ -217,7 +217,7 @@ func (s *BillingCacheSuite) TestSubscriptionCache() {
 			fn: func(ctx context.Context, rdb *redis.Client, cache service.BillingCache) {
 				userID := int64(101)
 				platformID := int64(10)
-				subKey := fmt.Sprintf("%s%d:%d", billingSubKeyPrefix, userID, platformID)
+				subKey := billingSubKey(userID, platformID)
 
 				data := &service.SubscriptionCacheData{
 					Status:       "active",
@@ -248,7 +248,7 @@ func (s *BillingCacheSuite) TestSubscriptionCache() {
 			fn: func(ctx context.Context, rdb *redis.Client, cache service.BillingCache) {
 				userID := int64(102)
 				platformID := int64(11)
-				subKey := fmt.Sprintf("%s%d:%d", billingSubKeyPrefix, userID, platformID)
+				subKey := billingSubKey(userID, platformID)
 
 				fields := map[string]any{
 					"expires_at":    time.Now().Add(1 * time.Hour).Unix(),

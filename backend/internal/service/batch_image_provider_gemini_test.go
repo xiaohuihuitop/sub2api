@@ -183,7 +183,7 @@ func TestGeminiProvider_OpenResultStreamsResultFile(t *testing.T) {
 	outputRef := "files/output-jsonl"
 	r, contentType, err := provider.OpenResult(context.Background(), &BatchImageJob{ProviderOutputRef: &outputRef}, geminiAPIKeyAccount("sk-secret"))
 	require.NoError(t, err)
-	defer r.Close()
+	t.Cleanup(func() { require.NoError(t, r.Close()) })
 
 	body, err := io.ReadAll(r)
 	require.NoError(t, err)
