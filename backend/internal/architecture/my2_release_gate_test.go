@@ -41,6 +41,7 @@ type my2ReleaseStep struct {
 	Name string            `yaml:"name"`
 	Run  string            `yaml:"run"`
 	Uses string            `yaml:"uses"`
+	With map[string]string `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
 }
 
@@ -61,6 +62,7 @@ func TestMy2ReleaseRequiresCompleteQualityGate(t *testing.T) {
 	requireMy2ReleaseText(t, joinedMy2ReleaseRuns(backend), "make test-unit", "make test-integration")
 	requireMy2ReleaseText(t, joinedMy2ReleaseRuns(frontend), "pnpm run test:run", "pnpm run typecheck", "pnpm run lint:check")
 	requireMy2ReleaseText(t, joinedMy2ReleaseUses(lint), "golangci/golangci-lint-action")
+	requireMy2ReleaseText(t, joinedMy2ReleaseWith(lint, "args"), "--build-tags=unit")
 }
 
 func TestMy2ReleasePublishesLatestOnlyAfterValidatedRelease(t *testing.T) {
@@ -157,6 +159,14 @@ func joinedMy2ReleaseUses(job my2ReleaseJob) string {
 		uses = append(uses, step.Uses)
 	}
 	return strings.Join(uses, "\n")
+}
+
+func joinedMy2ReleaseWith(job my2ReleaseJob, key string) string {
+	var values []string
+	for _, step := range job.Steps {
+		values = append(values, step.With[key])
+	}
+	return strings.Join(values, "\n")
 }
 
 func requireMy2ReleaseText(t *testing.T, text string, values ...string) {
