@@ -144,7 +144,7 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 // POST /v1beta/models/{model}:generateContent
 // POST /v1beta/models/{model}:streamGenerateContent?alt=sse
 func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointGeminiNative, h.legacyGeminiV1BetaModels)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointGeminiNative)
 }
 
 func (h *GatewayHandler) legacyGeminiV1BetaModels(c *gin.Context) {

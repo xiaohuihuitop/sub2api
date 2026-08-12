@@ -2,12 +2,9 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
-	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +15,7 @@ import (
 // The route middleware already authenticates the API key and resolves the
 // group; this handler intentionally does not select an account or check billing.
 func (h *OpenAIGatewayHandler) GrokCountTokens(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointCountTokens, h.legacyGrokCountTokens)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointCountTokens)
 }
 
 func (h *OpenAIGatewayHandler) legacyGrokCountTokens(c *gin.Context) {
@@ -64,136 +61,5 @@ func (h *OpenAIGatewayHandler) legacyGrokCountTokens(c *gin.Context) {
 // It validates billing and routes to an OpenAI token-count bridge without taking concurrency slots
 // or recording usage.
 func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointCountTokens, h.legacyCountTokens)
-}
-
-func (h *OpenAIGatewayHandler) legacyCountTokens(c *gin.Context) {
-	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
-	if !ok {
-		h.anthropicErrorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
-		return
-	}
-
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		h.anthropicErrorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
-		return
-	}
-	reqLog := requestLogger(
-		c,
-		"handler.openai_gateway.count_tokens",
-		zap.Int64("user_id", subject.UserID),
-		zap.Int64("api_key_id", apiKey.ID),
-		zap.Any("platform_namespace_id", service.PlatformSchedulingID(c.Request.Context())),
-	)
-
-	if !h.ensureResponsesDependencies(c, reqLog) {
-		return
-	}
-
-	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
-	if err != nil {
-		if maxErr, ok := extractMaxBytesError(err); ok {
-			h.anthropicErrorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
-			return
-		}
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
-		return
-	}
-	if len(body) == 0 {
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
-		return
-	}
-
-	bodyRef := service.NewRequestBodyRef(body)
-	parsedReq, err := service.ParseGatewayRequest(bodyRef, domain.PlatformAnthropic)
-	if err != nil {
-		logRequestBodyParseFailure(reqLog, body, err)
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
-		return
-	}
-	body = parsedReq.Body.Bytes()
-	if parsedReq.Model == "" {
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")
-		return
-	}
-
-	reqModel := parsedReq.Model
-	ensureModelTargetPlatform(c, reqModel)
-	if !modelTargetPlatformAllowed(c, reqModel, service.PlatformOpenAI) {
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint")
-		return
-	}
-	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
-	preferredMappedModel := resolveOpenAIMessagesDispatchMappedModel(apiKey, reqModel)
-	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", parsedReq.Stream))
-
-	setOpsRequestContext(c, reqModel, false)
-	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(false, false)))
-
-	modelMapping := h.gatewayService.ResolvePlatformModelMapping(c.Request.Context(), reqModel)
-	mappedBodyForMessages := newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)
-
-	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("openai_count_tokens.billing_eligibility_check_failed", zap.Error(err))
-		status, code, message, retryAfter := billingErrorDetails(err)
-		if retryAfter > 0 {
-			c.Header("Retry-After", strconv.Itoa(retryAfter))
-		}
-		h.anthropicErrorResponse(c, status, code, message)
-		return
-	}
-
-	requestStart := time.Now()
-	sessionHash := h.gatewayService.GenerateSessionHash(c, body)
-	currentRoutingModel := routingModel
-	if preferredMappedModel != "" {
-		currentRoutingModel = preferredMappedModel
-	}
-	selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
-		c.Request.Context(),
-		service.PlatformSchedulingID(c.Request.Context()),
-		"",
-		sessionHash,
-		currentRoutingModel,
-		nil,
-		service.OpenAIUpstreamTransportAny,
-		service.OpenAIEndpointCapabilityChatCompletions,
-		false,
-		false,
-		false,
-		openAICompatibleRequestPlatform(c.Request.Context(), apiKey),
-	)
-	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
-	if err != nil {
-		requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
-		reqLog.Warn("openai_count_tokens.account_select_failed", zap.Error(openAICompatibleSelectionErrorForLog(err, requestPlatform)))
-		cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, currentRoutingModel, reqModel)
-		if !cls.ModelNotFound {
-			markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-		}
-		h.anthropicErrorResponse(c, cls.Status, cls.ErrType, cls.Message)
-		return
-	}
-	if selection == nil || selection.Account == nil {
-		cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, currentRoutingModel, reqModel)
-		if !cls.ModelNotFound {
-			markOpsRoutingCapacityLimited(c)
-		}
-		h.anthropicErrorResponse(c, cls.Status, cls.ErrType, cls.Message)
-		return
-	}
-
-	account := selection.Account
-	setOpsSelectedAccount(c, account.ID, account.Platform)
-	if selection.Acquired && selection.ReleaseFunc != nil {
-		defer selection.ReleaseFunc()
-	}
-	forwardBody := mappedBodyForMessages(modelMapping.Mapped, modelMapping.MappedModel)
-	defaultMappedModel := preferredMappedModel
-
-	if err := h.gatewayService.ForwardCountTokensAsAnthropic(c.Request.Context(), c, account, forwardBody, defaultMappedModel); err != nil {
-		reqLog.Error("openai_count_tokens.forward_failed", zap.Int64("account_id", account.ID), zap.Error(err))
-	}
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointCountTokens)
 }

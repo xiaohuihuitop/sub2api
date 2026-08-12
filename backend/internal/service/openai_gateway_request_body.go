@@ -581,6 +581,13 @@ func (v openAIRequestView) Decode(c *gin.Context) (map[string]any, error) {
 	return getOpenAIRequestBodyMap(c, v.body)
 }
 
+// DecodeRuntime decodes the request view without requiring the legacy Gin
+// request carrier. Runtime preparation uses this for ordinary OpenAI HTTP
+// requests; protocol-specific legacy branches continue to call Decode.
+func (v openAIRequestView) DecodeRuntime() (map[string]any, error) {
+	return getOpenAIRequestBodyMap(nil, v.body)
+}
+
 func (v *openAIRequestView) MarkPatchSet(path string, value any) {
 	if v == nil || v.patchesDisabled {
 		return

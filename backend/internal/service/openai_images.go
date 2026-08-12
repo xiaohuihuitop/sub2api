@@ -179,12 +179,24 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	if c == nil || c.Request == nil {
 		return nil, fmt.Errorf("missing request context")
 	}
-	endpoint := normalizeOpenAIImagesEndpointPath(c.Request.URL.Path)
+	contentType := strings.TrimSpace(c.GetHeader("Content-Type"))
+	return parseOpenAIImagesRequest(c.Request.URL.Path, contentType, body)
+}
+
+// ParseOpenAIImagesRequestFromMetadata parses an image request without requiring
+// a framework context. Runtime executors use this entry point so request
+// validation stays on the pure protocol side of the adapter boundary.
+func (s *OpenAIGatewayService) ParseOpenAIImagesRequestFromMetadata(path, contentType string, body []byte) (*OpenAIImagesRequest, error) {
+	return parseOpenAIImagesRequest(path, contentType, body)
+}
+
+func parseOpenAIImagesRequest(path, contentType string, body []byte) (*OpenAIImagesRequest, error) {
+	endpoint := normalizeOpenAIImagesEndpointPath(path)
 	if endpoint == "" {
 		return nil, fmt.Errorf("unsupported images endpoint")
 	}
 
-	contentType := strings.TrimSpace(c.GetHeader("Content-Type"))
+	contentType = strings.TrimSpace(contentType)
 	req := &OpenAIImagesRequest{
 		Endpoint:    endpoint,
 		ContentType: contentType,
@@ -742,6 +754,22 @@ func (s *OpenAIGatewayService) buildOpenAIImagesRequest(
 	token string,
 	endpoint string,
 ) (*http.Request, error) {
+	var headers http.Header
+	if c != nil && c.Request != nil {
+		headers = c.Request.Header
+	}
+	return s.buildOpenAIImagesRequestFromHeaders(ctx, headers, account, body, contentType, token, endpoint)
+}
+
+func (s *OpenAIGatewayService) buildOpenAIImagesRequestFromHeaders(
+	ctx context.Context,
+	headers http.Header,
+	account *Account,
+	body []byte,
+	contentType string,
+	token string,
+	endpoint string,
+) (*http.Request, error) {
 	targetURL := openAIImagesGenerationsURL
 	if endpoint == openAIImagesEditsEndpoint {
 		targetURL = openAIImagesEditsURL
@@ -769,7 +797,7 @@ func (s *OpenAIGatewayService) buildOpenAIImagesRequest(
 			req.Header.Add(key, value)
 		}
 	}
-	for key, values := range c.Request.Header {
+	for key, values := range headers {
 		if !openaiPassthroughAllowedHeaders[strings.ToLower(key)] {
 			continue
 		}

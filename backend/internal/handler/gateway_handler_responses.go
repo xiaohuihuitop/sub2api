@@ -21,7 +21,7 @@ import (
 // This converts Responses API requests to Anthropic format, forwards to Anthropic
 // upstream, and converts responses back to Responses format.
 func (h *GatewayHandler) Responses(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointResponses, h.legacyResponses)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointResponses)
 }
 
 func (h *GatewayHandler) legacyResponses(c *gin.Context) {

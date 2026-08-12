@@ -212,6 +212,16 @@ func (s *OpenAIGatewayService) forwardAlphaSearchViaResponsesWebSearch(
 }
 
 func (s *OpenAIGatewayService) buildOpenAIAlphaSearchResponsesWebSearchRequest(ctx context.Context, c *gin.Context, account *Account, alphaBody []byte, body []byte, token string) (*http.Request, error) {
+	var headers http.Header
+	apiKeyID := int64(0)
+	if c != nil && c.Request != nil {
+		headers = c.Request.Header
+		apiKeyID = getAPIKeyIDFromContext(c)
+	}
+	return s.buildOpenAIAlphaSearchResponsesWebSearchRequestFromHeaders(ctx, headers, apiKeyID, account, alphaBody, body, token)
+}
+
+func (s *OpenAIGatewayService) buildOpenAIAlphaSearchResponsesWebSearchRequestFromHeaders(ctx context.Context, headers http.Header, apiKeyID int64, account *Account, alphaBody []byte, body []byte, token string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, chatgptCodexURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -235,22 +245,22 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchResponsesWebSearchRequest(c
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("OpenAI-Beta", "responses=experimental")
-	if turnMetadata := openAIAlphaSearchInboundHeader(c, "X-Codex-Turn-Metadata"); turnMetadata != "" {
+	if turnMetadata := openAIAlphaSearchInboundHeaderValue(headers, "X-Codex-Turn-Metadata"); turnMetadata != "" {
 		req.Header.Set("X-Codex-Turn-Metadata", turnMetadata)
 	}
-	if version := openAIAlphaSearchInboundHeader(c, "Version"); version != "" {
+	if version := openAIAlphaSearchInboundHeaderValue(headers, "Version"); version != "" {
 		req.Header.Set("Version", version)
 	} else {
 		req.Header.Set("Version", codexCLIVersion)
 	}
-	if originator := openAIAlphaSearchInboundHeader(c, "Originator"); originator != "" {
+	if originator := openAIAlphaSearchInboundHeaderValue(headers, "Originator"); originator != "" {
 		req.Header.Set("Originator", originator)
 	} else {
 		req.Header.Set("Originator", "codex_cli_rs")
 	}
 	if customUA := account.GetOpenAIUserAgent(); customUA != "" {
 		req.Header.Set("User-Agent", customUA)
-	} else if userAgent := openAIAlphaSearchInboundHeader(c, "User-Agent"); userAgent != "" {
+	} else if userAgent := openAIAlphaSearchInboundHeaderValue(headers, "User-Agent"); userAgent != "" {
 		req.Header.Set("User-Agent", userAgent)
 	} else {
 		req.Header.Set("User-Agent", codexCLIUserAgent)
@@ -258,7 +268,6 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchResponsesWebSearchRequest(c
 	if s.cfg != nil && s.cfg.Gateway.ForceCodexCLI {
 		req.Header.Set("User-Agent", codexCLIUserAgent)
 	}
-	apiKeyID := getAPIKeyIDFromContext(c)
 	if sessionID := strings.TrimSpace(gjson.GetBytes(alphaBody, "id").String()); sessionID != "" {
 		isolated := isolateOpenAISessionID(apiKeyID, sessionID)
 		req.Header.Set("Session_ID", isolated)
@@ -336,6 +345,18 @@ func truncateOpenAIAlphaSearchPromptJSON(value string, limit int) string {
 }
 
 func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string) (*http.Request, error) {
+	var headers http.Header
+	var query url.Values
+	if c != nil && c.Request != nil {
+		headers = c.Request.Header
+		if c.Request.URL != nil {
+			query = c.Request.URL.Query()
+		}
+	}
+	return s.buildOpenAIAlphaSearchRequestFromHeaders(ctx, headers, query, account, body, token)
+}
+
+func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequestFromHeaders(ctx context.Context, headers http.Header, query url.Values, account *Account, body []byte, token string) (*http.Request, error) {
 	targetURL, err := s.openAIAlphaSearchURL(account)
 	if err != nil {
 		return nil, err
@@ -344,14 +365,14 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequest(ctx context.Context
 	if err != nil {
 		return nil, fmt.Errorf("parse alpha search URL: %w", err)
 	}
-	if c != nil && c.Request != nil && c.Request.URL != nil {
-		query := parsedURL.Query()
-		for key, values := range c.Request.URL.Query() {
+	if len(query) > 0 {
+		mergedQuery := parsedURL.Query()
+		for key, values := range query {
 			for _, value := range values {
-				query.Add(key, value)
+				mergedQuery.Add(key, value)
 			}
 		}
-		parsedURL.RawQuery = query.Encode()
+		parsedURL.RawQuery = mergedQuery.Encode()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, parsedURL.String(), bytes.NewReader(body))
@@ -379,22 +400,22 @@ func (s *OpenAIGatewayService) buildOpenAIAlphaSearchRequest(ctx context.Context
 			return nil, fmt.Errorf("resolve chatgpt account headers: %w", err)
 		}
 
-		if turnMetadata := openAIAlphaSearchInboundHeader(c, "X-Codex-Turn-Metadata"); turnMetadata != "" {
+		if turnMetadata := openAIAlphaSearchInboundHeaderValue(headers, "X-Codex-Turn-Metadata"); turnMetadata != "" {
 			req.Header.Set("X-Codex-Turn-Metadata", turnMetadata)
 		}
-		if version := openAIAlphaSearchInboundHeader(c, "Version"); version != "" {
+		if version := openAIAlphaSearchInboundHeaderValue(headers, "Version"); version != "" {
 			req.Header.Set("Version", version)
 		} else {
 			req.Header.Set("Version", codexCLIVersion)
 		}
-		if originator := openAIAlphaSearchInboundHeader(c, "Originator"); originator != "" {
+		if originator := openAIAlphaSearchInboundHeaderValue(headers, "Originator"); originator != "" {
 			req.Header.Set("Originator", originator)
 		} else {
 			req.Header.Set("Originator", "codex_cli_rs")
 		}
 		if customUA := account.GetOpenAIUserAgent(); customUA != "" {
 			req.Header.Set("User-Agent", customUA)
-		} else if userAgent := openAIAlphaSearchInboundHeader(c, "User-Agent"); userAgent != "" {
+		} else if userAgent := openAIAlphaSearchInboundHeaderValue(headers, "User-Agent"); userAgent != "" {
 			req.Header.Set("User-Agent", userAgent)
 		} else {
 			req.Header.Set("User-Agent", codexCLIUserAgent)
@@ -441,6 +462,13 @@ func openAIAlphaSearchInboundHeader(c *gin.Context, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(c.GetHeader(key))
+}
+
+func openAIAlphaSearchInboundHeaderValue(headers http.Header, key string) string {
+	if headers == nil {
+		return ""
+	}
+	return strings.TrimSpace(headers.Get(key))
 }
 
 var openAIAlphaSearchUnsupportedBodyFields = [...]string{

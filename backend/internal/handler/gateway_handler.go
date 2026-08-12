@@ -71,7 +71,7 @@ type GatewayHandler struct {
 // compatible endpoint. Authenticated Gateway execution is owned by the
 // sub2APIMessagesExecutor.
 func (h *GatewayHandler) Messages(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointMessages, h.legacyMessages)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointMessages)
 }
 
 // SetApplicationGateway installs the single production runtime entrypoint.
@@ -1813,7 +1813,7 @@ func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, mess
 // POST /v1/messages/count_tokens
 // 鐗圭偣锛氭牎楠岃闃?浣欓锛屼絾涓嶈绠楀苟鍙戙€佷笉璁板綍浣跨敤閲?
 func (h *GatewayHandler) CountTokens(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointCountTokens, h.legacyCountTokens)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointCountTokens)
 }
 
 func (h *GatewayHandler) legacyCountTokens(c *gin.Context) {

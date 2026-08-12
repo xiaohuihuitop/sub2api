@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -112,26 +113,48 @@ func isOpenAIResponsesToolCallItemType(itemType string) bool {
 }
 
 func flattenOpenAIResponsesNamespaces(c *gin.Context, body []byte) ([]byte, error) {
-	if !bytes.Contains(body, []byte(`"namespace"`)) {
-		return body, nil
-	}
-	var requestBody map[string]any
-	if err := json.Unmarshal(body, &requestBody); err != nil {
-		return body, fmt.Errorf("decode OpenAI namespace body: %w", err)
-	}
-	names, changed, err := apicompat.FlattenResponsesNamespacesExcept(requestBody, map[string]bool{"image_gen": true})
-	if err != nil {
+	rebuilt, names, changed, err := flattenOpenAIResponsesNamespacesData(body)
+	if err != nil || !changed {
 		return body, err
-	}
-	if !changed {
-		return body, nil
-	}
-	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
-	if err != nil {
-		return body, fmt.Errorf("encode OpenAI namespace body: %w", err)
 	}
 	setOpenAIResponsesNamespaceNames(c, names)
 	return rebuilt, nil
+}
+
+// flattenOpenAIResponsesNamespacesExchange is the transport-neutral variant
+// used by the runtime Responses path. The mapping is request state, not an
+// HTTP or product object, so it is safe to keep on HTTPExchange.
+func flattenOpenAIResponsesNamespacesExchange(exchange gatewayruntime.HTTPExchange, body []byte) ([]byte, error) {
+	rebuilt, names, changed, err := flattenOpenAIResponsesNamespacesData(body)
+	if err != nil || !changed {
+		return body, err
+	}
+	if exchange != nil {
+		exchange.SetState(openAIResponsesNamespaceNamesContextKey, names)
+	}
+	return rebuilt, nil
+}
+
+func flattenOpenAIResponsesNamespacesData(body []byte) ([]byte, map[string]apicompat.ResponsesNamespaceName, bool, error) {
+	if !bytes.Contains(body, []byte(`"namespace"`)) {
+		return body, nil, false, nil
+	}
+	var requestBody map[string]any
+	if err := json.Unmarshal(body, &requestBody); err != nil {
+		return body, nil, false, fmt.Errorf("decode OpenAI namespace body: %w", err)
+	}
+	names, changed, err := apicompat.FlattenResponsesNamespacesExcept(requestBody, map[string]bool{"image_gen": true})
+	if err != nil {
+		return body, nil, false, err
+	}
+	if !changed {
+		return body, nil, false, nil
+	}
+	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
+	if err != nil {
+		return body, nil, false, fmt.Errorf("encode OpenAI namespace body: %w", err)
+	}
+	return rebuilt, names, true, nil
 }
 
 // stripOpenAIResponsesInputNamespaces removes namespace only from direct input

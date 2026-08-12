@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,6 +45,40 @@ func GetOpenAIClientTransport(c *gin.Context) OpenAIClientTransport {
 		return normalizeOpenAIClientTransport(v)
 	case string:
 		return normalizeOpenAIClientTransport(OpenAIClientTransport(v))
+	default:
+		return OpenAIClientTransportUnknown
+	}
+}
+
+// SetOpenAIClientTransportExchange stores the inbound protocol on the pure
+// runtime exchange. It is the exchange counterpart of the legacy Gin helper;
+// the value is a transport fact and contains no product-side state.
+func SetOpenAIClientTransportExchange(exchange gatewayruntime.HTTPExchange, transport OpenAIClientTransport) {
+	if exchange == nil {
+		return
+	}
+	normalized := normalizeOpenAIClientTransport(transport)
+	if normalized == OpenAIClientTransportUnknown {
+		return
+	}
+	exchange.SetState(openAIClientTransportContextKey, string(normalized))
+}
+
+// GetOpenAIClientTransportExchange reads the inbound protocol from an
+// exchange without requiring a Gin compatibility context.
+func GetOpenAIClientTransportExchange(exchange gatewayruntime.HTTPExchange) OpenAIClientTransport {
+	if exchange == nil {
+		return OpenAIClientTransportUnknown
+	}
+	raw, ok := exchange.State(openAIClientTransportContextKey)
+	if !ok || raw == nil {
+		return OpenAIClientTransportUnknown
+	}
+	switch value := raw.(type) {
+	case OpenAIClientTransport:
+		return normalizeOpenAIClientTransport(value)
+	case string:
+		return normalizeOpenAIClientTransport(OpenAIClientTransport(value))
 	default:
 		return OpenAIClientTransportUnknown
 	}

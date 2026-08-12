@@ -25,7 +25,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "This model is not supported on the Chat Completions endpoint")
 		return
 	}
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointChatCompletions, h.legacyChatCompletions)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointChatCompletions)
 }
 
 func (h *GatewayHandler) legacyChatCompletions(c *gin.Context) {

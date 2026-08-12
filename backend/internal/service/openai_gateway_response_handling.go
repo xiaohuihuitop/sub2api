@@ -38,11 +38,102 @@ type openaiNonStreamingResult struct {
 	imageOutputSizes []string
 }
 
+type ginOpenAIStreamSink struct {
+	context *gin.Context
+}
+
+func (s ginOpenAIStreamSink) Header() http.Header {
+	if s.context == nil || s.context.Writer == nil {
+		return make(http.Header)
+	}
+	return s.context.Writer.Header()
+}
+
+func (s ginOpenAIStreamSink) WriteHeader(status int) {
+	if s.context != nil && s.context.Writer != nil {
+		s.context.Writer.WriteHeader(status)
+	}
+}
+
+func (s ginOpenAIStreamSink) Write(body []byte) (int, error) {
+	if s.context == nil || s.context.Writer == nil {
+		return 0, http.ErrNotSupported
+	}
+	return s.context.Writer.Write(body)
+}
+
+func (s ginOpenAIStreamSink) Flush() {
+	if s.context != nil && s.context.Writer != nil {
+		s.context.Writer.Flush()
+	}
+}
+
+func (s ginOpenAIStreamSink) Written() bool {
+	return s.context != nil && s.context.Writer != nil && s.context.Writer.Written()
+}
+
+func (s *OpenAIGatewayService) newOpenAIStreamGinHooks(ctx context.Context, c *gin.Context) openAIStreamHooks {
+	return openAIStreamHooks{
+		clientOutputStarted: func(localStarted bool) bool {
+			return openAIStreamClientOutputStarted(c, localStarted)
+		},
+		failoverError: func(account *Account, passthrough bool, upstreamRequestID string, payload []byte, message string, responseHeaders ...http.Header) *UpstreamFailoverError {
+			return s.newOpenAIStreamFailoverError(c, account, passthrough, upstreamRequestID, payload, message, responseHeaders...)
+		},
+		recordUpstreamError: func(account *Account, passthrough bool, upstreamRequestID, kind string, payload []byte, message string) string {
+			return s.recordOpenAIStreamUpstreamError(c, account, passthrough, upstreamRequestID, kind, payload, message)
+		},
+		applyPassthrough: func(platform string, payload []byte, failedMessage string) (int, string, string, bool) {
+			return applyOpenAIStreamFailedErrorPassthroughRule(c, platform, payload, failedMessage)
+		},
+		firstOutputTimeout: func(account *Account, startTime time.Time, originalModel, reasoningEffort string, timeout time.Duration, phase string, responseHeaders http.Header) *UpstreamFailoverError {
+			return s.newOpenAIFirstOutputTimeoutError(ctx, c, account, startTime, originalModel, reasoningEffort, timeout, phase, responseHeaders)
+		},
+		markCyberPolicy: func(mark CyberPolicyMark) {
+			MarkOpsCyberPolicy(c, mark)
+		},
+		markResponseCommit: func() {
+			MarkResponseCommitted(c)
+		},
+		restorePayload: func(payload []byte) ([]byte, error) {
+			restored, err := restoreGrokResponsesClientToolPayload(c, payload)
+			if err != nil {
+				return nil, fmt.Errorf("restore Grok Responses client tool response: %w", err)
+			}
+			restored, err = restoreOpenAIResponsesNamespacePayload(c, restored)
+			if err != nil {
+				return nil, fmt.Errorf("restore OpenAI namespace response: %w", err)
+			}
+			return restored, nil
+		},
+	}
+}
+
 func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel string) (*openaiStreamingResult, error) {
 	return s.handleStreamingResponseWithReasoning(ctx, resp, c, account, startTime, originalModel, mappedModel, "")
 }
 
 func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel, reasoningEffort string) (*openaiStreamingResult, error) {
+	if exchange, ok := runtimeHTTPExchangeFromGinContext(c); ok && account != nil && account.Platform == PlatformOpenAI {
+		// Forward may have populated namespace/tool mappings on the temporary Gin
+		// context during request normalization. The outer bridge normally copies
+		// state only after Forward returns, so sync it before the pure stream core
+		// reads exchange state.
+		copyRuntimeGinState(exchange, c)
+		return s.handleOpenAIStreamingResponseExchange(ctx, resp, exchange, account, startTime, originalModel, mappedModel, reasoningEffort)
+	}
+	return s.handleStreamingResponseWithReasoningCore(ctx, resp, ginOpenAIStreamSink{context: c}, s.newOpenAIStreamGinHooks(ctx, c), account, startTime, originalModel, mappedModel, reasoningEffort)
+}
+
+func (s *OpenAIGatewayService) handleStreamingResponseWithReasoningCore(ctx context.Context, resp *http.Response, sink openAIStreamResponseSink, hooks openAIStreamHooks, account *Account, startTime time.Time, originalModel, mappedModel, reasoningEffort string) (*openaiStreamingResult, error) {
+	streamClientOutputStarted := hooks.clientOutputStarted
+	streamFailoverError := hooks.failoverError
+	recordStreamUpstreamError := hooks.recordUpstreamError
+	applyStreamPassthroughRule := hooks.applyPassthrough
+	firstOutputTimeoutError := hooks.firstOutputTimeout
+	markStreamCyberPolicy := hooks.markCyberPolicy
+	markStreamResponseCommitted := hooks.markResponseCommit
+	restoreStreamPayload := hooks.restorePayload
 	firstOutputTimeout := time.Duration(0)
 	if account != nil && account.Platform == PlatformOpenAI {
 		firstOutputTimeout = s.openAIFirstOutputTimeout(reasoningEffort)
@@ -56,42 +147,39 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			attemptResponseHeaders = http.Header{"X-Request-Id": []string{requestID}}
 		}
 	} else if s.responseHeaderFilter != nil {
-		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
+		responseheaders.WriteFilteredHeaders(sink.Header(), resp.Header, s.responseHeaderFilter)
 	}
 
 	// Set SSE response headers
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no")
+	sink.Header().Set("Content-Type", "text/event-stream")
+	sink.Header().Set("Cache-Control", "no-cache")
+	sink.Header().Set("Connection", "keep-alive")
+	sink.Header().Set("X-Accel-Buffering", "no")
 
 	// Pass through other headers
 	if !guardFirstOutput && resp.Header.Get("x-request-id") != "" {
 		v := resp.Header.Get("x-request-id")
-		c.Header("x-request-id", v)
+		sink.Header().Set("x-request-id", v)
 	}
 	applyAttemptResponseHeaders := func() {
-		if !guardFirstOutput || len(attemptResponseHeaders) == 0 || c.Writer.Written() {
+		if !guardFirstOutput || len(attemptResponseHeaders) == 0 || sink.Written() {
 			return
 		}
 		for key, values := range attemptResponseHeaders {
 			for _, value := range values {
-				c.Writer.Header().Add(key, value)
+				sink.Header().Add(key, value)
 			}
 		}
 		// These headers describe this gateway's SSE stream and are stable across
 		// account attempts. Keep them authoritative over upstream values.
-		c.Header("Content-Type", "text/event-stream")
-		c.Header("Cache-Control", "no-cache")
-		c.Header("Connection", "keep-alive")
-		c.Header("X-Accel-Buffering", "no")
+		sink.Header().Set("Content-Type", "text/event-stream")
+		sink.Header().Set("Cache-Control", "no-cache")
+		sink.Header().Set("Connection", "keep-alive")
+		sink.Header().Set("X-Accel-Buffering", "no")
 	}
 
-	w := c.Writer
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		return nil, errors.New("streaming not supported")
-	}
+	w := sink
+	flusher := sink
 	maxLineSize := defaultMaxLineSize
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
@@ -226,7 +314,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				message = "OpenAI first-output staging limit exceeded"
 			}
 			logger.LegacyPrintf("service.openai_gateway", "%s: account=%d model=%s error=%v", message, account.ID, originalModel, err)
-			failoverErr := s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, nil, message)
+			failoverErr := streamFailoverError(account, false, upstreamRequestID, nil, message)
 			failoverErr.SafeToFailoverAfterWrite = true
 			streamEarlyErr = failoverErr
 			_ = resp.Body.Close()
@@ -317,9 +405,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		if sawTerminalEvent && !sawFailedEvent {
 			s.clearOpenAIProxyStreamDisconnect(account)
 		}
-		if !sawTerminalEvent && !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
-			return resultWithUsage(), s.newOpenAIStreamFailoverError(
-				c,
+		if !sawTerminalEvent && !streamClientOutputStarted(clientOutputStarted) && !eventShouldFlush {
+			return resultWithUsage(), streamFailoverError(
 				account,
 				false,
 				upstreamRequestID,
@@ -329,7 +416,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		}
 		flushPending("Client disconnected during final flush, returning collected usage")
 		if !sawTerminalEvent {
-			if openAIStreamClientOutputStarted(c, clientOutputStarted) && !clientDisconnected {
+			if streamClientOutputStarted(clientOutputStarted) && !clientDisconnected {
 				s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), upstreamRequestID)
 			}
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing terminal event")
@@ -345,8 +432,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		}
 		if errors.Is(scanErr, errOpenAIFirstOutputScannerLimit) && firstTokenMs == nil {
 			logger.LegacyPrintf("service.openai_gateway", "SSE token exceeded guarded first-output limit: account=%d limit=%d error=%v", account.ID, openAIFirstOutputStageMaxBytes+openAIFirstOutputScannerFramingAllowance, scanErr)
-			failoverErr := s.newOpenAIStreamFailoverError(
-				c, account, false, upstreamRequestID, nil,
+			failoverErr := streamFailoverError(
+				account, false, upstreamRequestID, nil,
 				"OpenAI SSE line exceeds guarded first-output limit",
 			)
 			failoverErr.SafeToFailoverAfterWrite = true
@@ -354,8 +441,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		}
 		if errors.Is(scanErr, bufio.ErrTooLong) && guardFirstOutput && firstTokenMs == nil {
 			logger.LegacyPrintf("service.openai_gateway", "SSE line too long before first output: account=%d max_size=%d error=%v", account.ID, maxLineSize, scanErr)
-			failoverErr := s.newOpenAIStreamFailoverError(
-				c, account, false, upstreamRequestID, nil,
+			failoverErr := streamFailoverError(
+				account, false, upstreamRequestID, nil,
 				"OpenAI SSE line exceeds guarded first-output limit",
 			)
 			failoverErr.SafeToFailoverAfterWrite = true
@@ -382,12 +469,12 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			sendErrorEvent("response_too_large")
 			return resultWithUsage(), scanErr, true
 		}
-		if !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
+		if !streamClientOutputStarted(clientOutputStarted) && !eventShouldFlush {
 			msg := "OpenAI stream disconnected before completion"
 			if errText := strings.TrimSpace(scanErr.Error()); errText != "" {
 				msg += ": " + errText
 			}
-			return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, nil, msg), true
+			return resultWithUsage(), streamFailoverError(account, false, upstreamRequestID, nil, msg), true
 		}
 		// 客户端已断开时，上游出错仅影响体验，不影响计费；返回已收集 usage
 		if clientDisconnected {
@@ -421,7 +508,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				// 而漏记真实用量。对齐 WS V2 / Chat 流式路径（均先解析 usage 再 Mark）。
 				s.parseSSEUsageBytes(dataBytes, usage)
 				if hit, code, msg := detectOpenAICyberPolicy(dataBytes); hit {
-					MarkOpsCyberPolicy(c, CyberPolicyMark{
+					markStreamCyberPolicy(CyberPolicyMark{
 						Code:           code,
 						Message:        msg,
 						Body:           truncateString(string(dataBytes), 4096),
@@ -430,26 +517,23 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 						UpstreamOutTok: usage.OutputTokens,
 					})
 				}
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
-					if status, errType, errMsg, matched := applyOpenAIStreamFailedErrorPassthroughRule(c, account.Platform, dataBytes, failedMessage); matched {
+				if !streamClientOutputStarted(clientOutputStarted) {
+					if status, errType, errMsg, matched := applyStreamPassthroughRule(account.Platform, dataBytes, failedMessage); matched {
 						sawFailedEvent = true
 						// 命中透传规则也要记录 ops 上游错误事件（对齐 CC/Messages 与
 						// antigravity 先例），否则透传命中的 failed 在监控中不可见。
-						s.recordOpenAIStreamUpstreamError(c, account, false, upstreamRequestID, "http_error", dataBytes, failedMessage)
-						MarkResponseCommitted(c)
-						c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-						c.JSON(status, gin.H{
-							"error": gin.H{
-								"type":    errType,
-								"message": errMsg,
-							},
-						})
+						recordStreamUpstreamError(account, false, upstreamRequestID, "http_error", dataBytes, failedMessage)
+						markStreamResponseCommitted()
+						if writeErr := writeOpenAIStreamJSONError(sink, status, errType, errMsg); writeErr != nil {
+							streamEarlyErr = fmt.Errorf("write upstream passthrough response: %w", writeErr)
+							return
+						}
 						streamEarlyErr = fmt.Errorf("upstream response failed: passthrough rule matched message=%s", errMsg)
 						return
 					}
 					if openAIStreamFailedEventShouldFailover(dataBytes, failedMessage) {
 						sawFailedEvent = true
-						streamEarlyErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage, resp.Header)
+						streamEarlyErr = streamFailoverError(account, false, upstreamRequestID, dataBytes, failedMessage, resp.Header)
 						return
 					}
 				}
@@ -485,14 +569,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				line = "data: " + data
 				eventType = strings.TrimSpace(gjson.GetBytes(dataBytes, "type").String())
 			}
-			restoredData, restoreErr := restoreGrokResponsesClientToolPayload(c, dataBytes)
+			restoredData, restoreErr := restoreStreamPayload(dataBytes)
 			if restoreErr != nil {
-				streamEarlyErr = fmt.Errorf("restore Grok Responses client tool response: %w", restoreErr)
-				return
-			}
-			restoredData, restoreErr = restoreOpenAIResponsesNamespacePayload(c, restoredData)
-			if restoreErr != nil {
-				streamEarlyErr = fmt.Errorf("restore OpenAI namespace response: %w", restoreErr)
+				streamEarlyErr = restoreErr
 				return
 			}
 			if !bytes.Equal(restoredData, dataBytes) {
@@ -504,7 +583,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			if sanitizedData, sanitized := sanitizeOpenAIResponseFailedEventForClient(
 				dataBytes,
 				eventType,
-				openAIStreamClientOutputStarted(c, clientOutputStarted),
+				streamClientOutputStarted(clientOutputStarted),
 			); sanitized {
 				dataBytes = sanitizedData
 				data = string(sanitizedData)
@@ -699,8 +778,8 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			for ev := range events {
 				markEventProcessed(ev)
 			}
-			return resultWithUsage(), s.newOpenAIFirstOutputTimeoutError(
-				ctx, c, account, startTime, originalModel, reasoningEffort,
+			return resultWithUsage(), firstOutputTimeoutError(
+				account, startTime, originalModel, reasoningEffort,
 				firstOutputTimeout, "semantic_output", resp.Header,
 			)
 
@@ -1106,6 +1185,11 @@ func openAICacheCreationTokensFromUsage(value gjson.Result) int {
 }
 
 func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
+	if account != nil && account.Platform == PlatformOpenAI {
+		if exchange, ok := runtimeHTTPExchangeFromGinContext(c); ok {
+			return s.handleOpenAINonStreamingResponseExchange(ctx, resp, exchange, account, originalModel, mappedModel)
+		}
+	}
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
 	if err != nil {
 		return nil, err

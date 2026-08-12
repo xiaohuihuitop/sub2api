@@ -18,8 +18,9 @@ type gatewayEndpointExecution func(
 ) (gatewayruntime.Result, error)
 
 // sub2APIMessagesExecutor owns the Gateway implementation of Messages and its
-// Chat/Responses compatibility protocols. OpenAI/Grok stays on the explicit
-// compatibility bridge until Task 6 migrates that protocol family.
+// Chat/Responses compatibility protocols. OpenAI/Grok requests are delegated
+// to the dedicated OpenAI runtime executor; other platforms remain on the
+// Gateway migration path until their protocol family is selected for work.
 type sub2APIMessagesExecutor struct {
 	gatewayHandler *GatewayHandler
 	openaiHandler  *OpenAIGatewayHandler
@@ -39,8 +40,9 @@ func (e sub2APIMessagesExecutor) Execute(ctx context.Context, request gatewayrun
 		switch route.Platform.AccountPlatform {
 		case service.PlatformOpenAI, service.PlatformGrok:
 			return (sub2APIOpenAIExecutor{
-				handler:  e.openaiHandler,
-				endpoint: e.endpoint,
+				handler:        e.openaiHandler,
+				gatewayHandler: e.gatewayHandler,
+				endpoint:       e.endpoint,
 			}).Execute(ctx, request, sink)
 		default:
 			return e.executeGatewayRequest(ctx, request, sink)
@@ -232,21 +234,5 @@ func runtimeEndpointCapability(endpoint gatewayruntime.Endpoint) string {
 		return "messages"
 	default:
 		return string(endpoint)
-	}
-}
-
-func (e sub2APIMessagesExecutor) openAIHandlerForEndpoint() legacyGinHandler {
-	if e.openaiHandler == nil {
-		return nil
-	}
-	switch e.endpoint {
-	case gatewayruntime.EndpointMessages:
-		return e.openaiHandler.legacyMessages
-	case gatewayruntime.EndpointChatCompletions:
-		return e.openaiHandler.legacyChatCompletions
-	case gatewayruntime.EndpointResponses:
-		return e.openaiHandler.legacyResponses
-	default:
-		return nil
 	}
 }

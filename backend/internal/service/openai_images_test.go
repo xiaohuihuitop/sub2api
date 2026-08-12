@@ -58,6 +58,19 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_JSON(t *testing.T) {
 	require.False(t, parsed.Multipart)
 }
 
+func TestOpenAIGatewayServiceParseOpenAIImagesRequestFromMetadata(t *testing.T) {
+	body := []byte(`{"model":"gpt-image-2","prompt":"draw a cat"}`)
+	parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequestFromMetadata(
+		"/v1/images/generations",
+		"Application/JSON; charset=utf-8",
+		body,
+	)
+	require.NoError(t, err)
+	require.Equal(t, "/v1/images/generations", parsed.Endpoint)
+	require.Equal(t, "gpt-image-2", parsed.Model)
+	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+}
+
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEdit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

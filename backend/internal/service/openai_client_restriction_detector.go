@@ -88,6 +88,17 @@ func NewOpenAICodexClientRestrictionDetector(cfg *config.Config) *OpenAICodexCli
 //  5. Codex 版本（仅官方候选）：版本必须可解析（否则 VersionUndetectable）；< Min → 拒（TooLow）；> Max → 拒（TooHigh）。
 //  6. 引擎指纹 AND 硬门：按 EngineFingerprintSignals 列表勾选 AND 判定（无任何 Required 信号→放行，即「关闭指纹门」=取消所有勾选）；白名单条目可显式 skip。
 func (d *OpenAICodexClientRestrictionDetector) Detect(c *gin.Context, account *Account, policy CodexRestrictionPolicy, body []byte) CodexClientRestrictionDetectionResult {
+	var header http.Header
+	if c != nil && c.Request != nil {
+		header = c.Request.Header
+	}
+	return d.DetectRequest(header, account, policy, body)
+}
+
+// DetectRequest is the transport-neutral Codex restriction surface. Header
+// facts are supplied explicitly so runtime execution does not need to create
+// or inspect a Gin context.
+func (d *OpenAICodexClientRestrictionDetector) DetectRequest(header http.Header, account *Account, policy CodexRestrictionPolicy, body []byte) CodexClientRestrictionDetectionResult {
 	if account == nil || !account.IsCodexCLIOnlyEnabled() {
 		return CodexClientRestrictionDetectionResult{Enabled: false, Matched: false, Reason: CodexClientRestrictionReasonDisabled}
 	}
@@ -98,13 +109,9 @@ func (d *OpenAICodexClientRestrictionDetector) Detect(c *gin.Context, account *A
 
 	userAgent := ""
 	originator := ""
-	var header http.Header
-	if c != nil {
-		userAgent = c.GetHeader("User-Agent")
-		originator = c.GetHeader("originator")
-		if c.Request != nil {
-			header = c.Request.Header
-		}
+	if header != nil {
+		userAgent = header.Get("User-Agent")
+		originator = header.Get("originator")
 	}
 
 	// 3. 黑名单优先（门内 deny 最先，OR：任一已声明字段命中即拒）。

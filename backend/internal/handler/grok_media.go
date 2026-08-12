@@ -20,7 +20,7 @@ import (
 
 // GrokImages handles xAI image generation/editing through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokImages(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointImages, h.legacyGrokImages)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointImages)
 }
 
 func (h *OpenAIGatewayHandler) legacyGrokImages(c *gin.Context) {
@@ -33,7 +33,7 @@ func (h *OpenAIGatewayHandler) legacyGrokImages(c *gin.Context) {
 
 // GrokVideoGeneration handles xAI video generation through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoGeneration(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointVideos, h.legacyGrokVideoGeneration)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointVideos)
 }
 
 func (h *OpenAIGatewayHandler) legacyGrokVideoGeneration(c *gin.Context) {
@@ -42,7 +42,7 @@ func (h *OpenAIGatewayHandler) legacyGrokVideoGeneration(c *gin.Context) {
 
 // GrokVideoEdit handles asynchronous xAI video edits through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoEdit(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointVideos, h.legacyGrokVideoEdit)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointVideos)
 }
 
 func (h *OpenAIGatewayHandler) legacyGrokVideoEdit(c *gin.Context) {
@@ -51,7 +51,7 @@ func (h *OpenAIGatewayHandler) legacyGrokVideoEdit(c *gin.Context) {
 
 // GrokVideoExtension handles asynchronous xAI video extensions through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoExtension(c *gin.Context) {
-	_ = h.dispatchLegacyEndpoint(c, gatewayruntime.EndpointVideos, h.legacyGrokVideoExtension)
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointVideos)
 }
 
 func (h *OpenAIGatewayHandler) legacyGrokVideoExtension(c *gin.Context) {
@@ -60,12 +60,12 @@ func (h *OpenAIGatewayHandler) legacyGrokVideoExtension(c *gin.Context) {
 
 // GrokVideoStatus handles xAI video status retrieval through Grok platform accounts.
 func (h *OpenAIGatewayHandler) GrokVideoStatus(c *gin.Context) {
-	h.handleGrokMedia(c, service.GrokMediaEndpointVideoStatus, c.Param("request_id"))
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointVideos)
 }
 
 // GrokVideoContent proxies downloadable video content through the task's upstream account.
 func (h *OpenAIGatewayHandler) GrokVideoContent(c *gin.Context) {
-	h.handleGrokMedia(c, service.GrokMediaEndpointVideoContent, c.Param("request_id"))
+	h.dispatchRuntimeEndpoint(c, gatewayruntime.EndpointVideos)
 }
 
 func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.GrokMediaEndpoint, requestID string) {

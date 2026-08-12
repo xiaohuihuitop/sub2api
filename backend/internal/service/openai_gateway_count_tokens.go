@@ -237,6 +237,20 @@ func (s *OpenAIGatewayService) buildInputTokensUpstreamRequest(
 	body []byte,
 	token string,
 ) (*http.Request, error) {
+	var inboundHeaders http.Header
+	if c != nil && c.Request != nil {
+		inboundHeaders = c.Request.Header
+	}
+	return s.buildInputTokensUpstreamRequestFromHeaders(ctx, inboundHeaders, account, body, token)
+}
+
+func (s *OpenAIGatewayService) buildInputTokensUpstreamRequestFromHeaders(
+	ctx context.Context,
+	inboundHeaders http.Header,
+	account *Account,
+	body []byte,
+	token string,
+) (*http.Request, error) {
 	targetURL := openaiPlatformAPIInputTokensURL
 	if account.Type == AccountTypeAPIKey {
 		if baseURL := account.GetOpenAIBaseURL(); strings.TrimSpace(baseURL) != "" {
@@ -265,15 +279,13 @@ func (s *OpenAIGatewayService) buildInputTokensUpstreamRequest(
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("accept", "application/json")
 
-	if c != nil && c.Request != nil {
-		for key, values := range c.Request.Header {
-			lower := strings.ToLower(strings.TrimSpace(key))
-			if lower != "user-agent" && lower != "accept-language" {
-				continue
-			}
-			for _, v := range values {
-				req.Header.Add(key, v)
-			}
+	for key, values := range inboundHeaders {
+		lower := strings.ToLower(strings.TrimSpace(key))
+		if lower != "user-agent" && lower != "accept-language" {
+			continue
+		}
+		for _, v := range values {
+			req.Header.Add(key, v)
 		}
 	}
 

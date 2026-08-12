@@ -545,6 +545,38 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, err
 	}
 
+	// Native HTTP Responses attempts use the exchange-only transport core. The
+	// temporary Gin state is copied once here for request-scoped compatibility
+	// facts (namespace restoration, compact bridge and message conversion); the
+	// attempt loop itself no longer reads or writes Gin.
+	if exchange, ok := runtimeHTTPExchangeFromGinContext(c); ok && wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 {
+		copyRuntimeGinState(exchange, c)
+		reasoningEffort := extractOpenAIReasoningEffortFromBody(body, upstreamModel, billingModel, originalModel)
+		reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, reqModel)
+		reasoningEffortValue := ""
+		if reasoningEffort != nil {
+			reasoningEffortValue = *reasoningEffort
+		}
+		return s.forwardOpenAIHTTPExchange(ctx, openAIHTTPExchangeForwardInput{
+			Exchange:          exchange,
+			Account:           account,
+			Body:              body,
+			Token:             token,
+			OriginalModel:     originalModel,
+			UpstreamModel:     upstreamModel,
+			BillingModel:      billingModel,
+			ReasoningEffort:   reasoningEffortValue,
+			PromptCacheKey:    promptCacheKey,
+			APIKeyID:          apiKeyID,
+			IsCodexCLI:        isCodexCLI,
+			Stream:            reqStream,
+			StartTime:         startTime,
+			ImageBillingModel: imageBillingModel,
+			ImageSizeTier:     imageSizeTier,
+			ImageInputSize:    imageInputSize,
+		})
+	}
+
 	// 命中 WS 时仅走 WebSocket Mode；不再自动回退 HTTP。
 	if wsDecision.Transport == OpenAIUpstreamTransportResponsesWebsocketV2 {
 		// WS 分支需要结构化 payload 与重连恢复，命中后再触发 full-map decode。
@@ -810,9 +842,14 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 
 		// Send request
-		upstreamStart := time.Now()
-		resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
-		SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
+		var resp *http.Response
+		if exchange, ok := runtimeHTTPExchangeFromGinContext(c); ok {
+			resp, err = s.doOpenAIUpstreamRequestExchange(upstreamCtx, exchange, account, upstreamReq, proxyURL)
+		} else {
+			upstreamStart := time.Now()
+			resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+			SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
+		}
 		if headerGuard != nil && headerGuard.stopHeaderWait() {
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
@@ -987,6 +1024,30 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 }
 
 func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string, isStream bool, promptCacheKey string, isCodexCLI bool) (*http.Request, error) {
+	if c == nil || c.Request == nil {
+		return nil, ErrRuntimeExchangeUnavailable
+	}
+	return s.buildOpenAIUpstreamRequestFromRuntimeRequestWithState(
+		ctx,
+		c.Request,
+		account,
+		body,
+		token,
+		isStream,
+		promptCacheKey,
+		isCodexCLI,
+		openAIRequestBuildRuntimeState{
+			APIKeyID:         getAPIKeyIDFromContext(c),
+			MessagesBridge:   isOpenAICompatMessagesBridgeContext(c) || isOpenAICompatMessagesBridgeBody(body),
+			CompactSessionID: resolveOpenAICompactSessionID(c),
+		},
+	)
+}
+
+// buildUpstreamRequestLegacy preserves the pre-exchange implementation as a
+// temporary parity oracle while protocol response handling is migrated. It is
+// intentionally not called by production runtime paths.
+func (s *OpenAIGatewayService) buildUpstreamRequestLegacy(ctx context.Context, c *gin.Context, account *Account, body []byte, token string, isStream bool, promptCacheKey string, isCodexCLI bool) (*http.Request, error) {
 	// Determine target URL based on account type
 	var targetURL string
 	switch account.Type {

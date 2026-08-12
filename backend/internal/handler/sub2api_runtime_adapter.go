@@ -10,6 +10,7 @@ import (
 var (
 	ErrSub2APIRuntimeUnavailable         = errors.New("sub2api runtime adapter is unavailable")
 	ErrSub2APIRuntimeEndpointUnavailable = errors.New("sub2api runtime endpoint is unavailable")
+	ErrSub2APIRuntimeExchangeUnavailable = errors.New("sub2api runtime exchange is unavailable")
 	ErrSub2APIRuntimeTerminalMissing     = errors.New("sub2api runtime terminal usage is missing")
 )
 

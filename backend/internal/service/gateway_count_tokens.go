@@ -370,6 +370,20 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 	body []byte,
 	token string,
 ) (*http.Request, error) {
+	var headers http.Header
+	if c != nil && c.Request != nil {
+		headers = c.Request.Header
+	}
+	return s.buildCountTokensRequestAnthropicAPIKeyPassthroughFromHeaders(ctx, headers, account, body, token)
+}
+
+func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthroughFromHeaders(
+	ctx context.Context,
+	clientHeaders http.Header,
+	account *Account,
+	body []byte,
+	token string,
+) (*http.Request, error) {
 	targetURL := claudeAPICountTokensURL
 	baseURL := account.GetBaseURL()
 	if baseURL != "" {
@@ -383,9 +397,7 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 
 	// 同 buildUpstreamRequestAnthropicAPIKeyPassthrough：能力维度 sanitize。
 	clientBeta := ""
-	if c != nil && c.Request != nil {
-		clientBeta = getHeaderRaw(c.Request.Header, "anthropic-beta")
-	}
+	clientBeta = getHeaderRaw(clientHeaders, "anthropic-beta")
 	// 账号覆写了 anthropic-beta 时，覆写值即最终上游值：净化以覆写值为准
 	if beta, ok := account.HeaderOverrideValue("anthropic-beta"); ok {
 		clientBeta = beta
@@ -399,16 +411,14 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 		return nil, err
 	}
 
-	if c != nil && c.Request != nil {
-		for key, values := range c.Request.Header {
-			lowerKey := strings.ToLower(strings.TrimSpace(key))
-			if !allowedHeaders[lowerKey] {
-				continue
-			}
-			wireKey := resolveWireCasing(key)
-			for _, v := range values {
-				addHeaderRaw(req.Header, wireKey, v)
-			}
+	for key, values := range clientHeaders {
+		lowerKey := strings.ToLower(strings.TrimSpace(key))
+		if !allowedHeaders[lowerKey] {
+			continue
+		}
+		wireKey := resolveWireCasing(key)
+		for _, v := range values {
+			addHeaderRaw(req.Header, wireKey, v)
 		}
 	}
 
@@ -433,6 +443,29 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 
 // buildCountTokensRequest 构建 count_tokens 上游请求
 func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token, tokenType, modelID string, mimicClaudeCode bool) (*http.Request, []byte, error) {
+	clientHeaders := http.Header{}
+	if c != nil && c.Request != nil {
+		clientHeaders = c.Request.Header
+	}
+	filterSet := s.getBetaPolicyFilterSet(ctx, c, account, modelID)
+	setState := func(key string, value any) {
+		if c != nil {
+			c.Set(key, value)
+		}
+	}
+	return s.buildCountTokensRequestFromHeaders(ctx, clientHeaders, filterSet, setState, account, body, token, tokenType, modelID, mimicClaudeCode)
+}
+
+func (s *GatewayService) buildCountTokensRequestFromHeaders(
+	ctx context.Context,
+	clientHeaders http.Header,
+	betaPolicyFilterSet map[string]struct{},
+	setState func(string, any),
+	account *Account,
+	body []byte,
+	token, tokenType, modelID string,
+	mimicClaudeCode bool,
+) (*http.Request, []byte, error) {
 	// 确定目标 URL
 	targetURL := claudeAPICountTokensURL
 	if account.Type == AccountTypeAPIKey {
@@ -454,11 +487,6 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 			return nil, nil, err
 		}
 		targetURL = s.buildCustomRelayURL(validatedURL, "/v1/messages/count_tokens", account)
-	}
-
-	clientHeaders := http.Header{}
-	if c != nil && c.Request != nil {
-		clientHeaders = c.Request.Header
 	}
 
 	// OAuth 账号：应用统一指纹和重写 userID（受设置开关控制）
@@ -490,7 +518,7 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 
 	// === 计算最终 anthropic-beta header（先于 body sanitize 与 CCH 签名）===
 	// 顺序约束同 buildUpstreamRequest。
-	ctEffectiveDropSet := mergeDropSets(s.getBetaPolicyFilterSet(ctx, c, account, modelID))
+	ctEffectiveDropSet := mergeDropSets(betaPolicyFilterSet)
 	finalBetaHeader, finalBetaShouldSet := s.computeFinalCountTokensAnthropicBeta(
 		tokenType, mimicClaudeCode, modelID, clientHeaders, body, ctEffectiveDropSet,
 	)
@@ -569,8 +597,8 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 	// 账号级请求头覆写（仅 anthropic/openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
 
-	if c != nil && tokenType == "oauth" {
-		c.Set(claudeMimicDebugInfoKey, buildClaudeMimicDebugLine(req, body, account, tokenType, mimicClaudeCode))
+	if setState != nil && tokenType == "oauth" {
+		setState(claudeMimicDebugInfoKey, buildClaudeMimicDebugLine(req, body, account, tokenType, mimicClaudeCode))
 	}
 	if s.debugClaudeMimicEnabled() {
 		logClaudeMimicDebug(req, body, account, tokenType, mimicClaudeCode)

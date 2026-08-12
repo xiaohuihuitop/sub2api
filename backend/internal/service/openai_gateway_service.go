@@ -934,6 +934,33 @@ func (s *OpenAIGatewayService) detectCodexClientRestriction(c *gin.Context, acco
 	return s.getCodexClientRestrictionDetector().Detect(c, account, policy, body)
 }
 
+// detectCodexClientRestrictionRequest is the transport-neutral counterpart of
+// detectCodexClientRestriction. The default detector implements the request
+// surface; custom legacy-only detectors are treated conservatively so a
+// runtime request never silently bypasses an account restriction.
+func (s *OpenAIGatewayService) detectCodexClientRestrictionRequest(ctx context.Context, header http.Header, account *Account, body []byte) CodexClientRestrictionDetectionResult {
+	policy := CodexRestrictionPolicy{EngineFingerprintSignals: openai.DefaultEngineFingerprintSignals}
+	if account != nil && account.IsCodexCLIOnlyEnabled() && s != nil && s.settingService != nil {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		policy = s.settingService.GetCodexRestrictionPolicy(ctx)
+	}
+	type requestDetector interface {
+		DetectRequest(http.Header, *Account, CodexRestrictionPolicy, []byte) CodexClientRestrictionDetectionResult
+	}
+	detector := s.getCodexClientRestrictionDetector()
+	if requestAware, ok := detector.(requestDetector); ok {
+		return requestAware.DetectRequest(header, account, policy, body)
+	}
+	if account != nil && account.IsCodexCLIOnlyEnabled() {
+		return CodexClientRestrictionDetectionResult{
+			Enabled: true, Matched: false, Reason: CodexClientRestrictionReasonNotMatchedUA,
+		}
+	}
+	return CodexClientRestrictionDetectionResult{Enabled: false, Matched: false, Reason: CodexClientRestrictionReasonDisabled}
+}
+
 func getAPIKeyIDFromContext(c *gin.Context) int64 {
 	if c == nil {
 		return 0

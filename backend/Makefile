@@ -1,5 +1,16 @@
 .PHONY: build generate test test-unit test-integration test-e2e
 
+UNIT_PACKAGES := ./internal/... ./ent/... ./migrations ./cmd/...
+
+INTEGRATION_PACKAGES := \
+	./internal/repository \
+	./internal/middleware \
+	./internal/server/routes \
+	./internal/pkg/tlsfingerprint \
+	./ent/migrate \
+	./migrations \
+	./cmd/...
+
 VERSION ?= $(shell ./scripts/resolve-version.sh)
 LDFLAGS ?= -s -w -X main.Version=$(VERSION)
 
@@ -11,14 +22,14 @@ generate:
 	go generate ./cmd/server
 
 test:
-	go test ./...
+	go test $(UNIT_PACKAGES)
 	golangci-lint run ./...
 
 test-unit:
-	go test -tags=unit ./...
+	go test -tags=unit $(UNIT_PACKAGES)
 
 test-integration:
-	go test -tags=integration ./...
+	go test -tags=integration $(INTEGRATION_PACKAGES)
 
 test-e2e:
 	./scripts/e2e-test.sh

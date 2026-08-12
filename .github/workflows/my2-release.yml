@@ -12,16 +12,20 @@ on:
         type: string
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 concurrency:
   group: my2-preview-${{ github.event.inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  source-gate:
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.metadata.outputs.tag_name }}
+      version: ${{ steps.metadata.outputs.version }}
+      image: ${{ steps.metadata.outputs.image }}
+      commit_sha: ${{ steps.metadata.outputs.commit_sha }}
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v6
@@ -29,7 +33,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Resolve preview metadata
+      - name: Resolve and verify preview metadata
         id: metadata
         shell: bash
         env:
@@ -50,11 +54,119 @@ jobs:
               ;;
           esac
 
+          git fetch --no-tags origin "+refs/heads/my2.0:refs/remotes/origin/my2.0"
+          TAG_COMMIT="$(git rev-list -n 1 "$TAG_NAME")"
+          if [ -z "$TAG_COMMIT" ]; then
+            echo "Unable to resolve tag commit: $TAG_NAME" >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/my2.0; then
+            echo "Tag $TAG_NAME does not belong to the my2.0 branch history" >&2
+            exit 1
+          fi
+
           VERSION="${TAG_NAME#my2-v}"
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$TAG_COMMIT" >> "$GITHUB_OUTPUT"
+
+  backend-gate:
+    needs: source-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validated tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source-gate.outputs.tag_name }}
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: go version | grep -q 'go1.26.5'
+      - name: Unit tests
+        working-directory: backend
+        run: make test-unit
+      - name: Integration tests
+        working-directory: backend
+        run: make test-integration
+
+  frontend-gate:
+    needs: source-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validated tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source-gate.outputs.tag_name }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Full frontend tests
+        working-directory: frontend
+        run: pnpm run test:run
+      - name: Frontend typecheck
+        working-directory: frontend
+        run: pnpm run typecheck
+      - name: Frontend lint
+        working-directory: frontend
+        run: pnpm run lint:check
+
+  lint-gate:
+    needs: source-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validated tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source-gate.outputs.tag_name }}
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: go version | grep -q 'go1.26.5'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.9
+          args: --timeout=30m
+          working-directory: backend
+
+  release:
+    needs:
+      - source-gate
+      - backend-gate
+      - frontend-gate
+      - lint-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.source-gate.outputs.tag_name }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -84,7 +196,8 @@ jobs:
       - name: Build embedded server
         shell: bash
         env:
-          VERSION: ${{ steps.metadata.outputs.version }}
+          VERSION: ${{ needs.source-gate.outputs.version }}
+          COMMIT_SHA: ${{ needs.source-gate.outputs.commit_sha }}
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: '0'
@@ -93,7 +206,7 @@ jobs:
           mkdir -p .release/my2
           printf '%s\n' "$VERSION" > backend/cmd/server/VERSION
           go build -C backend -tags=embed -trimpath \
-            -ldflags "-s -w -X main.Commit=${GITHUB_SHA} -X main.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.BuildType=my2" \
+            -ldflags "-s -w -X main.Commit=${COMMIT_SHA} -X main.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.BuildType=my2" \
             -o ../.release/my2/sub2api ./cmd/server
 
       - name: Prepare Docker build context
@@ -115,16 +228,17 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish my2 image
+      - name: Build and publish versioned my2 image
         shell: bash
         env:
-          IMAGE: ${{ steps.metadata.outputs.image }}
-          VERSION: ${{ steps.metadata.outputs.version }}
+          IMAGE: ${{ needs.source-gate.outputs.image }}
+          VERSION: ${{ needs.source-gate.outputs.version }}
+          COMMIT_SHA: ${{ needs.source-gate.outputs.commit_sha }}
         run: |
           set -euo pipefail
           docker buildx build --platform linux/amd64 --pull --load \
             --label "org.opencontainers.image.version=$VERSION" \
-            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.revision=$COMMIT_SHA" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             -f .release/my2/Dockerfile \
             -t "sub2api:my2-latest" \
@@ -132,30 +246,34 @@ jobs:
             -t "$IMAGE:my2-latest" \
             -t "$IMAGE:my2-$VERSION" \
             .release/my2
-          docker push "$IMAGE:my2-latest"
           docker push "$IMAGE:my2-$VERSION"
 
-      - name: Create offline Docker package
+      - name: Create and validate offline Docker package
         shell: bash
         env:
-          VERSION: ${{ steps.metadata.outputs.version }}
+          VERSION: ${{ needs.source-gate.outputs.version }}
         run: |
           set -euo pipefail
           docker save "sub2api:my2-latest" "sub2api:my2-$VERSION" | gzip -9 > sub2api_my2_latest.tar
+          test -s sub2api_my2_latest.tar
+          gzip -t sub2api_my2_latest.tar
           sha256sum sub2api_my2_latest.tar > sub2api_my2_latest.tar.sha256
+          sha256sum -c sub2api_my2_latest.tar.sha256
+          ARCH="$(docker image inspect "sub2api:my2-$VERSION" --format '{{.Os}}/{{.Architecture}}')"
+          test "$ARCH" = "linux/amd64"
 
       - name: Publish my2 prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.metadata.outputs.tag_name }}
-          name: Sub2API My2 ${{ steps.metadata.outputs.version }}
+          tag_name: ${{ needs.source-gate.outputs.tag_name }}
+          name: Sub2API My2 ${{ needs.source-gate.outputs.version }}
           prerelease: true
           body: |
             My2 test channel. This release does not replace the stable `latest` image.
 
             Docker image:
             ```bash
-            docker pull ${{ steps.metadata.outputs.image }}:my2-${{ steps.metadata.outputs.version }}
+            docker pull ${{ needs.source-gate.outputs.image }}:my2-${{ needs.source-gate.outputs.version }}
             ```
 
             Offline package:
@@ -166,3 +284,11 @@ jobs:
           files: |
             sub2api_my2_latest.tar
             sub2api_my2_latest.tar.sha256
+
+      - name: Publish my2 latest tag
+        shell: bash
+        env:
+          IMAGE: ${{ needs.source-gate.outputs.image }}
+        run: |
+          set -euo pipefail
+          docker push "$IMAGE:my2-latest"

@@ -34,6 +34,7 @@ func (e *ginHTTPExchange) WriteHeader(status int) {
 		return
 	}
 	e.context.Writer.WriteHeader(status)
+	e.context.Set(gatewayruntime.HTTPExchangeStatusStateKey, status)
 }
 
 func (e *ginHTTPExchange) Write(body []byte) (int, error) {

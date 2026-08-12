@@ -29,6 +29,12 @@ type PlatformRoute struct {
 }
 
 type RequestMetadata struct {
+	// APIKeyID is a scalar correlation value copied by ingress. The runtime
+	// never receives the API key entity or any product-side credential state.
+	APIKeyID int64
+	// UserID is a scalar owner identifier used only for long-lived media task
+	// bindings; the runtime never receives the user entity.
+	UserID             int64
 	Headers            map[string]string
 	UserAgent          string
 	ClientIP           string

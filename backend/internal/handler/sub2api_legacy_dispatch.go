@@ -74,47 +74,6 @@ func (e legacyEndpointExecutor) Execute(
 	return gatewayruntime.Result{StatusCode: status, Response: gatewayruntime.Response{Streamed: request.Stream}}, nil
 }
 
-type contextDecisionProvider struct{}
-
-func (contextDecisionProvider) Resolve(ctx context.Context, _ productcore.AccessGrant, _ productcore.Request) (*productcore.Decision, error) {
-	route, ok := service.GatewayPlatformAssetContextFromContext(ctx)
-	if !ok || route == nil || route.Platform == nil {
-		return nil, service.ErrAPIKeyPlatformForbidden
-	}
-	platform := route.Platform
-	decision := &productcore.Decision{
-		Platform: productcore.Platform{
-			ID:                   platform.PlatformID,
-			Code:                 platform.PlatformCode,
-			AccountPlatform:      platform.AccountPlatform,
-			RequestedModel:       platform.RequestedModel,
-			UpstreamModel:        platform.UpstreamModel,
-			EndpointCapabilities: append([]string(nil), platform.EndpointCapabilities...),
-			MatchPriority:        platform.MatchPriority,
-		},
-	}
-	if route.BillingAsset != nil {
-		asset := route.BillingAsset
-		decision.BillingAsset = &productcore.BillingAsset{
-			Source:         asset.Source,
-			SubscriptionID: cloneInt64Pointer(asset.SubscriptionID),
-			PlanID:         cloneInt64Pointer(asset.PlanID),
-			RateMultiplier: asset.RateMultiplier,
-		}
-	}
-	return decision, nil
-}
-
-type noOpRuntimeUsageSink struct{}
-
-func (noOpRuntimeUsageSink) RecordFinal(context.Context, gatewayruntime.UsageEvent) error { return nil }
-
-type noOpRuntimeUsageSinkFactory struct{}
-
-func (noOpRuntimeUsageSinkFactory) ForDecision(applicationgateway.DecisionSnapshot) gatewayruntime.UsageSink {
-	return noOpRuntimeUsageSink{}
-}
-
 func (h *GatewayHandler) dispatchLegacyEndpoint(c *gin.Context, endpoint gatewayruntime.Endpoint, legacy legacyGinHandler) error {
 	if h != nil && h.applicationGateway != nil {
 		return dispatchLegacyEndpointWithGateway(c, endpoint, legacy, h.applicationGateway)
@@ -193,91 +152,9 @@ func dispatchLegacyEndpointWithGateway(c *gin.Context, endpoint gatewayruntime.E
 	return err
 }
 
-// NewSub2APIProductionApplicationGateway composes the existing protocol
-// handlers behind one runtime adapter. The handlers remain protocol-specific;
-// the application boundary is shared and is the only production dispatch path.
-func NewSub2APIProductionApplicationGateway(gatewayHandler *GatewayHandler, openaiHandler *OpenAIGatewayHandler, apiKeys service.ProductUsageAPIKeyLoader) *applicationgateway.Gateway {
-	executors := make(map[gatewayruntime.Endpoint]Sub2APIEndpointExecutor, 12)
-	for _, endpoint := range []gatewayruntime.Endpoint{
-		gatewayruntime.EndpointMessages,
-		gatewayruntime.EndpointChatCompletions,
-		gatewayruntime.EndpointResponses,
-	} {
-		executors[endpoint] = sub2APIMessagesExecutor{
-			gatewayHandler: gatewayHandler,
-			openaiHandler:  openaiHandler,
-			endpoint:       endpoint,
-		}
-	}
-	for _, endpoint := range []gatewayruntime.Endpoint{
-		gatewayruntime.EndpointGeminiNative,
-		gatewayruntime.EndpointEmbeddings,
-		gatewayruntime.EndpointAlphaSearch,
-		gatewayruntime.EndpointImages,
-		gatewayruntime.EndpointVideos,
-		gatewayruntime.EndpointCountTokens,
-		gatewayruntime.EndpointLive,
-	} {
-		executors[endpoint] = sub2APIAuxiliaryExecutor{
-			gatewayHandler: gatewayHandler,
-			openAIHandler:  openaiHandler,
-			endpoint:       endpoint,
-		}
-	}
-	adapter := NewSub2APIRuntimeAdapter(executors)
-	usageFactory := service.NewSub2APIProductUsageSinkFactory(
-		gatewayServiceFromHandler(gatewayHandler),
-		openAIGatewayServiceFromHandler(openaiHandler),
-		apiKeys,
-	)
-	return applicationgateway.New(contextDecisionProvider{}, adapter, usageFactory)
-}
-
-func gatewayServiceFromHandler(h *GatewayHandler) *service.GatewayService {
-	if h == nil {
-		return nil
-	}
-	return h.gatewayService
-}
-
-func openAIGatewayServiceFromHandler(h *OpenAIGatewayHandler) *service.OpenAIGatewayService {
-	if h == nil {
-		return nil
-	}
-	return h.gatewayService
-}
-
 func (h *OpenAIGatewayHandler) dispatchLegacyEndpoint(c *gin.Context, endpoint gatewayruntime.Endpoint, legacy legacyGinHandler) error {
 	if h != nil && h.applicationGateway != nil {
 		return dispatchLegacyEndpointWithGateway(c, endpoint, legacy, h.applicationGateway)
 	}
 	return dispatchLegacyEndpoint(c, endpoint, legacy)
-}
-
-func endpointCapabilityForRuntime(endpoint gatewayruntime.Endpoint) string {
-	switch endpoint {
-	case gatewayruntime.EndpointChatCompletions:
-		return "chat_completions"
-	case gatewayruntime.EndpointResponses:
-		return "responses"
-	case gatewayruntime.EndpointMessages:
-		return "messages"
-	default:
-		return string(endpoint)
-	}
-}
-
-func requestLikelyStreams(c *gin.Context) bool {
-	if c == nil || c.Request == nil {
-		return false
-	}
-	return strings.EqualFold(c.GetHeader("Accept"), "text/event-stream")
-}
-
-func cloneInt64Pointer(value *int64) *int64 {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }

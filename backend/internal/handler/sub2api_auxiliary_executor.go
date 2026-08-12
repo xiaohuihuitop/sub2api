@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -37,66 +36,13 @@ func (e sub2APIAuxiliaryExecutor) Execute(ctx context.Context, request gatewayru
 }
 
 func (e sub2APIAuxiliaryExecutor) handlerFor(request gatewayruntime.Request, adapter string) legacyGinHandler {
-	adapter = strings.ToLower(strings.TrimSpace(adapter))
 	switch e.endpoint {
-	case gatewayruntime.EndpointGeminiNative:
-		if e.gatewayHandler != nil {
-			return e.gatewayHandler.legacyGeminiV1BetaModels
-		}
-	case gatewayruntime.EndpointCountTokens:
-		if adapter == service.PlatformOpenAI && e.openAIHandler != nil {
-			return e.openAIHandler.legacyCountTokens
-		}
-		if adapter == service.PlatformGrok && e.openAIHandler != nil {
-			return e.openAIHandler.legacyGrokCountTokens
-		}
-		if e.gatewayHandler != nil {
-			return e.gatewayHandler.legacyCountTokens
-		}
-	case gatewayruntime.EndpointEmbeddings:
-		if e.openAIHandler != nil {
-			return e.openAIHandler.legacyEmbeddings
-		}
-	case gatewayruntime.EndpointAlphaSearch:
-		if e.openAIHandler != nil {
-			return e.openAIHandler.legacyAlphaSearch
-		}
-	case gatewayruntime.EndpointImages:
-		if e.openAIHandler != nil {
-			if adapter == service.PlatformGrok {
-				return e.openAIHandler.legacyGrokImages
-			}
-			return e.openAIHandler.legacyImages
-		}
-	case gatewayruntime.EndpointVideos:
-		return e.videoHandler(runtimeRequestPath(request))
 	case gatewayruntime.EndpointLive:
 		if e.openAIHandler != nil {
 			return e.openAIHandler.legacyLive
 		}
 	}
 	return nil
-}
-
-func (e sub2APIAuxiliaryExecutor) videoHandler(path string) legacyGinHandler {
-	if e.openAIHandler == nil {
-		return nil
-	}
-	switch {
-	case strings.Contains(path, "/videos/edits"):
-		return e.openAIHandler.legacyGrokVideoEdit
-	case strings.Contains(path, "/videos/extensions"):
-		return e.openAIHandler.legacyGrokVideoExtension
-	default:
-		return e.openAIHandler.legacyGrokVideoGeneration
-	}
-}
-
-func runtimeRequestPath(request gatewayruntime.Request) string {
-	if request.Exchange != nil && request.Exchange.Request() != nil && request.Exchange.Request().URL != nil {
-		return request.Exchange.Request().URL.Path
-	}
-	return request.InboundEndpoint
 }
 
 var _ Sub2APIEndpointExecutor = (*sub2APIAuxiliaryExecutor)(nil)
