@@ -75,14 +75,22 @@ func (r *platformRepository) DeleteUnused(ctx context.Context, id int64) error {
 		}
 		return fmt.Errorf("lock platform: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `LOCK TABLE scheduler_outbox, ops_error_logs, ops_system_metrics,
-		ops_metrics_hourly, ops_metrics_daily, ops_alert_silences, ops_alert_rules,
-		ops_alert_events, settings IN SHARE MODE`); err != nil {
+	var hasOpsAlertSilences bool
+	if err := tx.QueryRowContext(ctx, `SELECT to_regclass('public.ops_alert_silences') IS NOT NULL`).Scan(&hasOpsAlertSilences); err != nil {
+		return fmt.Errorf("check optional platform reference tables: %w", err)
+	}
+	lockSQL := platformReferenceTableLockSQL
+	opsAlertSilencesCountSQL := `0::bigint AS ops_alert_silences`
+	if hasOpsAlertSilences {
+		lockSQL = platformReferenceTableLockWithAlertSilencesSQL
+		opsAlertSilencesCountSQL = `(SELECT COUNT(*) FROM ops_alert_silences WHERE platform_id = $1) AS ops_alert_silences`
+	}
+	if _, err := tx.ExecContext(ctx, lockSQL); err != nil {
 		return fmt.Errorf("lock platform reference tables: %w", err)
 	}
 
 	var counts platformReferenceCounts
-	err = tx.QueryRowContext(ctx, platformReferenceCountSQL, id).Scan(
+	err = tx.QueryRowContext(ctx, fmt.Sprintf(platformReferenceCountSQLTemplate, opsAlertSilencesCountSQL), id).Scan(
 		&counts.accounts, &counts.apiKeys, &counts.usageLogs,
 		&counts.promptAuditJobs, &counts.promptAuditEvents, &counts.contentModerationLogs,
 		&counts.schedulerOutbox, &counts.opsErrorLogs, &counts.opsSystemMetrics,
@@ -114,7 +122,13 @@ func (r *platformRepository) DeleteUnused(ctx context.Context, id int64) error {
 	return nil
 }
 
-const platformReferenceCountSQL = `SELECT
+const platformReferenceTableLockSQL = `LOCK TABLE scheduler_outbox, ops_error_logs, ops_system_metrics,
+	ops_metrics_hourly, ops_metrics_daily, ops_alert_rules, ops_alert_events, settings IN SHARE MODE`
+
+const platformReferenceTableLockWithAlertSilencesSQL = `LOCK TABLE scheduler_outbox, ops_error_logs, ops_system_metrics,
+	ops_metrics_hourly, ops_metrics_daily, ops_alert_silences, ops_alert_rules, ops_alert_events, settings IN SHARE MODE`
+
+const platformReferenceCountSQLTemplate = `SELECT
 	(SELECT COUNT(*) FROM accounts WHERE platform_id = $1) AS accounts,
 	(SELECT COUNT(*) FROM api_key_platforms WHERE platform_id = $1) AS api_keys,
 	(SELECT COUNT(*) FROM usage_logs WHERE platform_id = $1) AS usage_logs,
@@ -126,7 +140,7 @@ const platformReferenceCountSQL = `SELECT
 	(SELECT COUNT(*) FROM ops_system_metrics WHERE platform_id = $1) AS ops_system_metrics,
 	(SELECT COUNT(*) FROM ops_metrics_hourly WHERE platform_id = $1) AS ops_metrics_hourly,
 	(SELECT COUNT(*) FROM ops_metrics_daily WHERE platform_id = $1) AS ops_metrics_daily,
-	(SELECT COUNT(*) FROM ops_alert_silences WHERE platform_id = $1) AS ops_alert_silences,
+	%s,
 	(SELECT COUNT(*) FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_rules,
 	(SELECT COUNT(*) FROM ops_alert_events WHERE COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_events,
 	(SELECT COUNT(*) FROM settings WHERE key = 'content_moderation_config'

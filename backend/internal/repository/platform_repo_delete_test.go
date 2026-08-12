@@ -27,6 +27,8 @@ func expectPlatformDeletePrelude(mock sqlmock.Sqlmock, id int64) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM platforms WHERE id = $1 FOR UPDATE")).
 		WithArgs(id).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(id))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT to_regclass('public.ops_alert_silences') IS NOT NULL")).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectExec("LOCK TABLE scheduler_outbox.*IN SHARE MODE").WillReturnResult(sqlmock.NewResult(0, 0))
 }
 
@@ -78,5 +80,24 @@ func TestPlatformRepositoryDeleteUnusedReturnsNotFound(t *testing.T) {
 	mock.ExpectRollback()
 
 	require.ErrorIs(t, repo.DeleteUnused(context.Background(), 7), service.ErrPlatformNotFound)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPlatformRepositoryDeleteUnusedAllowsMissingOptionalOpsTable(t *testing.T) {
+	repo, mock := newPlatformDeleteRepo(t)
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM platforms WHERE id = $1 FOR UPDATE")).
+		WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(7)))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT to_regclass('public.ops_alert_silences') IS NOT NULL")).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	mock.ExpectExec("LOCK TABLE scheduler_outbox.*ops_alert_events, settings IN SHARE MODE").
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery("SELECT.*accounts.*0::bigint AS ops_alert_silences.*prompt_audit_config").WithArgs(int64(7)).
+		WillReturnRows(platformReferenceRows(make([]int64, 16)...))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM platforms WHERE id = $1")).WithArgs(int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	require.NoError(t, repo.DeleteUnused(context.Background(), 7))
 	require.NoError(t, mock.ExpectationsWereMet())
 }
