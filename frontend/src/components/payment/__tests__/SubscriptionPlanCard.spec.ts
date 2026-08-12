@@ -24,6 +24,7 @@ const i18n = createI18n({
           unlimited: "Unlimited",
         },
         subscribeNow: "Subscribe now",
+        addAnother: "Add another",
       },
     },
   },
@@ -138,5 +139,17 @@ describe("SubscriptionPlanCard", () => {
     expect(title.text()).toBe("Pro");
     expect(title.attributes("title")).toBe("Pro");
     expect(title.classes()).toEqual(expect.arrayContaining(["text-base", "font-bold", "h-12"]));
+  });
+
+  it("labels a repeated plan purchase as another independent subscription", () => {
+	const wrapper = mount(SubscriptionPlanCard, {
+	  props: {
+		plan: { id: 1, name: "Pro", price: 10, amount: 1000, features: [], rate_multiplier: 1, validity_days: 30, validity_unit: "day", supported_model_scopes: [], is_active: true },
+		activeSubscriptions: [{ id: 9, subscription_plan_id: 1, status: "active" }],
+	  },
+	  global: { plugins: [i18n, createPinia()] },
+	});
+
+	expect(wrapper.get("button").text()).toBe("payment.addAnother");
   });
 });

@@ -19,6 +19,8 @@ type platformHandlerServiceStub struct {
 	platforms []service.Platform
 	created   service.CreatePlatformInput
 	updated   service.UpdatePlatformInput
+	deletedID int64
+	deleteErr error
 }
 
 func (s *platformHandlerServiceStub) List(context.Context) ([]service.Platform, error) {
@@ -45,6 +47,11 @@ func (s *platformHandlerServiceStub) Update(_ context.Context, id int64, input s
 	return &service.Platform{ID: id, Code: "gpt", Name: "GPT", AccountPlatform: service.PlatformOpenAI, Status: service.PlatformStatusActive}, nil
 }
 
+func (s *platformHandlerServiceStub) Delete(_ context.Context, id int64) error {
+	s.deletedID = id
+	return s.deleteErr
+}
+
 func setupPlatformHandlerRouter(svc platformManagementService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -53,7 +60,54 @@ func setupPlatformHandlerRouter(svc platformManagementService) *gin.Engine {
 	router.GET("/api/v1/admin/platforms/:id", handler.GetByID)
 	router.POST("/api/v1/admin/platforms", handler.Create)
 	router.PUT("/api/v1/admin/platforms/:id", handler.Update)
+	router.DELETE("/api/v1/admin/platforms/:id", handler.Delete)
 	return router
+}
+
+func TestPlatformHandlerDeletesUnusedPlatform(t *testing.T) {
+	stub := &platformHandlerServiceStub{}
+	router := setupPlatformHandlerRouter(stub)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/api/v1/admin/platforms/7", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, int64(7), stub.deletedID)
+	require.JSONEq(t, `{"code":0,"message":"success"}`, recorder.Body.String())
+}
+
+func TestPlatformHandlerReturnsConflictForReferencedPlatform(t *testing.T) {
+	stub := &platformHandlerServiceStub{
+		deleteErr: service.ErrPlatformInUse.WithMetadata(map[string]string{"accounts": "1"}),
+	}
+	router := setupPlatformHandlerRouter(stub)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/api/v1/admin/platforms/7", nil))
+
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"reason":"PLATFORM_IN_USE"`)
+	require.Contains(t, recorder.Body.String(), `"accounts":"1"`)
+}
+
+func TestPlatformHandlerRejectsInvalidDeleteID(t *testing.T) {
+	router := setupPlatformHandlerRouter(&platformHandlerServiceStub{})
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/api/v1/admin/platforms/0", nil))
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestPlatformHandlerReturnsNotFoundWhenDeletingMissingPlatform(t *testing.T) {
+	stub := &platformHandlerServiceStub{deleteErr: service.ErrPlatformNotFound}
+	router := setupPlatformHandlerRouter(stub)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/api/v1/admin/platforms/7", nil))
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"reason":"PLATFORM_NOT_FOUND"`)
 }
 
 func TestPlatformHandlerListsAndCreatesPlatformPools(t *testing.T) {

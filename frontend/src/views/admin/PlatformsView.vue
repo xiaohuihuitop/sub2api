@@ -72,14 +72,28 @@
           </label>
         </template>
         <template #cell-actions="{ row }">
-          <button class="icon-button" type="button" :title="t('common.edit')" :aria-label="t('common.edit')" @click="openEdit(row)">
-            <Icon name="edit" size="sm" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button class="icon-button" type="button" :title="t('common.edit')" :aria-label="t('common.edit')" @click="openEdit(row)">
+              <Icon name="edit" size="sm" />
+            </button>
+            <button class="icon-button text-red-600 hover:text-red-700 dark:text-red-400" type="button" :data-test="`delete-platform-${row.id}`" :title="t('common.delete')" :aria-label="t('common.delete')" @click="confirmDelete(row)">
+              <Icon name="trash" size="sm" />
+            </button>
+          </div>
         </template>
       </DataTable>
     </div>
 
     <PlatformPoolDialog :show="showDialog" :platform="editingPlatform" :submitting="saving" @close="closeDialog" @save="savePlatform" />
+    <ConfirmDialog
+      :show="deletingPlatform !== null"
+      :title="t('admin.platforms.deleteTitle')"
+      :message="t('admin.platforms.deleteMessage', { name: deletingPlatform?.name ?? '' })"
+      :confirm-text="t('common.delete')"
+      danger
+      @confirm="deletePlatform"
+      @cancel="deletingPlatform = null"
+    />
   </AppLayout>
 </template>
 
@@ -94,8 +108,9 @@ import DataTable from '@/components/common/DataTable.vue'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import PlatformPoolDialog from '@/components/admin/platform/PlatformPoolDialog.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useAppStore } from '@/stores/app'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -105,6 +120,7 @@ const loadError = ref(false)
 const saving = ref(false)
 const showDialog = ref(false)
 const editingPlatform = ref<PlatformPool | null>(null)
+const deletingPlatform = ref<PlatformPool | null>(null)
 
 const columns = computed((): Column[] => [
   { key: 'name', label: t('admin.platforms.name') },
@@ -179,6 +195,23 @@ async function toggleStatus(platform: PlatformPool) {
     await loadPlatforms()
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('admin.platforms.saveFailed')))
+  }
+}
+
+function confirmDelete(platform: PlatformPool) {
+  deletingPlatform.value = platform
+}
+
+async function deletePlatform() {
+  const platform = deletingPlatform.value
+  if (!platform) return
+  try {
+    await adminAPI.platforms.remove(platform.id)
+    deletingPlatform.value = null
+    appStore.showSuccess(t('admin.platforms.deleted'))
+    await loadPlatforms()
+  } catch (error) {
+    appStore.showError(extractI18nErrorMessage(error, t, 'admin.platforms.errors', t('admin.platforms.deleteFailed')))
   }
 }
 

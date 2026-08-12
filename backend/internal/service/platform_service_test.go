@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,8 +56,10 @@ func (r *platformRepositoryStub) HasAccountsByPlatformID(context.Context, int64)
 
 type platformManagementRepositoryStub struct {
 	platformRepositoryStub
-	platform *Platform
-	updated  *Platform
+	platform  *Platform
+	updated   *Platform
+	deletedID int64
+	deleteErr error
 }
 
 func (r *platformManagementRepositoryStub) GetByID(context.Context, int64) (*Platform, error) {
@@ -66,6 +69,37 @@ func (r *platformManagementRepositoryStub) GetByID(context.Context, int64) (*Pla
 func (r *platformManagementRepositoryStub) Update(_ context.Context, platform *Platform) error {
 	r.updated = platform
 	return nil
+}
+
+func (r *platformManagementRepositoryStub) DeleteUnused(_ context.Context, id int64) error {
+	r.deletedID = id
+	return r.deleteErr
+}
+
+func TestPlatformServiceDeleteUsesAtomicRepositoryOperation(t *testing.T) {
+	repo := &platformManagementRepositoryStub{}
+
+	err := NewPlatformService(repo).Delete(context.Background(), 17)
+
+	require.NoError(t, err)
+	require.Equal(t, int64(17), repo.deletedID)
+}
+
+func TestPlatformServiceDeleteRejectsInvalidID(t *testing.T) {
+	err := NewPlatformService(&platformManagementRepositoryStub{}).Delete(context.Background(), 0)
+
+	require.ErrorIs(t, err, ErrPlatformNotFound)
+}
+
+func TestPlatformServiceDeletePreservesInUseError(t *testing.T) {
+	repo := &platformManagementRepositoryStub{
+		deleteErr: ErrPlatformInUse.WithMetadata(map[string]string{"accounts": "1"}),
+	}
+
+	err := NewPlatformService(repo).Delete(context.Background(), 17)
+
+	require.ErrorIs(t, err, ErrPlatformInUse)
+	require.Equal(t, "1", infraerrors.FromError(err).Metadata["accounts"])
 }
 
 func TestPlatformServiceCreateAllowsCrossPlatformModelOverlap(t *testing.T) {

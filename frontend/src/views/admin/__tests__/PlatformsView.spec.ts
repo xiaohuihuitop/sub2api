@@ -14,7 +14,7 @@ vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
     ...actual,
-    useI18n: () => ({ t: (key: string) => key }),
+    useI18n: () => ({ t: (key: string) => key === 'admin.platforms.errors.PLATFORM_IN_USE' ? 'localized platform in use' : key }),
   }
 })
 
@@ -24,6 +24,7 @@ vi.mock('@/api/admin', () => ({
       list: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      remove: vi.fn(),
     },
   },
 }))
@@ -56,6 +57,11 @@ const mountView = () => mount(PlatformsView, {
       Icon: true,
       PlatformIcon: true,
       PlatformPoolDialog: { template: '<div />' },
+      ConfirmDialog: defineComponent({
+        props: ['show', 'title', 'message'],
+        emits: ['confirm', 'cancel'],
+        template: '<button v-if="show" data-test="confirm-platform-delete" @click="$emit(\'confirm\')">confirm</button>',
+      }),
     },
   },
 })
@@ -63,6 +69,9 @@ const mountView = () => mount(PlatformsView, {
 describe('PlatformsView', () => {
   beforeEach(() => {
     vi.mocked(adminAPI.platforms.list).mockReset()
+    vi.mocked(adminAPI.platforms.remove).mockReset()
+    showError.mockReset()
+    showSuccess.mockReset()
   })
 
   it('renders platforms from the platform-level endpoint contract', async () => {
@@ -106,5 +115,41 @@ describe('PlatformsView', () => {
 
     expect(wrapper.find('[data-test="platform-load-error"]').exists()).toBe(true)
     expect(showError).toHaveBeenCalled()
+  })
+
+  it('deletes a platform only after explicit confirmation', async () => {
+    vi.mocked(adminAPI.platforms.list).mockResolvedValue([{
+      id: 7, code: 'unused', name: 'Unused', account_platform: 'openai', status: 'disabled',
+      endpoint_capabilities: [], model_rules: [],
+    }])
+    vi.mocked(adminAPI.platforms.remove).mockResolvedValue(undefined)
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    expect(adminAPI.platforms.remove).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="confirm-platform-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(adminAPI.platforms.remove).toHaveBeenCalledWith(7)
+    expect(showSuccess).toHaveBeenCalledWith('admin.platforms.deleted')
+  })
+
+  it('shows the localized safe-delete conflict instead of removing references', async () => {
+    vi.mocked(adminAPI.platforms.list).mockResolvedValue([{
+      id: 7, code: 'used', name: 'Used', account_platform: 'openai', status: 'active',
+      endpoint_capabilities: ['responses'], model_rules: [],
+    }])
+    vi.mocked(adminAPI.platforms.remove).mockRejectedValue({
+      reason: 'PLATFORM_IN_USE', metadata: { accounts: '1', api_keys: '2', usage_logs: '3', audits: '4', ops: '5', configs: '6' },
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    await wrapper.get('[data-test="confirm-platform-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(showError).toHaveBeenCalledWith('localized platform in use')
   })
 })

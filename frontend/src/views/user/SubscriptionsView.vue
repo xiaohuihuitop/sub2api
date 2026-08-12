@@ -60,9 +60,9 @@
               <button
                 v-if="subscription.status === 'active'"
                 class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
-                @click="renewSubscription(subscription)"
+                @click="purchaseAnother(subscription)"
               >
-                {{ t('payment.renewNow') }}
+                {{ t('payment.addAnother') }}
               </button>
             </div>
           </div>
@@ -280,7 +280,7 @@ function formatSubscriptionLimit(subscription: UserSubscription, window: Subscri
   return (getSubscriptionLimit(subscription, window) ?? 0).toFixed(2)
 }
 
-function renewSubscription(subscription: UserSubscription) {
+function purchaseAnother(subscription: UserSubscription) {
   const query = subscription.subscription_plan_id
     ? { tab: 'subscription', plan: String(subscription.subscription_plan_id) }
     : { tab: 'subscription' }

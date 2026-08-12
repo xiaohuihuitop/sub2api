@@ -321,7 +321,8 @@ export default {
       qrFailed: 'Failed to get WeChat Pay QR code',
     },
     subscribeNow: 'Subscribe Now',
-    renewNow: 'Renew',
+    addAnother: 'Add another',
+    independentSubscriptionNotice: 'Each purchase creates a separate subscription and does not extend an existing duration. Multiple subscriptions coexist and are consumed in system order.',
     selectPlan: 'Select Plan',
     planFeatures: 'Features',
     planCard: {

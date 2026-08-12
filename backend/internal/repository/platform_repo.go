@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -30,6 +31,110 @@ func (r *platformRepository) HasAccountsByPlatformID(ctx context.Context, platfo
 	}
 	return exists, nil
 }
+
+type platformReferenceCounts struct {
+	accounts, apiKeys, usageLogs                              int64
+	promptAuditJobs, promptAuditEvents, contentModerationLogs int64
+	schedulerOutbox, opsErrorLogs, opsSystemMetrics           int64
+	opsMetricsHourly, opsMetricsDaily, opsAlertSilences       int64
+	opsAlertRules, opsAlertEvents                             int64
+	contentModerationConfig, promptAuditConfig                int64
+}
+
+func (c platformReferenceCounts) total() int64 {
+	return c.accounts + c.apiKeys + c.usageLogs + c.promptAuditJobs + c.promptAuditEvents +
+		c.contentModerationLogs + c.schedulerOutbox + c.opsErrorLogs + c.opsSystemMetrics +
+		c.opsMetricsHourly + c.opsMetricsDaily + c.opsAlertSilences + c.opsAlertRules +
+		c.opsAlertEvents + c.contentModerationConfig + c.promptAuditConfig
+}
+
+func (c platformReferenceCounts) metadata() map[string]string {
+	return map[string]string{
+		"accounts":   strconv.FormatInt(c.accounts, 10),
+		"api_keys":   strconv.FormatInt(c.apiKeys, 10),
+		"usage_logs": strconv.FormatInt(c.usageLogs, 10),
+		"audits":     strconv.FormatInt(c.promptAuditJobs+c.promptAuditEvents+c.contentModerationLogs, 10),
+		"ops":        strconv.FormatInt(c.schedulerOutbox+c.opsErrorLogs+c.opsSystemMetrics+c.opsMetricsHourly+c.opsMetricsDaily+c.opsAlertSilences+c.opsAlertRules+c.opsAlertEvents, 10),
+		"configs":    strconv.FormatInt(c.contentModerationConfig+c.promptAuditConfig, 10),
+	}
+}
+
+// DeleteUnused serializes deletion with platform-owned writes and rejects any
+// platform that is still referenced by current or historical data.
+func (r *platformRepository) DeleteUnused(ctx context.Context, id int64) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin platform delete: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var lockedID int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM platforms WHERE id = $1 FOR UPDATE`, id).Scan(&lockedID); err != nil {
+		if err == sql.ErrNoRows {
+			return service.ErrPlatformNotFound
+		}
+		return fmt.Errorf("lock platform: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `LOCK TABLE scheduler_outbox, ops_error_logs, ops_system_metrics,
+		ops_metrics_hourly, ops_metrics_daily, ops_alert_silences, ops_alert_rules,
+		ops_alert_events, settings IN SHARE MODE`); err != nil {
+		return fmt.Errorf("lock platform reference tables: %w", err)
+	}
+
+	var counts platformReferenceCounts
+	err = tx.QueryRowContext(ctx, platformReferenceCountSQL, id).Scan(
+		&counts.accounts, &counts.apiKeys, &counts.usageLogs,
+		&counts.promptAuditJobs, &counts.promptAuditEvents, &counts.contentModerationLogs,
+		&counts.schedulerOutbox, &counts.opsErrorLogs, &counts.opsSystemMetrics,
+		&counts.opsMetricsHourly, &counts.opsMetricsDaily, &counts.opsAlertSilences,
+		&counts.opsAlertRules, &counts.opsAlertEvents,
+		&counts.contentModerationConfig, &counts.promptAuditConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("count platform references: %w", err)
+	}
+	if counts.total() > 0 {
+		return service.ErrPlatformInUse.WithMetadata(counts.metadata())
+	}
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM platforms WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete platform: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read platform delete result: %w", err)
+	}
+	if rows == 0 {
+		return service.ErrPlatformNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit platform delete: %w", err)
+	}
+	return nil
+}
+
+const platformReferenceCountSQL = `SELECT
+	(SELECT COUNT(*) FROM accounts WHERE platform_id = $1) AS accounts,
+	(SELECT COUNT(*) FROM api_key_platforms WHERE platform_id = $1) AS api_keys,
+	(SELECT COUNT(*) FROM usage_logs WHERE platform_id = $1) AS usage_logs,
+	(SELECT COUNT(*) FROM prompt_audit_jobs WHERE platform_id = $1) AS prompt_audit_jobs,
+	(SELECT COUNT(*) FROM prompt_audit_events WHERE platform_id = $1) AS prompt_audit_events,
+	(SELECT COUNT(*) FROM content_moderation_logs WHERE platform_id = $1) AS content_moderation_logs,
+	(SELECT COUNT(*) FROM scheduler_outbox WHERE platform_id = $1) AS scheduler_outbox,
+	(SELECT COUNT(*) FROM ops_error_logs WHERE platform_id = $1) AS ops_error_logs,
+	(SELECT COUNT(*) FROM ops_system_metrics WHERE platform_id = $1) AS ops_system_metrics,
+	(SELECT COUNT(*) FROM ops_metrics_hourly WHERE platform_id = $1) AS ops_metrics_hourly,
+	(SELECT COUNT(*) FROM ops_metrics_daily WHERE platform_id = $1) AS ops_metrics_daily,
+	(SELECT COUNT(*) FROM ops_alert_silences WHERE platform_id = $1) AS ops_alert_silences,
+	(SELECT COUNT(*) FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_rules,
+	(SELECT COUNT(*) FROM ops_alert_events WHERE COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_events,
+	(SELECT COUNT(*) FROM settings WHERE key = 'content_moderation_config'
+		AND COALESCE((value::jsonb)->>'all_platforms', 'true') = 'false'
+		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS content_moderation_config,
+	(SELECT COUNT(*) FROM settings WHERE key = 'prompt_audit_config'
+		AND COALESCE((value::jsonb)->>'all_platforms', 'true') = 'false'
+		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS prompt_audit_config`
 
 // Create persists the platform and all of its model rules in one transaction.
 // A partial account-pool configuration must never become schedulable.

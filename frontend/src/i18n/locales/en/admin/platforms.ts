@@ -34,5 +34,12 @@ export default {
     loadFailed: 'Failed to load platforms',
     retry: 'Retry',
     saveFailed: 'Failed to save platform',
+    deleteTitle: 'Delete platform',
+    deleteMessage: 'Delete platform “{name}”? Only a completely unused platform can be deleted.',
+    deleted: 'Platform deleted',
+    deleteFailed: 'Failed to delete platform',
+    errors: {
+      PLATFORM_IN_USE: 'This platform is still referenced and cannot be deleted (accounts {accounts}, API keys {api_keys}, usage logs {usage_logs}, audits {audits}, operations {ops}, configurations {configs}). References and history are never removed automatically.',
+    },
   },
 }

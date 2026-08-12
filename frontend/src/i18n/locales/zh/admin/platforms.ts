@@ -34,5 +34,12 @@ export default {
     loadFailed: '加载平台失败',
     retry: '重试',
     saveFailed: '保存平台失败',
+    deleteTitle: '删除平台',
+    deleteMessage: '确定删除平台“{name}”吗？仅完全未被使用的平台可以删除。',
+    deleted: '平台已删除',
+    deleteFailed: '删除平台失败',
+    errors: {
+      PLATFORM_IN_USE: '平台仍被引用，无法删除（账号 {accounts}、密钥 {api_keys}、使用记录 {usage_logs}、审计 {audits}、运维 {ops}、配置 {configs}）。请先处理相关数据，系统不会自动解绑或清除历史。',
+    },
   },
 }

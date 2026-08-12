@@ -15,10 +15,10 @@ type platformManagementService interface {
 	GetByID(ctx context.Context, id int64) (*service.Platform, error)
 	Create(ctx context.Context, input service.CreatePlatformInput) (*service.Platform, error)
 	Update(ctx context.Context, id int64, input service.UpdatePlatformInput) (*service.Platform, error)
+	Delete(ctx context.Context, id int64) error
 }
 
-// PlatformHandler manages business platform account pools. Deletion is not
-// exposed: disabling a platform preserves existing account ownership.
+// PlatformHandler manages business platform account pools.
 type PlatformHandler struct {
 	platforms platformManagementService
 }
@@ -185,8 +185,7 @@ func (h *PlatformHandler) Create(c *gin.Context) {
 	response.Success(c, platformResponseFromService(platform))
 }
 
-// Update edits a platform pool. Administrators disable pools instead of
-// deleting them, so existing account ownership remains intact.
+// Update edits a platform pool.
 func (h *PlatformHandler) Update(c *gin.Context) {
 	id, ok := parsePositiveIDParam(c, "id")
 	if !ok {
@@ -203,4 +202,17 @@ func (h *PlatformHandler) Update(c *gin.Context) {
 		return
 	}
 	response.Success(c, platformResponseFromService(platform))
+}
+
+// Delete removes a platform only when no durable reference remains.
+func (h *PlatformHandler) Delete(c *gin.Context) {
+	id, ok := parsePositiveIDParam(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.platforms.Delete(c.Request.Context(), id); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, nil)
 }

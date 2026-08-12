@@ -8,7 +8,7 @@ const componentPath = resolve(dirname(fileURLToPath(import.meta.url)), '../Subsc
 const source = readFileSync(componentPath, 'utf8')
 
 describe('SubscriptionsView V2 asset boundary', () => {
-  it('uses plan renewal without exposing legacy routing-group presentation', () => {
+  it('starts another independent plan purchase without exposing legacy routing-group presentation', () => {
     expect(source).toContain('subscription.subscription_plan_id')
     expect(source).not.toContain('subscription.group?.platform')
     expect(source).not.toContain('subscription.group?.description')

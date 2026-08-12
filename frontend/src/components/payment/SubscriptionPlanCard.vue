@@ -82,7 +82,7 @@
         class="w-full rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white transition-all hover:bg-primary-700 active:scale-[0.98] dark:bg-primary-500 dark:hover:bg-primary-600"
         @click="emit('select', plan)"
       >
-        {{ isRenewal ? t('payment.renewNow') : t('payment.subscribeNow') }}
+        {{ hasSameActivePlan ? t('payment.addAnother') : t('payment.subscribeNow') }}
       </button>
     </div>
   </div>
@@ -100,7 +100,7 @@ const props = defineProps<{ plan: SubscriptionPlan; activeSubscriptions?: UserSu
 const emit = defineEmits<{ select: [plan: SubscriptionPlan] }>()
 const { t } = useI18n()
 
-const isRenewal = computed(() =>
+const hasSameActivePlan = computed(() =>
   props.activeSubscriptions?.some(s =>
     s.status === 'active' && s.subscription_plan_id === props.plan.id
   ) ?? false

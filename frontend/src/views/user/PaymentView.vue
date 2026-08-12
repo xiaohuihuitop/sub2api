@@ -97,6 +97,9 @@
           <template v-else-if="activeTab === 'subscription'">
             <!-- Subscription confirm (inline, replaces plan list) -->
             <template v-if="selectedPlan">
+              <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                {{ t('payment.independentSubscriptionNotice') }}
+              </div>
               <div class="card p-5">
                 <div class="mb-3 flex flex-wrap items-center gap-2">
                   <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ selectedPlan.name }}</h3>
@@ -173,6 +176,9 @@
             </template>
             <!-- Plan list -->
             <template v-else>
+              <div v-if="checkout.plans.length > 0" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                {{ t('payment.independentSubscriptionNotice') }}
+              </div>
               <div v-if="checkout.plans.length === 0" class="card py-16 text-center">
                 <Icon name="gift" size="xl" class="mx-auto mb-3 text-gray-300 dark:text-dark-600" />
                 <p class="text-gray-500 dark:text-gray-400">{{ t('payment.noPlans') }}</p>
@@ -1067,7 +1073,7 @@ onMounted(async () => {
     if (checkout.value.balance_disabled) {
       activeTab.value = 'subscription'
     }
-    // Handle renewal navigation by immutable plan ID.
+    // Select the exact plan for another independent purchase by immutable ID.
     if (route.query.tab === 'subscription') {
       activeTab.value = 'subscription'
       if (route.query.plan) {

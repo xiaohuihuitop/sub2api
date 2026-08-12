@@ -291,17 +291,17 @@ describe('PaymentView subscription plan grid', () => {
 })
 
 describe('PaymentView subscription confirmation amounts', () => {
-  it('selects the exact plan from a renewal URL before falling back to its group', async () => {
+  it('selects the exact plan from a repeat-purchase URL', async () => {
     const firstPlan = checkoutInfoWithPlansFixture().data.plans[0]
     const wrapper = await mountSubscriptionConfirm({
       plans: [
         { ...firstPlan, id: 7, name: 'First plan' },
-        { ...firstPlan, id: 8, name: 'Exact renewal plan' },
+        { ...firstPlan, id: 8, name: 'Exact repeat-purchase plan' },
       ],
     }, { tab: 'subscription', plan: '8' })
 
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
-    expect(wrapper.text()).toContain('Exact renewal plan')
+    expect(wrapper.text()).toContain('Exact repeat-purchase plan')
   })
 
   it('shows converted CNY pay amount using the subscription rate, not the balance multiplier', async () => {

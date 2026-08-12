@@ -12,6 +12,7 @@ import (
 var (
 	ErrPlatformNotFound = infraerrors.NotFound("PLATFORM_NOT_FOUND", "platform not found")
 	ErrPlatformExists   = infraerrors.Conflict("PLATFORM_EXISTS", "platform code already exists")
+	ErrPlatformInUse    = infraerrors.Conflict("PLATFORM_IN_USE", "platform is still referenced")
 	ErrPlatformInvalid  = infraerrors.BadRequest("INVALID_PLATFORM", "invalid platform configuration")
 )
 
@@ -29,6 +30,7 @@ type PlatformManagementRepository interface {
 	PlatformRepository
 	GetByID(ctx context.Context, id int64) (*Platform, error)
 	Update(ctx context.Context, platform *Platform) error
+	DeleteUnused(ctx context.Context, id int64) error
 }
 
 type PlatformAccountOwnershipReader interface {
@@ -186,6 +188,22 @@ func (s *PlatformService) Update(ctx context.Context, id int64, input UpdatePlat
 		return nil, fmt.Errorf("update platform: %w", err)
 	}
 	return candidate, nil
+}
+
+// Delete removes a platform only when the repository can prove atomically
+// that no business, configuration, or operational data still references it.
+func (s *PlatformService) Delete(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return ErrPlatformNotFound
+	}
+	repo, err := s.managementRepository()
+	if err != nil {
+		return err
+	}
+	if err := repo.DeleteUnused(ctx, id); err != nil {
+		return fmt.Errorf("delete platform: %w", err)
+	}
+	return nil
 }
 
 func (s *PlatformService) validateCandidate(ctx context.Context, platform *Platform, candidateID int64) error {

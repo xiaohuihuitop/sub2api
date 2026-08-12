@@ -187,7 +187,7 @@ export default {
     orderManagement: 'Orders',
     paymentDashboard: 'Payment Dashboard',
     paymentConfig: 'Payment Config',
-    paymentPlans: 'Plans',
+    paymentPlans: 'Listed Subscriptions',
     channelManagement: 'Channels',
     channelPricing: 'Channel Pricing',
     channelMonitor: 'Channel Monitor',

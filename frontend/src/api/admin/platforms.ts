@@ -30,6 +30,10 @@ export async function update(id: number, input: UpdatePlatformPoolRequest): Prom
   return data
 }
 
-const platformsAPI = { list, getById, create, update }
+export async function remove(id: number): Promise<void> {
+  await apiClient.delete(`/admin/platforms/${id}`)
+}
+
+const platformsAPI = { list, getById, create, update, remove }
 
 export default platformsAPI
