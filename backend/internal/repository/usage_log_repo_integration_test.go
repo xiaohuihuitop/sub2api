@@ -708,7 +708,7 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 	})
 
 	platform, err := s.client.Platform.Create().
-		SetCode(uniqueTestValue(s.T(), "dashboard-platform")).
+		SetCode(fmt.Sprintf("dashboard-%d", time.Now().UnixNano())).
 		SetName("Dashboard platform").
 		SetAccountPlatform(service.PlatformAnthropic).
 		SetStatus(service.StatusActive).

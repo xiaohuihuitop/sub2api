@@ -65,6 +65,32 @@ func TestMy2ReleaseRequiresCompleteQualityGate(t *testing.T) {
 	requireMy2ReleaseText(t, joinedMy2ReleaseWith(lint, "args"), "--build-tags=unit", "--concurrency=2")
 }
 
+func TestMy2ReleasePreservesActionableIntegrationFailureLogs(t *testing.T) {
+	workflow := loadMy2ReleaseWorkflow(t)
+	backend := requireMy2ReleaseJob(t, workflow, "backend-gate")
+	runs := joinedMy2ReleaseRuns(backend)
+	uses := joinedMy2ReleaseUses(backend)
+
+	requireMy2ReleaseText(t, runs, "tail -n 25 integration-test.log")
+	requireMy2ReleaseText(t, uses, "actions/upload-artifact@")
+
+	foundUpload := false
+	for _, step := range backend.Steps {
+		if strings.Contains(step.Uses, "actions/upload-artifact@") {
+			foundUpload = true
+			if step.With["path"] != "backend/integration-test.log" {
+				t.Errorf("integration log artifact path = %q", step.With["path"])
+			}
+			if step.With["if-no-files-found"] != "error" {
+				t.Errorf("integration log artifact must fail when missing, got %q", step.With["if-no-files-found"])
+			}
+		}
+	}
+	if !foundUpload {
+		t.Fatal("backend gate must upload the complete integration test log")
+	}
+}
+
 func TestMy2ReleasePublishesLatestOnlyAfterValidatedRelease(t *testing.T) {
 	workflow := loadMy2ReleaseWorkflow(t)
 	release := requireMy2ReleaseJob(t, workflow, "release")
