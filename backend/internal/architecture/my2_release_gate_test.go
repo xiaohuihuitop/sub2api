@@ -91,28 +91,36 @@ func TestMy2ReleasePreservesActionableIntegrationFailureLogs(t *testing.T) {
 	}
 }
 
-func TestMy2ReleasePublishesLatestOnlyAfterValidatedRelease(t *testing.T) {
+func TestMy2ReleasePublishesXCodeLatestOnlyAfterValidatedRelease(t *testing.T) {
 	workflow := loadMy2ReleaseWorkflow(t)
 	release := requireMy2ReleaseJob(t, workflow, "release")
 
-	versionedIndex := my2ReleaseStepIndex(t, release, "Build and publish versioned my2 image")
+	buildIndex := my2ReleaseStepIndex(t, release, "Build xcode latest image")
 	offlineIndex := my2ReleaseStepIndex(t, release, "Create and validate offline Docker package")
 	releaseIndex := my2ReleaseStepIndex(t, release, "Publish my2 prerelease")
-	latestIndex := my2ReleaseStepIndex(t, release, "Publish my2 latest tag")
-	if versionedIndex >= offlineIndex || offlineIndex >= releaseIndex || releaseIndex >= latestIndex {
-		t.Fatalf("release steps must publish version, validate archive, create release, then update latest")
+	latestIndex := my2ReleaseStepIndex(t, release, "Publish xcode latest image")
+	if buildIndex >= offlineIndex || offlineIndex >= releaseIndex || releaseIndex >= latestIndex {
+		t.Fatalf("release steps must build xcode, validate archive, create release, then publish latest")
 	}
 
-	versionedRun := release.Steps[versionedIndex].Run
-	requireMy2ReleaseText(t, versionedRun, `docker push "$IMAGE:my2-$VERSION"`, `org.opencontainers.image.revision=$COMMIT_SHA`)
-	if commitSource := release.Steps[versionedIndex].Env["COMMIT_SHA"]; !strings.Contains(commitSource, "source-gate.outputs.commit_sha") {
-		t.Fatalf("versioned image step must receive the validated commit SHA, got %q", commitSource)
+	buildRun := release.Steps[buildIndex].Run
+	requireMy2ReleaseText(t, buildRun, `-t "xcode:latest"`, `-t "$IMAGE:latest"`, `org.opencontainers.image.revision=$COMMIT_SHA`)
+	if commitSource := release.Steps[buildIndex].Env["COMMIT_SHA"]; !strings.Contains(commitSource, "source-gate.outputs.commit_sha") {
+		t.Fatalf("xcode image step must receive the validated commit SHA, got %q", commitSource)
 	}
-	if strings.Contains(versionedRun, `docker push "$IMAGE:my2-latest"`) {
-		t.Fatal("versioned image step must not update my2-latest")
+	if strings.Contains(buildRun, "docker push") {
+		t.Fatal("build step must not publish xcode:latest before archive and release validation")
 	}
-	requireMy2ReleaseText(t, release.Steps[offlineIndex].Run, "gzip -t", "sha256sum -c", "docker image inspect", "linux/amd64")
-	requireMy2ReleaseText(t, release.Steps[latestIndex].Run, `docker push "$IMAGE:my2-latest"`)
+	offlineRun := release.Steps[offlineIndex].Run
+	requireMy2ReleaseText(t, offlineRun, `docker save "xcode:latest"`, "xcode_latest.tar", "gzip -t", "sha256sum -c", "docker image inspect", "linux/amd64")
+	requireMy2ReleaseText(t, release.Steps[latestIndex].Run, `docker push "$IMAGE:latest"`)
+
+	allRuns := joinedMy2ReleaseRuns(release)
+	for _, forbidden := range []string{"sub2api:my2", "$IMAGE:my2-", "$IMAGE:my2-latest", "sub2api_my2_latest.tar"} {
+		if strings.Contains(allRuns, forbidden) {
+			t.Errorf("xcode release workflow still contains legacy image or archive name %q", forbidden)
+		}
+	}
 }
 
 func TestMy2IntegrationTargetExcludesNonIntegrationPackages(t *testing.T) {

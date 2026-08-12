@@ -66,7 +66,7 @@ jobs:
           fi
 
           VERSION="${TAG_NAME#my2-v}"
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/xcode"
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
@@ -244,7 +244,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish versioned my2 image
+      - name: Build xcode latest image
         shell: bash
         env:
           IMAGE: ${{ needs.source-gate.outputs.image }}
@@ -257,54 +257,49 @@ jobs:
             --label "org.opencontainers.image.revision=$COMMIT_SHA" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             -f .release/my2/Dockerfile \
-            -t "sub2api:my2-latest" \
-            -t "sub2api:my2-$VERSION" \
-            -t "$IMAGE:my2-latest" \
-            -t "$IMAGE:my2-$VERSION" \
+            -t "xcode:latest" \
+            -t "$IMAGE:latest" \
             .release/my2
-          docker push "$IMAGE:my2-$VERSION"
 
       - name: Create and validate offline Docker package
         shell: bash
-        env:
-          VERSION: ${{ needs.source-gate.outputs.version }}
         run: |
           set -euo pipefail
-          docker save "sub2api:my2-latest" "sub2api:my2-$VERSION" | gzip -9 > sub2api_my2_latest.tar
-          test -s sub2api_my2_latest.tar
-          gzip -t sub2api_my2_latest.tar
-          sha256sum sub2api_my2_latest.tar > sub2api_my2_latest.tar.sha256
-          sha256sum -c sub2api_my2_latest.tar.sha256
-          ARCH="$(docker image inspect "sub2api:my2-$VERSION" --format '{{.Os}}/{{.Architecture}}')"
+          docker save "xcode:latest" | gzip -9 > xcode_latest.tar
+          test -s xcode_latest.tar
+          gzip -t xcode_latest.tar
+          sha256sum xcode_latest.tar > xcode_latest.tar.sha256
+          sha256sum -c xcode_latest.tar.sha256
+          ARCH="$(docker image inspect "xcode:latest" --format '{{.Os}}/{{.Architecture}}')"
           test "$ARCH" = "linux/amd64"
 
       - name: Publish my2 prerelease
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.source-gate.outputs.tag_name }}
-          name: Sub2API My2 ${{ needs.source-gate.outputs.version }}
+          name: XCode ${{ needs.source-gate.outputs.version }}
           prerelease: true
           body: |
-            My2 test channel. This release does not replace the stable `latest` image.
+            XCode Docker release built from the My2 branch.
 
             Docker image:
             ```bash
-            docker pull ${{ needs.source-gate.outputs.image }}:my2-${{ needs.source-gate.outputs.version }}
+            docker pull ${{ needs.source-gate.outputs.image }}:latest
             ```
 
             Offline package:
             ```bash
-            docker load -i sub2api_my2_latest.tar
-            # Use sub2api:my2-latest in the test deployment.
+            docker load -i xcode_latest.tar
+            # The loaded image is xcode:latest.
             ```
           files: |
-            sub2api_my2_latest.tar
-            sub2api_my2_latest.tar.sha256
+            xcode_latest.tar
+            xcode_latest.tar.sha256
 
-      - name: Publish my2 latest tag
+      - name: Publish xcode latest image
         shell: bash
         env:
           IMAGE: ${{ needs.source-gate.outputs.image }}
         run: |
           set -euo pipefail
-          docker push "$IMAGE:my2-latest"
+          docker push "$IMAGE:latest"
