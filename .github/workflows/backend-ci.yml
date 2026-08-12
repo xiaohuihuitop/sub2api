@@ -38,7 +38,16 @@ jobs:
         run: make test-unit
       - name: Integration tests
         working-directory: backend
-        run: make test-integration
+        shell: bash
+        run: |
+          set +e
+          make test-integration 2>&1 | tee integration-test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            message=$(tail -n 80 integration-test.log | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            echo "::error file=backend/Makefile,line=32::$message"
+          fi
+          exit "$status"
 
   frontend:
     runs-on: ubuntu-latest
@@ -77,5 +86,5 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.9
-          args: --timeout=30m --build-tags=unit
+          args: --timeout=30m --build-tags=unit --concurrency=2
           working-directory: backend

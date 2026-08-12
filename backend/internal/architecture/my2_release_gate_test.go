@@ -62,7 +62,7 @@ func TestMy2ReleaseRequiresCompleteQualityGate(t *testing.T) {
 	requireMy2ReleaseText(t, joinedMy2ReleaseRuns(backend), "make test-unit", "make test-integration")
 	requireMy2ReleaseText(t, joinedMy2ReleaseRuns(frontend), "pnpm run test:run", "pnpm run typecheck", "pnpm run lint:check")
 	requireMy2ReleaseText(t, joinedMy2ReleaseUses(lint), "golangci/golangci-lint-action")
-	requireMy2ReleaseText(t, joinedMy2ReleaseWith(lint, "args"), "--build-tags=unit")
+	requireMy2ReleaseText(t, joinedMy2ReleaseWith(lint, "args"), "--build-tags=unit", "--concurrency=2")
 }
 
 func TestMy2ReleasePublishesLatestOnlyAfterValidatedRelease(t *testing.T) {
