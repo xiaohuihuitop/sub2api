@@ -52,10 +52,7 @@ func TestGetMyPlatformQuotas_EmptyReturns200WithEmptyArray(t *testing.T) {
 	if body.Code != 0 {
 		t.Errorf("expected code=0, got %d", body.Code)
 	}
-	if body.Data.PlatformQuotas == nil {
-		// nil 和 empty slice 均视为可接受（JSON 可能序列化为 null 或 []）
-		// 此断言只验证 HTTP 200 + code=0 即可
-	}
+	// nil 和 empty slice 均可接受；这里只验证 HTTP 200 与业务 code。
 }
 
 func TestGetMyPlatformQuotas_D14_LazyZeroForExpiredWindow(t *testing.T) {

@@ -3,7 +3,6 @@
 package architecture
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -192,13 +191,4 @@ func sortedKeys(values map[string]int) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func formatLegacyBridgeCallsites(values map[string]int) string {
-	keys := sortedKeys(values)
-	parts := make([]string, 0, len(keys))
-	for _, key := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%d", key, values[key]))
-	}
-	return strings.Join(parts, ", ")
 }

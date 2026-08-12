@@ -43,7 +43,11 @@ type mockSmartRetryUpstream struct {
 
 func (m *mockSmartRetryUpstream) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
 	idx := m.callIdx
-	m.calls = append(m.calls, req.URL.String())
+	requestURL := ""
+	if req != nil && req.URL != nil {
+		requestURL = req.URL.String()
+	}
+	m.calls = append(m.calls, requestURL)
 	if req != nil && req.Body != nil {
 		body, _ := io.ReadAll(req.Body)
 		m.requestBodies = append(m.requestBodies, body)

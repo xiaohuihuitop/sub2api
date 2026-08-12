@@ -204,7 +204,8 @@ func TestWeChatOAuthCallbackFallsBackToOpenIDWhenUnionIDMissingInSingleChannelMo
 	require.Equal(t, "openid-123", session.ProviderSubject)
 	require.Equal(t, wechatSyntheticEmail("openid-123"), session.ResolvedEmail)
 
-	completion := session.LocalFlowState[oauthCompletionResponseKey].(map[string]any)
+	completion, ok := session.LocalFlowState[oauthCompletionResponseKey].(map[string]any)
+	require.True(t, ok)
 	require.Equal(t, oauthPendingChoiceStep, completion["step"])
 	require.Equal(t, "third_party_signup", completion["choice_reason"])
 }
@@ -280,7 +281,8 @@ func TestWeChatOAuthCallbackCreatesLoginPendingSessionForExistingIdentityUserWit
 	require.Equal(t, existingUser.ID, *session.TargetUserID)
 	require.Equal(t, existingUser.Email, session.ResolvedEmail)
 
-	completion := session.LocalFlowState[oauthCompletionResponseKey].(map[string]any)
+	completion, ok := session.LocalFlowState[oauthCompletionResponseKey].(map[string]any)
+	require.True(t, ok)
 	require.Equal(t, "/dashboard", completion["redirect"])
 	_, hasAccessToken := completion["access_token"]
 	require.False(t, hasAccessToken)

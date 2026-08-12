@@ -4,6 +4,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -74,7 +75,7 @@ func TestForwardOpenAIResponsesHTTPRuntimeUsesPurePreparation(t *testing.T) {
 		Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token", "chatgpt_account_id": "chatgpt-account"},
 	}
 
-	result, err := svc.forwardOpenAIResponsesHTTPRuntime(nil, exchange, account, body, 7)
+	result, err := svc.forwardOpenAIResponsesHTTPRuntime(context.Background(), exchange, account, body, 7)
 
 	require.NoError(t, err)
 	require.NotNil(t, result)

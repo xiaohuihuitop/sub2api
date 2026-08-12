@@ -20,7 +20,7 @@ import (
 // response without creating a Gin context. It keeps SSE conversion, namespace
 // restoration and compact-stream bridging inside the same exchange boundary.
 func (s *OpenAIGatewayService) handleOpenAINonStreamingResponseExchange(
-	ctx context.Context,
+	_ context.Context,
 	resp *http.Response,
 	exchange gatewayruntime.HTTPExchange,
 	account *Account,
@@ -29,9 +29,6 @@ func (s *OpenAIGatewayService) handleOpenAINonStreamingResponseExchange(
 ) (*openaiNonStreamingResult, error) {
 	if exchange == nil || resp == nil || resp.Body == nil {
 		return nil, ErrRuntimeExchangeUnavailable
-	}
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	body, err := readUpstreamResponseBodyLimited(resp.Body, resolveUpstreamResponseReadLimit(s.cfg))
 	if err != nil {

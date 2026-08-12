@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -95,7 +96,7 @@ func TestCheckUsageLimitsPrefersSubscriptionSnapshot(t *testing.T) {
 	}
 	svc := NewSubscriptionService(userSubRepoNoop{}, nil, nil, nil)
 
-	err := svc.CheckUsageLimits(nil, subscription, 2)
+	err := svc.CheckUsageLimits(context.Background(), subscription, 2)
 
 	require.ErrorIs(t, err, ErrDailyLimitExceeded)
 }

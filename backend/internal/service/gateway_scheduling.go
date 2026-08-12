@@ -31,12 +31,12 @@ func (s *GatewayService) SelectAccountForModel(ctx context.Context, platformID *
 }
 
 // SelectAccountForModelWithExclusions selects an account supporting the requested model while excluding specified accounts.
-func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context, platformNamespaceID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
+func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context, _ *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
 	scope, scoped := PlatformSchedulingScopeFromContext(ctx)
 	if !scoped {
 		return nil, fmt.Errorf("%w: platform scheduling scope is required", ErrPlatformInvalid)
 	}
-	platformNamespaceID = platformSchedulingCacheID(scope)
+	platformNamespaceID := platformSchedulingCacheID(scope)
 	if platformNamespaceID == nil {
 		return nil, fmt.Errorf("%w: invalid platform scheduling scope", ErrPlatformInvalid)
 	}
@@ -1190,16 +1190,16 @@ func shuffleWithinPriority(accounts []*Account) {
 }
 
 // selectAccountForModelWithPlatform 选择单平台账户（完全隔离）
-func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, platformID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, platform string) (*Account, error) {
+func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, _ *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, _ string) (*Account, error) {
 	scope, ok := PlatformSchedulingScopeFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("%w: platform scheduling scope is required", ErrPlatformInvalid)
 	}
-	platformID = platformSchedulingCacheID(scope)
+	platformID := platformSchedulingCacheID(scope)
 	if platformID == nil {
 		return nil, fmt.Errorf("%w: invalid platform scheduling scope", ErrPlatformInvalid)
 	}
-	platform = scope.AccountPlatform
+	platform := scope.AccountPlatform
 	preferOAuth := platform == PlatformGemini
 
 	var accounts []Account

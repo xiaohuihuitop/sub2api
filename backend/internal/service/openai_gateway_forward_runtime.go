@@ -296,7 +296,7 @@ func (s *OpenAIGatewayService) forwardOpenAIHTTPExchange(
 		if err != nil {
 			return nil, err
 		}
-		usage := &OpenAIUsage{}
+		var usage *OpenAIUsage
 		responseID := ""
 		imageCount := 0
 		var imageOutputSizes []string

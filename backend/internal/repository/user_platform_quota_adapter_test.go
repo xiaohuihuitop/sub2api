@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type fakeRepoForAdapter struct {
@@ -74,12 +76,10 @@ func TestGenericAdapter_ResetExpiredWindow_ForwardsAllParams(t *testing.T) {
 	if err := adapter.ResetExpiredWindow(context.Background(), 7, "openai", "weekly", now); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if fake.resetCalledWith[0].(int64) != 7 ||
-		fake.resetCalledWith[1].(string) != "openai" ||
-		fake.resetCalledWith[2].(string) != "weekly" ||
-		!fake.resetCalledWith[3].(time.Time).Equal(now) {
-		t.Errorf("forwarded params mismatch: %+v", fake.resetCalledWith)
-	}
+	require.Equal(t, int64(7), fake.resetCalledWith[0])
+	require.Equal(t, "openai", fake.resetCalledWith[1])
+	require.Equal(t, "weekly", fake.resetCalledWith[2])
+	require.Equal(t, now, fake.resetCalledWith[3])
 }
 
 func TestGenericAdapter_ResetExpiredWindow_PropagatesError(t *testing.T) {

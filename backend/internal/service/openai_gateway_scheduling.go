@@ -639,7 +639,7 @@ func resolveOpenAIAccountUpstreamModelForRequest(ctx context.Context, account *A
 	return upstreamModel
 }
 
-func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.Context, platformID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyAccountID int64, requiredCapability OpenAIEndpointCapability, preferLowUpstreamRate bool) (*Account, error) {
+func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.Context, _ *int64, _ string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyAccountID int64, requiredCapability OpenAIEndpointCapability, preferLowUpstreamRate bool) (*Account, error) {
 	scope, ok := PlatformSchedulingScopeFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("%w: platform scheduling scope is required", ErrPlatformInvalid)
@@ -648,12 +648,11 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	platformID = platformSchedulingCacheID(scope)
+	platformID := platformSchedulingCacheID(scope)
 	if platformID == nil {
 		return nil, fmt.Errorf("%w: invalid platform scheduling scope", ErrPlatformInvalid)
 	}
-	platform = resolvedPlatform
-	platform = normalizeOpenAICompatiblePlatform(platform)
+	platform := normalizeOpenAICompatiblePlatform(resolvedPlatform)
 
 	// 1. 尝试粘性会话命中
 	// Try sticky session hit

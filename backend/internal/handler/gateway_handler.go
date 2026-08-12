@@ -613,9 +613,8 @@ func (e sub2APIMessagesExecutor) executeMessages(c *gin.Context, usageSink gatew
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	for {
+	{
 		fs := NewFailoverState(h.maxAccountSwitches, hasBoundSession)
-		retryWithFallback := false
 
 		for {
 			attemptParsedReq, err := parsedReq.CloneForBody(body)
@@ -1007,9 +1006,6 @@ func (e sub2APIMessagesExecutor) executeMessages(c *gin.Context, usageSink gatew
 			submitForwardUsage(result)
 			return
 		}
-		if !retryWithFallback {
-			return
-		}
 	}
 }
 
@@ -1021,10 +1017,6 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok || apiKey == nil {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "API key required")
-		return
-	}
-	if h.platformModels == nil {
-		response.ErrorFrom(c, service.ErrAPIKeyPlatformForbidden)
 		return
 	}
 	models, err := h.platformModels.ListAuthorizedModels(c.Request.Context(), apiKey.AllowedPlatformIDs)
@@ -2030,7 +2022,8 @@ func sendMockInterceptStream(c *gin.Context, model string, interceptType Interce
 	case InterceptTypeSuggestionMode:
 		msgID = generateRealisticMsgID()
 		outputTokens = 1
-		textDeltas = []string{""} // 绌哄唴瀹?	default: // InterceptTypeWarmup
+		textDeltas = []string{""}
+	default: // InterceptTypeWarmup
 		msgID = generateRealisticMsgID()
 		outputTokens = 2
 		textDeltas = []string{"New", " Conversation"}

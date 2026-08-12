@@ -73,7 +73,7 @@ func TestMy2ReleasePublishesLatestOnlyAfterValidatedRelease(t *testing.T) {
 	offlineIndex := my2ReleaseStepIndex(t, release, "Create and validate offline Docker package")
 	releaseIndex := my2ReleaseStepIndex(t, release, "Publish my2 prerelease")
 	latestIndex := my2ReleaseStepIndex(t, release, "Publish my2 latest tag")
-	if !(versionedIndex < offlineIndex && offlineIndex < releaseIndex && releaseIndex < latestIndex) {
+	if versionedIndex >= offlineIndex || offlineIndex >= releaseIndex || releaseIndex >= latestIndex {
 		t.Fatalf("release steps must publish version, validate archive, create release, then update latest")
 	}
 
@@ -118,6 +118,32 @@ func TestMy2IntegrationTargetExcludesNonIntegrationPackages(t *testing.T) {
 	}
 	if !strings.Contains(makefile, "go test -p 1 -tags=integration") {
 		t.Fatal("integration target must serialize package execution to avoid testcontainer resource contention")
+	}
+}
+
+func TestMy2LintGateFocusesOnProductionCorrectness(t *testing.T) {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve architecture test path")
+	}
+	path := filepath.Join(filepath.Dir(filename), "..", "..", ".golangci.yml")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := string(content)
+	for _, linter := range []string{"errcheck", "govet", "ineffassign", "staticcheck"} {
+		if !strings.Contains(config, "    - "+linter+"\n") {
+			t.Errorf("release lint gate must enable %s", linter)
+		}
+	}
+	if strings.Contains(config, "    - unused\n") {
+		t.Fatal("unused must remain disabled while deferred protocol adapters are intentionally retained")
+	}
+	for _, exclusion := range []string{"'(.+)_test\\.go'", "'^(ST|QF)[0-9]+:'", "'^SA1008:'", "'^SA1019:'"} {
+		if !strings.Contains(config, exclusion) {
+			t.Errorf("release lint gate is missing scoped exclusion %s", exclusion)
+		}
 	}
 }
 

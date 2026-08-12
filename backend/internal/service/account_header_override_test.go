@@ -140,9 +140,11 @@ func TestApplyHeaderOverrides(t *testing.T) {
 	// user-agent 覆盖且只有一个值（已知头恢复 wire casing）
 	require.Equal(t, []string{"override-agent/2.0"}, h["User-Agent"])
 	// anthropic-beta：非 canonical 旧值被清除，写入 wire casing（小写）
+	//lint:ignore SA1008 This test intentionally verifies the raw HTTP/2 wire key.
 	require.Equal(t, []string{"custom-beta-1"}, h["anthropic-beta"])
 	require.Empty(t, h["Anthropic-Beta"])
 	// 新增头（未知头以小写原样键写入，与转发链路 wire casing 约定一致）
+	//lint:ignore SA1008 This test intentionally verifies the raw HTTP/2 wire key.
 	require.Equal(t, []string{"custom-value"}, h["x-custom"])
 	require.Equal(t, "custom-value", getHeaderRaw(h, "x-custom"))
 	// 未覆写的头不受影响

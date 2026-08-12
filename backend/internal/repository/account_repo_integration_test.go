@@ -206,15 +206,14 @@ func (s *AccountRepoSuite) TestUpdate_SyncSchedulerSnapshotOnCredentialsChange()
 		Status:      service.StatusActive,
 		Schedulable: true,
 		Credentials: map[string]any{
-			"model_mapping": map[string]any{
-				"gpt-5": "gpt-5.1",
-			},
+			"access_token": "old-token",
 		},
 	})
 	cacheRecorder := &schedulerCacheRecorder{}
 	s.repo.schedulerCache = cacheRecorder
 
 	account.Credentials = map[string]any{
+		"access_token": "new-token",
 		"model_mapping": map[string]any{
 			"gpt-5": "gpt-5.2",
 		},
@@ -224,15 +223,9 @@ func (s *AccountRepoSuite) TestUpdate_SyncSchedulerSnapshotOnCredentialsChange()
 
 	s.Require().Len(cacheRecorder.setAccounts, 1)
 	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
-	mapping := cacheRecorder.setAccounts[0].Credentials["model_mapping"]
-	switch typed := mapping.(type) {
-	case map[string]any:
-		s.Require().Equal("gpt-5.2", typed["gpt-5"])
-	case map[string]string:
-		s.Require().Equal("gpt-5.2", typed["gpt-5"])
-	default:
-		s.Fail("unexpected model_mapping type", "%T", mapping)
-	}
+	snapshot := cacheRecorder.setAccounts[0]
+	s.Require().Equal("new-token", snapshot.GetCredential("access_token"))
+	s.Require().NotContains(snapshot.Credentials, "model_mapping", "account-level model policy must not return to scheduler state")
 }
 
 func (s *AccountRepoSuite) TestUpdateCredentials_SyncsSnapshotAndDurableOutbox() {
