@@ -88,9 +88,14 @@ func TestBuildGeminiBatchJSONL_WritesReferenceImages(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal([]byte(lines[0]), &got))
-	request := got["request"].(map[string]any)
-	contents := request["contents"].([]any)
-	parts := contents[0].(map[string]any)["parts"].([]any)
+	request, ok := got["request"].(map[string]any)
+	require.True(t, ok)
+	contents, ok := request["contents"].([]any)
+	require.True(t, ok)
+	firstContent, ok := contents[0].(map[string]any)
+	require.True(t, ok)
+	parts, ok := firstContent["parts"].([]any)
+	require.True(t, ok)
 	require.Len(t, parts, 3)
 	require.Equal(t, "A clean product hero image", parts[0].(map[string]any)["text"])
 	inlineData := parts[1].(map[string]any)["inlineData"].(map[string]any)

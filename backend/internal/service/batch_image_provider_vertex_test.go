@@ -188,7 +188,7 @@ func TestVertexProvider_OpenResultReturnsCombinedJSONLStream(t *testing.T) {
 	provider := newTestVertexProvider(&fakeVertexBatchClient{}, store)
 	r, contentType, err := provider.OpenResult(context.Background(), &BatchImageJob{ProviderOutputRef: &output}, vertexServiceAccount())
 	require.NoError(t, err)
-	defer r.Close()
+	t.Cleanup(func() { require.NoError(t, r.Close()) })
 
 	body, err := io.ReadAll(r)
 	require.NoError(t, err)

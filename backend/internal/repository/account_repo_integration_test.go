@@ -224,9 +224,15 @@ func (s *AccountRepoSuite) TestUpdate_SyncSchedulerSnapshotOnCredentialsChange()
 
 	s.Require().Len(cacheRecorder.setAccounts, 1)
 	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
-	mapping, ok := cacheRecorder.setAccounts[0].Credentials["model_mapping"].(map[string]any)
-	s.Require().True(ok)
-	s.Require().Equal("gpt-5.2", mapping["gpt-5"])
+	mapping := cacheRecorder.setAccounts[0].Credentials["model_mapping"]
+	switch typed := mapping.(type) {
+	case map[string]any:
+		s.Require().Equal("gpt-5.2", typed["gpt-5"])
+	case map[string]string:
+		s.Require().Equal("gpt-5.2", typed["gpt-5"])
+	default:
+		s.Fail("unexpected model_mapping type", "%T", mapping)
+	}
 }
 
 func (s *AccountRepoSuite) TestUpdateCredentials_SyncsSnapshotAndDurableOutbox() {

@@ -141,7 +141,7 @@ func TestHandleOpenAIStreamingResponseExchangeWritesSSEAndUsage(t *testing.T) {
 func TestHandleOpenAIStreamingResponseExchangeUsesFirstOutputTimeout(t *testing.T) {
 	exchange := newRuntimeExchangeTestDouble(t, nil)
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	t.Cleanup(func() { require.NoError(t, writer.Close()) })
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
 		Header:     http.Header{"X-Request-Id": []string{"stream-timeout-1"}},
