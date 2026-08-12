@@ -29,7 +29,7 @@ test-unit:
 	go test -tags=unit $(UNIT_PACKAGES)
 
 test-integration:
-	go test -tags=integration $(INTEGRATION_PACKAGES)
+	go test -p 1 -tags=integration $(INTEGRATION_PACKAGES)
 
 test-e2e:
 	./scripts/e2e-test.sh

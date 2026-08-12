@@ -116,6 +116,9 @@ func TestMy2IntegrationTargetExcludesNonIntegrationPackages(t *testing.T) {
 	if strings.Contains(makefile, "go test -tags=integration ./...") {
 		t.Fatal("integration target must not compile unrelated packages with ./...")
 	}
+	if !strings.Contains(makefile, "go test -p 1 -tags=integration") {
+		t.Fatal("integration target must serialize package execution to avoid testcontainer resource contention")
+	}
 }
 
 func loadMy2ReleaseWorkflow(t *testing.T) my2ReleaseWorkflow {

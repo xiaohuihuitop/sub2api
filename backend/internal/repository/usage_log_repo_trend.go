@@ -511,7 +511,7 @@ func (r *usageLogRepository) getModelStatsWithFiltersBySource(ctx context.Contex
 
 // GetPlatformStatsWithUsageFilters returns usage grouped by the effective
 // account platform. Rows without a platform remain visible under platform_id zero.
-func (r *usageLogRepository) GetPlatformStatsWithUsageFilters(ctx context.Context, startTime, endTime time.Time, filters UsageLogFilters) ([]usagestats.PlatformStat, error) {
+func (r *usageLogRepository) GetPlatformStatsWithUsageFilters(ctx context.Context, startTime, endTime time.Time, filters UsageLogFilters) (results []usagestats.PlatformStat, err error) {
 	query := `
 		SELECT
 			COALESCE(ul.platform_id, 0) AS platform_id,
@@ -556,8 +556,12 @@ func (r *usageLogRepository) GetPlatformStatsWithUsageFilters(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	results := make([]usagestats.PlatformStat, 0)
+	defer func() {
+		if closeErr := rows.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
+	results = make([]usagestats.PlatformStat, 0)
 	for rows.Next() {
 		var row usagestats.PlatformStat
 		if err := rows.Scan(&row.PlatformID, &row.PlatformCode, &row.PlatformName, &row.Requests, &row.TotalTokens, &row.Cost, &row.ActualCost, &row.AccountCost); err != nil {
