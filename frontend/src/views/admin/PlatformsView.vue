@@ -76,7 +76,7 @@
             <button class="icon-button" type="button" :title="t('common.edit')" :aria-label="t('common.edit')" @click="openEdit(row)">
               <Icon name="edit" size="sm" />
             </button>
-            <button class="icon-button text-red-600 hover:text-red-700 dark:text-red-400" type="button" :data-test="`delete-platform-${row.id}`" :title="t('common.delete')" :aria-label="t('common.delete')" @click="confirmDelete(row)">
+            <button class="icon-button text-red-600 hover:text-red-700 dark:text-red-400" type="button" :data-test="`delete-platform-${row.id}`" :disabled="previewingPlatformID !== null" :title="t('common.delete')" :aria-label="t('common.delete')" @click="confirmDelete(row)">
               <Icon name="trash" size="sm" />
             </button>
           </div>
@@ -93,7 +93,7 @@
 	  :confirm-disabled="!deleteImpact?.can_delete"
       danger
       @confirm="deletePlatform"
-      @cancel="deletingPlatform = null"
+      @cancel="cancelDelete"
     />
   </AppLayout>
 </template>
@@ -123,6 +123,7 @@ const showDialog = ref(false)
 const editingPlatform = ref<PlatformPool | null>(null)
 const deletingPlatform = ref<PlatformPool | null>(null)
 const deleteImpact = ref<PlatformDeleteImpact | null>(null)
+const previewingPlatformID = ref<number | null>(null)
 
 const deleteMessage = computed(() => {
 	const platform = deletingPlatform.value
@@ -217,14 +218,22 @@ async function toggleStatus(platform: PlatformPool) {
 }
 
 async function confirmDelete(platform: PlatformPool) {
+  if (previewingPlatformID.value !== null) return
+  previewingPlatformID.value = platform.id
   try {
-	deleteImpact.value = await adminAPI.platforms.previewDelete(platform.id)
+    deleteImpact.value = await adminAPI.platforms.previewDelete(platform.id)
     deletingPlatform.value = platform
   } catch (error) {
-	deleteImpact.value = null
-	deletingPlatform.value = null
+    cancelDelete()
     appStore.showError(extractApiErrorMessage(error, t('admin.platforms.deleteFailed')))
+  } finally {
+    previewingPlatformID.value = null
   }
+}
+
+function cancelDelete() {
+  deletingPlatform.value = null
+  deleteImpact.value = null
 }
 
 async function deletePlatform() {
@@ -232,8 +241,7 @@ async function deletePlatform() {
 	if (!platform || !deleteImpact.value?.can_delete) return
   try {
     await adminAPI.platforms.remove(platform.id)
-    deletingPlatform.value = null
-	deleteImpact.value = null
+    cancelDelete()
     appStore.showSuccess(t('admin.platforms.deleted'))
     await loadPlatforms()
   } catch (error) {

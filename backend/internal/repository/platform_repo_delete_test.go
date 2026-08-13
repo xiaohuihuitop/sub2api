@@ -33,6 +33,11 @@ func platformReferenceRows(values ...int64) *sqlmock.Rows {
 	return sqlmock.NewRows(columns).AddRow(row...)
 }
 
+func TestPlatformReferenceCountIncludesEverySettingThatCleanupWillModify(t *testing.T) {
+	require.NotContains(t, platformReferenceCountSQLTemplate, "all_platforms")
+	require.Contains(t, platformReferenceCountSQLTemplate, "platform_ids")
+}
+
 func expectPlatformImpactQuery(mock sqlmock.Sqlmock, id int64, hasSilences bool, values ...int64) {
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT to_regclass('public.ops_alert_silences') IS NOT NULL")).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(hasSilences))

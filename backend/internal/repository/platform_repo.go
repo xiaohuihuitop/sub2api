@@ -298,10 +298,8 @@ const platformReferenceCountSQLTemplate = `SELECT
 				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
 			)) AS ops_alert_events,
 	(SELECT COUNT(*) FROM settings WHERE key = 'content_moderation_config'
-		AND COALESCE((value::jsonb)->>'all_platforms', 'true') = 'false'
 		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS content_moderation_config,
 	(SELECT COUNT(*) FROM settings WHERE key = 'prompt_audit_config'
-		AND COALESCE((value::jsonb)->>'all_platforms', 'true') = 'false'
 		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS prompt_audit_config`
 
 // Create persists the platform and all of its model rules in one transaction.

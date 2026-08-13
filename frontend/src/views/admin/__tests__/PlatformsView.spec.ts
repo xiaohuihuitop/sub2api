@@ -195,6 +195,33 @@ describe('PlatformsView', () => {
     expect(showError).toHaveBeenCalled()
   })
 
+  it('disables delete commands while the impact preview is loading', async () => {
+    vi.mocked(adminAPI.platforms.list).mockResolvedValue([{
+      id: 7, code: 'unused', name: 'Unused', account_platform: 'openai', status: 'disabled',
+      endpoint_capabilities: [], model_rules: [],
+    }])
+    let resolvePreview!: (value: Awaited<ReturnType<typeof adminAPI.platforms.previewDelete>>) => void
+    vi.mocked(adminAPI.platforms.previewDelete).mockReturnValue(new Promise((resolve) => {
+      resolvePreview = resolve
+    }))
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+
+    expect(wrapper.get<HTMLButtonElement>('[data-test="delete-platform-7"]').element.disabled).toBe(true)
+    await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    expect(adminAPI.platforms.previewDelete).toHaveBeenCalledTimes(1)
+
+    resolvePreview({
+      accounts: 0, api_keys: 0, usage_logs: 0, audits: 0, ops: 0, configs: 0, can_delete: true,
+    })
+    await flushPromises()
+
+    expect(wrapper.get<HTMLButtonElement>('[data-test="delete-platform-7"]').element.disabled).toBe(false)
+    expect(wrapper.find('[data-test="platform-delete-dialog"]').exists()).toBe(true)
+  })
+
   it('shows the localized safe-delete conflict instead of removing references', async () => {
     vi.mocked(adminAPI.platforms.list).mockResolvedValue([{
       id: 7, code: 'used', name: 'Used', account_platform: 'openai', status: 'active',
