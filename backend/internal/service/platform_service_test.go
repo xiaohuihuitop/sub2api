@@ -56,10 +56,13 @@ func (r *platformRepositoryStub) HasAccountsByPlatformID(context.Context, int64)
 
 type platformManagementRepositoryStub struct {
 	platformRepositoryStub
-	platform  *Platform
-	updated   *Platform
-	deletedID int64
-	deleteErr error
+	platform     *Platform
+	updated      *Platform
+	deleteImpact *PlatformDeleteImpact
+	deleteResult *PlatformDeleteResult
+	previewedID  int64
+	deletedID    int64
+	deleteErr    error
 }
 
 func (r *platformManagementRepositoryStub) GetByID(context.Context, int64) (*Platform, error) {
@@ -71,22 +74,31 @@ func (r *platformManagementRepositoryStub) Update(_ context.Context, platform *P
 	return nil
 }
 
-func (r *platformManagementRepositoryStub) DeleteUnused(_ context.Context, id int64) error {
+func (r *platformManagementRepositoryStub) PreviewDelete(_ context.Context, id int64) (*PlatformDeleteImpact, error) {
+	r.previewedID = id
+	return r.deleteImpact, nil
+}
+
+func (r *platformManagementRepositoryStub) DeleteControlled(_ context.Context, id int64) (*PlatformDeleteResult, error) {
 	r.deletedID = id
-	return r.deleteErr
+	return r.deleteResult, r.deleteErr
 }
 
 func TestPlatformServiceDeleteUsesAtomicRepositoryOperation(t *testing.T) {
-	repo := &platformManagementRepositoryStub{}
+	repo := &platformManagementRepositoryStub{deleteResult: &PlatformDeleteResult{
+		PlatformID: 17,
+		Cleaned:    PlatformDeleteImpact{UsageLogs: 3, Ops: 2, CanDelete: true},
+	}}
 
-	err := NewPlatformService(repo).Delete(context.Background(), 17)
+	result, err := NewPlatformService(repo).Delete(context.Background(), 17)
 
 	require.NoError(t, err)
 	require.Equal(t, int64(17), repo.deletedID)
+	require.Equal(t, repo.deleteResult, result)
 }
 
 func TestPlatformServiceDeleteRejectsInvalidID(t *testing.T) {
-	err := NewPlatformService(&platformManagementRepositoryStub{}).Delete(context.Background(), 0)
+	_, err := NewPlatformService(&platformManagementRepositoryStub{}).Delete(context.Background(), 0)
 
 	require.ErrorIs(t, err, ErrPlatformNotFound)
 }
@@ -96,10 +108,33 @@ func TestPlatformServiceDeletePreservesInUseError(t *testing.T) {
 		deleteErr: ErrPlatformInUse.WithMetadata(map[string]string{"accounts": "1"}),
 	}
 
-	err := NewPlatformService(repo).Delete(context.Background(), 17)
+	_, err := NewPlatformService(repo).Delete(context.Background(), 17)
 
 	require.ErrorIs(t, err, ErrPlatformInUse)
 	require.Equal(t, "1", infraerrors.FromError(err).Metadata["accounts"])
+}
+
+func TestPlatformServicePreviewDeleteReturnsIndependentImpact(t *testing.T) {
+	repo := &platformManagementRepositoryStub{deleteImpact: &PlatformDeleteImpact{
+		UsageLogs: 12,
+		Audits:    4,
+		Ops:       7,
+		CanDelete: true,
+	}}
+
+	impact, err := NewPlatformService(repo).PreviewDelete(context.Background(), 17)
+
+	require.NoError(t, err)
+	require.Equal(t, int64(17), repo.previewedID)
+	require.Equal(t, int64(12), impact.UsageLogs)
+	impact.UsageLogs = 99
+	require.Equal(t, int64(12), repo.deleteImpact.UsageLogs)
+}
+
+func TestPlatformServicePreviewDeleteRejectsInvalidID(t *testing.T) {
+	_, err := NewPlatformService(&platformManagementRepositoryStub{}).PreviewDelete(context.Background(), 0)
+
+	require.ErrorIs(t, err, ErrPlatformNotFound)
 }
 
 func TestPlatformServiceCreateAllowsCrossPlatformModelOverlap(t *testing.T) {

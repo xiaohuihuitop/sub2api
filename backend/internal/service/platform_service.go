@@ -30,11 +30,29 @@ type PlatformManagementRepository interface {
 	PlatformRepository
 	GetByID(ctx context.Context, id int64) (*Platform, error)
 	Update(ctx context.Context, platform *Platform) error
-	DeleteUnused(ctx context.Context, id int64) error
+	PreviewDelete(ctx context.Context, id int64) (*PlatformDeleteImpact, error)
+	DeleteControlled(ctx context.Context, id int64) (*PlatformDeleteResult, error)
 }
 
 type PlatformAccountOwnershipReader interface {
 	HasAccountsByPlatformID(ctx context.Context, platformID int64) (bool, error)
+}
+
+// PlatformDeleteImpact summarizes blockers and data that a controlled platform
+// deletion will permanently remove.
+type PlatformDeleteImpact struct {
+	Accounts  int64 `json:"accounts"`
+	APIKeys   int64 `json:"api_keys"`
+	UsageLogs int64 `json:"usage_logs"`
+	Audits    int64 `json:"audits"`
+	Ops       int64 `json:"ops"`
+	Configs   int64 `json:"configs"`
+	CanDelete bool  `json:"can_delete"`
+}
+
+type PlatformDeleteResult struct {
+	PlatformID int64                `json:"platform_id"`
+	Cleaned    PlatformDeleteImpact `json:"cleaned"`
 }
 
 // CreatePlatformInput contains all fields that must be decided at platform
@@ -190,20 +208,41 @@ func (s *PlatformService) Update(ctx context.Context, id int64, input UpdatePlat
 	return candidate, nil
 }
 
-// Delete removes a platform only when the repository can prove atomically
-// that no business, configuration, or operational data still references it.
-func (s *PlatformService) Delete(ctx context.Context, id int64) error {
+func (s *PlatformService) PreviewDelete(ctx context.Context, id int64) (*PlatformDeleteImpact, error) {
 	if id <= 0 {
-		return ErrPlatformNotFound
+		return nil, ErrPlatformNotFound
 	}
 	repo, err := s.managementRepository()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := repo.DeleteUnused(ctx, id); err != nil {
-		return fmt.Errorf("delete platform: %w", err)
+	impact, err := repo.PreviewDelete(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("preview platform delete: %w", err)
 	}
-	return nil
+	if impact == nil {
+		return nil, fmt.Errorf("preview platform delete: empty impact")
+	}
+	result := *impact
+	result.CanDelete = result.Accounts == 0 && result.APIKeys == 0
+	return &result, nil
+}
+
+// Delete removes a platform after the repository atomically rechecks active
+// blockers and clears only approved historical references.
+func (s *PlatformService) Delete(ctx context.Context, id int64) (*PlatformDeleteResult, error) {
+	if id <= 0 {
+		return nil, ErrPlatformNotFound
+	}
+	repo, err := s.managementRepository()
+	if err != nil {
+		return nil, err
+	}
+	result, err := repo.DeleteControlled(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("delete platform: %w", err)
+	}
+	return result, nil
 }
 
 func (s *PlatformService) validateCandidate(ctx context.Context, platform *Platform, candidateID int64) error {
