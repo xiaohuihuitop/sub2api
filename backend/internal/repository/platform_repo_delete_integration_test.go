@@ -24,9 +24,10 @@ func TestPlatformRepositoryDeleteControlledRemovesOnlyTargetHistory(t *testing.T
 		code string
 		id   *int64
 	}{
-		{code: "delete-target-" + suffix, id: &targetID},
-		{code: "delete-control-" + suffix, id: &controlID},
+		{code: "del-target-" + suffix, id: &targetID},
+		{code: "del-control-" + suffix, id: &controlID},
 	} {
+		require.LessOrEqual(t, len(item.code), 50, "platform fixture code must fit the database constraint")
 		err := integrationDB.QueryRowContext(ctx, `
 			INSERT INTO platforms (code, name, account_platform, status, endpoint_capabilities)
 			VALUES ($1, $1, 'openai', 'disabled', '[]'::jsonb)
