@@ -617,6 +617,21 @@ export interface UpdatePlatformPoolRequest {
   model_rules?: PlatformModelRule[]
 }
 
+export interface PlatformDeleteImpact {
+  accounts: number
+  api_keys: number
+  usage_logs: number
+  audits: number
+  ops: number
+  configs: number
+  can_delete: boolean
+}
+
+export interface PlatformDeleteResult {
+  platform_id: number
+  cleaned: PlatformDeleteImpact
+}
+
 // Claude Model type (returned by /v1/models and account models API)
 export interface ClaudeModel {
   id: string

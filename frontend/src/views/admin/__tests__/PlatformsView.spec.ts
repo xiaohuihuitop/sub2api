@@ -24,6 +24,7 @@ vi.mock('@/api/admin', () => ({
       list: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      previewDelete: vi.fn(),
       remove: vi.fn(),
     },
   },
@@ -69,6 +70,7 @@ const mountView = () => mount(PlatformsView, {
 describe('PlatformsView', () => {
   beforeEach(() => {
     vi.mocked(adminAPI.platforms.list).mockReset()
+    vi.mocked(adminAPI.platforms.previewDelete).mockReset()
     vi.mocked(adminAPI.platforms.remove).mockReset()
     showError.mockReset()
     showSuccess.mockReset()
@@ -123,10 +125,15 @@ describe('PlatformsView', () => {
       endpoint_capabilities: [], model_rules: [],
     }])
     vi.mocked(adminAPI.platforms.remove).mockResolvedValue(undefined)
+    vi.mocked(adminAPI.platforms.previewDelete).mockResolvedValue({
+      accounts: 0, api_keys: 0, usage_logs: 3, audits: 0, ops: 2, configs: 0, can_delete: true,
+    })
     const wrapper = mountView()
     await flushPromises()
 
     await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    await flushPromises()
+    expect(adminAPI.platforms.previewDelete).toHaveBeenCalledWith(7)
     expect(adminAPI.platforms.remove).not.toHaveBeenCalled()
     await wrapper.get('[data-test="confirm-platform-delete"]').trigger('click')
     await flushPromises()
@@ -143,10 +150,14 @@ describe('PlatformsView', () => {
     vi.mocked(adminAPI.platforms.remove).mockRejectedValue({
       reason: 'PLATFORM_IN_USE', metadata: { accounts: '1', api_keys: '2', usage_logs: '3', audits: '4', ops: '5', configs: '6' },
     })
+    vi.mocked(adminAPI.platforms.previewDelete).mockResolvedValue({
+      accounts: 0, api_keys: 0, usage_logs: 3, audits: 4, ops: 5, configs: 6, can_delete: true,
+    })
     const wrapper = mountView()
     await flushPromises()
 
     await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-test="confirm-platform-delete"]').trigger('click')
     await flushPromises()
 

@@ -198,8 +198,13 @@ async function toggleStatus(platform: PlatformPool) {
   }
 }
 
-function confirmDelete(platform: PlatformPool) {
-  deletingPlatform.value = platform
+async function confirmDelete(platform: PlatformPool) {
+  try {
+    await adminAPI.platforms.previewDelete(platform.id)
+    deletingPlatform.value = platform
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.platforms.deleteFailed')))
+  }
 }
 
 async function deletePlatform() {

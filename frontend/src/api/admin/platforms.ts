@@ -6,6 +6,8 @@
 import { apiClient } from '../client'
 import type {
   CreatePlatformPoolRequest,
+  PlatformDeleteImpact,
+  PlatformDeleteResult,
   PlatformPool,
   UpdatePlatformPoolRequest
 } from '@/types'
@@ -30,10 +32,16 @@ export async function update(id: number, input: UpdatePlatformPoolRequest): Prom
   return data
 }
 
-export async function remove(id: number): Promise<void> {
-  await apiClient.delete(`/admin/platforms/${id}`)
+export async function previewDelete(id: number): Promise<PlatformDeleteImpact> {
+  const { data } = await apiClient.get<PlatformDeleteImpact>(`/admin/platforms/${id}/delete-impact`)
+  return data
 }
 
-const platformsAPI = { list, getById, create, update, remove }
+export async function remove(id: number): Promise<PlatformDeleteResult> {
+  const { data } = await apiClient.delete<PlatformDeleteResult>(`/admin/platforms/${id}`)
+  return data
+}
+
+const platformsAPI = { list, getById, create, update, previewDelete, remove }
 
 export default platformsAPI
