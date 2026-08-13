@@ -59,38 +59,127 @@ func (c platformReferenceCounts) metadata() map[string]string {
 	}
 }
 
-// DeleteUnused serializes deletion with platform-owned writes and rejects any
-// platform that is still referenced by current or historical data.
-func (r *platformRepository) DeleteUnused(ctx context.Context, id int64) error {
+func (c platformReferenceCounts) impact() service.PlatformDeleteImpact {
+	return service.PlatformDeleteImpact{
+		Accounts:  c.accounts,
+		APIKeys:   c.apiKeys,
+		UsageLogs: c.usageLogs,
+		Audits:    c.promptAuditJobs + c.promptAuditEvents + c.contentModerationLogs,
+		Ops: c.schedulerOutbox + c.opsErrorLogs + c.opsSystemMetrics +
+			c.opsMetricsHourly + c.opsMetricsDaily + c.opsAlertSilences +
+			c.opsAlertRules + c.opsAlertEvents,
+		Configs:   c.contentModerationConfig + c.promptAuditConfig,
+		CanDelete: c.accounts == 0 && c.apiKeys == 0,
+	}
+}
+
+func (r *platformRepository) PreviewDelete(ctx context.Context, id int64) (*service.PlatformDeleteImpact, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("begin platform delete preview: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var platformID int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM platforms WHERE id = $1`, id).Scan(&platformID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, service.ErrPlatformNotFound
+		}
+		return nil, fmt.Errorf("find platform for delete preview: %w", err)
+	}
+	counts, err := countPlatformReferences(ctx, tx, id, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit platform delete preview: %w", err)
+	}
+	impact := counts.impact()
+	return &impact, nil
+}
+
+// DeleteControlled serializes deletion with platform-owned writes, rejects
+// active account/key bindings, and atomically clears approved historical data.
+func (r *platformRepository) DeleteControlled(ctx context.Context, id int64) (*service.PlatformDeleteResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin platform delete: %w", err)
+		return nil, fmt.Errorf("begin platform delete: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	var lockedID int64
 	if err := tx.QueryRowContext(ctx, `SELECT id FROM platforms WHERE id = $1 FOR UPDATE`, id).Scan(&lockedID); err != nil {
 		if err == sql.ErrNoRows {
-			return service.ErrPlatformNotFound
+			return nil, service.ErrPlatformNotFound
 		}
-		return fmt.Errorf("lock platform: %w", err)
+		return nil, fmt.Errorf("lock platform: %w", err)
 	}
+	counts, hasOpsAlertSilences, err := countPlatformReferencesForDelete(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if counts.accounts > 0 || counts.apiKeys > 0 {
+		return nil, service.ErrPlatformInUse.WithMetadata(counts.metadata())
+	}
+	if err := clearPlatformHistoricalReferences(ctx, tx, id, hasOpsAlertSilences); err != nil {
+		return nil, fmt.Errorf("delete platform historical references: %w", err)
+	}
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM platforms WHERE id = $1`, id)
+	if err != nil {
+		return nil, fmt.Errorf("delete platform: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("read platform delete result: %w", err)
+	}
+	if rows == 0 {
+		return nil, service.ErrPlatformNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit platform delete: %w", err)
+	}
+	return &service.PlatformDeleteResult{PlatformID: id, Cleaned: counts.impact()}, nil
+}
+
+func countPlatformReferences(ctx context.Context, tx *sql.Tx, id int64, lockTables bool) (platformReferenceCounts, error) {
 	var hasOpsAlertSilences bool
 	if err := tx.QueryRowContext(ctx, `SELECT to_regclass('public.ops_alert_silences') IS NOT NULL`).Scan(&hasOpsAlertSilences); err != nil {
-		return fmt.Errorf("check optional platform reference tables: %w", err)
+		return platformReferenceCounts{}, fmt.Errorf("check optional platform reference tables: %w", err)
+	}
+	if lockTables {
+		lockSQL := platformReferenceTableLockSQL
+		if hasOpsAlertSilences {
+			lockSQL = platformReferenceTableLockWithAlertSilencesSQL
+		}
+		if _, err := tx.ExecContext(ctx, lockSQL); err != nil {
+			return platformReferenceCounts{}, fmt.Errorf("lock platform reference tables: %w", err)
+		}
+	}
+	counts, err := queryPlatformReferenceCounts(ctx, tx, id, hasOpsAlertSilences)
+	return counts, err
+}
+
+func countPlatformReferencesForDelete(ctx context.Context, tx *sql.Tx, id int64) (platformReferenceCounts, bool, error) {
+	var hasOpsAlertSilences bool
+	if err := tx.QueryRowContext(ctx, `SELECT to_regclass('public.ops_alert_silences') IS NOT NULL`).Scan(&hasOpsAlertSilences); err != nil {
+		return platformReferenceCounts{}, false, fmt.Errorf("check optional platform reference tables: %w", err)
 	}
 	lockSQL := platformReferenceTableLockSQL
 	opsAlertSilencesCountSQL := `0::bigint AS ops_alert_silences`
 	if hasOpsAlertSilences {
 		lockSQL = platformReferenceTableLockWithAlertSilencesSQL
-		opsAlertSilencesCountSQL = `(SELECT COUNT(*) FROM ops_alert_silences WHERE platform_id = $1) AS ops_alert_silences`
+		opsAlertSilencesCountSQL = `(SELECT COUNT(*) FROM ops_alert_silences
+			WHERE platform_id = $1 OR rule_id IN (
+				SELECT id FROM ops_alert_rules
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+			)) AS ops_alert_silences`
 	}
 	if _, err := tx.ExecContext(ctx, lockSQL); err != nil {
-		return fmt.Errorf("lock platform reference tables: %w", err)
+		return platformReferenceCounts{}, false, fmt.Errorf("lock platform reference tables: %w", err)
 	}
-
 	var counts platformReferenceCounts
-	err = tx.QueryRowContext(ctx, fmt.Sprintf(platformReferenceCountSQLTemplate, opsAlertSilencesCountSQL), id).Scan(
+	err := tx.QueryRowContext(ctx, fmt.Sprintf(platformReferenceCountSQLTemplate, opsAlertSilencesCountSQL), id).Scan(
 		&counts.accounts, &counts.apiKeys, &counts.usageLogs,
 		&counts.promptAuditJobs, &counts.promptAuditEvents, &counts.contentModerationLogs,
 		&counts.schedulerOutbox, &counts.opsErrorLogs, &counts.opsSystemMetrics,
@@ -99,28 +188,88 @@ func (r *platformRepository) DeleteUnused(ctx context.Context, id int64) error {
 		&counts.contentModerationConfig, &counts.promptAuditConfig,
 	)
 	if err != nil {
-		return fmt.Errorf("count platform references: %w", err)
+		return platformReferenceCounts{}, false, fmt.Errorf("count platform references: %w", err)
 	}
-	if counts.total() > 0 {
-		return service.ErrPlatformInUse.WithMetadata(counts.metadata())
-	}
+	return counts, hasOpsAlertSilences, nil
+}
 
-	result, err := tx.ExecContext(ctx, `DELETE FROM platforms WHERE id = $1`, id)
+func queryPlatformReferenceCounts(ctx context.Context, tx *sql.Tx, id int64, hasOpsAlertSilences bool) (platformReferenceCounts, error) {
+	opsAlertSilencesCountSQL := `0::bigint AS ops_alert_silences`
+	if hasOpsAlertSilences {
+		opsAlertSilencesCountSQL = `(SELECT COUNT(*) FROM ops_alert_silences
+			WHERE platform_id = $1 OR rule_id IN (
+				SELECT id FROM ops_alert_rules
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+			)) AS ops_alert_silences`
+	}
+	var counts platformReferenceCounts
+	err := tx.QueryRowContext(ctx, fmt.Sprintf(platformReferenceCountSQLTemplate, opsAlertSilencesCountSQL), id).Scan(
+		&counts.accounts, &counts.apiKeys, &counts.usageLogs,
+		&counts.promptAuditJobs, &counts.promptAuditEvents, &counts.contentModerationLogs,
+		&counts.schedulerOutbox, &counts.opsErrorLogs, &counts.opsSystemMetrics,
+		&counts.opsMetricsHourly, &counts.opsMetricsDaily, &counts.opsAlertSilences,
+		&counts.opsAlertRules, &counts.opsAlertEvents,
+		&counts.contentModerationConfig, &counts.promptAuditConfig,
+	)
 	if err != nil {
-		return fmt.Errorf("delete platform: %w", err)
+		return platformReferenceCounts{}, fmt.Errorf("count platform references: %w", err)
 	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("read platform delete result: %w", err)
+	return counts, nil
+}
+
+func clearPlatformHistoricalReferences(ctx context.Context, tx *sql.Tx, id int64, hasOpsAlertSilences bool) error {
+	statements := []string{}
+	if hasOpsAlertSilences {
+		statements = append(statements, `DELETE FROM ops_alert_silences
+			WHERE platform_id = $1 OR rule_id IN (
+				SELECT id FROM ops_alert_rules
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+			)`)
 	}
-	if rows == 0 {
-		return service.ErrPlatformNotFound
+	statements = append(statements,
+		`DELETE FROM ops_alert_events
+		 WHERE rule_id IN (
+			SELECT id FROM ops_alert_rules
+			WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+		 ) OR COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)`,
+		`DELETE FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)`,
+		`DELETE FROM usage_logs WHERE platform_id = $1`,
+		`DELETE FROM prompt_audit_events WHERE platform_id = $1`,
+		`DELETE FROM prompt_audit_jobs WHERE platform_id = $1`,
+		`DELETE FROM content_moderation_logs WHERE platform_id = $1`,
+		`DELETE FROM scheduler_outbox WHERE platform_id = $1`,
+		`DELETE FROM ops_error_logs WHERE platform_id = $1`,
+		`DELETE FROM ops_system_metrics WHERE platform_id = $1`,
+		`DELETE FROM ops_metrics_hourly WHERE platform_id = $1`,
+		`DELETE FROM ops_metrics_daily WHERE platform_id = $1`,
+	)
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement, id); err != nil {
+			return err
+		}
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit platform delete: %w", err)
+	if _, err := tx.ExecContext(ctx, platformSettingsCleanupSQL, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM platform_model_rules WHERE platform_id = $1`, id); err != nil {
+		return err
 	}
 	return nil
 }
+
+const platformSettingsCleanupSQL = `UPDATE settings
+SET value = jsonb_set(
+	value::jsonb,
+	'{platform_ids}',
+	COALESCE((
+		SELECT jsonb_agg(item)
+		FROM jsonb_array_elements(COALESCE(value::jsonb->'platform_ids', '[]'::jsonb)) item
+		WHERE item <> to_jsonb($1::bigint)
+	), '[]'::jsonb),
+	true
+)::text
+WHERE key IN ('content_moderation_config', 'prompt_audit_config')
+	AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)`
 
 const platformReferenceTableLockSQL = `LOCK TABLE scheduler_outbox, ops_error_logs, ops_system_metrics,
 	ops_metrics_hourly, ops_metrics_daily, ops_alert_rules, ops_alert_events, settings IN SHARE MODE`
@@ -142,7 +291,12 @@ const platformReferenceCountSQLTemplate = `SELECT
 	(SELECT COUNT(*) FROM ops_metrics_daily WHERE platform_id = $1) AS ops_metrics_daily,
 	%s,
 	(SELECT COUNT(*) FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_rules,
-	(SELECT COUNT(*) FROM ops_alert_events WHERE COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_events,
+	(SELECT COUNT(*) FROM ops_alert_events
+		WHERE COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+			OR rule_id IN (
+				SELECT id FROM ops_alert_rules
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+			)) AS ops_alert_events,
 	(SELECT COUNT(*) FROM settings WHERE key = 'content_moderation_config'
 		AND COALESCE((value::jsonb)->>'all_platforms', 'true') = 'false'
 		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS content_moderation_config,
