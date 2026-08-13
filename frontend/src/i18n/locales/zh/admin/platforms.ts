@@ -35,11 +35,12 @@ export default {
     retry: '重试',
     saveFailed: '保存平台失败',
     deleteTitle: '删除平台',
-    deleteMessage: '确定删除平台“{name}”吗？仅完全未被使用的平台可以删除。',
+	deleteMessage: '确定删除平台“{name}”吗？将永久清理使用记录 {usage_logs} 条、审计记录 {audits} 条、运维记录 {ops} 条、平台范围配置 {configs} 项。用户、余额、订阅、订单不会被删除。',
+	deleteBlockedMessage: '平台“{name}”仍绑定账号 {accounts} 个、API 密钥 {api_keys} 个，暂时不能删除。请先解除这些绑定；历史记录不会阻止删除。',
     deleted: '平台已删除',
     deleteFailed: '删除平台失败',
     errors: {
-      PLATFORM_IN_USE: '平台仍被引用，无法删除（账号 {accounts}、密钥 {api_keys}、使用记录 {usage_logs}、审计 {audits}、运维 {ops}、配置 {configs}）。请先处理相关数据，系统不会自动解绑或清除历史。',
+	  PLATFORM_IN_USE: '平台仍绑定账号 {accounts} 个或 API 密钥 {api_keys} 个，无法删除。请先解除账号和密钥绑定。',
     },
   },
 }

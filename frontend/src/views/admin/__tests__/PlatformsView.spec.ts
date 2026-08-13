@@ -14,7 +14,12 @@ vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
     ...actual,
-    useI18n: () => ({ t: (key: string) => key === 'admin.platforms.errors.PLATFORM_IN_USE' ? 'localized platform in use' : key }),
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) => {
+        if (key === 'admin.platforms.errors.PLATFORM_IN_USE') return 'localized platform in use'
+        return params ? `${key}:${JSON.stringify(params)}` : key
+      },
+    }),
   }
 })
 
@@ -59,9 +64,14 @@ const mountView = () => mount(PlatformsView, {
       PlatformIcon: true,
       PlatformPoolDialog: { template: '<div />' },
       ConfirmDialog: defineComponent({
-        props: ['show', 'title', 'message'],
+        props: ['show', 'title', 'message', 'confirmDisabled'],
         emits: ['confirm', 'cancel'],
-        template: '<button v-if="show" data-test="confirm-platform-delete" @click="$emit(\'confirm\')">confirm</button>',
+        template: `
+          <div v-if="show" data-test="platform-delete-dialog">
+            <p data-test="platform-delete-message">{{ message }}</p>
+            <button data-test="confirm-platform-delete" :disabled="confirmDisabled" @click="$emit('confirm')">confirm</button>
+          </div>
+        `,
       }),
     },
   },
@@ -124,7 +134,10 @@ describe('PlatformsView', () => {
       id: 7, code: 'unused', name: 'Unused', account_platform: 'openai', status: 'disabled',
       endpoint_capabilities: [], model_rules: [],
     }])
-    vi.mocked(adminAPI.platforms.remove).mockResolvedValue(undefined)
+    vi.mocked(adminAPI.platforms.remove).mockResolvedValue({
+      platform_id: 7,
+      cleaned: { accounts: 0, api_keys: 0, usage_logs: 3, audits: 0, ops: 2, configs: 0, can_delete: true },
+    })
     vi.mocked(adminAPI.platforms.previewDelete).mockResolvedValue({
       accounts: 0, api_keys: 0, usage_logs: 3, audits: 0, ops: 2, configs: 0, can_delete: true,
     })
@@ -135,11 +148,51 @@ describe('PlatformsView', () => {
     await flushPromises()
     expect(adminAPI.platforms.previewDelete).toHaveBeenCalledWith(7)
     expect(adminAPI.platforms.remove).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-test="platform-delete-message"]').text()).toContain('"usage_logs":3')
+    expect(wrapper.get('[data-test="platform-delete-message"]').text()).toContain('"ops":2')
+    expect(wrapper.get<HTMLButtonElement>('[data-test="confirm-platform-delete"]').element.disabled).toBe(false)
     await wrapper.get('[data-test="confirm-platform-delete"]').trigger('click')
     await flushPromises()
 
     expect(adminAPI.platforms.remove).toHaveBeenCalledWith(7)
     expect(showSuccess).toHaveBeenCalledWith('admin.platforms.deleted')
+  })
+
+  it('blocks deletion when accounts or API keys are still attached', async () => {
+    vi.mocked(adminAPI.platforms.list).mockResolvedValue([{
+      id: 7, code: 'used', name: 'Used', account_platform: 'openai', status: 'disabled',
+      endpoint_capabilities: [], model_rules: [],
+    }])
+    vi.mocked(adminAPI.platforms.previewDelete).mockResolvedValue({
+      accounts: 1, api_keys: 2, usage_logs: 30, audits: 4, ops: 5, configs: 6, can_delete: false,
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="platform-delete-message"]').text()).toContain('"accounts":1')
+    expect(wrapper.get('[data-test="platform-delete-message"]').text()).toContain('"api_keys":2')
+    expect(wrapper.get<HTMLButtonElement>('[data-test="confirm-platform-delete"]').element.disabled).toBe(true)
+    await wrapper.get('[data-test="confirm-platform-delete"]').trigger('click')
+    expect(adminAPI.platforms.remove).not.toHaveBeenCalled()
+  })
+
+  it('does not open the confirmation dialog when preview fails', async () => {
+    vi.mocked(adminAPI.platforms.list).mockResolvedValue([{
+      id: 7, code: 'unused', name: 'Unused', account_platform: 'openai', status: 'disabled',
+      endpoint_capabilities: [], model_rules: [],
+    }])
+    vi.mocked(adminAPI.platforms.previewDelete).mockRejectedValue(new Error('offline'))
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="delete-platform-7"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="platform-delete-dialog"]').exists()).toBe(false)
+    expect(showError).toHaveBeenCalled()
   })
 
   it('shows the localized safe-delete conflict instead of removing references', async () => {

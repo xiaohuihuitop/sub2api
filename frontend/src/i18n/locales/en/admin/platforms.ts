@@ -35,11 +35,12 @@ export default {
     retry: 'Retry',
     saveFailed: 'Failed to save platform',
     deleteTitle: 'Delete platform',
-    deleteMessage: 'Delete platform “{name}”? Only a completely unused platform can be deleted.',
+	deleteMessage: 'Delete platform “{name}”? This permanently removes {usage_logs} usage logs, {audits} audit records, {ops} operations records, and {configs} platform-scoped configurations. Users, balances, subscriptions, and orders are not deleted.',
+	deleteBlockedMessage: 'Platform “{name}” still has {accounts} accounts and {api_keys} API keys attached. Detach them before deleting; historical records do not block deletion.',
     deleted: 'Platform deleted',
     deleteFailed: 'Failed to delete platform',
     errors: {
-      PLATFORM_IN_USE: 'This platform is still referenced and cannot be deleted (accounts {accounts}, API keys {api_keys}, usage logs {usage_logs}, audits {audits}, operations {ops}, configurations {configs}). References and history are never removed automatically.',
+	  PLATFORM_IN_USE: 'This platform still has {accounts} accounts or {api_keys} API keys attached. Detach the accounts and API keys before deleting it.',
     },
   },
 }

@@ -88,8 +88,9 @@
     <ConfirmDialog
       :show="deletingPlatform !== null"
       :title="t('admin.platforms.deleteTitle')"
-      :message="t('admin.platforms.deleteMessage', { name: deletingPlatform?.name ?? '' })"
+	  :message="deleteMessage"
       :confirm-text="t('common.delete')"
+	  :confirm-disabled="!deleteImpact?.can_delete"
       danger
       @confirm="deletePlatform"
       @cancel="deletingPlatform = null"
@@ -101,7 +102,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { CreatePlatformPoolRequest, PlatformPool } from '@/types'
+import type { CreatePlatformPoolRequest, PlatformDeleteImpact, PlatformPool } from '@/types'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -121,6 +122,23 @@ const saving = ref(false)
 const showDialog = ref(false)
 const editingPlatform = ref<PlatformPool | null>(null)
 const deletingPlatform = ref<PlatformPool | null>(null)
+const deleteImpact = ref<PlatformDeleteImpact | null>(null)
+
+const deleteMessage = computed(() => {
+	const platform = deletingPlatform.value
+	const impact = deleteImpact.value
+	if (!platform || !impact) return ''
+	const params = {
+		name: platform.name,
+		accounts: impact.accounts,
+		api_keys: impact.api_keys,
+		usage_logs: impact.usage_logs,
+		audits: impact.audits,
+		ops: impact.ops,
+		configs: impact.configs,
+	}
+	return t(impact.can_delete ? 'admin.platforms.deleteMessage' : 'admin.platforms.deleteBlockedMessage', params)
+})
 
 const columns = computed((): Column[] => [
   { key: 'name', label: t('admin.platforms.name') },
@@ -200,19 +218,22 @@ async function toggleStatus(platform: PlatformPool) {
 
 async function confirmDelete(platform: PlatformPool) {
   try {
-    await adminAPI.platforms.previewDelete(platform.id)
+	deleteImpact.value = await adminAPI.platforms.previewDelete(platform.id)
     deletingPlatform.value = platform
   } catch (error) {
+	deleteImpact.value = null
+	deletingPlatform.value = null
     appStore.showError(extractApiErrorMessage(error, t('admin.platforms.deleteFailed')))
   }
 }
 
 async function deletePlatform() {
   const platform = deletingPlatform.value
-  if (!platform) return
+	if (!platform || !deleteImpact.value?.can_delete) return
   try {
     await adminAPI.platforms.remove(platform.id)
     deletingPlatform.value = null
+	deleteImpact.value = null
     appStore.showSuccess(t('admin.platforms.deleted'))
     await loadPlatforms()
   } catch (error) {
