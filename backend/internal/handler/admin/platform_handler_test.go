@@ -16,11 +16,14 @@ import (
 )
 
 type platformHandlerServiceStub struct {
-	platforms []service.Platform
-	created   service.CreatePlatformInput
-	updated   service.UpdatePlatformInput
-	deletedID int64
-	deleteErr error
+	platforms    []service.Platform
+	created      service.CreatePlatformInput
+	updated      service.UpdatePlatformInput
+	deleteImpact *service.PlatformDeleteImpact
+	deleteResult *service.PlatformDeleteResult
+	previewedID  int64
+	deletedID    int64
+	deleteErr    error
 }
 
 func (s *platformHandlerServiceStub) List(context.Context) ([]service.Platform, error) {
@@ -47,9 +50,14 @@ func (s *platformHandlerServiceStub) Update(_ context.Context, id int64, input s
 	return &service.Platform{ID: id, Code: "gpt", Name: "GPT", AccountPlatform: service.PlatformOpenAI, Status: service.PlatformStatusActive}, nil
 }
 
-func (s *platformHandlerServiceStub) Delete(_ context.Context, id int64) error {
+func (s *platformHandlerServiceStub) PreviewDelete(_ context.Context, id int64) (*service.PlatformDeleteImpact, error) {
+	s.previewedID = id
+	return s.deleteImpact, nil
+}
+
+func (s *platformHandlerServiceStub) Delete(_ context.Context, id int64) (*service.PlatformDeleteResult, error) {
 	s.deletedID = id
-	return s.deleteErr
+	return s.deleteResult, s.deleteErr
 }
 
 func setupPlatformHandlerRouter(svc platformManagementService) *gin.Engine {
@@ -60,12 +68,20 @@ func setupPlatformHandlerRouter(svc platformManagementService) *gin.Engine {
 	router.GET("/api/v1/admin/platforms/:id", handler.GetByID)
 	router.POST("/api/v1/admin/platforms", handler.Create)
 	router.PUT("/api/v1/admin/platforms/:id", handler.Update)
+	router.GET("/api/v1/admin/platforms/:id/delete-impact", handler.DeleteImpact)
 	router.DELETE("/api/v1/admin/platforms/:id", handler.Delete)
 	return router
 }
 
 func TestPlatformHandlerDeletesUnusedPlatform(t *testing.T) {
-	stub := &platformHandlerServiceStub{}
+	stub := &platformHandlerServiceStub{deleteResult: &service.PlatformDeleteResult{
+		PlatformID: 7,
+		Cleaned: service.PlatformDeleteImpact{
+			UsageLogs: 3,
+			Ops:       2,
+			CanDelete: true,
+		},
+	}}
 	router := setupPlatformHandlerRouter(stub)
 	recorder := httptest.NewRecorder()
 
@@ -73,7 +89,33 @@ func TestPlatformHandlerDeletesUnusedPlatform(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.Equal(t, int64(7), stub.deletedID)
-	require.JSONEq(t, `{"code":0,"message":"success"}`, recorder.Body.String())
+	require.JSONEq(t, `{"code":0,"message":"success","data":{"platform_id":7,"cleaned":{"accounts":0,"api_keys":0,"usage_logs":3,"audits":0,"ops":2,"configs":0,"can_delete":true}}}`, recorder.Body.String())
+}
+
+func TestPlatformHandlerReturnsDeleteImpact(t *testing.T) {
+	stub := &platformHandlerServiceStub{deleteImpact: &service.PlatformDeleteImpact{
+		UsageLogs: 12,
+		Audits:    4,
+		Ops:       7,
+		CanDelete: true,
+	}}
+	router := setupPlatformHandlerRouter(stub)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/admin/platforms/7/delete-impact", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, int64(7), stub.previewedID)
+	require.JSONEq(t, `{"code":0,"message":"success","data":{"accounts":0,"api_keys":0,"usage_logs":12,"audits":4,"ops":7,"configs":0,"can_delete":true}}`, recorder.Body.String())
+}
+
+func TestPlatformHandlerRejectsInvalidDeleteImpactID(t *testing.T) {
+	router := setupPlatformHandlerRouter(&platformHandlerServiceStub{})
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/admin/platforms/0/delete-impact", nil))
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestPlatformHandlerReturnsConflictForReferencedPlatform(t *testing.T) {

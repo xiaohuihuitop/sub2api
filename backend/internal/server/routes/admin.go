@@ -303,6 +303,7 @@ func registerPlatformRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		platforms.GET("", h.Admin.Platform.List)
 		platforms.GET("/:id", h.Admin.Platform.GetByID)
+		platforms.GET("/:id/delete-impact", h.Admin.Platform.DeleteImpact)
 		platforms.POST("", h.Admin.Platform.Create)
 		platforms.PUT("/:id", h.Admin.Platform.Update)
 		platforms.DELETE("/:id", h.Admin.Platform.Delete)

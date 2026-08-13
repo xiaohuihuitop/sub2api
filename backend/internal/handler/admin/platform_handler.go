@@ -15,7 +15,8 @@ type platformManagementService interface {
 	GetByID(ctx context.Context, id int64) (*service.Platform, error)
 	Create(ctx context.Context, input service.CreatePlatformInput) (*service.Platform, error)
 	Update(ctx context.Context, id int64, input service.UpdatePlatformInput) (*service.Platform, error)
-	Delete(ctx context.Context, id int64) error
+	PreviewDelete(ctx context.Context, id int64) (*service.PlatformDeleteImpact, error)
+	Delete(ctx context.Context, id int64) (*service.PlatformDeleteResult, error)
 }
 
 // PlatformHandler manages business platform account pools.
@@ -204,15 +205,30 @@ func (h *PlatformHandler) Update(c *gin.Context) {
 	response.Success(c, platformResponseFromService(platform))
 }
 
-// Delete removes a platform only when no durable reference remains.
+// DeleteImpact previews blockers and historical data that deletion will clear.
+func (h *PlatformHandler) DeleteImpact(c *gin.Context) {
+	id, ok := parsePositiveIDParam(c, "id")
+	if !ok {
+		return
+	}
+	impact, err := h.platforms.PreviewDelete(c.Request.Context(), id)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, impact)
+}
+
+// Delete performs a fresh atomic blocker check and controlled cleanup.
 func (h *PlatformHandler) Delete(c *gin.Context) {
 	id, ok := parsePositiveIDParam(c, "id")
 	if !ok {
 		return
 	}
-	if err := h.platforms.Delete(c.Request.Context(), id); err != nil {
+	result, err := h.platforms.Delete(c.Request.Context(), id)
+	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, nil)
+	response.Success(c, result)
 }
