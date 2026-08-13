@@ -36,6 +36,9 @@ func platformReferenceRows(values ...int64) *sqlmock.Rows {
 func TestPlatformReferenceCountIncludesEverySettingThatCleanupWillModify(t *testing.T) {
 	require.NotContains(t, platformReferenceCountSQLTemplate, "all_platforms")
 	require.Contains(t, platformReferenceCountSQLTemplate, "platform_ids")
+	require.NotContains(t, platformReferenceCountSQLTemplate, "jsonb_build_object('platform_id', $1)")
+	require.NotContains(t, platformReferenceCountSQLTemplate, "jsonb_build_array($1)")
+	require.NotContains(t, platformSettingsCleanupSQL, "jsonb_build_array($1)")
 }
 
 func expectPlatformImpactQuery(mock sqlmock.Sqlmock, id int64, hasSilences bool, values ...int64) {

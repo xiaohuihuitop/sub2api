@@ -172,7 +172,7 @@ func countPlatformReferencesForDelete(ctx context.Context, tx *sql.Tx, id int64)
 		opsAlertSilencesCountSQL = `(SELECT COUNT(*) FROM ops_alert_silences
 			WHERE platform_id = $1 OR rule_id IN (
 				SELECT id FROM ops_alert_rules
-				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)
 			)) AS ops_alert_silences`
 	}
 	if _, err := tx.ExecContext(ctx, lockSQL); err != nil {
@@ -199,7 +199,7 @@ func queryPlatformReferenceCounts(ctx context.Context, tx *sql.Tx, id int64, has
 		opsAlertSilencesCountSQL = `(SELECT COUNT(*) FROM ops_alert_silences
 			WHERE platform_id = $1 OR rule_id IN (
 				SELECT id FROM ops_alert_rules
-				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)
 			)) AS ops_alert_silences`
 	}
 	var counts platformReferenceCounts
@@ -223,16 +223,16 @@ func clearPlatformHistoricalReferences(ctx context.Context, tx *sql.Tx, id int64
 		statements = append(statements, `DELETE FROM ops_alert_silences
 			WHERE platform_id = $1 OR rule_id IN (
 				SELECT id FROM ops_alert_rules
-				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)
 			)`)
 	}
 	statements = append(statements,
 		`DELETE FROM ops_alert_events
 		 WHERE rule_id IN (
 			SELECT id FROM ops_alert_rules
-			WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
-		 ) OR COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)`,
-		`DELETE FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)`,
+			WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)
+		 ) OR COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)`,
+		`DELETE FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)`,
 		`DELETE FROM usage_logs WHERE platform_id = $1`,
 		`DELETE FROM prompt_audit_events WHERE platform_id = $1`,
 		`DELETE FROM prompt_audit_jobs WHERE platform_id = $1`,
@@ -269,7 +269,7 @@ SET value = jsonb_set(
 	true
 )::text
 WHERE key IN ('content_moderation_config', 'prompt_audit_config')
-	AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)`
+	AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1::bigint)`
 
 const platformReferenceTableLockSQL = `LOCK TABLE scheduler_outbox, ops_error_logs, ops_system_metrics,
 	ops_metrics_hourly, ops_metrics_daily, ops_alert_rules, ops_alert_events, settings IN SHARE MODE`
@@ -290,17 +290,17 @@ const platformReferenceCountSQLTemplate = `SELECT
 	(SELECT COUNT(*) FROM ops_metrics_hourly WHERE platform_id = $1) AS ops_metrics_hourly,
 	(SELECT COUNT(*) FROM ops_metrics_daily WHERE platform_id = $1) AS ops_metrics_daily,
 	%s,
-	(SELECT COUNT(*) FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)) AS ops_alert_rules,
+	(SELECT COUNT(*) FROM ops_alert_rules WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)) AS ops_alert_rules,
 	(SELECT COUNT(*) FROM ops_alert_events
-		WHERE COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+		WHERE COALESCE(dimensions, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)
 			OR rule_id IN (
 				SELECT id FROM ops_alert_rules
-				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1)
+				WHERE COALESCE(filters, '{}'::jsonb) @> jsonb_build_object('platform_id', $1::bigint)
 			)) AS ops_alert_events,
 	(SELECT COUNT(*) FROM settings WHERE key = 'content_moderation_config'
-		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS content_moderation_config,
+		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1::bigint)) AS content_moderation_config,
 	(SELECT COUNT(*) FROM settings WHERE key = 'prompt_audit_config'
-		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1)) AS prompt_audit_config`
+		AND COALESCE(value::jsonb->'platform_ids', '[]'::jsonb) @> jsonb_build_array($1::bigint)) AS prompt_audit_config`
 
 // Create persists the platform and all of its model rules in one transaction.
 // A partial account-pool configuration must never become schedulable.
