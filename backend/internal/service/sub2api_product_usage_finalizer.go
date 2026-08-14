@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 )
@@ -98,26 +99,7 @@ func (f *Sub2APIProductUsageFinalizer) Finalize(ctx context.Context, record Prod
 			return ErrProductUsageFinalizerUnavailable
 		}
 		return f.openai.RecordUsage(ctx, &OpenAIRecordUsageInput{
-			Result: &OpenAIForwardResult{
-				RequestID:        record.Event.RequestID,
-				Model:            firstNonEmptyProduct(facts.Model, facts.RequestedModel),
-				BillingModel:     facts.BillingModel,
-				UpstreamModel:    facts.UpstreamModel,
-				UpstreamEndpoint: facts.UpstreamEndpoint,
-				ServiceTier:      stringPointerProduct(facts.ServiceTier),
-				ReasoningEffort:  stringPointerProduct(facts.ReasoningEffort),
-				Usage: OpenAIUsage{
-					InputTokens:              facts.InputTokens,
-					OutputTokens:             facts.OutputTokens,
-					CacheCreationInputTokens: facts.CacheCreationTokens,
-					CacheReadInputTokens:     facts.CacheReadTokens,
-					ImageInputTokens:         facts.ImageInputTokens,
-					ImageOutputTokens:        facts.ImageOutputTokens,
-				},
-				ImageCount: facts.ImageCount,
-				VideoCount: facts.VideoCount,
-				Stream:     facts.RequestWasClientStream,
-			},
+			Result: openAIForwardResultFromProductUsage(record.Event),
 			APIKey: apiKey, User: user, Account: account, Subscription: subscription,
 			InboundEndpoint: facts.InboundEndpoint, UpstreamEndpoint: facts.UpstreamEndpoint,
 			UserAgent: facts.UserAgent, IPAddress: facts.ClientIP, SessionID: facts.SessionID,
@@ -134,19 +116,7 @@ func (f *Sub2APIProductUsageFinalizer) Finalize(ctx context.Context, record Prod
 		return ErrProductUsageFinalizerUnavailable
 	}
 	return f.gateway.RecordUsage(ctx, &RecordUsageInput{
-		Result: &ForwardResult{
-			RequestID:     record.Event.RequestID,
-			Model:         firstNonEmptyProduct(facts.Model, facts.RequestedModel),
-			UpstreamModel: facts.UpstreamModel,
-			Usage: ClaudeUsage{
-				InputTokens:              facts.InputTokens,
-				OutputTokens:             facts.OutputTokens,
-				CacheCreationInputTokens: facts.CacheCreationTokens,
-				CacheReadInputTokens:     facts.CacheReadTokens,
-				ImageOutputTokens:        facts.ImageOutputTokens,
-			},
-			Stream: facts.RequestWasClientStream,
-		},
+		Result: gatewayForwardResultFromProductUsage(record.Event),
 		APIKey: apiKey, User: user, Account: account, Subscription: subscription,
 		InboundEndpoint: facts.InboundEndpoint, UpstreamEndpoint: facts.UpstreamEndpoint,
 		UserAgent: facts.UserAgent, IPAddress: facts.ClientIP, SessionID: facts.SessionID,
@@ -157,6 +127,66 @@ func (f *Sub2APIProductUsageFinalizer) Finalize(ctx context.Context, record Prod
 			BillingModelSource: facts.BillingModelSource, ModelMappingChain: facts.ModelMappingChain,
 		},
 	})
+}
+
+func openAIForwardResultFromProductUsage(event gatewayruntime.UsageEvent) *OpenAIForwardResult {
+	facts := event.Facts
+	return &OpenAIForwardResult{
+		RequestID:        event.RequestID,
+		Model:            firstNonEmptyProduct(facts.Model, facts.RequestedModel),
+		BillingModel:     facts.BillingModel,
+		UpstreamModel:    facts.UpstreamModel,
+		UpstreamEndpoint: facts.UpstreamEndpoint,
+		ServiceTier:      stringPointerProduct(facts.ServiceTier),
+		ReasoningEffort:  stringPointerProduct(facts.ReasoningEffort),
+		Usage: OpenAIUsage{
+			InputTokens:              facts.InputTokens,
+			OutputTokens:             facts.OutputTokens,
+			CacheCreationInputTokens: facts.CacheCreationTokens,
+			CacheReadInputTokens:     facts.CacheReadTokens,
+			ImageInputTokens:         facts.ImageInputTokens,
+			ImageOutputTokens:        facts.ImageOutputTokens,
+		},
+		ImageCount:   facts.ImageCount,
+		VideoCount:   facts.VideoCount,
+		Stream:       facts.RequestWasClientStream,
+		Duration:     productUsageDuration(facts.DurationMilliseconds),
+		FirstTokenMs: productUsageFirstToken(facts.FirstTokenMilliseconds),
+	}
+}
+
+func gatewayForwardResultFromProductUsage(event gatewayruntime.UsageEvent) *ForwardResult {
+	facts := event.Facts
+	return &ForwardResult{
+		RequestID:     event.RequestID,
+		Model:         firstNonEmptyProduct(facts.Model, facts.RequestedModel),
+		UpstreamModel: facts.UpstreamModel,
+		Usage: ClaudeUsage{
+			InputTokens:              facts.InputTokens,
+			OutputTokens:             facts.OutputTokens,
+			CacheCreationInputTokens: facts.CacheCreationTokens,
+			CacheReadInputTokens:     facts.CacheReadTokens,
+			ImageOutputTokens:        facts.ImageOutputTokens,
+		},
+		Stream:       facts.RequestWasClientStream,
+		Duration:     productUsageDuration(facts.DurationMilliseconds),
+		FirstTokenMs: productUsageFirstToken(facts.FirstTokenMilliseconds),
+	}
+}
+
+func productUsageDuration(milliseconds int64) time.Duration {
+	if milliseconds <= 0 {
+		return 0
+	}
+	return time.Duration(milliseconds) * time.Millisecond
+}
+
+func productUsageFirstToken(milliseconds int64) *int {
+	if milliseconds <= 0 {
+		return nil
+	}
+	value := int(milliseconds)
+	return &value
 }
 
 func isOpenAIUsageAdapter(adapter, fallback string) bool {
