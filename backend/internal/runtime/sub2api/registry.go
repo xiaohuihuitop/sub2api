@@ -16,6 +16,21 @@ var (
 	ErrInvalidExecutor     = errors.New("sub2api driver executor is invalid")
 )
 
+// DeferredEndpointFamilies makes the migration boundary explicit. These
+// endpoints remain on the legacy compatibility executor until their own pure
+// exchange implementation and conformance tests are complete; no new-driver
+// failure silently falls back to them.
+var DeferredEndpointFamilies = []v1.Endpoint{
+	v1.EndpointCountTokens,
+	v1.EndpointEmbeddings,
+	v1.EndpointAlphaSearch,
+	v1.EndpointGeminiNative,
+	v1.EndpointImages,
+	v1.EndpointVideos,
+	v1.EndpointLive,
+	v1.EndpointWebSocket,
+}
+
 type EndpointExecutor interface {
 	Execute(context.Context, v1.Request, runtimebridge.EventSink) (v1.Result, error)
 }

@@ -108,3 +108,28 @@ func TestRegistryRejectsEmptyAdapter(t *testing.T) {
 		t.Fatalf("Adapter(empty) error = %v, want ErrRegistryUnavailable", err)
 	}
 }
+
+func TestDeferredEndpointFamiliesAreExplicit(t *testing.T) {
+	want := map[v1.Endpoint]bool{
+		v1.EndpointCountTokens:  true,
+		v1.EndpointEmbeddings:   true,
+		v1.EndpointAlphaSearch:  true,
+		v1.EndpointGeminiNative: true,
+		v1.EndpointImages:       true,
+		v1.EndpointVideos:       true,
+		v1.EndpointLive:         true,
+		v1.EndpointWebSocket:    true,
+	}
+	got := make(map[v1.Endpoint]bool, len(DeferredEndpointFamilies))
+	for _, endpoint := range DeferredEndpointFamilies {
+		got[endpoint] = true
+	}
+	if len(got) != len(want) {
+		t.Fatalf("deferred endpoint families = %#v, want %#v", got, want)
+	}
+	for endpoint := range want {
+		if !got[endpoint] {
+			t.Fatalf("deferred endpoint %q is missing", endpoint)
+		}
+	}
+}

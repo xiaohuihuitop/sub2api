@@ -7,6 +7,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/applicationgateway"
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/productcore"
+	sub2api "github.com/Wei-Shaw/sub2api/internal/runtime/sub2api"
 	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -67,6 +68,11 @@ func NewSub2APIProductionApplicationGateway(gatewayHandler *GatewayHandler, open
 			gatewayHandler: gatewayHandler,
 			openaiHandler:  openaiHandler,
 			endpoint:       endpoint,
+			openAIDriver: sub2api.OpenAIExecutor{Port: &sub2APIOpenAIPort{
+				service:       openAIGatewayServiceFromHandler(openaiHandler),
+				legacyGateway: gatewayServiceFromHandler(gatewayHandler),
+				maxSwitches:   openAIHandlerMaxAccountSwitches(openaiHandler),
+			}},
 		}
 	}
 	for _, endpoint := range []gatewayruntime.Endpoint{
@@ -78,6 +84,10 @@ func NewSub2APIProductionApplicationGateway(gatewayHandler *GatewayHandler, open
 			gatewayHandler: gatewayHandler,
 			openAIHandler:  openaiHandler,
 			endpoint:       endpoint,
+			syncDriver: sub2api.OpenAIExecutor{Port: &sub2APISyncPort{
+				service:     openAIGatewayServiceFromHandler(openaiHandler),
+				maxSwitches: openAIHandlerMaxAccountSwitches(openaiHandler),
+			}},
 		}
 	}
 	for _, endpoint := range []gatewayruntime.Endpoint{
@@ -89,6 +99,10 @@ func NewSub2APIProductionApplicationGateway(gatewayHandler *GatewayHandler, open
 			gatewayHandler: gatewayHandler,
 			openAIHandler:  openaiHandler,
 			endpoint:       endpoint,
+			mediaDriver: sub2api.OpenAIExecutor{Port: &sub2APIMediaPort{
+				service:     openAIGatewayServiceFromHandler(openaiHandler),
+				maxSwitches: openAIHandlerMaxAccountSwitches(openaiHandler),
+			}},
 		}
 	}
 	executors[gatewayruntime.EndpointLive] = sub2APIAuxiliaryExecutor{
@@ -118,6 +132,13 @@ func openAIGatewayServiceFromHandler(h *OpenAIGatewayHandler) *service.OpenAIGat
 		return nil
 	}
 	return h.gatewayService
+}
+
+func openAIHandlerMaxAccountSwitches(h *OpenAIGatewayHandler) int {
+	if h == nil {
+		return 0
+	}
+	return h.maxAccountSwitches
 }
 
 func endpointCapabilityForRuntime(endpoint gatewayruntime.Endpoint) string {
