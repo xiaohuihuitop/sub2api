@@ -23,6 +23,7 @@ func (r *LocalRuntime) Dispatch(
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx = WithLocalExchange(ctx, request.Exchange)
 	contractRequest := requestFromRuntime(request)
 	if err := contractRequest.Validate(); err != nil {
 		return gatewayruntime.Result{}, err

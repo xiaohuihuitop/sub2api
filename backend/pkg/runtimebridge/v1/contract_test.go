@@ -18,9 +18,10 @@ func validContractRequest() Request {
 			RequestedModel:       "gpt-test",
 			EndpointCapabilities: []string{"chat_completions"},
 		},
-		Endpoint: EndpointChatCompletions,
-		Payload:  []byte(`{"model":"gpt-test"}`),
-		Headers:  map[string]string{"Content-Type": "application/json"},
+		Endpoint:        EndpointChatCompletions,
+		InboundEndpoint: "/v1/chat/completions",
+		Payload:         []byte(`{"model":"gpt-test"}`),
+		Headers:         map[string]string{"Content-Type": "application/json"},
 	}
 }
 
@@ -54,6 +55,7 @@ func TestRequestClonesMutableFields(t *testing.T) {
 	clone.Headers["Content-Type"] = "text/plain"
 	clone.Headers["X-Test"] = "clone-only"
 	clone.Platform.EndpointCapabilities[0] = "responses"
+	clone.InboundEndpoint = "/v1/responses"
 
 	if string(original.Payload) == string(clone.Payload) {
 		t.Fatal("Clone() shares payload backing array")
@@ -66,6 +68,9 @@ func TestRequestClonesMutableFields(t *testing.T) {
 	}
 	if original.Platform.EndpointCapabilities[0] == clone.Platform.EndpointCapabilities[0] {
 		t.Fatal("Clone() shares endpoint capability storage")
+	}
+	if original.InboundEndpoint == clone.InboundEndpoint {
+		t.Fatal("Clone() changed scalar inbound endpoint unexpectedly")
 	}
 }
 
@@ -104,5 +109,38 @@ func TestRuntimeErrorNeverSerializesCredentialFields(t *testing.T) {
 		if strings.Contains(serialized, forbidden) {
 			t.Fatalf("serialized RuntimeError contains forbidden credential marker %q: %s", forbidden, serialized)
 		}
+	}
+}
+
+func TestUsageFactsRetainPricingAndAttributionFields(t *testing.T) {
+	original := UsageFacts{
+		Adapter:               "openai",
+		UpstreamEndpoint:      "https://upstream.test/v1/responses",
+		ServiceTier:           "priority",
+		ReasoningEffort:       "high",
+		BillingModel:          "gpt-billing",
+		OriginalModel:         "gpt-client",
+		MappedModel:           "gpt-upstream",
+		BillingModelSource:    "platform",
+		ModelMappingChain:     "gpt-client->gpt-upstream",
+		ForceCacheBilling:     true,
+		CyberBlocked:          false,
+		LongContextThreshold:  128000,
+		LongContextMultiplier: 1.2,
+		InboundEndpoint:       "/v1/responses",
+		UserAgent:             "test-client",
+		ClientIP:              "192.0.2.1",
+		SessionID:             "session-1",
+		RequestPayloadHash:    "hash-1",
+	}
+	clone := Event{Kind: EventUsageFinal, Usage: &original}.Clone()
+	if clone.Usage == nil {
+		t.Fatal("Clone() lost usage facts")
+	}
+	if clone.Usage.Adapter != original.Adapter || clone.Usage.UpstreamEndpoint != original.UpstreamEndpoint || clone.Usage.BillingModel != original.BillingModel {
+		t.Fatalf("clone lost pricing fields: %#v", clone.Usage)
+	}
+	if clone.Usage.ModelMappingChain != original.ModelMappingChain || clone.Usage.LongContextMultiplier != original.LongContextMultiplier || clone.Usage.RequestPayloadHash != original.RequestPayloadHash {
+		t.Fatalf("clone lost attribution fields: %#v", clone.Usage)
 	}
 }

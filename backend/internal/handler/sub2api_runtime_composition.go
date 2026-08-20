@@ -7,6 +7,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/applicationgateway"
 	"github.com/Wei-Shaw/sub2api/internal/gatewayruntime"
 	"github.com/Wei-Shaw/sub2api/internal/productcore"
+	"github.com/Wei-Shaw/sub2api/internal/runtimebridge"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -96,12 +97,13 @@ func NewSub2APIProductionApplicationGateway(gatewayHandler *GatewayHandler, open
 		endpoint:       gatewayruntime.EndpointLive,
 	}
 	adapter := NewSub2APIRuntimeAdapter(executors)
+	localRuntime := runtimebridge.NewLocalRuntime(newSub2APILegacyDriver(adapter))
 	usageFactory := service.NewSub2APIProductUsageSinkFactory(
 		gatewayServiceFromHandler(gatewayHandler),
 		openAIGatewayServiceFromHandler(openaiHandler),
 		apiKeys,
 	)
-	return applicationgateway.New(contextDecisionProvider{}, adapter, usageFactory)
+	return applicationgateway.New(contextDecisionProvider{}, localRuntime, usageFactory)
 }
 
 func gatewayServiceFromHandler(h *GatewayHandler) *service.GatewayService {

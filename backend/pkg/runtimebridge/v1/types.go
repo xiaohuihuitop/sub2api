@@ -65,6 +65,7 @@ type Request struct {
 	RequestID       string            `json:"request_id"`
 	Platform        PlatformRoute     `json:"platform"`
 	Endpoint        Endpoint          `json:"endpoint"`
+	InboundEndpoint string            `json:"inbound_endpoint,omitempty"`
 	Stream          bool              `json:"stream"`
 	Payload         []byte            `json:"payload,omitempty"`
 	Headers         map[string]string `json:"headers,omitempty"`
@@ -84,24 +85,43 @@ type Result struct {
 }
 
 type UsageFacts struct {
-	AccountID                int64  `json:"account_id"`
-	PlatformID               int64  `json:"platform_id"`
-	Endpoint                 string `json:"endpoint"`
-	RequestedModel           string `json:"requested_model"`
-	UpstreamModel            string `json:"upstream_model"`
-	InputTokens              int    `json:"input_tokens"`
-	OutputTokens             int    `json:"output_tokens"`
-	CacheCreationTokens      int    `json:"cache_creation_tokens"`
-	CacheReadTokens          int    `json:"cache_read_tokens"`
-	ImageInputTokens         int    `json:"image_input_tokens,omitempty"`
-	ImageOutputTokens        int    `json:"image_output_tokens,omitempty"`
-	ImageCount               int    `json:"image_count,omitempty"`
-	VideoCount               int    `json:"video_count,omitempty"`
-	FirstTokenMilliseconds   int64  `json:"first_token_milliseconds"`
-	DurationMilliseconds     int64  `json:"duration_milliseconds"`
-	TerminalStatus           string `json:"terminal_status"`
-	RequestWasClientStream   bool   `json:"request_was_client_stream"`
-	ResponseWasPartiallySent bool   `json:"response_was_partially_sent"`
+	Adapter                  string  `json:"adapter"`
+	AccountID                int64   `json:"account_id"`
+	PlatformID               int64   `json:"platform_id"`
+	Endpoint                 string  `json:"endpoint"`
+	RequestedModel           string  `json:"requested_model"`
+	UpstreamModel            string  `json:"upstream_model"`
+	UpstreamEndpoint         string  `json:"upstream_endpoint,omitempty"`
+	Model                    string  `json:"model,omitempty"`
+	ServiceTier              string  `json:"service_tier,omitempty"`
+	ReasoningEffort          string  `json:"reasoning_effort,omitempty"`
+	BillingModel             string  `json:"billing_model,omitempty"`
+	OriginalModel            string  `json:"original_model,omitempty"`
+	MappedModel              string  `json:"mapped_model,omitempty"`
+	BillingModelSource       string  `json:"billing_model_source,omitempty"`
+	ModelMappingChain        string  `json:"model_mapping_chain,omitempty"`
+	InputTokens              int     `json:"input_tokens"`
+	OutputTokens             int     `json:"output_tokens"`
+	CacheCreationTokens      int     `json:"cache_creation_tokens"`
+	CacheReadTokens          int     `json:"cache_read_tokens"`
+	ImageInputTokens         int     `json:"image_input_tokens,omitempty"`
+	ImageOutputTokens        int     `json:"image_output_tokens,omitempty"`
+	ImageCount               int     `json:"image_count,omitempty"`
+	VideoCount               int     `json:"video_count,omitempty"`
+	ForceCacheBilling        bool    `json:"force_cache_billing,omitempty"`
+	CyberBlocked             bool    `json:"cyber_blocked,omitempty"`
+	LongContextThreshold     int     `json:"long_context_threshold,omitempty"`
+	LongContextMultiplier    float64 `json:"long_context_multiplier,omitempty"`
+	FirstTokenMilliseconds   int64   `json:"first_token_milliseconds"`
+	DurationMilliseconds     int64   `json:"duration_milliseconds"`
+	TerminalStatus           string  `json:"terminal_status"`
+	RequestWasClientStream   bool    `json:"request_was_client_stream"`
+	ResponseWasPartiallySent bool    `json:"response_was_partially_sent"`
+	InboundEndpoint          string  `json:"inbound_endpoint,omitempty"`
+	UserAgent                string  `json:"user_agent,omitempty"`
+	ClientIP                 string  `json:"client_ip,omitempty"`
+	SessionID                string  `json:"session_id,omitempty"`
+	RequestPayloadHash       string  `json:"request_payload_hash,omitempty"`
 }
 
 type Event struct {
